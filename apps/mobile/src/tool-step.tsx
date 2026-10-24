@@ -48,6 +48,8 @@ const toolIcons: Record<string, LucideIcon> = {
   create_goal: Target,
   watch_page: Bell,
   remember_fact: Brain,
+  recall_memory: Brain,
+  recall: Brain,
   read_calendar: CalendarDays,
 };
 
@@ -172,6 +174,12 @@ function toolTitle(tool: string, args: ToolArguments, result: unknown, t: Transl
     }
     case "agent_status":
       return t("tools.toolStepAgentStatus");
+    case "list_reminders":
+    case "reminders":
+      return t("tools.toolStepReminders");
+    case "recall_memory":
+    case "recall":
+      return t("tools.toolStepRecallMemory");
     case "create_goal": {
       const title = textArgument(args, "title");
       return title ? t("tools.toolStepGoalTitle", { title: clip(title) }) : t("tools.toolStepGoal");
@@ -358,7 +366,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flexShrink: 1,
-    color: colors.text,
+    color: colors.muted,
     fontSize: 13,
     lineHeight: 18,
   },

@@ -33,13 +33,11 @@ const threads = {
   "threads.workspaceSavedNote":
     "Your conversation is saved in this workspace. You can manage connections in Apps.",
   "threads.delegateTask": "Delegate task",
-  "threads.delegateTaskDetail": "A plan, document, or spending summary",
   "threads.agentComputer": "Agent computer",
   "threads.agentComputerDetail": "Browser, sessions and documents",
   "threads.calendar": "Calendar",
   "threads.files": "Files",
   "threads.appsAndSettings": "Apps & settings",
-  "threads.refreshWorkspace": "Refresh workspace",
 } satisfies Dictionary;
 
 export default threads;

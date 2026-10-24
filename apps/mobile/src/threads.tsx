@@ -6,7 +6,6 @@ import {
   MessageCircle,
   Monitor,
   Plus,
-  RefreshCw,
   Settings2,
 } from "lucide-react-native";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
@@ -118,7 +117,7 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
     select,
     start,
   } = useLingWuThread();
-  const { workspace, open, navigate, refresh } = useWorkspace();
+  const { workspace, open, navigate } = useWorkspace();
   const threads = useThreads({ agentId: "default", enabled, includeArchived: true, limit: 20 });
   const [editing, setEditing] = useState<string>();
   const [name, setName] = useState("");
@@ -321,15 +320,6 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
         )}
         <View style={s.divider} />
         <LinkRow
-          icon={Plus}
-          title={t("threads.delegateTask")}
-          detail={t("threads.delegateTaskDetail")}
-          onPress={() => {
-            onClose();
-            open({ type: "delegate" });
-          }}
-        />
-        <LinkRow
           icon={Monitor}
           title={t("threads.agentComputer")}
           detail={t("threads.agentComputerDetail")}
@@ -341,9 +331,6 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
         <LinkRow icon={CalendarDays} title={t("threads.calendar")} onPress={() => go("calendar")} />
         <LinkRow icon={FileText} title={t("threads.files")} onPress={() => go("files")} />
         <LinkRow icon={Settings2} title={t("threads.appsAndSettings")} onPress={() => go("apps")} />
-        <Button small icon={RefreshCw} onPress={() => void mutate(refresh)}>
-          {t("threads.refreshWorkspace")}
-        </Button>
       </View>
     </Sheet>
   );

@@ -125,7 +125,7 @@ export function LanguageSwitcher({
                 right: anchor.right,
                 left: anchor.left,
                 bottom: anchor.bottom,
-                minWidth: 168,
+                minWidth: 144,
                 backgroundColor: colors.card,
                 borderRadius: 20,
                 borderWidth: 1,
@@ -145,7 +145,7 @@ export function LanguageSwitcher({
                   letterSpacing: 1.2,
                   textTransform: "uppercase",
                   color: colors.muted,
-                  paddingHorizontal: 16,
+                  paddingHorizontal: 14,
                   paddingTop: 8,
                   paddingBottom: 6,
                 }}
@@ -166,7 +166,7 @@ export function LanguageSwitcher({
                       flexDirection: "row",
                       alignItems: "center",
                       gap: 10,
-                      paddingHorizontal: 16,
+                      paddingHorizontal: 14,
                       paddingVertical: 11,
                       backgroundColor: pressed ? colors.canvas : "transparent",
                     })}

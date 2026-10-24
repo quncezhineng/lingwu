@@ -238,9 +238,9 @@ export async function createApp(
     guardSignIn(c, email);
     const user = await accounts.verifyOtp(email, body.code);
     await openWorkspace(user.id);
-    const session = await auth.issue(user.id, user.email, device(c));
+    const session = await auth.issue(user.id, user.email ?? email, device(c));
     audit(user.id, "signin_otp", c);
-    return c.json({ ...session, user: { id: user.id, email: user.email } });
+    return c.json({ ...session, user: { id: user.id, email: user.email ?? email } });
   });
   app.get("/api/google/callback", async (c) => {
     if (c.req.query("error"))

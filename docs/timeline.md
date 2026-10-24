@@ -5,6 +5,52 @@
 
 ## 变更记录
 
+### 2026-10-25 · 「委派任务」入口移入「目标」页面
+
+**背景**
+
+用户要求「button 这个功能移到 div 这个边栏，位于灵感和目标之间」，随后又调整方向「还是将这个功能移到 div 目标页面吧」，最终确认：委派任务入口不再放在图标栏/底部标签栏，而是作为「目标」页面内的一个入口行。
+
+**方案**
+
+委派任务在语义上是一个**动作入口**（点击打开委派面板），但它不适合作为顶级页签常驻导航——占用导航空间且与上下文割裂。最终将其作为「目标」页面（GoalsScreen）底部的一个独立入口行，与「创建一个目标」区块同层并列，点击调用 `useWorkspace().open({ type: "delegate" })` 弹出委派面板（Detail 面板类型本就支持该形态，workspace 层无需改动）。
+
+**实现**
+
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：`GoalsScreen` 引入 `useWorkspace().open`；在「创建一个目标」区块之后追加分隔线与一条「委派任务」入口行（`Send` 图标 + `threads.delegateTask` 文案 + `ChevronRight` 尾图标），点击打开委派面板。
+- [shell.tsx](../apps/mobile/src/shell.tsx)：撤销上次的联合类型 `SectionNavItem`（page/action 可辨识联合），恢复为纯页面导航类型 `NavItem = { id: Section; labelKey; icon }`；`SECTION_NAV` 移除委派任务动作项，「灵感」与「目标」恢复相邻；`Rail` 渲染点还原为 `active={section === item.id}`、`onPress={() => navigate(item.id)}`。
+- [App.tsx](../apps/mobile/App.tsx)：底部标签栏移除动作项分流（`item.kind === "action"` 逻辑删除，`onPress` 直调 `navigate(item.id)`、`active` 直判 `section === item.id`），页签数由七个还原为六个（对话/动态/灵感/目标/应用/我的）。
+- i18n：`threads.delegateTask` 键保留，复用为目标页入口文案；无新增键。
+
+**验证**
+
+- biome 检查无告警（自动格式化）；`pnpm typecheck` 通过；全量测试 570/570 通过。
+- 浏览器实测（Chrome DevTools + 本地 dev 服务，桌面视口与 390×844 移动视口）：
+  - 桌面端左侧图标栏已无「委派任务」，顺序为 对话/动态/灵感/目标/应用。
+  - 桌面端「目标」页面底部出现「委派任务」入口，点击弹出委派面板（计划/文档/财务/通用任务）。
+  - 移动端底部标签栏还原为六个页签（对话/动态/灵感/目标/应用/我的）；「目标」页面内「委派任务」入口点击正常弹出委派面板。
+- i18n 校验（中英键等对）通过。
+
+### 2026-10-24 · 移除「更多」面板中的刷新工作区入口
+
+**背景**
+
+用户选中「更多 → 刷新工作区」按钮并要求删除该功能：此前该入口会触发 `useWorkspace().refresh()` 重新拉取工作区数据，实际使用率低，保留只会增加界面噪音。
+
+**方案**
+
+直接删除入口与相关资源，不影响其他工作区数据读取（会话、日历、文件等列表仍按各自逻辑自动加载/刷新）。
+
+**实现**
+
+- [threads.tsx](../apps/mobile/src/threads.tsx)：删除 `ThreadsSheet` 底部的「刷新工作区」按钮；`useWorkspace()` 解构移除 `refresh`；移除 `RefreshCw` 图标导入。
+- [en/threads.ts](../apps/mobile/src/i18n/locales/en/threads.ts) / [zh-Hans/threads.ts](../apps/mobile/src/i18n/locales/zh-Hans/threads.ts)：删除 `threads.refreshWorkspace` 键（中英同步）。
+
+**验证**
+
+- biome 检查无告警（自动格式化）；`pnpm typecheck` 通过；全量测试 555/555 通过。
+- 影响面：仅「更多 → 对话」面板底部一个入口；其余入口（委托任务、智能体电脑、日历、文件、应用与设置）保持不变。
+
 ### 2026-10-23 · 旁聊操作入口由内联重命名改为紧贴按钮的下拉操作列表
 
 **背景**

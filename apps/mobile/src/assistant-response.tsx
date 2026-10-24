@@ -3,7 +3,7 @@ import { Animated, Linking, Platform, ScrollView, Text, type TextStyle, View } f
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import type { Artifact } from "../../../packages/domain/src";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
-import { findReferencedFile } from "./chat-content";
+import { findReferencedFile, markFileMentions } from "./chat-content";
 import { tr } from "./i18n/translate";
 import { colors, ErrorNotice } from "./ui";
 
@@ -98,6 +98,7 @@ export function AssistantResponse({
   onOpenFile?: (file: Artifact) => void;
 }) {
   const [linkError, setLinkError] = useState("");
+  const source = useMemo(() => markFileMentions(content, files), [content, files]);
   const onLinkPress = useCallback(
     (url: string) => {
       const file = findReferencedFile(url, files);
@@ -138,7 +139,14 @@ export function AssistantResponse({
             style={[
               styles.codeInline as TextStyle,
               ...(file && onOpenFile
-                ? [{ color: colors.blueDark, textDecorationLine: "underline" as const }]
+                ? [
+                    {
+                      color: colors.blueDark,
+                      backgroundColor: colors.sky,
+                      textDecorationLine: "underline" as const,
+                      textDecorationStyle: "dotted" as const,
+                    },
+                  ]
                 : []),
             ]}
           >
@@ -161,7 +169,7 @@ export function AssistantResponse({
             rules={rules}
             onLinkPress={onLinkPress}
           >
-            {content}
+            {source}
           </Markdown>
         </View>
         {streaming && <StreamingCursor />}

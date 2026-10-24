@@ -20,3 +20,5 @@ artifacts/
 .playwright-mcp/
 .copilotkit
 .pnpm-store
+.qoder
+.qoder-collab-runtime

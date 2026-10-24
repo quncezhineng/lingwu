@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assistantMarkdown, isSafeAssistantUrl } from "../src/assistant-markdown.ts";
+import { markFileMentions } from "../src/chat-content.ts";
 
 test("assistant Markdown structures the reported response", () => {
   const html = assistantMarkdown.render(
@@ -24,4 +25,12 @@ test("only absolute HTTP(S) links can open", () => {
   for (const url of ["javascript:alert(1)", "file:///tmp/private", "//example.com", "not a URL"]) {
     assert.equal(isSafeAssistantUrl(url), false);
   }
+});
+
+test("bare file names survive Markdown formatting as inline file references", () => {
+  const source = markFileMentions("把 **byd-stock-brief.html** 正文补完。", [
+    { name: "byd-stock-brief.html" },
+  ]);
+  const html = assistantMarkdown.render(source);
+  assert.match(html, /<strong><code>byd-stock-brief\.html<\/code><\/strong>/);
 });

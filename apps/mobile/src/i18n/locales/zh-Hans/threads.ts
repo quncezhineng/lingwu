@@ -31,13 +31,11 @@ const threads = {
   "threads.sideChatFootnote": "侧边对话各自保留独立的上下文，但会共享智能体已保存的记忆。",
   "threads.workspaceSavedNote": "你的对话保存在当前工作区中，可在「应用」里管理各种连接。",
   "threads.delegateTask": "委派任务",
-  "threads.delegateTaskDetail": "计划、文档或支出汇总",
   "threads.agentComputer": "智能体电脑",
   "threads.agentComputerDetail": "浏览器、会话与文档",
   "threads.calendar": "日历",
   "threads.files": "文件",
   "threads.appsAndSettings": "应用与设置",
-  "threads.refreshWorkspace": "刷新工作区",
 } satisfies Dictionary;
 
 export default threads;

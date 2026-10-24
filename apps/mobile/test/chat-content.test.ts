@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { displayUserMessage, findReferencedFile } from "../src/chat-content.ts";
+import { displayUserMessage, findReferencedFile, markFileMentions } from "../src/chat-content.ts";
 
 test("attachment metadata is hidden from the user bubble and returned as chips", () => {
   const content =
@@ -40,4 +40,49 @@ test("inline code and relative links resolve to thread files", () => {
   assert.equal(findReferencedFile("file-2", files)?.id, "file-2");
   assert.equal(findReferencedFile("catl%20report.html", files), undefined);
   assert.equal(findReferencedFile("https://example.com/report.pdf", files), undefined);
+  assert.equal(
+    findReferencedFile("report.html", [
+      { id: "file-3", name: "report.html" },
+      { id: "file-4", name: "report.html" },
+    ]),
+    undefined,
+  );
+});
+
+test("bare file names in prose become tappable inline references", () => {
+  const files = [
+    { name: "byd-stock-brief.html" },
+    { name: "monthly-sales.csv" },
+    { name: "report (final).pdf" },
+  ];
+  assert.equal(
+    markFileMentions("把 **byd-stock-brief.html** 正文补完，并附上 monthly-sales.csv。", files),
+    "把 **`byd-stock-brief.html`** 正文补完，并附上 `monthly-sales.csv`。",
+  );
+  assert.equal(
+    markFileMentions("打开 report (final).pdf 看一下", files),
+    "打开 `report (final).pdf` 看一下",
+  );
+});
+
+test("file mention markup leaves existing code, links and HTML alone", () => {
+  const files = [{ name: "byd-stock-brief.html" }];
+  const source = [
+    "`byd-stock-brief.html`",
+    "[已有链接](byd-stock-brief.html)",
+    "```",
+    "byd-stock-brief.html",
+    "```",
+    '<span title="byd-stock-brief.html">x</span>',
+  ].join("\n");
+  assert.equal(markFileMentions(source, files), source);
+});
+
+test("ambiguous or partial file names are not linked", () => {
+  const files = [{ name: "report.html" }, { name: "report.html" }, { name: "notes.md" }];
+  assert.equal(
+    markFileMentions("report.html and myreport.html", files),
+    "report.html and myreport.html",
+  );
+  assert.equal(markFileMentions("notes.md", files), "`notes.md`");
 });

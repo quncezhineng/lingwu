@@ -95,8 +95,7 @@ export function ConversationHeader({
             alignItems: "center",
             justifyContent: "center",
             borderRadius: 16,
-            backgroundColor:
-              filesOpen || pressed ? colors.sky : "transparent",
+            backgroundColor: filesOpen || pressed ? colors.sky : "transparent",
           })}
         >
           <FileText size={17} color={filesOpen ? colors.blueDark : colors.muted} />

@@ -15,6 +15,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Send,
   Square,
   Target,
   Users,
@@ -949,6 +950,7 @@ function IdeaCard({ idea }: { idea: Idea }) {
 export function GoalsScreen() {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
+  const { open } = useWorkspace();
   const [adding, setAdding] = useState<string>();
   const [selectedGoal, setSelectedGoal] = useState<string>();
   const [selectedMonitor, setSelectedMonitor] = useState<string>();
@@ -1070,6 +1072,18 @@ export function GoalsScreen() {
           <Plus size={18} color="#989C9F" />
         </Pressable>
       ))}
+      <View style={{ height: 1, backgroundColor: colors.line }} />
+      {/* 委派任务：交办一项成果，由灵悟保存计划并持续执行（原来的边栏入口，用户要求移入目标页面）。 */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("threads.delegateTask")}
+        onPress={() => open({ type: "delegate" })}
+        style={[s.row, { gap: 12, minHeight: 38 }]}
+      >
+        <Send size={23} color="#989C9F" />
+        <Text style={[s.text, { flex: 1, color: "#666A6D" }]}>{t("threads.delegateTask")}</Text>
+        <ChevronRight size={18} color="#A3A6A8" />
+      </Pressable>
       {adding && (
         <Sheet
           title={adding === "Tracking" ? t("agent.trackSomething") : t("agent.createGoal")}

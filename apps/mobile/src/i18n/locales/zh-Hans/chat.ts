@@ -55,8 +55,7 @@ const chat = {
   "chat.openArtifacts": "文件产物",
   "chat.closeArtifacts": "关闭文件产物",
   "chat.artifactsEmptyTitle": "还没有文件产物",
-  "chat.artifactsEmptyDetail":
-    "让灵悟在本对话中生成文档、表格或 PDF，产物会显示在这里。",
+  "chat.artifactsEmptyDetail": "让灵悟在本对话中生成文档、表格或 PDF，产物会显示在这里。",
   "chat.artifactRow": "打开产物：{name}",
   "chat.researchArtifacts": "研究产物",
   "chat.filesGroup": "文件",

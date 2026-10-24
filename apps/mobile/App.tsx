@@ -381,7 +381,6 @@ function WorkspaceShell({
   const {
     selection,
     visited,
-    mainId,
     loading: threadsLoading,
     error: threadsError,
     retry: retryThreads,
@@ -601,7 +600,7 @@ function WorkspaceShell({
                     style={{
                       flexDirection: "row",
                       width: "100%",
-                      // 六个页签（含「我的」）比原来多一个，容器放宽以保证点击区域。
+                      // 六个页签（含「我的」），容器放宽以保证点击区域。
                       maxWidth: 430,
                       padding: 5,
                       backgroundColor: "#FFF",

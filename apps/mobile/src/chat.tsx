@@ -48,7 +48,9 @@ import { statusLabel } from "./i18n/translate";
 import { confirmedJevSelection, displayJevUserMessage, latestJevPanelId } from "./jev-actions";
 import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
+import { MemoryRecallCard } from "./memory-recall-card";
 import { QuestionCard, taskHasQuestion } from "./question-card";
+import { ReminderToolCard } from "./reminder-tool-card";
 import { SearchToolCard } from "./search-tool-card";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
 import { type Selection, useLingWuThread } from "./threads";
@@ -188,6 +190,16 @@ export function WorkspaceTools() {
     ),
   });
   useRenderTool({
+    name: "list_reminders",
+    description: "Display scheduled reminders and recent alerts",
+    parameters: displayParameters,
+    render: ({ args, result, status }) => (
+      <ToolStep tool="list_reminders" args={args} result={result} status={status}>
+        <ReminderToolCard result={result} loading={status !== "complete"} />
+      </ToolStep>
+    ),
+  });
+  useRenderTool({
     name: "create_goal",
     description: "Display a saved goal",
     parameters: displayParameters,
@@ -214,6 +226,16 @@ export function WorkspaceTools() {
     render: ({ args, result, status }) => (
       <ToolStep tool="remember_fact" args={args} result={result} status={status}>
         <ServerToolCard name="Memory" result={result} loading={status !== "complete"} />
+      </ToolStep>
+    ),
+  });
+  useRenderTool({
+    name: "recall_memory",
+    description: "Display memories relevant to the conversation",
+    parameters: displayParameters,
+    render: ({ args, result, status }) => (
+      <ToolStep tool="recall_memory" args={args} result={result} status={status}>
+        <MemoryRecallCard result={result} loading={status !== "complete"} />
       </ToolStep>
     ),
   });

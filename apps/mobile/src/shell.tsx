@@ -48,8 +48,11 @@ import { useLingWuThread } from "./threads";
 import { Button, colors, ErrorNotice, Mascot, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
+/** 图标栏中的导航项：都对应一个页面，点击切换到对应 section。 */
+export type NavItem = { id: Section; labelKey: TranslationKey; icon: LucideIcon };
+
 /** 图标栏中间的主页面（底部的「我的」单独列出，见 ACCOUNT_NAV）。 */
-export const SECTION_NAV: { id: Section; labelKey: TranslationKey; icon: LucideIcon }[] = [
+export const SECTION_NAV: NavItem[] = [
   { id: "chat", labelKey: "app.navChat", icon: MessageCircle },
   { id: "activity", labelKey: "app.navActivity", icon: PanelsTopLeft },
   { id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb },
@@ -57,8 +60,8 @@ export const SECTION_NAV: { id: Section; labelKey: TranslationKey; icon: LucideI
   { id: "apps", labelKey: "app.navApps", icon: Shapes },
 ];
 
-/** 图标栏底部的「我的」。 */
-export const ACCOUNT_NAV: { id: Section; labelKey: TranslationKey; icon: LucideIcon } = {
+/** 图标栏底部的「我的」页面项。 */
+export const ACCOUNT_NAV: NavItem = {
   id: "account",
   labelKey: "app.navAccount",
   icon: CircleUserRound,
