@@ -22,7 +22,7 @@ export const modelProviders: ModelProvider[] = [
     id: "deepseek",
     label: "DeepSeek",
     key: "DEEPSEEK_API_KEY",
-    models: ["deepseek-chat", "deepseek-reasoner"],
+    models: ["deepseek-flash", "deepseek-v4-pro"],
   },
   { id: "moonshot", label: "Moonshot", key: "MOONSHOT_API_KEY", models: ["kimi-latest"] },
 ];

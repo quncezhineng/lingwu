@@ -35,7 +35,7 @@ import type {
   RunEvent,
 } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
-import { activeLocaleTag, useTranslation } from "./i18n";
+import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
 import { ActivityScreen, ConnectionsScreen } from "./screens";
 import {
@@ -803,10 +803,147 @@ export function DelegateSheet({ goalId, milestoneId }: { goalId?: string; milest
     </Sheet>
   );
 }
+/*
+ * 目标表单的投研模板：按目标分类（对应 GoalsScreen 传入的内部类目名）提供预设，
+ * 点击后自动填入标题、成功标准与里程碑，用户仍可继续编辑再创建。
+ */
+type GoalTemplate = {
+  titleKey: TranslationKey;
+  descKey: TranslationKey;
+  milestoneKeys: TranslationKey[];
+};
+const GOAL_TEMPLATES: Record<string, GoalTemplate[]> = {
+  Health: [
+    {
+      titleKey: "agent.tplBriefingTitle",
+      descKey: "agent.tplBriefingDesc",
+      milestoneKeys: [
+        "agent.tplBriefingMilestone1",
+        "agent.tplBriefingMilestone2",
+        "agent.tplBriefingMilestone3",
+      ],
+    },
+    {
+      titleKey: "agent.tplRateTitle",
+      descKey: "agent.tplRateDesc",
+      milestoneKeys: [
+        "agent.tplRateMilestone1",
+        "agent.tplRateMilestone2",
+        "agent.tplRateMilestone3",
+      ],
+    },
+  ],
+  Relationships: [
+    {
+      titleKey: "agent.tplStockDeepTitle",
+      descKey: "agent.tplStockDeepDesc",
+      milestoneKeys: [
+        "agent.tplStockDeepMilestone1",
+        "agent.tplStockDeepMilestone2",
+        "agent.tplStockDeepMilestone3",
+      ],
+    },
+    {
+      titleKey: "agent.tplEarningsTitle",
+      descKey: "agent.tplEarningsDesc",
+      milestoneKeys: [
+        "agent.tplEarningsMilestone1",
+        "agent.tplEarningsMilestone2",
+        "agent.tplEarningsMilestone3",
+      ],
+    },
+  ],
+  Finances: [
+    {
+      titleKey: "agent.tplPortfolioTitle",
+      descKey: "agent.tplPortfolioDesc",
+      milestoneKeys: [
+        "agent.tplPortfolioMilestone1",
+        "agent.tplPortfolioMilestone2",
+        "agent.tplPortfolioMilestone3",
+      ],
+    },
+    {
+      titleKey: "agent.tplNotesTitle",
+      descKey: "agent.tplNotesDesc",
+      milestoneKeys: [
+        "agent.tplNotesMilestone1",
+        "agent.tplNotesMilestone2",
+        "agent.tplNotesMilestone3",
+      ],
+    },
+  ],
+  "Something else": [
+    {
+      titleKey: "agent.tplBusinessTitle",
+      descKey: "agent.tplBusinessDesc",
+      milestoneKeys: [
+        "agent.tplBusinessMilestone1",
+        "agent.tplBusinessMilestone2",
+        "agent.tplBusinessMilestone3",
+      ],
+    },
+    {
+      titleKey: "agent.tplIndustryTitle",
+      descKey: "agent.tplIndustryDesc",
+      milestoneKeys: [
+        "agent.tplIndustryMilestone1",
+        "agent.tplIndustryMilestone2",
+        "agent.tplIndustryMilestone3",
+      ],
+    },
+  ],
+};
+
+/*
+ * 灵感页空态预置的投研灵感：每条展示一句动机，点击「开始这个」即委派
+ * 一条通用研究任务并打开任务详情，与云端灵感的启动路径一致。
+ */
+type IdeaSuggestion = {
+  emoji: string;
+  titleKey: TranslationKey;
+  reasonKey: TranslationKey;
+  promptKey: TranslationKey;
+};
+const IDEA_SUGGESTIONS: IdeaSuggestion[] = [
+  {
+    emoji: "📊",
+    titleKey: "agent.tplIdeaStockTitle",
+    reasonKey: "agent.tplIdeaStockReason",
+    promptKey: "agent.tplIdeaStockPrompt",
+  },
+  {
+    emoji: "🌅",
+    titleKey: "agent.tplIdeaBriefingTitle",
+    reasonKey: "agent.tplIdeaBriefingReason",
+    promptKey: "agent.tplIdeaBriefingPrompt",
+  },
+  {
+    emoji: "🧾",
+    titleKey: "agent.tplIdeaEarningsTitle",
+    reasonKey: "agent.tplIdeaEarningsReason",
+    promptKey: "agent.tplIdeaEarningsPrompt",
+  },
+  {
+    emoji: "🏛️",
+    titleKey: "agent.tplIdeaRatesTitle",
+    reasonKey: "agent.tplIdeaRatesReason",
+    promptKey: "agent.tplIdeaRatesPrompt",
+  },
+  {
+    emoji: "⚖️",
+    titleKey: "agent.tplIdeaPeerTitle",
+    reasonKey: "agent.tplIdeaPeerReason",
+    promptKey: "agent.tplIdeaPeerPrompt",
+  },
+] as const;
+
 export function IdeasScreen() {
   const { t } = useTranslation();
-  const { data, mutate } = useAgentWorkspace();
+  const { data, mutate, delegate } = useAgentWorkspace();
+  const { open } = useWorkspace();
   const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   async function refreshIdeas() {
     setBusy(true);
@@ -817,6 +954,24 @@ export function IdeasScreen() {
       setError(errorText(e));
     } finally {
       setBusy(false);
+    }
+  }
+  // 预置灵感：直接委派一条研究任务并打开任务详情，与灵感卡片的「开始这个」行为一致。
+  async function startSuggestion(suggestion: (typeof IDEA_SUGGESTIONS)[number]) {
+    setBusyKey(suggestion.titleKey);
+    setError("");
+    try {
+      const task = await delegate({
+        title: t(suggestion.titleKey),
+        prompt: t(suggestion.promptKey),
+        kind: "agent",
+        input: {},
+      });
+      open({ type: "task", taskId: task.id });
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusyKey(null);
     }
   }
   const ideas = data?.ideas.filter((idea) => idea.status === "new") || [];
@@ -834,11 +989,44 @@ export function IdeasScreen() {
         <IdeaCard key={idea.id} idea={idea} />
       ))}
       {!ideas.length && (
-        <Empty
-          icon={Lightbulb}
-          title={t("agent.ideasEmptyTitle")}
-          detail={t("agent.ideasEmptyDetail")}
-        />
+        <>
+          <Empty
+            icon={Lightbulb}
+            title={t("agent.ideasEmptyTitle")}
+            detail={t("agent.ideasEmptyDetail")}
+          />
+          <View style={{ gap: 0 }}>
+            <Text style={[s.small, { marginBottom: 6 }]}>{t("agent.ideaSuggestions")}</Text>
+            {IDEA_SUGGESTIONS.map((suggestion) => (
+              <View
+                key={suggestion.titleKey}
+                style={{
+                  paddingVertical: 14,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.line,
+                }}
+              >
+                <View style={s.row}>
+                  <Text style={{ fontSize: 22, width: 32, paddingTop: 2 }}>{suggestion.emoji}</Text>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={[s.heading, { fontSize: 15, lineHeight: 21 }]}>
+                      {t(suggestion.titleKey)}
+                    </Text>
+                    <Text style={s.muted}>{t(suggestion.reasonKey)}</Text>
+                  </View>
+                  <Button
+                    small
+                    primary
+                    busy={busyKey === suggestion.titleKey}
+                    onPress={() => void startSuggestion(suggestion)}
+                  >
+                    {t("agent.startThis")}
+                  </Button>
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
       )}
       {(data?.ideas || [])
         .filter((idea) => idea.status === "accepted")
@@ -1139,6 +1327,24 @@ function GoalForm({ onDone, category }: { onDone: () => void; category?: string 
   }
   return (
     <Card>
+      {!!category && !!GOAL_TEMPLATES[category]?.length && (
+        <View style={{ gap: 8 }}>
+          <Text style={s.small}>{t("agent.templateExamples")}</Text>
+          {GOAL_TEMPLATES[category].map((template) => (
+            <Button
+              small
+              key={template.titleKey}
+              onPress={() => {
+                setTitle(t(template.titleKey));
+                setDescription(t(template.descKey));
+                setMilestones(template.milestoneKeys.map((key) => t(key)).join("\n"));
+              }}
+            >
+              {t(template.titleKey)}
+            </Button>
+          ))}
+        </View>
+      )}
       <Field
         label={t("agent.yourGoal")}
         value={title}

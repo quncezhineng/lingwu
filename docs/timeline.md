@@ -5,6 +5,58 @@
 
 ## 变更记录
 
+### 2026-10-25 · 灵感页空态下方预置投研灵感建议
+
+**背景**
+
+用户在灵感页空态选中「给好研究留点空间」提示块（`Empty` 组件），要求在它下方添加一些投研灵感，让空状态不只是两句话，而是可以直接动手的高频投研场景。
+
+**方案**
+
+将空态中原有的「或从投研模板快速开始 + 3 个按钮」升级为**投研灵感建议列表**：每条灵感以「emoji + 标题 + 一句话动机 + 开始这个」的行卡片呈现，视觉与云端刷新出来的灵感卡片一致；点击「开始这个」直接委派一条 `kind: "agent"` 研究任务并打开任务详情，沿用既有 `executeModelTask` 链路，无需新增后端路由。
+
+**实现**
+
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：
+  - `IDEA_TEMPLATES` 升级为 `IDEA_SUGGESTIONS`（5 条，含 `emoji` / `titleKey` / `reasonKey` / `promptKey`）：个股深度研究、每日市场简报、财报核心分析、利率与政策跟踪、同业估值对比。
+  - `startTemplate` 更名为 `startSuggestion`，按条目粒度用 `busyKey` 控制按钮忙碌态（原先整页 `busy`）。
+  - 空态渲染由按钮列表改为分隔线卡片列表（`s.row` 行布局，标题 + 动机 + 右侧「开始这个」primary 小按钮）。
+- i18n：
+  - [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agent.ideaTemplates` 更名为 `agent.ideaSuggestions`；为原有 3 条补充 `Reason` 键；新增利率政策、同业对比 2 组建议的 Title/Reason/Prompt 键（中英对齐）。
+
+**验证**
+
+- biome 检查无告警（自动格式化 2 个文件）；`pnpm typecheck` 通过；全量测试 570/570 通过。
+- 影响面：仅灵感页的空态展示区块，非空态（已有云端灵感或已接受状态）渲染不变。
+
+### 2026-10-25 · 为「灵感」「目标」「对话」预置投研模板
+
+**背景**
+
+用户基于 [PRD-LingWu-个人投研智能体](PRD-LingWu-个人投研智能体.md) 提出，为「灵感」「目标」「对话」三个区块预置投研模板，帮助快速发起基本面研究、市场简报、行业对比等日常工作。经确认采用**直接内置到界面**的形式：灵感页空态提供一键研究模板、目标表单按分类提供模板示例按钮、对话空态建议由 3 个扩充到 6 个。
+
+**方案**
+
+- **灵感空态**：在 `Empty` 组件下方渲染 3 个一键研究模板（个股深度研究 / 每日市场简报 / 财报分析），点击直接委派一个 `kind: "agent"` 的通用研究任务并打开任务详情，复用既有 `executeModelTask` 链路，无需新增后端路由。
+- **目标表单**：按 `GoalsScreen` 传入的四类内部类目（Health / Relationships / Finances / Something else）各预置 2 个模板示例按钮，点击自动填充标题、成功标准与里程碑（多行文本），用户仍可编辑后再创建。
+- **对话空态**：保留原有 3 个建议按钮，新增 3 个投研建议（深度研究股票基本面与估值 / 生成今日市场简报 / 对比同行业公司估值），共 6 个。
+
+**实现**
+
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：
+  - 新增 `GOAL_TEMPLATES`（8 个目标模板，每类 2 个，字段全部使用 i18n key）与 `IDEA_TEMPLATES`（3 个灵感模板）。
+  - `IdeasScreen` 空态新增模板区块，`startTemplate` 通过 `useAgentWorkspace().delegate({ title, prompt, kind: "agent", input: {} })` 一键委派并 `open({ type: "task", taskId })` 打开任务详情。
+  - `GoalForm` 在字段区上方按 `category` 渲染对应模板按钮，点击填充 `title` / `description` / `milestones`。
+- [chat.tsx](../apps/mobile/src/chat.tsx)：空态建议按钮由 3 个扩充到 6 个，新增 `chat.suggestionDeepDive` / `chat.suggestionBriefing` / `chat.suggestionPeerCompare` 三个普通研究建议（纯 `enqueue`，无需特殊导航）。
+- i18n：
+  - [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：新增 `agent.ideaTemplates`、`agent.templateExamples` 及 3 组灵感模板、8 组目标模板的标题/描述/里程碑键（中英对齐）。
+  - [zh-Hans/chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts) / [en/chat.ts](../apps/mobile/src/i18n/locales/en/chat.ts)：新增 `chat.suggestionDeepDive` / `chat.suggestionBriefing` / `chat.suggestionPeerCompare` 三个建议键（中英对齐）。
+
+**验证**
+
+- biome 检查无告警（自动格式化）；`pnpm typecheck` 通过；i18n 键等对校验 15/15 通过；全量测试 570/570 通过。
+- 影响面：仅新增空态/表单内的提示区块与按钮，既有列表、编辑、创建流程不受影响。
+
 ### 2026-10-25 · 「委派任务」入口移入「目标」页面
 
 **背景**

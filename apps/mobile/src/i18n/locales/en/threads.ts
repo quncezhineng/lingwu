@@ -32,7 +32,7 @@ const threads = {
     "Side chats keep their own conversation context. Your agent's saved memory is shared.",
   "threads.workspaceSavedNote":
     "Your conversation is saved in this workspace. You can manage connections in Apps.",
-  "threads.delegateTask": "Delegate task",
+  "threads.delegateTask": "Tasks",
   "threads.agentComputer": "Agent computer",
   "threads.agentComputerDetail": "Browser, sessions and documents",
   "threads.calendar": "Calendar",

@@ -1493,7 +1493,7 @@ function SettingsLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** `deepseek/deepseek-chat` reads better as the model id alone inside the picker. */
+/** `deepseek/deepseek-flash` reads better as the model id alone inside the picker. */
 function shortModel(spec: string) {
   return spec.split("/").slice(1).join("/") || spec;
 }

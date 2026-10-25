@@ -87,40 +87,40 @@ test("only providers with a server key are offered, and the key never leaves the
     {
       provider: "deepseek",
       label: "DeepSeek",
-      models: ["deepseek/deepseek-chat", "deepseek/deepseek-reasoner"],
+      models: ["deepseek/deepseek-flash", "deepseek/deepseek-v4-pro"],
     },
   ]);
   assert.doesNotMatch(JSON.stringify(body), /test-deepseek-key/);
 });
 
 test("switching a model applies immediately and reaches the workspace snapshot", async () => {
-  const response = await request("/api/model", { model: "deepseek/deepseek-reasoner" });
+  const response = await request("/api/model", { model: "deepseek/deepseek-v4-pro" });
   assert.equal(response.status, 200, await response.clone().text());
-  assert.equal((await response.json()).model, "deepseek/deepseek-reasoner");
-  assert.equal(config.model, "deepseek/deepseek-reasoner");
+  assert.equal((await response.json()).model, "deepseek/deepseek-v4-pro");
+  assert.equal(config.model, "deepseek/deepseek-v4-pro");
 
   const snapshot = await (await request("/api/workspace")).json();
-  assert.equal(snapshot.runtime.model, "deepseek/deepseek-reasoner");
+  assert.equal(snapshot.runtime.model, "deepseek/deepseek-v4-pro");
   assert.deepEqual(snapshot.runtime.modelOptions, [
     {
       provider: "deepseek",
       label: "DeepSeek",
-      models: ["deepseek/deepseek-chat", "deepseek/deepseek-reasoner"],
+      models: ["deepseek/deepseek-flash", "deepseek/deepseek-v4-pro"],
     },
   ]);
 });
 
 test("a hand-written MODEL stays selectable next to the curated list", async () => {
-  const custom = { ...baseConfig(), model: "deepseek/deepseek-flash" };
+  const custom = { ...baseConfig(), model: "deepseek/deepseek-r1" };
   const app = await createApp(db, custom);
   try {
     const options = await (
       await app.app.request("/api/models", { headers: await tokenFor(app) })
     ).json();
     assert.deepEqual(options.options[0].models, [
+      "deepseek/deepseek-r1",
       "deepseek/deepseek-flash",
-      "deepseek/deepseek-chat",
-      "deepseek/deepseek-reasoner",
+      "deepseek/deepseek-v4-pro",
     ]);
   } finally {
     await app.agent.stop();
@@ -148,7 +148,7 @@ test("a sample or AG-UI deployment cannot switch models", async () => {
     const response = await app.app.request("/api/model", {
       method: "POST",
       headers: authorization,
-      body: JSON.stringify({ model: "deepseek/deepseek-chat" }),
+      body: JSON.stringify({ model: "deepseek/deepseek-flash" }),
     });
     assert.equal(response.status, 400);
   } finally {
@@ -165,14 +165,14 @@ test("a choice made in the app is restored on the next start", async () => {
     const response = await app.app.request("/api/model", {
       method: "POST",
       headers: await tokenFor(app),
-      body: JSON.stringify({ model: "deepseek/deepseek-reasoner" }),
+      body: JSON.stringify({ model: "deepseek/deepseek-v4-pro" }),
     });
     assert.equal(response.status, 200, await response.clone().text());
     await app.agent.stop();
 
     const restarted = { ...baseConfig(), dataDir: isolated };
     const second = await createApp(store, restarted);
-    assert.equal(restarted.model, "deepseek/deepseek-reasoner");
+    assert.equal(restarted.model, "deepseek/deepseek-v4-pro");
     await second.agent.stop();
   } finally {
     await store.close();
@@ -181,7 +181,7 @@ test("a choice made in the app is restored on the next start", async () => {
 });
 
 test("a saved choice for a provider whose key was removed falls back to MODEL", async () => {
-  await db.put("system", "settings", { id: "model", model: "deepseek/deepseek-reasoner" });
+  await db.put("system", "settings", { id: "model", model: "deepseek/deepseek-v4-pro" });
   const previous = process.env.DEEPSEEK_API_KEY;
   delete process.env.DEEPSEEK_API_KEY;
   try {

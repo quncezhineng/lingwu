@@ -884,6 +884,18 @@ export function ChatScreen({
                   action: () => enqueue(t("chat.suggestionSummarize")),
                 },
                 {
+                  text: t("chat.suggestionDeepDive"),
+                  action: () => enqueue(t("chat.suggestionDeepDive")),
+                },
+                {
+                  text: t("chat.suggestionBriefing"),
+                  action: () => enqueue(t("chat.suggestionBriefing")),
+                },
+                {
+                  text: t("chat.suggestionPeerCompare"),
+                  action: () => enqueue(t("chat.suggestionPeerCompare")),
+                },
+                {
                   text: t("chat.suggestionWatchWebsite"),
                   action: () => {
                     enqueue(t("chat.suggestionWatchWebsite"));

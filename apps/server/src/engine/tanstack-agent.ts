@@ -31,7 +31,7 @@ function adapter(spec: string) {
   const [, provider = "", model = ""] = spec.trim().match(/^([^/:]*)[/:](.*)$/) ?? [];
   if (!provider || !model.trim())
     throw new Error(
-      `Invalid model string "${spec}". Use "openai/gpt-5", "anthropic/claude-sonnet-4.5", "google/gemini-2.5-pro" or "deepseek/deepseek-chat".`,
+      `Invalid model string "${spec}". Use "openai/gpt-5", "anthropic/claude-sonnet-4.5", "google/gemini-2.5-pro" or "deepseek/deepseek-flash".`,
     );
   const id = model.trim();
   switch (provider.toLowerCase()) {

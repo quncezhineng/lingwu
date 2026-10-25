@@ -30,7 +30,7 @@ const threads = {
   "threads.loadMore": "加载更多对话",
   "threads.sideChatFootnote": "侧边对话各自保留独立的上下文，但会共享智能体已保存的记忆。",
   "threads.workspaceSavedNote": "你的对话保存在当前工作区中，可在「应用」里管理各种连接。",
-  "threads.delegateTask": "委派任务",
+  "threads.delegateTask": "任务",
   "threads.agentComputer": "智能体电脑",
   "threads.agentComputerDetail": "浏览器、会话与文档",
   "threads.calendar": "日历",

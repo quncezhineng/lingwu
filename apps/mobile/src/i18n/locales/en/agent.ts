@@ -101,6 +101,32 @@ const agent = {
   "agent.ideasEmptyTitle": "Room for good research",
   "agent.ideasEmptyDetail":
     "Find ideas from the markets, reports and data sources you follow. Each suggestion includes its evidence.",
+  "agent.ideaSuggestions": "Research ideas",
+  "agent.tplIdeaStockTitle": "Deep-dive a stock",
+  "agent.tplIdeaStockReason":
+    "Check fundamentals and valuation before buying to see if the price leaves a margin of safety.",
+  "agent.tplIdeaStockPrompt":
+    "Deep-dive a target company: pull the latest filings, compute key valuation and growth metrics, search recent news, filings and research, compare with peers, and output a structured report.",
+  "agent.tplIdeaBriefingTitle": "Daily market briefing",
+  "agent.tplIdeaBriefingReason":
+    "Take a few minutes each morning to stay on top of overnight markets and today's big events.",
+  "agent.tplIdeaBriefingPrompt":
+    "Generate today's market briefing: cover overnight US, European and Asia-Pacific closes, list key economic data and earnings on the calendar, and update the latest on your holdings and watchlist.",
+  "agent.tplIdeaEarningsTitle": "Earnings core analysis",
+  "agent.tplIdeaEarningsReason":
+    "Read the key numbers and drivers right after an earnings release.",
+  "agent.tplIdeaEarningsPrompt":
+    "Summarize a company's latest earnings: extract key figures such as revenue, profit and cash flow, analyze what drives the YoY and QoQ changes, and list the key risks.",
+  "agent.tplIdeaRatesTitle": "Rates & policy watch",
+  "agent.tplIdeaRatesReason":
+    "Central-bank moves and inflation data shift valuation floors — worth tracking.",
+  "agent.tplIdeaRatesPrompt":
+    "Track rates, inflation and central-bank policy: summarize recent statements and rate moves, compile key inflation and employment data, assess the potential impact on your holdings, and draft an initial read.",
+  "agent.tplIdeaPeerTitle": "Peer valuation comparison",
+  "agent.tplIdeaPeerReason":
+    "A single name is hard to judge — comparing against peers shows what's cheap and what's rich.",
+  "agent.tplIdeaPeerPrompt":
+    "Pick 3-5 comparable peers for a target company, compare revenue growth, margins and valuation multiples, and locate where the target sits in the industry.",
   "agent.started": "Started",
   "agent.viewTask": "View task",
   "agent.viewIdeaLabel": "View idea: {title}",
@@ -130,6 +156,56 @@ const agent = {
   "agent.successLookLike": "What does success look like?",
   "agent.milestonesPerLine": "Milestones (one per line)",
   "agent.createGoalButton": "Create goal",
+  "agent.templateExamples": "Templates (tap to fill)",
+  "agent.tplBriefingTitle": "Daily market briefing",
+  "agent.tplBriefingDesc":
+    "Track overnight global markets and today's key events into a readable briefing for morning decisions.",
+  "agent.tplBriefingMilestone1":
+    "Summarize overnight closes across US, European and Asia-Pacific markets",
+  "agent.tplBriefingMilestone2": "List today's key economic data and earnings calendar",
+  "agent.tplBriefingMilestone3": "Generate and save a weekly market briefing",
+  "agent.tplRateTitle": "Rates & policy watch",
+  "agent.tplRateDesc":
+    "Track rates, inflation and central-bank policy, and assess the potential impact on your holdings.",
+  "agent.tplRateMilestone1": "Summarize recent central-bank decisions and rate moves",
+  "agent.tplRateMilestone2": "Compile key inflation and employment data",
+  "agent.tplRateMilestone3": "Draft an initial read on the policy impact",
+  "agent.tplStockDeepTitle": "Deep-dive a stock",
+  "agent.tplStockDeepDesc":
+    "Run full fundamentals and valuation research on a target stock and produce a structured report.",
+  "agent.tplStockDeepMilestone1":
+    "Pull the latest filings and compute key metrics: PE, PB, ROE, revenue growth",
+  "agent.tplStockDeepMilestone2": "Search recent news, filings and broker research",
+  "agent.tplStockDeepMilestone3": "Compare valuation with peers and draw conclusions",
+  "agent.tplEarningsTitle": "Earnings deep-dive",
+  "agent.tplEarningsDesc":
+    "Interpret the latest earnings report: core figures, changes and potential risks.",
+  "agent.tplEarningsMilestone1": "Extract core figures: revenue, profit, cash flow",
+  "agent.tplEarningsMilestone2": "Analyze YoY/QoQ changes and what drives them",
+  "agent.tplEarningsMilestone3": "List key risks and metrics to keep watching",
+  "agent.tplPortfolioTitle": "Portfolio health check",
+  "agent.tplPortfolioDesc":
+    "Regularly review allocation, concentration and risk exposure, and spot where rebalancing is needed.",
+  "agent.tplPortfolioMilestone1": "Compute asset allocation and sector breakdown",
+  "agent.tplPortfolioMilestone2": "Calculate returns, drawdown and benchmark comparison",
+  "agent.tplPortfolioMilestone3": "Suggest a rebalancing plan",
+  "agent.tplNotesTitle": "Investment notes & review",
+  "agent.tplNotesDesc": "Record buy theses and rationale, and re-test them weekly.",
+  "agent.tplNotesMilestone1": "Log holdings rationale, buy theses and key assumptions",
+  "agent.tplNotesMilestone2": "Re-test theses weekly and log any drift",
+  "agent.tplNotesMilestone3": "Produce a weekly review summary",
+  "agent.tplBusinessTitle": "Break down a company's business model",
+  "agent.tplBusinessDesc":
+    "Study a company's business model, moat and competitive position to judge its long-term value.",
+  "agent.tplBusinessMilestone1": "Map the business model and revenue sources",
+  "agent.tplBusinessMilestone2": "Analyze the moat and competitive landscape",
+  "agent.tplBusinessMilestone3": "Summarize key points and what to track",
+  "agent.tplIndustryTitle": "Research an industry",
+  "agent.tplIndustryDesc":
+    "Study an industry's size, structure and trends to locate opportunities and risks.",
+  "agent.tplIndustryMilestone1": "Describe industry size and growth trend",
+  "agent.tplIndustryMilestone2": "Analyze competitive structure and key players",
+  "agent.tplIndustryMilestone3": "Draft an industry research summary",
   "agent.milestonesProgress": "{done} of {total} milestones",
   "agent.delegate": "Delegate",
   "agent.completeGoal": "Complete goal",
