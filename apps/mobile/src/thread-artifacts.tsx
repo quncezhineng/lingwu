@@ -6,6 +6,7 @@ import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agen
 import { ArtifactCard, TaskCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { BrowserThreadCard } from "./computer";
+import { fileKind } from "./file-kind";
 import { useTranslation } from "./i18n";
 import { QuestionCard, taskHasQuestion } from "./question-card";
 import { Button, Card, colors, ErrorNotice, s } from "./ui";
@@ -14,16 +15,21 @@ import { useWorkspace } from "./workspace";
 export function FileThreadCard({ file }: { file: Artifact }) {
   const { open } = useWorkspace();
   const { t } = useTranslation();
+  const kind = fileKind(file);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t("tools.openPdf", { name: file.name })}
+      accessibilityLabel={t(kind === "html" ? "tools.openHtml" : "tools.openPdf", {
+        name: file.name,
+      })}
       onPress={() => open({ type: "file", file })}
       style={{ width: "100%", maxWidth: 440 }}
     >
-      <Card style={{ padding: 18, backgroundColor: "#F0F1F2", gap: 18 }}>
+      <Card style={{ padding: 18, backgroundColor: colors.surface, gap: 18 }}>
         <View style={{ borderRadius: 12, padding: 22, backgroundColor: "#FFF", gap: 14 }}>
-          <Text style={[s.heading, { fontSize: 18 }]}>{file.name.replace(/\.pdf$/i, "")}</Text>
+          <Text style={[s.heading, { fontSize: 18 }]}>
+            {file.name.replace(/\.(pdf|html?)$/i, "")}
+          </Text>
           {file.fields?.length ? (
             file.fields.slice(0, 4).map((field) => (
               <View
@@ -43,23 +49,25 @@ export function FileThreadCard({ file }: { file: Artifact }) {
             ))
           ) : (
             <Text style={s.muted}>
-              {file.pageCount === 1
-                ? t("tools.fileTapSingle")
-                : t("tools.fileTapPlural", { pageCount: file.pageCount })}
+              {kind === "html"
+                ? t("tools.fileHtmlTap")
+                : file.pageCount === 1
+                  ? t("tools.fileTapSingle")
+                  : t("tools.fileTapPlural", { pageCount: file.pageCount })}
             </Text>
           )}
         </View>
         <View style={[s.row, { gap: 13 }]}>
-          <View style={{ backgroundColor: "#FC2359", padding: 9, borderRadius: 9 }}>
-            <FileText size={23} color="#FFF" />
+          <View style={{ backgroundColor: colors.primary, padding: 9, borderRadius: 9 }}>
+            <FileText size={23} strokeWidth={1.8} color={colors.onPrimary} />
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text numberOfLines={2} style={s.heading}>
               {file.name}
             </Text>
-            <Text style={s.muted}>PDF</Text>
+            <Text style={s.muted}>{kind === "html" ? "HTML" : "PDF"}</Text>
           </View>
-          <ChevronRight size={18} color={colors.muted} />
+          <ChevronRight size={18} strokeWidth={1.8} color={colors.muted} />
         </View>
       </Card>
     </Pressable>

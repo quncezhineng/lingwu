@@ -156,7 +156,7 @@ export function LinuxWorkspace({
     <View style={{ gap: 16 }}>
       <Card style={{ backgroundColor: colors.sky, gap: 12 }}>
         <View style={[s.row, { gap: 12 }]}>
-          <Terminal size={24} color={colors.blueDark} />
+          <Terminal size={24} strokeWidth={1.8} color={colors.blueDark} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={s.heading}>{t("computer.yourLinuxWorkspace")}</Text>
             <Text style={s.muted}>
@@ -215,7 +215,9 @@ export function LinuxWorkspace({
         <>
           <View style={{ display: tab === "Terminal" ? "flex" : "none", gap: 16 }}>
             {editingCommand || command.length > 0 || snapshot.commands.length === 0 ? (
-              <View style={{ borderRadius: 22, backgroundColor: "#F1F3F4", padding: 18, gap: 8 }}>
+              <View
+                style={{ borderRadius: 22, backgroundColor: colors.surface, padding: 18, gap: 8 }}
+              >
                 <Text style={{ color: colors.muted, fontSize: 12, fontFamily: mono }}>
                   {t("computer.terminalLabel")}
                 </Text>
@@ -338,7 +340,7 @@ function CommandReceipt({ run }: { run: ComputerCommand }) {
             {
               color:
                 run.status === "succeeded"
-                  ? "#248258"
+                  ? colors.success
                   : run.status === "running"
                     ? colors.blueDark
                     : colors.danger,
@@ -529,7 +531,7 @@ function ComputerFiles({ running, active }: { running: boolean; active: boolean 
         {editor?.path || path}
       </Text>
       <ErrorNotice error={error} />
-      {!!notice && <Text style={[s.small, { color: "#248258" }]}>{notice}</Text>}
+      {!!notice && <Text style={[s.small, { color: colors.success }]}>{notice}</Text>}
       {!running && <Text style={s.muted}>{t("computer.filesStartHint")}</Text>}
       {editor ? (
         <>

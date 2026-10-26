@@ -40,6 +40,7 @@ import { browserAddress, browserSite } from "./browser-address";
 import { ComputerSheet } from "./computer";
 import DateTimeEditor from "./DateTimeEditor";
 import { localDateTime, zonedInstant } from "./date-time";
+import { fileKind } from "./file-kind";
 import HtmlPreview from "./HtmlPreview";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
@@ -191,7 +192,11 @@ function MailDetail({ mail: m }: { mail: Mail }) {
               <LinkRow
                 key={id}
                 title={file.name}
-                detail={t("details.pdfAttachment", { pages: file.pageCount })}
+                detail={
+                  fileKind(file) === "html"
+                    ? t("screens.filesWebPage")
+                    : t("details.pdfAttachment", { pages: file.pageCount })
+                }
                 icon={FileText}
                 onPress={() => open({ type: "file", file })}
               />
@@ -629,7 +634,7 @@ function ReviewDetail({ initial }: { initial: ActionProposal }) {
     >
       <View style={[s.row, { gap: 13, marginBottom: 21 }]}>
         <View style={[s.iconBox, { backgroundColor: colors.lavender }]}>
-          <ShieldCheck size={22} color={colors.text} />
+          <ShieldCheck size={22} strokeWidth={1.8} color={colors.text} />
         </View>
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={s.heading}>{action.title}</Text>
@@ -780,6 +785,9 @@ function ReviewLine({ label, value }: { label: string; value: string }) {
 function FileDetail({ file: f }: { file: Artifact }) {
   const { t } = useTranslation();
   const { api, refresh, open, close } = useWorkspace();
+  const kind = fileKind(f);
+  const [html, setHtml] = useState<string | undefined>();
+  const [htmlError, setHtmlError] = useState("");
   const [values, setValues] = useState<Record<string, string | boolean>>(() =>
     Object.fromEntries(
       (f.fields || [])
@@ -793,6 +801,23 @@ function FileDetail({ file: f }: { file: Artifact }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const url = api.url(f.url || `/api/files/${f.id}/content`);
+  useEffect(() => {
+    if (kind !== "html") return;
+    let active = true;
+    setHtml(undefined);
+    setHtmlError("");
+    void api
+      .text(`/api/files/${f.id}/content`)
+      .then((text) => {
+        if (active) setHtml(text);
+      })
+      .catch((e) => {
+        if (active) setHtmlError(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, f.id, kind]);
   async function fill() {
     setBusy(true);
     setError("");
@@ -813,17 +838,58 @@ function FileDetail({ file: f }: { file: Artifact }) {
         await Linking.openURL(url);
         return;
       }
-      const target = `${FileSystem.cacheDirectory}${f.id}.pdf`;
+      const extension = kind === "html" ? "html" : "pdf";
+      const target = `${FileSystem.cacheDirectory}${f.id}.${extension}`;
       await FileSystem.downloadAsync(url, target, {
         headers: { Authorization: `Bearer ${api.token}` },
       });
       if (await Sharing.isAvailableAsync())
-        await Sharing.shareAsync(target, { mimeType: "application/pdf", UTI: "com.adobe.pdf" });
+        await Sharing.shareAsync(target, {
+          mimeType: f.mimeType,
+          UTI: kind === "html" ? "public.html" : "com.adobe.pdf",
+        });
       else throw new Error("Sharing is not available on this device.");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
+  if (kind === "html")
+    return (
+      <Sheet
+        title={f.name}
+        subtitle={t("details.htmlSubtitle", {
+          size: Math.max(1, Math.round(f.size / 1024)),
+          source: f.source,
+        })}
+        onClose={close}
+        fullscreen
+      >
+        {htmlError ? (
+          <ErrorNotice error={htmlError} />
+        ) : html === undefined ? (
+          <View style={{ flex: 1, minHeight: 240, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : (
+          <HtmlPreview html={html} title={f.name} interactive />
+        )}
+        <View style={[s.row, { gap: 10, marginVertical: 18, flexWrap: "wrap" }]}>
+          <Button icon={Download} onPress={() => void share()}>
+            {Platform.OS === "web" ? t("details.openDownload") : t("details.saveOrShare")}
+          </Button>
+          <Button
+            icon={Send}
+            onPress={() => open({ type: "email", draft: { attachmentIds: [f.id] } })}
+          >
+            {t("details.attachToEmail")}
+          </Button>
+        </View>
+        <ErrorNotice error={error} />
+        <Text style={[s.small, { marginTop: 15 }]}>
+          {t("details.addedFile", { date: dateLabel(f.createdAt) })}
+        </Text>
+      </Sheet>
+    );
   return (
     <Sheet
       title={f.name}

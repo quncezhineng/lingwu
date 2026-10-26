@@ -49,7 +49,7 @@ export function MailToolCard({
         {active ? (
           <ActivityIndicator size="small" color={colors.blueDark} />
         ) : (
-          <Mail size={16} color={colors.muted} />
+          <Mail size={16} strokeWidth={1.8} color={colors.muted} />
         )}
         <Text style={s.muted}>
           {!active
@@ -68,7 +68,7 @@ export function MailToolCard({
     const count = parsed.data.matches.length;
     return (
       <View style={[s.row, { gap: 9, padding: 12 }]}>
-        <Search size={16} color={colors.muted} />
+        <Search size={16} strokeWidth={1.8} color={colors.muted} />
         <Text style={s.muted}>
           {count
             ? t(
@@ -94,11 +94,17 @@ export function MailToolCard({
   if (!message) return <Text style={s.muted}>{t("tools.noMessagesInThread")}</Text>;
   return (
     <Card
-      style={{ padding: 18, gap: 14, backgroundColor: "#F0EFF2", maxWidth: 440, width: "100%" }}
+      style={{
+        padding: 18,
+        gap: 14,
+        backgroundColor: colors.surface,
+        maxWidth: 440,
+        width: "100%",
+      }}
     >
       <View style={[s.row, { gap: 10 }]}>
-        <View style={[s.iconBox, { backgroundColor: "#EEF2FF" }]}>
-          <Mail size={20} color={colors.blueDark} />
+        <View style={[s.iconBox, { backgroundColor: colors.sky }]}>
+          <Mail size={20} strokeWidth={1.8} color={colors.blueDark} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{message.sender}</Text>

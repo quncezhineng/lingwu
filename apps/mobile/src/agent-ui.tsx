@@ -35,6 +35,7 @@ import type {
   RunEvent,
 } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
+import { fileKind } from "./file-kind";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
 import { ActivityScreen, ConnectionsScreen } from "./screens";
@@ -123,7 +124,7 @@ export function TaskCard({
           padding: compact ? 15 : 20,
           gap: 11,
           borderRadius: 22,
-          backgroundColor: "#F0F1F2",
+          backgroundColor: colors.surface,
         }}
       >
         <View style={[s.row, { gap: 10 }]}>
@@ -133,7 +134,7 @@ export function TaskCard({
               { width: 34, height: 34, backgroundColor: waiting ? colors.orange : colors.sky },
             ]}
           >
-            <ListChecks size={18} color={colors.blueDark} />
+            <ListChecks size={18} strokeWidth={1.8} color={colors.blueDark} />
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={s.heading}>{task.title}</Text>
@@ -144,7 +145,7 @@ export function TaskCard({
                 : ""}
             </Text>
           </View>
-          <ChevronRight size={17} color={colors.muted} />
+          <ChevronRight size={17} strokeWidth={1.8} color={colors.muted} />
         </View>
         {!!task.plan.length && (
           <View style={{ height: 4, backgroundColor: colors.line, borderRadius: 4 }}>
@@ -152,7 +153,7 @@ export function TaskCard({
               style={{
                 height: 4,
                 width: `${Math.round((done / task.plan.length) * 100)}%`,
-                backgroundColor: "#6366F1",
+                backgroundColor: colors.blueDark,
                 borderRadius: 4,
               }}
             />
@@ -605,7 +606,11 @@ export function TaskDetail({ taskId }: { taskId: string }) {
             <LinkRow
               key={file.id}
               title={file.name}
-              detail={t("agent.pagesPdf", { count: file.pageCount })}
+              detail={
+                fileKind(file) === "html"
+                  ? `${t("screens.filesWebPage")} · ${Math.max(1, Math.round(file.size / 1024))} KB`
+                  : t("agent.pagesPdf", { count: file.pageCount })
+              }
               icon={FileText}
               onPress={() => open({ type: "file", file })}
             />
@@ -1158,11 +1163,11 @@ export function GoalsScreen() {
                 height: 16,
                 borderRadius: 8,
                 borderWidth: 5,
-                borderColor: "#D9F1E2",
-                backgroundColor: "#24A46B",
+                borderColor: colors.green,
+                backgroundColor: colors.success,
               }}
             />
-            <Text style={[s.heading, { color: "#189A58" }]}>{t("agent.trackingHeading")}</Text>
+            <Text style={[s.heading, { color: colors.success }]}>{t("agent.trackingHeading")}</Text>
           </View>
           <Button small icon={Plus} onPress={() => setAdding("Tracking")}>
             {t("agent.track")}
@@ -1176,7 +1181,7 @@ export function GoalsScreen() {
             onPress={() => setSelectedMonitor(item.id)}
             style={[s.row, { gap: 12, paddingVertical: 13 }]}
           >
-            <Square size={21} color="#A7AAAC" />
+            <Square size={21} strokeWidth={1.8} color={colors.faint} />
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={s.text}>{item.title}</Text>
               <Text numberOfLines={1} style={s.muted}>
@@ -1185,7 +1190,7 @@ export function GoalsScreen() {
                   : statusLabel(item.status)}
               </Text>
             </View>
-            <ChevronRight size={18} color="#A3A6A8" />
+            <ChevronRight size={18} strokeWidth={1.8} color={colors.faint} />
           </Pressable>
         ))}
         {!monitors.length && (
@@ -1206,8 +1211,8 @@ export function GoalsScreen() {
               height: 16,
               borderRadius: 8,
               borderWidth: 5,
-              borderColor: "#C7D2FE",
-              backgroundColor: "#6366F1",
+              borderColor: colors.lineStrong,
+              backgroundColor: colors.blueDark,
             }}
           />
           <Text style={[s.heading, { color: colors.blueDark }]}>{t("app.titleGoals")}</Text>
@@ -1222,7 +1227,8 @@ export function GoalsScreen() {
           >
             <Square
               size={21}
-              color="#A7AAAC"
+              strokeWidth={1.8}
+              color={colors.faint}
               fill={item.status === "completed" ? colors.green : "transparent"}
             />
             <View style={{ flex: 1, gap: 4 }}>
@@ -1231,7 +1237,7 @@ export function GoalsScreen() {
                 {item.description || statusLabel(item.status)}
               </Text>
             </View>
-            <ChevronRight size={18} color="#A3A6A8" />
+            <ChevronRight size={18} strokeWidth={1.8} color={colors.faint} />
           </Pressable>
         ))}
         {!data?.goals.length && (
@@ -1255,9 +1261,9 @@ export function GoalsScreen() {
           onPress={() => setAdding(item.name)}
           style={[s.row, { gap: 12, minHeight: 38 }]}
         >
-          <item.icon size={23} color="#989C9F" />
-          <Text style={[s.text, { flex: 1, color: "#666A6D" }]}>{t(item.key)}</Text>
-          <Plus size={18} color="#989C9F" />
+          <item.icon size={23} strokeWidth={1.8} color={colors.faint} />
+          <Text style={[s.text, { flex: 1, color: colors.muted }]}>{t(item.key)}</Text>
+          <Plus size={18} strokeWidth={1.8} color={colors.faint} />
         </Pressable>
       ))}
       <View style={{ height: 1, backgroundColor: colors.line }} />
@@ -1268,9 +1274,9 @@ export function GoalsScreen() {
         onPress={() => open({ type: "delegate" })}
         style={[s.row, { gap: 12, minHeight: 38 }]}
       >
-        <Send size={23} color="#989C9F" />
-        <Text style={[s.text, { flex: 1, color: "#666A6D" }]}>{t("threads.delegateTask")}</Text>
-        <ChevronRight size={18} color="#A3A6A8" />
+        <Send size={23} strokeWidth={1.8} color={colors.faint} />
+        <Text style={[s.text, { flex: 1, color: colors.muted }]}>{t("threads.delegateTask")}</Text>
+        <ChevronRight size={18} strokeWidth={1.8} color={colors.faint} />
       </Pressable>
       {adding && (
         <Sheet
@@ -1758,7 +1764,7 @@ export function AppsScreen() {
       />
       <ConnectionsScreen query={query} />
       <Text style={s.heading}>{t("agent.onYourComputer")}</Text>
-      <Card style={{ paddingVertical: 3, backgroundColor: "#F4F5F6" }}>
+      <Card style={{ paddingVertical: 3, backgroundColor: colors.tertiary }}>
         {shortcuts
           .filter((item) =>
             `${item.title} ${item.detail}`.toLowerCase().includes(query.toLowerCase()),
@@ -1915,7 +1921,7 @@ export function AgentPersonalitySheet() {
               flex: 1,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: "rgba(15,23,42,0.35)",
+              backgroundColor: colors.modalShade,
             }}
           >
             <View
@@ -1939,12 +1945,12 @@ export function AgentPersonalitySheet() {
                   width: 26,
                   height: 26,
                   borderRadius: 13,
-                  backgroundColor: "#16A34A",
+                  backgroundColor: colors.success,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Check size={16} color="#FFFFFF" />
+                <Check size={16} strokeWidth={1.8} color={colors.onPrimary} />
               </View>
               <Text style={{ color: colors.text, fontSize: 15, fontWeight: "600" }}>
                 {t("agent.saved")}

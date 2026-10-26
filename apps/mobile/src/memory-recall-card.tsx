@@ -34,7 +34,7 @@ function MemoryRow({ memory }: { memory: RecalledMemory }) {
   return (
     <View style={styles.memory}>
       <View style={styles.icon}>
-        <Brain size={14} color={colors.blueDark} />
+        <Brain size={14} strokeWidth={1.8} color={colors.blueDark} />
       </View>
       <View style={styles.body}>
         <Text selectable style={styles.text}>

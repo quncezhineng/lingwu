@@ -96,11 +96,17 @@ export function BrowserToolCard({
       : "";
   return (
     <Card
-      style={{ padding: 13, backgroundColor: "#EEEEF0", gap: 12, width: "100%", maxWidth: 440 }}
+      style={{
+        padding: 13,
+        backgroundColor: colors.surface,
+        gap: 12,
+        width: "100%",
+        maxWidth: 440,
+      }}
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 10 }]}>
-          <Globe2 size={21} color={colors.blueDark} />
+          <Globe2 size={21} strokeWidth={1.8} color={colors.blueDark} />
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("app.titleBrowser")}</Text>
@@ -117,7 +123,7 @@ export function BrowserToolCard({
         {working ? (
           <ActivityIndicator size="small" color={colors.blueDark} />
         ) : visited ? (
-          <Check size={17} color="#47896C" accessibilityLabel={t("tools.pageRead")} />
+          <Check size={17} strokeWidth={1.8} color={colors.success} accessibilityLabel={t("tools.pageRead")} />
         ) : null}
       </View>
       {preview ? (
@@ -129,7 +135,7 @@ export function BrowserToolCard({
           onError={() => setPreviewFailed(true)}
         />
       ) : (
-        <View style={{ backgroundColor: "#FAFAFB", borderRadius: 12, padding: 21, gap: 12 }}>
+        <View style={{ backgroundColor: colors.tertiary, borderRadius: 12, padding: 21, gap: 12 }}>
           <Text numberOfLines={2} style={[s.text, { fontSize: 14 }]}>
             {visited?.title || siteLabel(url)}
           </Text>
@@ -138,7 +144,7 @@ export function BrowserToolCard({
               {(["90%", "74%", "84%"] as const).map((width) => (
                 <View
                   key={width}
-                  style={{ height: 7, width, borderRadius: 4, backgroundColor: "#E0E7FF" }}
+                  style={{ height: 7, width, borderRadius: 4, backgroundColor: colors.sky }}
                 />
               ))}
             </View>
@@ -163,7 +169,7 @@ export function BrowserToolCard({
           icon={Hand}
           disabled={!browser || running}
           onPress={() => browser && open({ type: "browser", browser })}
-          style={{ backgroundColor: "#F9F9FA", minHeight: 38, paddingVertical: 8 }}
+          style={{ backgroundColor: colors.tertiary, minHeight: 38, paddingVertical: 8 }}
         >
           {t("tools.takeControl")}
         </Button>

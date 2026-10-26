@@ -91,10 +91,11 @@ const screens = {
 
   // Files 文件
   "screens.filesSubtitle": "研报与公告，留一点整理的空间。",
-  "screens.filesImport": "导入 PDF",
+  "screens.filesImport": "导入 PDF 或 HTML",
   "screens.filesDocumentBadge": "文档",
   "screens.filesPage": "页",
   "screens.filesPages": "页",
+  "screens.filesWebPage": "网页",
   "screens.filesEmptyTitle": "你的文档都在这里",
   "screens.filesEmptyDetail": "导入 PDF 或打开邮件附件，即可阅读、填写支持的表单字段并分享副本。",
 

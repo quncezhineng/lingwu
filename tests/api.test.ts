@@ -194,6 +194,37 @@ test("keyed file IDs are UUIDs that work through lookup, content reads and attac
   assert.notEqual(deterministicFileId(owner, "x"), deterministicFileId("other", "x"));
 });
 
+test("HTML files round-trip through Files and the content route with sandbox headers", async () => {
+  const owner = "html-files";
+  const html =
+    "<!doctype html><html><body><h1>Savings tracker</h1><script>document.title = 'Saved';</script></body></html>";
+  const file = await agent.files.import(owner, "savings-tracker.html", Buffer.from(html), "test");
+  assert.equal(file.mimeType, "text/html");
+  assert.equal(file.pageCount, 0);
+  assert.equal(file.name, "savings-tracker.html");
+  assert.equal(Buffer.from(await agent.files.bytes(owner, file.id)).toString(), html);
+
+  const response = await app.request(file.url);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html/);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("content-security-policy"), "sandbox");
+  assert.match(response.headers.get("content-disposition") ?? "", /savings-tracker\.html/);
+  assert.equal(await response.text(), html);
+  await assert.rejects(agent.files.fill(owner, file.id, {}), /Only PDF files can be filled/);
+});
+
+test("file import rejects unsupported formats and invalid HTML text", async () => {
+  await assert.rejects(
+    agent.files.import("file-validation", "notes.txt", Buffer.from("not a document"), "test"),
+    /Choose an HTML or PDF file/,
+  );
+  await assert.rejects(
+    agent.files.import("file-validation", "broken.html", new Uint8Array([0xff, 0xfe]), "test"),
+    /HTML files must be UTF-8 text/,
+  );
+});
+
 test("sample workspace serves a real PDF and filling creates a new version", async () => {
   const response = await app.request("/api/workspace", { headers: headers() });
   assert.equal(response.status, 200);

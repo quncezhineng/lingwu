@@ -18,22 +18,22 @@ const style: Partial<MarkdownStyles> = {
   heading3: { fontSize: 17, lineHeight: 23 },
   link: { color: colors.blueDark, textDecorationLine: "underline" },
   codeInline: {
-    backgroundColor: "#EEF2FF",
-    color: "#3730A3",
+    backgroundColor: colors.sky,
+    color: colors.primary,
     borderRadius: 6,
     paddingHorizontal: 4,
     paddingVertical: 1,
     fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
     fontSize: 13,
   },
-  codeBlock: { backgroundColor: "#F6F7F9", color: colors.text },
+  codeBlock: { backgroundColor: colors.tertiary, color: colors.text },
 };
 
 const codeText: TextStyle = {
   fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
   fontSize: 13,
   lineHeight: 20,
-  color: "#1F2937",
+  color: colors.text,
 };
 
 const renderCodeBlock: RenderRules["fence"] = (node, _children, _parent, _styles) => {
@@ -48,7 +48,7 @@ const renderCodeBlock: RenderRules["fence"] = (node, _children, _parent, _styles
         borderRadius: 12,
         borderWidth: 1,
         borderColor: colors.line,
-        backgroundColor: "#F6F7F9",
+        backgroundColor: colors.tertiary,
       }}
       contentContainerStyle={{ padding: 12 }}
     >

@@ -49,7 +49,7 @@ function SourceLink({ title, url }: { title: string; url: string }) {
       <Text style={[s.small, { color: colors.blueDark, textDecorationLine: "underline" }]}>
         {title}
       </Text>
-      <ExternalLink size={12} color={colors.blueDark} />
+      <ExternalLink size={12} strokeWidth={1.8} color={colors.blueDark} />
     </Pressable>
   );
 }
@@ -97,7 +97,7 @@ function ChoiceButton({
         {pending ? (
           <ActivityIndicator size="small" color={colors.onPrimary} />
         ) : selected ? (
-          <Check size={15} color={colors.onPrimary} />
+          <Check size={15} strokeWidth={1.8} color={colors.onPrimary} />
         ) : null}
         <Text style={[s.buttonText, { color: colors.onPrimary }]}>{caption}</Text>
       </Pressable>
@@ -231,7 +231,7 @@ export function JevToolCard({ result, loading }: { result: unknown; loading: boo
           {panel.options.map((option, index) => (
             <View
               key={option.id}
-              style={{ borderRadius: 16, padding: 14, gap: 9, backgroundColor: "#F6F7F8" }}
+              style={{ borderRadius: 16, padding: 14, gap: 9, backgroundColor: colors.surface }}
             >
               <Text style={[s.text, { fontWeight: "600" }]}>{option.label}</Text>
               {!!option.details.length && (

@@ -106,7 +106,7 @@ function RailItem({
     >
       <Icon
         size={21}
-        strokeWidth={active ? 2.1 : 1.7}
+        strokeWidth={active ? 2 : 1.8}
         color={active ? colors.blueDark : colors.muted}
       />
       <Text
@@ -132,7 +132,7 @@ function RailItem({
             paddingHorizontal: 4,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: "#F43F5E",
+            backgroundColor: colors.danger,
           }}
         >
           <Text style={{ fontSize: 10, fontWeight: "700", color: "#FFFFFF" }}>{badge}</Text>
@@ -160,7 +160,7 @@ export function Rail({ name, pending }: { name: string; pending: number }) {
         alignItems: "center",
         borderRightWidth: 1,
         borderRightColor: colors.line,
-        backgroundColor: "#FBFBFC",
+        backgroundColor: "#FFF",
       }}
     >
       <Pressable
@@ -467,7 +467,7 @@ function ThreadRow({
           })}
         >
           {editing ? (
-            <Check size={15} strokeWidth={2.2} color={colors.blueDark} />
+            <Check size={15} strokeWidth={2} color={colors.blueDark} />
           ) : (
             <MoreHorizontal size={15} strokeWidth={2} color={colors.muted} />
           )}
@@ -610,7 +610,7 @@ export function ChatsColumn() {
         flexShrink: 0,
         borderRightWidth: 1,
         borderRightColor: colors.line,
-        backgroundColor: "#FAFAFB",
+        backgroundColor: colors.canvas,
       }}
     >
       <View style={{ paddingHorizontal: 12, paddingTop: 16, paddingBottom: 8 }}>
@@ -634,7 +634,7 @@ export function ChatsColumn() {
               paddingHorizontal: 10,
               paddingVertical: 6,
               borderRadius: 12,
-              backgroundColor: "#F1F2F3",
+              backgroundColor: colors.tertiary,
             },
           ]}
         >
@@ -705,7 +705,7 @@ export function ChatsColumn() {
                   backgroundColor: pressed ? colors.line : "transparent",
                 })}
               >
-                <Plus size={15} strokeWidth={1.9} color={colors.muted} />
+                <Plus size={15} strokeWidth={1.8} color={colors.muted} />
               </Pressable>
             </View>
 
@@ -765,7 +765,7 @@ export function ChatsColumn() {
             paddingHorizontal: 12,
             paddingVertical: 8,
             borderRadius: 12,
-            backgroundColor: "#F1F2F3",
+            backgroundColor: colors.tertiary,
             fontSize: 13,
             color: colors.text,
           }}
@@ -784,7 +784,7 @@ export function ChatsColumn() {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Plus size={17} strokeWidth={2.2} color={colors.onPrimary} />
+          <Plus size={17} strokeWidth={2} color={colors.onPrimary} />
         </Pressable>
       </View>
       {menuThread && menuAnchor && (

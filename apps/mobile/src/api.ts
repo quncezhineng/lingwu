@@ -25,6 +25,23 @@ export class LingWuApi {
     const payload = await readApiPayload<T>(response);
     return payload;
   }
+  async text(path: string): Promise<string> {
+    const response = await fetch(`${API_URL}${path}`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+    const body = await response.text();
+    if (response.ok) return body;
+    let message = `Could not open this file (${response.status}).`;
+    try {
+      const payload = JSON.parse(body) as { error?: unknown };
+      if (typeof payload.error === "string") message = payload.error;
+    } catch {
+      // A proxy or plain-text failure: keep the status-bearing fallback.
+    }
+    const failure = new Error(message) as Error & { status?: number };
+    failure.status = response.status;
+    throw failure;
+  }
   url(path: string) {
     return path.startsWith("http") ? path : `${API_URL}${path}`;
   }

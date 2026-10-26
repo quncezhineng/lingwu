@@ -62,7 +62,7 @@ export function QuestionCard({ task, agentName }: { task: AgentTask; agentName?:
     <View style={styles.wrap}>
       <View style={styles.card}>
         <View style={styles.header}>
-          <MessageCircleQuestion size={14} color={colors.blueDark} />
+          <MessageCircleQuestion size={14} strokeWidth={1.8} color={colors.blueDark} />
           <Text style={styles.headerText}>{t("tools.questionAsks", { name })}</Text>
         </View>
         <Text selectable style={styles.question}>
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderBottomLeftRadius: 7,
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: colors.lineStrong,
     backgroundColor: colors.card,
   },
   header: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: "#F8F8FA",
+    backgroundColor: colors.tertiary,
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: colors.text,

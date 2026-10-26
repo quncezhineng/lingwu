@@ -52,7 +52,7 @@ function ReminderList({ data, t }: { data: ReminderResult; t: TranslationFn }) {
       {data.reminders.map((reminder) => (
         <View key={reminder.id} style={styles.item}>
           <View style={styles.itemIcon}>
-            <Clock3 size={14} color={colors.blueDark} />
+            <Clock3 size={14} strokeWidth={1.8} color={colors.blueDark} />
           </View>
           <View style={styles.itemBody}>
             <Text style={styles.itemTitle}>{reminder.title}</Text>
@@ -69,7 +69,7 @@ function ReminderList({ data, t }: { data: ReminderResult; t: TranslationFn }) {
           {data.alerts.map((alert) => (
             <View key={alert.id} style={styles.item}>
               <View style={styles.itemIcon}>
-                <Bell size={14} color={colors.blueDark} />
+                <Bell size={14} strokeWidth={1.8} color={colors.blueDark} />
               </View>
               <View style={styles.itemBody}>
                 <Text style={styles.itemTitle}>{alert.title}</Text>

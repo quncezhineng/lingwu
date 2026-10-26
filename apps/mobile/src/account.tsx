@@ -36,7 +36,7 @@ function ProfileRow({
       ]}
     >
       <View style={s.iconBox}>
-        <Icon size={18} color={colors.blueDark} />
+        <Icon size={18} strokeWidth={1.8} color={colors.blueDark} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={s.small}>{label}</Text>

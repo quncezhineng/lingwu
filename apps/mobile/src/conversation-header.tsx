@@ -6,9 +6,9 @@ import { colors } from "./ui";
 export type ConversationHeaderState = "ready" | "working" | "reconnecting" | "error";
 
 const tone: Record<ConversationHeaderState, string> = {
-  ready: "#22C55E",
+  ready: colors.success,
   working: colors.primary,
-  reconnecting: "#F59E0B",
+  reconnecting: colors.orange,
   error: colors.danger,
 };
 
@@ -98,7 +98,7 @@ export function ConversationHeader({
             backgroundColor: filesOpen || pressed ? colors.sky : "transparent",
           })}
         >
-          <FileText size={17} color={filesOpen ? colors.blueDark : colors.muted} />
+          <FileText size={17} strokeWidth={1.8} color={filesOpen ? colors.blueDark : colors.muted} />
         </Pressable>
       )}
     </View>

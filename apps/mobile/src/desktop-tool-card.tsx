@@ -92,11 +92,17 @@ export function DesktopToolCard({
   }
   return (
     <Card
-      style={{ padding: 13, backgroundColor: "#EEEEF0", gap: 12, width: "100%", maxWidth: 640 }}
+      style={{
+        padding: 13,
+        backgroundColor: colors.surface,
+        gap: 12,
+        width: "100%",
+        maxWidth: 640,
+      }}
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 10 }]}>
-          <Monitor size={21} color={colors.blueDark} />
+          <Monitor size={21} strokeWidth={1.8} color={colors.blueDark} />
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("tools.desktopTitle")}</Text>
@@ -112,7 +118,7 @@ export function DesktopToolCard({
       </View>
       <ErrorNotice error={value?.error || error} />
       {latest && snapshot && !running ? (
-        <View style={{ backgroundColor: "#FAFAFB", borderRadius: 12, padding: 16, gap: 10 }}>
+        <View style={{ backgroundColor: colors.tertiary, borderRadius: 12, padding: 16, gap: 10 }}>
           <Text style={s.small}>{t("tools.computerOffline")}</Text>
           <Button small icon={Play} disabled={starting} onPress={() => void start()}>
             {starting ? t("tools.starting") : t("tools.startComputer")}

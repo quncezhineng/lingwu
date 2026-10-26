@@ -15,6 +15,7 @@ import { browserAddress } from "./browser-address";
 import { useComputerDraft } from "./computer-drafts";
 import { computerStatus } from "./computer-status";
 import { LinuxWorkspace } from "./computer-workspace";
+import { fileKind } from "./file-kind";
 import { useTranslation } from "./i18n";
 import { Button, Card, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -40,11 +41,11 @@ export function ComputerEntry() {
           paddingHorizontal: 12,
           paddingVertical: 7,
           borderRadius: 20,
-          backgroundColor: "#F1F3F4",
+          backgroundColor: colors.tertiary,
         },
       ]}
     >
-      <Monitor size={13} color={colors.muted} />
+      <Monitor size={13} strokeWidth={1.8} color={colors.muted} />
       <Text style={{ fontSize: 12, color: colors.muted }}>
         {t("computer.entryStatus", { status })}
       </Text>
@@ -53,7 +54,7 @@ export function ComputerEntry() {
           width: 5,
           height: 5,
           borderRadius: 3,
-          backgroundColor: available ? "#57AD85" : "#ACB0B5",
+          backgroundColor: available ? colors.success : colors.disabled,
         }}
       />
     </Pressable>
@@ -68,11 +69,17 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
   }, [browser.previewUrl, browser.updatedAt]);
   return (
     <Card
-      style={{ padding: 13, backgroundColor: "#EEEEF0", gap: 12, maxWidth: 440, width: "100%" }}
+      style={{
+        padding: 13,
+        backgroundColor: colors.surface,
+        gap: 12,
+        maxWidth: 440,
+        width: "100%",
+      }}
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 9 }]}>
-          <Globe2 size={21} color={colors.blueDark} />
+          <Globe2 size={21} strokeWidth={1.8} color={colors.blueDark} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("app.titleBrowser")}</Text>
@@ -103,7 +110,7 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
             gap: 10,
           }}
         >
-          <Globe2 size={30} color={colors.muted} />
+          <Globe2 size={30} strokeWidth={1.8} color={colors.muted} />
           <Text numberOfLines={2} style={[s.muted, { textAlign: "center" }]}>
             {failed ? t("computer.previewUnavailable") : browser.url}
           </Text>
@@ -189,7 +196,7 @@ export function ComputerSheet() {
           <View
             style={[s.row, { gap: 12, padding: 18, borderRadius: 20, backgroundColor: colors.sky }]}
           >
-            <Monitor size={28} color={colors.blueDark} />
+            <Monitor size={28} strokeWidth={1.8} color={colors.blueDark} />
             <View style={{ flex: 1 }}>
               <Text style={s.heading}>
                 {available ? t("computer.browserConnected") : t("computer.browserOffline")}
@@ -259,7 +266,11 @@ export function ComputerSheet() {
                 key={file.id}
                 icon={FileText}
                 title={file.name}
-                detail={t("computer.pdfPages", { count: file.pageCount })}
+                detail={
+                  fileKind(file) === "html"
+                    ? t("screens.filesWebPage")
+                    : t("computer.pdfPages", { count: file.pageCount })
+                }
                 onPress={() => open({ type: "file", file })}
               />
             ))}

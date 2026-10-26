@@ -213,37 +213,37 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
 <style>
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: #EFF1F5; color: #1C2026;
+    margin: 0; background: #F5F5F5; color: #171717;
     font: 14px/1.6 -apple-system, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
   }
-  .page { max-width: 780px; margin: 24px auto; background: #FFF; border-radius: 16px; padding: 28px 32px; box-shadow: 0 8px 30px rgba(16,24,40,.08); }
-  .chip { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #E0E7FF; color: #3730A3; font-size: 12px; font-weight: 600; }
+  .page { max-width: 780px; margin: 24px auto; background: #FFFFFF; border-radius: 12px; padding: 28px 32px; box-shadow: 0 8px 30px rgba(0,0,0,.08); }
+  .chip { display: inline-block; padding: 3px 10px; border-radius: 8px; background: #E5EAFF; color: #4B3FE3; font-size: 12px; font-weight: 600; }
   h1 { margin: 10px 0 4px; font-size: 22px; line-height: 1.35; }
-  .meta { margin: 0 0 18px; color: #7A8087; font-size: 13px; }
-  .summary { margin: 0 0 22px; padding: 14px 16px; background: #F7F8FA; border-left: 3px solid #6366F1; border-radius: 8px; color: #3A4048; white-space: pre-wrap; }
+  .meta { margin: 0 0 18px; color: #737373; font-size: 13px; }
+  .summary { margin: 0 0 22px; padding: 14px 16px; background: #F5F5F5; border-left: 3px solid #4B3FE3; border-radius: 8px; color: #404040; white-space: pre-wrap; }
   .block { margin-top: 24px; }
-  .block h2 { margin: 0 0 12px; padding-bottom: 6px; font-size: 16px; border-bottom: 1px solid #E5E7EB; }
+  .block h2 { margin: 0 0 12px; padding-bottom: 6px; font-size: 16px; border-bottom: 1px solid #E5E5E5; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .stat { padding: 14px 16px; border-radius: 12px; background: #F4F5F7; }
-  .stat-label { color: #7A8087; font-size: 12px; }
-  .stat-value { margin-top: 4px; font-size: 20px; font-weight: 700; color: #1C2026; }
-  .stat.positive .stat-value { color: #059669; }
+  .stat { padding: 14px 16px; border-radius: 12px; background: #F5F5F5; }
+  .stat-label { color: #737373; font-size: 12px; }
+  .stat-value { margin-top: 4px; font-size: 20px; font-weight: 700; color: #171717; font-variant-numeric: tabular-nums; }
+  .stat.positive .stat-value { color: #15A877; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 8px 10px; border-bottom: 1px solid #E9EBEE; text-align: left; vertical-align: top; }
-  th { background: #F7F8FA; font-weight: 600; color: #555B63; white-space: nowrap; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #E5E5E5; text-align: left; vertical-align: top; }
+  th { background: #F5F5F5; font-weight: 600; color: #404040; white-space: nowrap; }
   dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; }
-  dt { color: #7A8087; font-weight: 600; }
+  dt { color: #737373; font-weight: 600; }
   dd { margin: 0; }
   ul { margin: 0; padding-left: 20px; }
   li + li { margin-top: 6px; }
   .bar-row { display: grid; grid-template-columns: minmax(90px, 22%) 1fr 90px; align-items: center; gap: 12px; margin: 8px 0; }
-  .bar-name { font-size: 13px; color: #3A4048; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bar { height: 8px; border-radius: 6px; background: #E8EAF0; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #4F46E5, #6366F1); }
-  .bar-value { font-size: 13px; font-weight: 600; text-align: right; }
-  .empty { color: #9CA3AF; }
-  .note { color: #9CA3AF; font-size: 12px; }
-  pre { margin: 0; padding: 10px 12px; background: #F3F4F6; border-radius: 8px; overflow: auto; font-size: 12px; }
+  .bar-name { font-size: 13px; color: #404040; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar { height: 8px; border-radius: 6px; background: #E5E5E5; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #4B3FE3, #6A6FFF); }
+  .bar-value { font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .empty { color: #A1A1A1; }
+  .note { color: #A1A1A1; font-size: 12px; }
+  pre { margin: 0; padding: 10px 12px; background: #F5F5F5; border-radius: 8px; overflow: auto; font-size: 12px; }
   /* 产物数据里的 JSON / 代码 / 长文本：深色代码块 + 语法高亮配色 */
   pre.code { margin: 0; padding: 12px 14px; background: #1F2430; color: #D7DAE0; border-radius: 10px; overflow: auto; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   pre.code .tok-key { color: #C792EA; }

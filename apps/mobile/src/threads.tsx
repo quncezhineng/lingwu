@@ -247,7 +247,7 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
                   }}
                   style={[s.row, { gap: 10 }]}
                 >
-                  <MessageCircle size={19} color={colors.text} />
+                  <MessageCircle size={19} strokeWidth={1.8} color={colors.text} />
                   <Text style={[s.text, { flex: 1 }]}>
                     {thread.name || t("threads.untitledConversation")}
                   </Text>

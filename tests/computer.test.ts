@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import { ComputerService, type DockerResult } from "../apps/server/src/computer.ts";
+import { computerTools } from "../apps/server/src/computer-tools.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
+import type { Files } from "../apps/server/src/files.ts";
 import { config, fixture, ok, sandbox } from "./helpers/computer.ts";
 
 let db: Store;
@@ -134,6 +136,53 @@ test("paths cannot escape the workspace and file contents travel on stdin", asyn
   assert.ok(call);
   assert.equal(JSON.parse(call.input ?? "{}").text, text);
   assert.ok(!call.args.some((arg) => arg.includes(text)));
+});
+
+test("export_computer_file imports a UTF-8 page under its workspace basename", async () => {
+  const html = "<!doctype html><html><body><h1>Savings tracker</h1></body></html>";
+  const imports: Parameters<Files["import"]>[] = [];
+  const computer = {
+    provider: "docker",
+    read: async (_owner: string, path: string) => ({ path, text: html }),
+  } as unknown as ComputerService;
+  const files = {
+    import: async (...args: Parameters<Files["import"]>) => {
+      imports.push(args);
+      return { id: "savings-file" };
+    },
+  } as unknown as Files;
+  const tool = computerTools(computer, files, "owner", "scope").find(
+    (candidate) => candidate.name === "export_computer_file",
+  );
+  const execute = tool?.execute as (args: unknown) => Promise<unknown>;
+  assert.deepEqual(await execute({ path: "/workspace/pages/savings-tracker.html" }), {
+    id: "savings-file",
+  });
+  assert.equal(imports.length, 1);
+  assert.equal(imports[0][0], "owner");
+  assert.equal(imports[0][1], "savings-tracker.html");
+  assert.equal(Buffer.from(imports[0][2]).toString(), html);
+  assert.equal(imports[0][3], "Computer: /workspace/pages/savings-tracker.html");
+});
+
+test("export_computer_file rejects non-HTML workspace files", async () => {
+  let reads = 0;
+  const computer = {
+    provider: "docker",
+    read: async () => {
+      reads += 1;
+      return { text: "value\n1" };
+    },
+  } as unknown as ComputerService;
+  const files = { import: async () => ({ id: "unused" }) } as unknown as Files;
+  const tool = computerTools(computer, files, "owner", "scope").find(
+    (candidate) => candidate.name === "export_computer_file",
+  );
+  const execute = tool?.execute as (args: unknown) => Promise<unknown>;
+  assert.deepEqual(await execute({ path: "/workspace/pages/data.csv" }), {
+    error: "export_computer_file only imports .html or .htm files",
+  });
+  assert.equal(reads, 0);
 });
 
 test("Stop interrupts an active command and its final output cannot overwrite the interrupted receipt", async () => {

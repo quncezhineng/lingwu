@@ -38,13 +38,19 @@ export function SearchToolCard({ result, loading }: { result: unknown; loading: 
   const count = sources.length;
   return (
     <Card
-      style={{ padding: 14, gap: 10, backgroundColor: "#EEEEF0", maxWidth: 440, width: "100%" }}
+      style={{
+        padding: 14,
+        gap: 10,
+        backgroundColor: colors.surface,
+        maxWidth: 440,
+        width: "100%",
+      }}
     >
       <View style={[s.row, { gap: 10 }]}>
         {working ? (
           <ActivityIndicator size="small" color={colors.blueDark} />
         ) : (
-          <Search size={18} color={colors.blueDark} />
+          <Search size={18} strokeWidth={1.8} color={colors.blueDark} />
         )}
         <Text style={s.text}>
           {failure

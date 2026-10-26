@@ -42,6 +42,7 @@ import type {
 import { API_URL } from "./api";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
+import { fileKind } from "./file-kind";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel } from "./i18n/translate";
 import {
@@ -86,7 +87,7 @@ export function TodayScreen() {
       <View
         style={[
           {
-            backgroundColor: "#EEF2FF",
+            backgroundColor: colors.tertiary,
             borderRadius: 24,
             padding: 32,
             minHeight: 228,
@@ -97,7 +98,7 @@ export function TodayScreen() {
       >
         <View style={{ flex: 1, gap: 15, zIndex: 1 }}>
           <View style={[s.row, { gap: 7 }]}>
-            <Sparkles size={13} color={colors.blueDark} />
+            <Sparkles size={13} strokeWidth={1.8} color={colors.blueDark} />
             <Text style={[s.label, { color: colors.blueDark }]}>{t("screens.todayEyebrow")}</Text>
           </View>
           <Text
@@ -111,7 +112,7 @@ export function TodayScreen() {
           >
             {t("screens.todayHeroTitle")}
           </Text>
-          <Text style={[s.muted, { maxWidth: 420, color: "#6B7280" }]}>
+          <Text style={[s.muted, { maxWidth: 420, color: colors.faint }]}>
             {events.length
               ? t("screens.todayEventsCount", { count: events.length })
               : t("screens.todayCalendarRoom")}
@@ -135,7 +136,7 @@ export function TodayScreen() {
                 width: 190,
                 height: 190,
                 borderRadius: 100,
-                backgroundColor: "#E0E7FF",
+                backgroundColor: colors.sky,
               }}
             />
             <View
@@ -145,7 +146,7 @@ export function TodayScreen() {
                 height: 145,
                 borderRadius: 80,
                 borderWidth: 1,
-                borderColor: "#C7D2FE",
+                borderColor: colors.lineStrong,
               }}
             />
             <Mascot size={94} />
@@ -164,7 +165,7 @@ export function TodayScreen() {
                 },
               ]}
             >
-              <Check size={14} color="#739174" />
+              <Check size={14} strokeWidth={1.8} color={colors.success} />
               <Text style={s.small}>{t("screens.todayLighterDay")}</Text>
             </View>
             <View
@@ -182,7 +183,7 @@ export function TodayScreen() {
                 },
               ]}
             >
-              <CalendarDays size={17} color={colors.blueDark} />
+              <CalendarDays size={17} strokeWidth={1.8} color={colors.blueDark} />
               <Text style={s.small}>{t("screens.todayEverythingTogether")}</Text>
             </View>
           </View>
@@ -230,7 +231,7 @@ export function TodayScreen() {
                     { width: 31, height: 31, borderRadius: 10, backgroundColor: item.tint },
                   ]}
                 >
-                  <item.icon size={15} color={colors.text} />
+                  <item.icon size={15} strokeWidth={1.8} color={colors.text} />
                 </View>
               </View>
               <Text style={{ fontSize: 29, color: colors.text, letterSpacing: -1, marginTop: -2 }}>
@@ -249,7 +250,7 @@ export function TodayScreen() {
             onPress={() => navigate("calendar")}
           />
           {events.length ? (
-            events.slice(0, 3).map((e, i) => <AgendaRow key={e.id} event={e} index={i} />)
+            events.slice(0, 3).map((e) => <AgendaRow key={e.id} event={e} />)
           ) : (
             <Empty
               icon={CalendarDays}
@@ -270,7 +271,7 @@ export function TodayScreen() {
               },
             ]}
           >
-            <Plus size={15} color={colors.muted} />
+            <Plus size={15} strokeWidth={1.8} color={colors.muted} />
             <Text style={s.small}>{t("screens.todayMakeTime")}</Text>
           </Pressable>
         </Card>
@@ -310,7 +311,12 @@ export function TodayScreen() {
                 </View>
                 {m.unread && (
                   <View
-                    style={{ width: 5, height: 5, borderRadius: 4, backgroundColor: "#6366F1" }}
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: 4,
+                      backgroundColor: colors.blueDark,
+                    }}
                   />
                 )}
               </Pressable>
@@ -325,7 +331,7 @@ export function TodayScreen() {
         </Card>
       </View>
       <View style={{ flexDirection: wide ? "row" : "column", gap: 22 }}>
-        <Card style={{ flex: 1, backgroundColor: "#F0F0E7" }}>
+        <Card style={{ flex: 1, backgroundColor: colors.surface }}>
           <SectionHeading title={t("screens.todayHelpHeading")} />
           <Text style={[s.muted, { marginBottom: 15 }]}>{t("screens.todayHelpSubtitle")}</Text>
           {[
@@ -338,11 +344,11 @@ export function TodayScreen() {
               onPress={() => ask(prompt)}
               style={[
                 s.between,
-                { borderTopWidth: 1, borderTopColor: "#E1E2D9", paddingVertical: 13 },
+                { borderTopWidth: 1, borderTopColor: colors.line, paddingVertical: 13 },
               ]}
             >
               <Text style={[s.text, { fontSize: 12 }]}>{prompt}</Text>
-              <ArrowUpRight size={15} color={colors.muted} />
+              <ArrowUpRight size={15} strokeWidth={1.8} color={colors.muted} />
             </Pressable>
           ))}
         </Card>
@@ -372,7 +378,7 @@ export function TodayScreen() {
                   <View
                     style={[s.iconBox, { width: 32, height: 32, backgroundColor: colors.green }]}
                   >
-                    <Check size={14} color={colors.text} />
+                    <Check size={14} strokeWidth={1.8} color={colors.text} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.text, { fontSize: 12 }]}>{runtimeLabel(a.title)}</Text>
@@ -412,11 +418,9 @@ function Avatar({ name, index = 0 }: { name: string; index?: number }) {
 }
 export function AgendaRow({
   event: e,
-  index = 0,
   neighbors,
 }: {
   event: CalendarEvent;
-  index?: number;
   neighbors?: CalendarEvent[];
 }) {
   const { open } = useWorkspace();
@@ -439,7 +443,7 @@ export function AgendaRow({
           width: 3,
           height: 42,
           borderRadius: 4,
-          backgroundColor: ["#C7D2FE", "#C7D6AB", "#D9CDEA"][index % 3],
+          backgroundColor: colors.lineStrong,
         }}
       />
       <View style={{ flex: 1, gap: 3 }}>
@@ -451,7 +455,7 @@ export function AgendaRow({
               : t("screens.agendaTimeForYou"))}
         </Text>
       </View>
-      <ChevronRight size={14} color={colors.muted} />
+      <ChevronRight size={14} strokeWidth={1.8} color={colors.muted} />
     </Pressable>
   );
 }
@@ -503,7 +507,7 @@ export function MailScreen() {
             },
           ]}
         >
-          <Search size={16} color={colors.muted} />
+          <Search size={16} strokeWidth={1.8} color={colors.muted} />
           <TextInput
             accessibilityLabel={t("screens.mailSearchLabel")}
             placeholder={t("screens.mailSearchPlaceholder")}
@@ -573,7 +577,7 @@ export function MailScreen() {
                 </Text>
                 {!!m.attachments.length && (
                   <View style={[s.row, { gap: 4, marginTop: 2 }]}>
-                    <FileText size={12} color={colors.muted} />
+                    <FileText size={12} strokeWidth={1.8} color={colors.muted} />
                     <Text style={s.small}>
                       {m.attachments.length}{" "}
                       {t(
@@ -587,7 +591,7 @@ export function MailScreen() {
               </View>
               {m.unread && (
                 <View
-                  style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: "#818CF8" }}
+                  style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: colors.blueDark }}
                 />
               )}
             </Pressable>
@@ -780,7 +784,7 @@ export function CalendarScreen() {
                     backgroundColor: [...events, ...w.events].some(
                       (e) => e.calendarId === calendarId && eventDate(e) === key,
                     )
-                      ? "#A5B4FC"
+                      ? colors.blueDark
                       : "transparent",
                   }}
                 />
@@ -816,10 +820,10 @@ export function CalendarScreen() {
             <Text style={s.muted}>{t("screens.calendarChecking")}</Text>
           </View>
         ) : events.length ? (
-          events.map((e, i) => (
+          events.map((e) => (
             <View key={e.id}>
               {all && <Text style={[s.label, { marginTop: 16 }]}>{dateLabel(e.start)}</Text>}
-              <AgendaRow event={e} index={i} neighbors={events} />
+              <AgendaRow event={e} neighbors={events} />
               <Text style={[s.small, { marginLeft: 84, marginBottom: 8 }]}>{e.timeZone}</Text>
             </View>
           ))
@@ -870,7 +874,7 @@ export function BrowserScreen() {
     <View style={{ gap: 22 }}>
       <Card style={{ backgroundColor: colors.sky }}>
         <View style={[s.row, { gap: 12, marginBottom: 15 }]}>
-          <Globe2 size={22} color={colors.blueDark} />
+          <Globe2 size={22} strokeWidth={1.8} color={colors.blueDark} />
           <View>
             <Text style={s.heading}>{t("screens.browserHeading")}</Text>
             <Text style={s.muted}>{t("screens.browserSubtitle")}</Text>
@@ -915,7 +919,7 @@ export function BrowserScreen() {
             >
               <View style={[s.row, { gap: 14 }]}>
                 <View style={s.iconBox}>
-                  <Globe2 size={20} color={colors.blueDark} />
+                  <Globe2 size={20} strokeWidth={1.8} color={colors.blueDark} />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.heading}>{b.title || t("screens.browserSessionFallback")}</Text>
@@ -926,7 +930,7 @@ export function BrowserScreen() {
                 <Chip tint={b.status === "active" ? colors.green : colors.canvas}>
                   {statusLabel(b.status)}
                 </Chip>
-                <ArrowUpRight size={17} color={colors.muted} />
+                <ArrowUpRight size={17} strokeWidth={1.8} color={colors.muted} />
               </View>
               {!!b.previewUrl && (
                 <Image
@@ -963,7 +967,7 @@ export function FilesScreen() {
     setBusy(true);
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: "application/pdf",
+        type: ["application/pdf", "text/html"],
         copyToCacheDirectory: true,
       });
       if (result.canceled) return;
@@ -980,12 +984,13 @@ export function FilesScreen() {
           httpMethod: "POST",
           uploadType: FileSystem.FileSystemUploadType.MULTIPART,
           fieldName: "file",
-          mimeType: "application/pdf",
+          mimeType:
+            file.mimeType || (/\.html?$/i.test(file.name) ? "text/html" : "application/pdf"),
           headers: { Authorization: `Bearer ${api.token}` },
         });
         const payload = JSON.parse(result.body);
         if (result.status < 200 || result.status >= 300)
-          throw new Error(payload.error || "Could not import this PDF.");
+          throw new Error(payload.error || "Could not import this file.");
         artifact = payload;
       }
       await refresh();
@@ -1006,72 +1011,77 @@ export function FilesScreen() {
       </View>
       <ErrorNotice error={error} />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 18 }}>
-        {w.files.map((f) => (
-          <Pressable
-            key={f.id}
-            onPress={() => open({ type: "file", file: f })}
-            style={{ flexGrow: 1, flexBasis: 250, maxWidth: 430 }}
-          >
-            <Card style={{ padding: 0, overflow: "hidden" }}>
-              <View
-                style={{
-                  height: 175,
-                  backgroundColor: "#EDEFEA",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
+        {w.files.map((f) => {
+          const kind = fileKind(f);
+          return (
+            <Pressable
+              key={f.id}
+              onPress={() => open({ type: "file", file: f })}
+              style={{ flexGrow: 1, flexBasis: 250, maxWidth: 430 }}
+            >
+              <Card style={{ padding: 0, overflow: "hidden" }}>
                 <View
                   style={{
-                    width: 93,
-                    height: 121,
-                    borderRadius: 5,
-                    backgroundColor: "#FFF",
-                    padding: 14,
-                    transform: [{ rotate: "-4deg" }],
-                    borderWidth: 1,
-                    borderColor: "#DDE3DD",
+                    height: 175,
+                    backgroundColor: colors.tertiary,
+                    justifyContent: "center",
+                    alignItems: "center",
                   }}
                 >
-                  <View style={[s.row, { gap: 5, marginBottom: 15 }]}>
-                    <FileText size={13} color={colors.blueDark} />
-                    <Text style={{ fontSize: 7, color: colors.blueDark }}>
-                      {t("screens.filesDocumentBadge")}
-                    </Text>
+                  <View
+                    style={{
+                      width: 93,
+                      height: 121,
+                      borderRadius: 5,
+                      backgroundColor: "#FFF",
+                      padding: 14,
+                      transform: [{ rotate: "-4deg" }],
+                      borderWidth: 1,
+                      borderColor: colors.line,
+                    }}
+                  >
+                    <View style={[s.row, { gap: 5, marginBottom: 15 }]}>
+                      <FileText size={13} strokeWidth={1.8} color={colors.blueDark} />
+                      <Text style={{ fontSize: 7, color: colors.blueDark }}>
+                        {t("screens.filesDocumentBadge")}
+                      </Text>
+                    </View>
+                    {[100, 75, 90, 95, 60].map((width, i) => (
+                      <View
+                        key={width}
+                        style={{
+                          height: 3,
+                          backgroundColor: i === 0 ? colors.blueDark : colors.tertiary,
+                          width: `${width}%`,
+                          marginBottom: 7,
+                          borderRadius: 3,
+                        }}
+                      />
+                    ))}
                   </View>
-                  {[100, 75, 90, 95, 60].map((width, i) => (
-                    <View
-                      key={width}
-                      style={{
-                        height: 3,
-                        backgroundColor: i === 0 ? "#A5B4FC" : "#E3E7E3",
-                        width: `${width}%`,
-                        marginBottom: 7,
-                        borderRadius: 3,
-                      }}
-                    />
-                  ))}
+                  <View style={{ position: "absolute", bottom: 12, right: 14 }}>
+                    <Chip>{kind === "html" ? "HTML" : "PDF"}</Chip>
+                  </View>
                 </View>
-                <View style={{ position: "absolute", bottom: 12, right: 14 }}>
-                  <Chip>PDF</Chip>
+                <View style={{ padding: 21, gap: 6 }}>
+                  <Text numberOfLines={1} style={[s.heading, { fontSize: 14 }]}>
+                    {f.name}
+                  </Text>
+                  <Text style={s.small}>
+                    {kind === "html"
+                      ? t("screens.filesWebPage")
+                      : `${f.pageCount} ${t(f.pageCount === 1 ? "screens.filesPage" : "screens.filesPages")}`}{" "}
+                    · {Math.max(1, Math.round(f.size / 1024))} KB
+                  </Text>
+                  <View style={[s.between, { marginTop: 9 }]}>
+                    <Chip>{f.source}</Chip>
+                    <Text style={s.small}>{dateLabel(f.createdAt)}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={{ padding: 21, gap: 6 }}>
-                <Text numberOfLines={1} style={[s.heading, { fontSize: 14 }]}>
-                  {f.name}
-                </Text>
-                <Text style={s.small}>
-                  {f.pageCount} {t(f.pageCount === 1 ? "screens.filesPage" : "screens.filesPages")}{" "}
-                  · {Math.max(1, Math.round(f.size / 1024))} KB
-                </Text>
-                <View style={[s.between, { marginTop: 9 }]}>
-                  <Chip>{f.source}</Chip>
-                  <Text style={s.small}>{dateLabel(f.createdAt)}</Text>
-                </View>
-              </View>
-            </Card>
-          </Pressable>
-        ))}
+              </Card>
+            </Pressable>
+          );
+        })}
       </View>
       {!w.files.length && (
         <Card>
@@ -1123,9 +1133,9 @@ export function ActivityScreen() {
                 ]}
               >
                 {a.status === "awaiting_review" ? (
-                  <ShieldCheck size={18} color={colors.text} />
+                  <ShieldCheck size={18} strokeWidth={1.8} color={colors.text} />
                 ) : (
-                  <CheckCheck size={18} color={colors.text} />
+                  <CheckCheck size={18} strokeWidth={1.8} color={colors.text} />
                 )}
               </View>
               <View style={{ flex: 1, gap: 4 }}>
@@ -1135,7 +1145,7 @@ export function ActivityScreen() {
               <Chip
                 tint={
                   a.status === "failed"
-                    ? "#FBEFED"
+                    ? colors.errorSoft
                     : a.status === "awaiting_review"
                       ? colors.lavender
                       : colors.canvas
@@ -1143,7 +1153,7 @@ export function ActivityScreen() {
               >
                 {statusLabel(a.status)}
               </Chip>
-              <ChevronRight size={16} color={colors.muted} />
+              <ChevronRight size={16} strokeWidth={1.8} color={colors.muted} />
             </Pressable>
           ))}
         </Card>
@@ -1169,7 +1179,7 @@ export function ActivityScreen() {
                 <View
                   style={[s.iconBox, { height: 34, width: 34, backgroundColor: colors.canvas }]}
                 >
-                  <Clock3 size={16} color={colors.muted} />
+                  <Clock3 size={16} strokeWidth={1.8} color={colors.muted} />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.text}>{runtimeLabel(a.title)}</Text>
@@ -1263,7 +1273,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
       id: "model",
       name: t("screens.connectionsModelLabel"),
       icon: Cpu,
-      color: "#4F46E5",
+      color: colors.primary,
       connected: Boolean(w.runtime.model) && modelOptions.length > 0,
       group: "model",
     },
@@ -1307,7 +1317,9 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                   : t("screens.connectionsConnected")
                 : t("screens.connectionsAvailable")}
             </Text>
-            <View style={{ paddingHorizontal: 16, borderRadius: 23, backgroundColor: "#F3F4F5" }}>
+            <View
+              style={{ paddingHorizontal: 16, borderRadius: 23, backgroundColor: colors.surface }}
+            >
               {group.map((row, index) => (
                 <Pressable
                   key={row.id}
@@ -1322,7 +1334,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                       gap: 14,
                       minHeight: 61,
                       borderBottomWidth: index < group.length - 1 ? 1 : 0,
-                      borderBottomColor: "#E5E7E9",
+                      borderBottomColor: colors.line,
                     },
                   ]}
                 >
@@ -1336,7 +1348,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                       justifyContent: "center",
                     }}
                   >
-                    <row.icon size={23} color={row.color} />
+                    <row.icon size={23} strokeWidth={1.8} color={row.color} />
                   </View>
                   <Text style={[s.text, { flex: 1 }]}>{row.name}</Text>
                   {row.connected && row.group === "google" && w.mode === "sample" && (
@@ -1346,7 +1358,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                     <Text style={s.small}>{shortModel(w.runtime.model)}</Text>
                   )}
                   {row.connected ? (
-                    <ChevronRight size={18} color="#A4A7AA" />
+                    <ChevronRight size={18} strokeWidth={1.8} color={colors.faint} />
                   ) : (
                     <Text
                       style={{
@@ -1452,7 +1464,9 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                             style={[s.row, { gap: 4, opacity: busy ? 0.5 : 1 }]}
                           >
                             <Chip tint={current ? colors.sky : undefined}>{shortModel(spec)}</Chip>
-                            {current && <Check size={13} color={colors.blueDark} />}
+                            {current && (
+                              <Check size={13} strokeWidth={1.8} color={colors.blueDark} />
+                            )}
                           </Pressable>
                         );
                       })}

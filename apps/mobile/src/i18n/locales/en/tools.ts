@@ -189,6 +189,8 @@ const tools = {
   "tools.openPdf": "Open PDF: {name}",
   "tools.fileTapSingle": "1 page · Tap to read the document",
   "tools.fileTapPlural": "{pageCount} pages · Tap to read the document",
+  "tools.fileHtmlTap": "Web page · Tap to open",
+  "tools.openHtml": "Open {name}",
   "tools.reloadTaskResults": "Reload task results",
   // 浏览器地址校验
   "tools.enterWebsiteAddress":

@@ -85,6 +85,7 @@ const details = {
 
   // 文件详情。
   "details.fileSubtitle": "{pages} 页 · {size} KB · {source}",
+  "details.htmlSubtitle": "网页 · {size} KB · {source}",
   "details.openDownload": "打开 / 下载",
   "details.saveOrShare": "保存或分享",
   "details.attachToEmail": "附加到邮件",

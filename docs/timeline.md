@@ -5,6 +5,81 @@
 
 ## 变更记录
 
+### 2026-10-26 · 对话里的 HTML 文件可全屏打开
+
+**背景**
+
+LingTai 的 `FileViewer` 会把生成的 HTML 页面以 `srcDoc` 放进全屏 iframe，允许页面脚本运行但不授予同源权限。LingWu 此前只支持 PDF，点击对话里的 `.html` 文件名仍会进入 PDF 阅读器。REA 对 LingTai 约 506 KB 的生产 bundle 分析在 300 秒后超时，因此本次以 `web/src/components/FileViewer.tsx` 与相关源码作为逆向证据。
+
+**实现**
+
+- 服务端 [files.ts](../apps/server/src/files.ts)：支持 `.html` / `.htm` 与 PDF，HTML 必须是 UTF-8，按 `id.html` 存储并记录 `text/html`、`pageCount: 0`；HTML 不允许走 PDF 表单填充。
+- 服务端 [app.ts](../apps/server/src/app.ts)：文件内容按真实 MIME 返回；HTML 额外发送 `X-Content-Type-Options: nosniff` 与 `Content-Security-Policy: sandbox`。
+- 服务端 [computer-tools.ts](../apps/server/src/computer-tools.ts)：新增 `export_computer_file`，只把电脑工作区里的 `.html` / `.htm` 自包含页面导入 Files；对话与委托任务提示词要求页面使用内联 CSS/JavaScript、无外部资源，并在回复里写出准确文件名。
+- 移动端新增 [file-kind.ts](../apps/mobile/src/file-kind.ts)，统一按 MIME/扩展名识别 HTML、PDF；对话文件卡、任务详情、Files、电脑文件与邮件附件都显示正确类型。
+- 移动端 [details.tsx](../apps/mobile/src/details.tsx)：HTML 文件使用登录态读取文本，在 `fullscreen` Sheet 中由 `HtmlPreview` 渲染，并提供原文件打开/下载、分享与附加邮件操作。
+- [HtmlPreview.web.tsx](../apps/mobile/src/HtmlPreview.web.tsx) 对文件页启用 `allow-scripts allow-popups allow-forms allow-modals`，但不加 `allow-same-origin`；原生 WebView 同步开启 JavaScript 与 DOM storage。研究产物仍使用无脚本的只读沙箱。
+- Files 导入选择器与上传 MIME 同时接受 PDF 和 HTML。
+
+**验证**
+
+- `biome check`、根目录与 `apps/mobile` 的 `tsc --noEmit` 通过。
+- 全量测试 577/577 通过；新增 HTML 存储/响应头/填充拒绝、`export_computer_file`（含非 HTML 拒绝）与前端文件类型测试。
+
+### 2026-10-26 · 图标体系一致性统一
+
+**背景**
+
+在视觉大改版（对齐 TraeWork Light）之后，用户要求对前端全部 icon 进行重构。本轮设计库「TraeWork copy」在 Design Canvas 中暂时不可用，经用户确认采用「先做一致性统一」方式执行：不依赖设计库文件，仅基于会话中已确认的令牌与项目现状做收敛。
+
+**规范（两档线宽语义）**
+
+- 常规界面图标：`strokeWidth={1.8}`（细线基准，涵盖缺失补全与 1.7/1.9 归一）。
+- 强调/主 CTA/激活态图标：`strokeWidth={2}`（2.1/2.2 归一至此）。
+- 填充方钮（播放/停止）：保留 `strokeWidth={0}`。
+- 残留的 3 处硬编码白色图标（`#FFF`/`#FFFFFF`）对齐为 `colors.onPrimary`：`thread-artifacts.tsx` 文件图标、`ui.tsx` 勾选框、`agent-ui.tsx` 保存成功对勾。
+
+**实现**
+
+- 批量处理 `apps/mobile/src/*.tsx` 及 `App.tsx` 共 25 个文件：新增/规格化 `strokeWidth={1.8}` 92 处，离群值规格化 7 处（含 `shell.tsx` 导航激活态条件式 `active ? 2.1 : 1.7 → active ? 2 : 1.8`），全项目仅剩 1.8/2/0 三档合法值。
+- 边界处理：跳过 `Mascot`（自定义组件）、`ActivityIndicator`（RN 组件）、`PdfReader`/`desktop-stream`（渲染时无 `size` 属性）。
+
+**验证**
+
+- biome 检查 257 文件无告警（format 修复 3 个超长图标标签换行）；`pnpm typecheck` 通过；全量测试 570/570 通过。
+- 影响面：仅图标线宽与 3 处图标颜色，无布局/逻辑变化。
+
+### 2026-10-26 · 视觉体系对齐 TraeWork Light 设计系统
+
+**背景**
+
+用户通过 trae-design 插件选定「TraeWork copy」设计库，要求将 LingWu 前端视觉体系从自定义靛蓝紫主题（`#4F46E5` 系）迁移对齐到 TraeWork Light 模式设计语言。经确认执行两项决策：①彩色分类卡片统一为中性面（TraeWork「Quiet by default」）；②品牌主色同步替换 Logo/启动资源。
+
+**令牌映射（[ui.tsx](../apps/mobile/src/ui.tsx)）**
+
+- 页面背景 `#FFFFFF`（`--bg-base-default`）、卡片灰面 `#F5F5F5`（`--bg-base-secondary`，层级与旧主题相反）、次级灰面 `#E5E5E5`。
+- 文字阶梯 `#171717`/`#404040`/`#737373`/`#A1A1A1`（`--text-*`）；边框/分割线中性 alpha `rgba(115,115,115,0.12/0.18)`（`--border-neutral-l1/l2`）。
+- 交互态走中性 overlay 阶梯 `0.08/0.12/0.16`（悬停 l1 → 选中 l2 → 按下 l3），不再用品牌色填充。
+- 品牌主色 `#4B3FE3`（`--bg-brand`，稀缺使用）、亮阶 `#6A6FFF`、brand-100 浅底 `#E5EAFF`（选中态/图标块/状态 Chip 等小面积）。
+- 状态色 `#15A877`/`#E27900`/`#E8463A` 及配套 surface 浅底（`rgba(…,0.12)`）；新增 `modalShade` 遮罩令牌。
+- 数据/度量数字启用 `tabular-nums`（`s.metric`），对齐数值展示规范。
+
+**页面色值替换（消除约 120 处硬编码十六进制色）**
+
+- [App.tsx](../apps/mobile/App.tsx)、[chat.tsx](../apps/mobile/src/chat.tsx)、[shell.tsx](../apps/mobile/src/shell.tsx)、[screens.tsx](../apps/mobile/src/screens.tsx)、[agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)、[tool-step.tsx](../apps/mobile/src/tool-step.tsx)、[approval-card.tsx](../apps/mobile/src/approval-card.tsx)、[assistant-response.tsx](../apps/mobile/src/assistant-response.tsx)。
+- 工具卡系列（`browser/desktop/mail/search/jev-tool-card`、`computer`、`computer-workspace`、`thread-artifacts`、`question-card`、`conversation-header`、`LanguageSwitcher`）：卡片底统一 `colors.surface`，内嵌块 `colors.tertiary`，状态色对齐 TraeWork。
+- 治理说明：统一后移除 `AgendaRow` 失效的 `index` 参数及调用的 `index={i}`（其 `#C7D2FE/#C7D6AB/#D9CDEA` 轮换色条已收敛为中性线）；保留第三方品牌色（Gmail/Google/Skype/Yahoo）。
+- [artifact-html.ts](../apps/mobile/src/artifact-html.ts)（Web 产物模板）：背景/文字/表格/条纹/统计数字全部对齐 Light 规范；`.bar-fill` 渐变与 `.chip`/`.summary` 品牌色同步为 `#4B3FE3` 系；`.stat-value`/`.bar-value` 增加 `tabular-nums`；深色代码块配色保留。
+
+**品牌资源**
+
+- [logo.svg](../apps/mobile/assets/logo.svg)、[favicon.svg](../apps/mobile/public/favicon.svg)、[app.json](../apps/mobile/app.json) 的 `web.themeColor`：`#4F46E5` → `#4B3FE3`。
+
+**验证**
+
+- biome 检查 257 文件无告警（格式化 9 个文件）；`pnpm typecheck` 通过；全量测试 570/570 通过；Web 端 Metro 服务正常渲染。
+- 注意事项：`assets/logo.png` 为位图无法直接改色，需用新品牌色 `#4B3FE3` 重新导出。
+
 ### 2026-10-25 · 灵感页空态下方预置投研灵感建议
 
 **背景**

@@ -18,26 +18,42 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
+/**
+ * TraeWork Light 设计令牌映射（LingWu 重构图腾）：
+ * - 页面白底（--bg-base-default），卡片灰面（--bg-base-secondary），层级与原主题相反。
+ * - 品牌主色 #4B3FE3（--bg-brand），稀缺使用；选中/按下态走中性 overlay 阶梯。
+ * - 边框/分割线用中性 alpha（--border-neutral-l1/l2），聚焦用对比色。
+ * - 状态色对应 TraeWork --status-* 语义，含配套 surface 浅底。
+ */
 export const colors = {
-  canvas: "#FCFCFC",
-  card: "#FFFFFF",
-  text: "#11191C",
-  muted: "#697176",
-  line: "#EEEEF0",
-  // Theme palette. `primary` is the brand purple (#4F46E5), `primaryLight` the
-  // secondary one (#6366F1). The legacy `blue`/`blueDark` keys now map onto the
-  // purple palette: `blue` is the solid fill (needs `onPrimary` foreground),
-  // `blueDark` the accent used for icons, links and emphasis text.
-  primary: "#4F46E5",
-  primaryLight: "#6366F1",
+  canvas: "#FFFFFF", // --bg-base-default 页面背景
+  surface: "#F5F5F5", // --bg-base-secondary 卡片/灰面
+  card: "#F5F5F5", // 兼容别名：卡片灰面
+  tertiary: "#E5E5E5", // --bg-base-tertiary 次级灰面（次要按钮）
+  text: "#171717", // --text-default 主文字
+  muted: "#404040", // --text-secondary 次级文字
+  faint: "#737373", // --text-tertiary 三级文字/占位符
+  disabled: "#A1A1A1", // --text-disabled
+  line: "rgba(115,115,115,0.12)", // --border-neutral-l1
+  lineStrong: "rgba(115,115,115,0.18)", // --border-neutral-l2
+  overlay1: "rgba(115,115,115,0.08)", // --bg-overlay-l1
+  overlay2: "rgba(115,115,115,0.12)", // --bg-overlay-l2（悬停/选中）
+  overlay3: "rgba(115,115,115,0.16)", // --bg-overlay-l3（按下）
+  // 品牌（--bg-brand 系）。`primary`/`blue` 为实心填充（配 onPrimary 前景），
+  // `primaryLight`/`blueDark` 为图标、链接与强调文字色。
+  primary: "#4B3FE3",
+  primaryLight: "#6A6FFF",
   onPrimary: "#FFFFFF",
-  blue: "#4F46E5",
-  blueDark: "#6366F1",
-  sky: "#EEF2FF",
-  green: "#E3F3E8",
-  lavender: "#E0E7FF",
-  orange: "#FDF0DF",
-  danger: "#AA4A45",
+  blue: "#4B3FE3",
+  blueDark: "#6A6FFF",
+  sky: "#E5EAFF", // brand-100 浅品牌底（状态 Chip 等小面积使用）
+  lavender: "#E5EAFF", // 兼容别名 → brand-100
+  green: "rgba(64,176,139,0.12)", // status-success-surface-l1
+  success: "#15A877", // status-success-default
+  orange: "rgba(226,121,0,0.12)", // status-warning-surface-l1
+  danger: "#E8463A", // status-error-default
+  errorSoft: "rgba(232,70,58,0.12)", // status-error-surface-l1
+  modalShade: "rgba(23,23,23,0.4)", // 模态遮罩（弹窗/菜单背景）
 };
 export const s = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center" },
@@ -56,7 +72,7 @@ export const s = StyleSheet.create({
   heading: { color: colors.text, fontSize: 16, fontWeight: "600", letterSpacing: -0.25 },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 23,
+    borderRadius: 12,
     borderWidth: 0,
     borderColor: colors.line,
     padding: 20,
@@ -65,7 +81,7 @@ export const s = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 19,
+    borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     color: colors.text,
@@ -82,38 +98,46 @@ export const s = StyleSheet.create({
     paddingHorizontal: 17,
     minHeight: 42,
     paddingVertical: 10,
-    borderRadius: 24,
+    borderRadius: 8,
   },
   primary: { backgroundColor: colors.blue },
-  secondary: { backgroundColor: "#F1F2F3" },
+  secondary: { backgroundColor: colors.tertiary },
   buttonText: { fontSize: 14, fontWeight: "600" },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
+    borderRadius: 8,
     alignSelf: "flex-start",
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
   chipText: { fontSize: 10, fontWeight: "600", color: colors.muted },
   iconBox: {
     width: 42,
     height: 42,
-    borderRadius: 13,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.sky,
+    backgroundColor: colors.surface,
   },
-  error: { padding: 16, borderRadius: 14, backgroundColor: "#FBEFED", marginVertical: 10, gap: 4 },
+  error: {
+    padding: 16,
+    borderRadius: 8,
+    backgroundColor: colors.errorSoft,
+    marginVertical: 10,
+    gap: 4,
+  },
   modalShade: {
     flex: 1,
-    backgroundColor: "rgba(35,48,44,0.25)",
+    backgroundColor: "rgba(23,23,23,0.4)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
   sheet: {
     backgroundColor: colors.canvas,
-    borderRadius: 26,
+    borderRadius: 12,
     width: "100%",
     maxWidth: 790,
     maxHeight: "94%",
@@ -121,6 +145,8 @@ export const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
+  /** 数据/度量数字：等宽字体 + tabular 数字，对齐 TraeWork 数值展示规范。 */
+  metric: { fontVariant: ["tabular-nums"] as const },
 });
 export function Button({
   children,
@@ -167,7 +193,7 @@ export function Button({
       {busy && !quietBusy ? (
         <ActivityIndicator color={color} size="small" />
       ) : Icon ? (
-        <Icon size={15} color={color} />
+        <Icon size={15} strokeWidth={1.8} color={color} />
       ) : null}
       <Text style={[s.buttonText, { color }]}>{children}</Text>
     </Pressable>
@@ -193,8 +219,8 @@ export function IconButton({
           height: 44,
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: 22,
-          backgroundColor: pressed ? colors.line : "#FFFFFF",
+          borderRadius: 8,
+          backgroundColor: pressed ? colors.overlay2 : "#FFFFFF",
         },
       ]}
     >
@@ -217,7 +243,7 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
     <View style={s.field}>
       <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>{label}</Text>
       <TextInput
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={colors.faint}
         accessibilityLabel={label}
         {...props}
         style={[
@@ -242,8 +268,8 @@ export function Empty({
 }) {
   return (
     <View style={{ alignItems: "center", padding: 40, gap: 13 }}>
-      <View style={[s.iconBox, { width: 55, height: 55, borderRadius: 18 }]}>
-        <Icon size={24} color={colors.blueDark} />
+      <View style={[s.iconBox, { width: 55, height: 55, borderRadius: 12 }]}>
+        <Icon size={24} strokeWidth={1.8} color={colors.blueDark} />
       </View>
       <Text style={s.heading}>{title}</Text>
       <Text style={[s.muted, { textAlign: "center", maxWidth: 360 }]}>{detail}</Text>
@@ -324,7 +350,7 @@ export function Sheet({
                 width: 34,
                 height: 4,
                 borderRadius: 3,
-                backgroundColor: "#D8DBDE",
+                backgroundColor: colors.lineStrong,
                 marginTop: 10,
               }}
             />
@@ -379,13 +405,13 @@ export function CheckRow({
           height: 19,
           borderRadius: 5,
           borderWidth: 1,
-          borderColor: checked ? colors.blue : colors.line,
+          borderColor: checked ? colors.blue : colors.lineStrong,
           backgroundColor: checked ? colors.blue : "#FFF",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        {checked && <Check size={13} color="#FFF" />}
+        {checked && <Check size={13} strokeWidth={1.8} color={colors.onPrimary} />}
       </View>
       <Text style={[s.text, { flex: 1 }]}>{label}</Text>
     </Pressable>
@@ -406,7 +432,7 @@ export function SectionHeading({
       {action && onPress && (
         <Pressable accessibilityRole="button" onPress={onPress} style={[s.row, { gap: 5 }]}>
           <Text style={[s.small, { color: colors.text }]}>{action}</Text>
-          <ArrowUpRight size={13} color={colors.muted} />
+          <ArrowUpRight size={13} strokeWidth={1.8} color={colors.muted} />
         </Pressable>
       )}
     </View>
@@ -432,17 +458,17 @@ export function LinkRow({
       style={({ pressed }) => [
         s.row,
         { paddingVertical: 13, gap: 14, borderRadius: 10 },
-        pressed && { backgroundColor: colors.canvas },
+        pressed && { backgroundColor: colors.overlay1 },
       ]}
     >
       <View style={[s.iconBox, { backgroundColor: tint || colors.sky }]}>
-        <Icon size={19} color={colors.text} />
+        <Icon size={19} strokeWidth={1.8} color={colors.text} />
       </View>
       <View style={{ flex: 1, gap: 3 }}>
         <Text style={[s.text, { fontWeight: "500" }]}>{title}</Text>
         {!!detail && <Text style={s.small}>{detail}</Text>}
       </View>
-      <ChevronRight size={15} color={colors.muted} />
+      <ChevronRight size={15} strokeWidth={1.8} color={colors.muted} />
     </Pressable>
   );
 }
@@ -482,10 +508,10 @@ export function Mascot({ size = 42, variant }: { size?: number; variant?: string
   // 兜底涂装：默认（无 variant）或旧版 sky/sand/lilac 仍渲染水豚。
   const palette =
     {
-      sky: "#EEF2FF",
+      sky: "#E5EAFF",
       sand: "#FAF0DF",
       lilac: "#F1ECF9",
-    }[variant ?? "sky"] ?? "#EEF2FF";
+    }[variant ?? "sky"] ?? "#E5EAFF";
   return (
     <View accessibilityLabel={t("ui.capybaraLabel")} style={{ width: size, height: size }}>
       <View

@@ -83,13 +83,13 @@ export function LanguageSwitcher({
                 borderRadius: 19,
                 borderWidth: 1,
                 borderColor: colors.line,
-                backgroundColor: pressed ? colors.line : "#FFFFFF",
+                backgroundColor: pressed ? colors.overlay2 : "#FFFFFF",
               }
         }
       >
         {vertical ? (
           <>
-            <Languages size={21} strokeWidth={1.7} color={colors.muted} />
+            <Languages size={21} strokeWidth={1.8} color={colors.muted} />
             <Text
               numberOfLines={1}
               style={{ fontSize: 10.5, lineHeight: 13, fontWeight: "500", color: colors.muted }}
@@ -114,7 +114,7 @@ export function LanguageSwitcher({
             onPress={() => setOpen(false)}
             style={{
               flex: 1,
-              backgroundColor: "rgba(17,25,28,0.18)",
+              backgroundColor: colors.modalShade,
             }}
           >
             <View
@@ -131,7 +131,7 @@ export function LanguageSwitcher({
                 borderWidth: 1,
                 borderColor: colors.line,
                 paddingVertical: 8,
-                shadowColor: "#312E81",
+                shadowColor: "#000",
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: 0.12,
                 shadowRadius: 20,
@@ -182,7 +182,7 @@ export function LanguageSwitcher({
                         {meta.native}
                       </Text>
                     </View>
-                    {selected && <Check size={15} color={colors.blueDark} />}
+                    {selected && <Check size={15} strokeWidth={1.8} color={colors.blueDark} />}
                   </Pressable>
                 );
               })}

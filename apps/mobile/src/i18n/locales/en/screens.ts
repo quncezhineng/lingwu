@@ -92,10 +92,11 @@ const screens = {
 
   // Files 文件
   "screens.filesSubtitle": "Reports and filings, with room to organize.",
-  "screens.filesImport": "Import PDF",
+  "screens.filesImport": "Import PDF or HTML",
   "screens.filesDocumentBadge": "DOCUMENT",
   "screens.filesPage": "page",
   "screens.filesPages": "pages",
+  "screens.filesWebPage": "Web page",
   "screens.filesEmptyTitle": "Your documents live here",
   "screens.filesEmptyDetail":
     "Import a PDF or open a mail attachment to read, fill supported form fields, and share a copy.",

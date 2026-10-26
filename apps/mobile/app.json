@@ -13,7 +13,7 @@
       "bundler": "metro",
       "name": "LingWu — Your personal investment research agent",
       "lang": "zh",
-      "themeColor": "#4F46E5",
+      "themeColor": "#4B3FE3",
       "favicon": "./assets/logo.png"
     },
     "plugins": [

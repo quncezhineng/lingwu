@@ -248,9 +248,9 @@ export function ApprovalCard({
         <View style={styles.header}>
           <View style={[styles.iconBox, sensitive && pending && styles.sensitiveIconBox]}>
             {sensitive && pending ? (
-              <ShieldAlert size={22} color={colors.danger} />
+              <ShieldAlert size={22} strokeWidth={1.8} color={colors.danger} />
             ) : (
-              <Icon size={22} color={colors.blueDark} />
+              <Icon size={22} strokeWidth={1.8} color={colors.blueDark} />
             )}
           </View>
           <View style={styles.headerText}>
@@ -259,9 +259,9 @@ export function ApprovalCard({
             {!!destination && (
               <View style={styles.destination}>
                 {action.kind === "email.send" ? (
-                  <Mail size={12} color={colors.muted} />
+                  <Mail size={12} strokeWidth={1.8} color={colors.muted} />
                 ) : (
-                  <CalendarDays size={12} color={colors.muted} />
+                  <CalendarDays size={12} strokeWidth={1.8} color={colors.muted} />
                 )}
                 <Text numberOfLines={1} style={styles.destinationText}>
                   {destination}
@@ -278,7 +278,7 @@ export function ApprovalCard({
 
         {pending && sensitive && (
           <View style={styles.warning}>
-            <AlertTriangle size={13} color={colors.danger} />
+            <AlertTriangle size={13} strokeWidth={1.8} color={colors.danger} />
             <Text style={styles.warningText}>
               {destructive ? t("tools.approvalDeleteWarning") : t("tools.approvalEmailWarning")}
             </Text>
@@ -308,9 +308,9 @@ export function ApprovalCard({
               style={styles.more}
             >
               {expanded ? (
-                <ChevronDown size={13} color={colors.blueDark} />
+                <ChevronDown size={13} strokeWidth={1.8} color={colors.blueDark} />
               ) : (
-                <ChevronRight size={13} color={colors.blueDark} />
+                <ChevronRight size={13} strokeWidth={1.8} color={colors.blueDark} />
               )}
               <Text style={styles.moreText}>
                 {expanded ? t("tools.approvalShowLess") : t("tools.approvalShowAll")}
@@ -349,7 +349,8 @@ export function ApprovalCard({
             ) : (
               <StatusIcon
                 size={15}
-                color={action.status === "succeeded" ? "#2E9B68" : colors.muted}
+                strokeWidth={1.8}
+                color={action.status === "succeeded" ? colors.success : colors.muted}
               />
             )}
             <Text
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  sensitiveCard: { borderColor: "#F0B7B3" },
+  sensitiveCard: { borderColor: colors.errorSoft },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -403,7 +404,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: colors.lavender,
   },
-  sensitiveIconBox: { backgroundColor: "#FBEFED" },
+  sensitiveIconBox: { backgroundColor: colors.errorSoft },
   headerText: { flex: 1, minWidth: 0, gap: 2 },
   eyebrow: { color: colors.muted, fontSize: 12.5, lineHeight: 18, fontWeight: "500" },
   summary: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: "600" },
@@ -421,7 +422,7 @@ const styles = StyleSheet.create({
   previewOuter: { paddingHorizontal: 16, paddingBottom: 8 },
   preview: {
     borderRadius: 12,
-    backgroundColor: "#F6F7F8",
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -465,7 +466,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   statusText: { color: colors.muted, fontSize: 13, fontWeight: "500" },
-  statusSucceeded: { color: "#2E9B68" },
+  statusSucceeded: { color: colors.success },
   time: { marginLeft: "auto", color: colors.muted, fontSize: 12 },
   errorWrap: { paddingHorizontal: 16, paddingBottom: 12 },
 });

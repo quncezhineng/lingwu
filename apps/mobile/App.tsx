@@ -605,13 +605,13 @@ function WorkspaceShell({
                       padding: 5,
                       backgroundColor: "#FFF",
                       borderRadius: 40,
-                      shadowColor: "#312E81",
+                      shadowColor: "#000",
                       shadowOffset: { width: 0, height: 2 },
                       shadowOpacity: 0.07,
                       shadowRadius: 18,
                       elevation: 3,
                       borderWidth: 1,
-                      borderColor: "#F8F8F8",
+                      borderColor: colors.line,
                     }}
                   >
                     {nav.map((item) => {
@@ -628,7 +628,7 @@ function WorkspaceShell({
                             height: 47,
                             alignItems: "center",
                             justifyContent: "center",
-                            backgroundColor: active ? "#EEF2FF" : "transparent",
+                            backgroundColor: active ? colors.sky : "transparent",
                             borderRadius: 28,
                           }}
                         >
@@ -659,14 +659,14 @@ function WorkspaceShell({
                 },
               ]}
             >
-              <Check size={16} color="#A5B4FC" />
+              <Check size={16} strokeWidth={1.8} color={colors.sky} />
               <Text style={{ color: "#FFF", fontSize: 13, flexShrink: 1 }}>{toast}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("app.dismissNotification")}
                 onPress={clearToast}
               >
-                <X size={16} color="#FFF" />
+                <X size={16} strokeWidth={1.8} color="#FFF" />
               </Pressable>
             </View>
           </View>

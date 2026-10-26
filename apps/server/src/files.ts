@@ -10,6 +10,45 @@ import { AppError } from "./errors.ts";
 
 const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+type FileFormat = "pdf" | "html";
+
+interface FileMetadata {
+  mimeType: "application/pdf" | "text/html";
+  extension: FileFormat;
+  pageCount: number;
+  fields?: Artifact["fields"];
+}
+
+function formatFor(name: string, bytes: Uint8Array): FileFormat | null {
+  const extension = name.toLowerCase().split(".").pop();
+  if (extension === "html" || extension === "htm") return "html";
+  if (extension === "pdf" || Buffer.from(bytes.subarray(0, 5)).toString() === "%PDF-") return "pdf";
+  return null;
+}
+
+async function inspectFile(name: string, bytes: Uint8Array): Promise<FileMetadata> {
+  const format = formatFor(name, bytes);
+  if (format === "pdf") {
+    const metadata = await inspectPdf(bytes);
+    if (metadata.pageCount > 500) throw new AppError("PDFs must have 500 pages or fewer", 422);
+    return {
+      mimeType: "application/pdf",
+      extension: "pdf",
+      pageCount: metadata.pageCount,
+      fields: metadata.fields,
+    };
+  }
+  if (format === "html") {
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      throw new AppError("HTML files must be UTF-8 text", 422);
+    }
+    return { mimeType: "text/html", extension: "html", pageCount: 0 };
+  }
+  throw new AppError("Choose an HTML or PDF file", 415);
+}
+
 export function sanitizeFileName(name: string): string {
   const base = name.split(/[\\/]/).at(-1) ?? "document.pdf";
   // Slice code points, not UTF-16 units, so a surrogate pair is never split in half.
@@ -58,12 +97,11 @@ export class Files {
       const existing = await this.db.get<Artifact>(owner, "files", id);
       if (existing) return this.signed(owner, existing);
     }
-    if (bytes.length > 10 * 1024 * 1024) throw new AppError("PDFs must be 10 MB or smaller", 413);
-    let metadata = await inspectPdf(bytes);
-    if (metadata.pageCount > 500) throw new AppError("PDFs must have 500 pages or fewer", 422);
+    if (bytes.length > 10 * 1024 * 1024) throw new AppError("Files must be 10 MB or smaller", 413);
+    let metadata = await inspectFile(name, bytes);
     const directory = join(this.config.dataDir, "files");
     await mkdir(directory, { recursive: true, mode: 0o700 });
-    const path = this.pathFor(id);
+    const path = this.pathFor(id, metadata.extension);
     if (operationKey === undefined) {
       await writeFile(path, bytes, { mode: 0o600, flag: "wx" });
     } else {
@@ -75,7 +113,7 @@ export class Files {
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
           bytes = await readFile(path);
-          metadata = await inspectPdf(bytes);
+          metadata = await inspectFile(name, bytes);
         }
       } finally {
         await rm(temporary, { force: true });
@@ -85,7 +123,7 @@ export class Files {
     const artifact: Artifact = {
       id,
       name: safeName,
-      mimeType: "application/pdf",
+      mimeType: metadata.mimeType,
       size: bytes.length,
       pageCount: metadata.pageCount,
       fields: metadata.fields,
@@ -113,16 +151,16 @@ export class Files {
     if (!file) throw new AppError("File not found", 404);
     return file;
   }
-  private pathFor(id: string): string {
+  private pathFor(id: string, extension: FileFormat = "pdf"): string {
     assertFileId(id);
     const directory = resolve(this.config.dataDir, "files");
-    const resolved = resolve(directory, `${id}.pdf`);
+    const resolved = resolve(directory, `${id}.${extension}`);
     if (!resolved.startsWith(`${directory}${sep}`)) throw new AppError("File not found", 404);
     return resolved;
   }
   async bytes(owner: string, id: string) {
-    await this.get(owner, id);
-    return readFile(this.pathFor(id));
+    const file = await this.get(owner, id);
+    return readFile(this.pathFor(id, file.mimeType === "text/html" ? "html" : "pdf"));
   }
   async fill(
     owner: string,
@@ -131,6 +169,8 @@ export class Files {
     operationKey?: string,
   ) {
     const file = await this.get(owner, id);
+    if (file.mimeType !== "application/pdf")
+      throw new AppError("Only PDF files can be filled", 422);
     const bytes = await this.bytes(owner, id);
     const output = await fillPdf(bytes, values);
     return this.import(

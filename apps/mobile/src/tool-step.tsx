@@ -277,22 +277,22 @@ export function ToolStep({
           !canExpand && styles.headerStatic,
         ]}
       >
-        <Icon size={15} strokeWidth={1.9} color={colors.muted} />
+        <Icon size={15} strokeWidth={1.8} color={colors.muted} />
         <Text numberOfLines={1} style={styles.title}>
           {title}
         </Text>
         {failed ? (
-          <X size={14} color={colors.danger} />
+          <X size={14} strokeWidth={1.8} color={colors.danger} />
         ) : running ? (
           <ActivityIndicator size="small" color={colors.blueDark} style={styles.spinner} />
         ) : (
-          <Check size={14} color="#2E9B68" />
+          <Check size={14} strokeWidth={1.8} color={colors.success} />
         )}
         {canExpand &&
           (expanded ? (
-            <ChevronDown size={14} color={colors.muted} />
+            <ChevronDown size={14} strokeWidth={1.8} color={colors.muted} />
           ) : (
-            <ChevronRight size={14} color={colors.muted} />
+            <ChevronRight size={14} strokeWidth={1.8} color={colors.muted} />
           ))}
       </Pressable>
       {expanded && canExpand && (
@@ -355,11 +355,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: "#E8E8EC",
-    backgroundColor: "#F5F5F7",
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.surface,
   },
   headerPressed: {
-    backgroundColor: "#ECECF0",
+    backgroundColor: colors.overlay2,
   },
   headerStatic: {
     opacity: 0.92,
@@ -384,8 +384,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: "#E8E8EC",
-    backgroundColor: "#F8F8FA",
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.tertiary,
   },
   section: {
     gap: 6,

@@ -88,6 +88,7 @@ const details = {
 
   // File detail.
   "details.fileSubtitle": "{pages} pages · {size} KB · {source}",
+  "details.htmlSubtitle": "Web page · {size} KB · {source}",
   "details.openDownload": "Open / download",
   "details.saveOrShare": "Save or share",
   "details.attachToEmail": "Attach to email",
