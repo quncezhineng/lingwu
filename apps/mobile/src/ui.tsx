@@ -19,9 +19,9 @@ import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
 import { ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
 /**
- * 设计令牌（LingWu × Doubao Copy 设计系统）。
+ * 设计令牌（LingWu × Doubao 设计系统）。
  *
- * 视觉结构对齐 Doubao Copy 的「紧凑型 AI Dashboard」：
+ * 视觉结构对齐 Doubao 的「紧凑型 AI Dashboard」：
  * - 边框优先、弱阴影：卡片用 1px 描边区分层级，而不是靠灰面或投影。
  * - 单一中性面阶梯：canvas(页面) → surface(次级面) → tertiary(输入/深一档填充)。
  * - 单一圆角体系：面板 14、控件 10、按钮与 Chip 走胶囊形。

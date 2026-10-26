@@ -5,18 +5,18 @@
 
 ## 变更记录
 
-### 2026-10-26 · 图标体系迁移至自有 SVG 图标层 + 全站视觉收敛「Doubao Copy」
+### 2026-10-26 · 图标体系迁移至自有 SVG 图标层 + 全站视觉收敛「Doubao」
 
 **背景**
 
-用户要求按选中的设计系统「Doubao Copy」（ID `V.3RSOA.PBS1K2`）重构 LingWu 前端视觉，并用该设计系统的图标替换现有图标，同时保留 LingWu 既有的紫色（`#4B3FE3`）与白色主题。
+用户要求按选中的设计系统「Doubao」（ID `V.3RSOA.PBS1K2`）重构 LingWu 前端视觉，并用该设计系统的图标替换现有图标，同时保留 LingWu 既有的紫色（`#4B3FE3`）与白色主题。
 
 **设计库可用性说明（重要）**
 
 本轮 Design Canvas 未启用 / 未选中 / 鉴权不可用，因此**未能通过 trae-design 插件正式读取并核验该设计库资产**。实际执行依据为：
 
 1. 本会话此前已确立并固化进代码的设计规范（`ui.tsx` 令牌 + 圆角 + 描边 + 密度规则）；
-2. 早期会话从本地目录 `/Users/luffy/.trae/design_libraries/Doubao Copy` 抓取的历史本地快照。
+2. 早期会话从本地目录 `/Users/luffy/.trae/design_libraries/Doubao` 抓取的历史本地快照。
 
 历史快照中的 40 枚图标已登记为 `source: "library"`；其余 50 枚为设计库缺少对应语义时按同风格补齐，登记为 `source: "project"`。**Design Canvas 恢复后仍需重新通过插件核验资产清单与 token 映射。**
 
@@ -51,7 +51,7 @@
 - `pnpm typecheck`、`pnpm lint`（266 文件）、`pnpm build:web`（1293 modules / index 3.78 MB）全部通过。
 - `biome.json` 增加 `.qoder` / `.qoder-collab-runtime` 忽略项，避免本地工具运行文件干扰仓库级 lint。
 
-### 2026-10-26 · 移动端业务页面视觉对齐「Doubao Copy 紧凑型 AI Dashboard」
+### 2026-10-26 · 移动端业务页面视觉对齐「Doubao 紧凑型 AI Dashboard」
 
 **背景**
 
@@ -105,7 +105,7 @@ LingWu 的 `FileViewer` 会把生成的 HTML 页面以 `srcDoc` 放进全屏 ifr
 
 **背景**
 
-在视觉大改版（对齐 TraeWork Light）之后，用户要求对前端全部 icon 进行重构。本轮设计库「TraeWork copy」在 Design Canvas 中暂时不可用，经用户确认采用「先做一致性统一」方式执行：不依赖设计库文件，仅基于会话中已确认的令牌与项目现状做收敛。
+在视觉大改版（对齐 TraeWork Light）之后，用户要求对前端全部 icon 进行重构。本轮设计库「TraeWork」在 Design Canvas 中暂时不可用，经用户确认采用「先做一致性统一」方式执行：不依赖设计库文件，仅基于会话中已确认的令牌与项目现状做收敛。
 
 **规范（两档线宽语义）**
 
@@ -128,7 +128,7 @@ LingWu 的 `FileViewer` 会把生成的 HTML 页面以 `srcDoc` 放进全屏 ifr
 
 **背景**
 
-用户通过 trae-design 插件选定「TraeWork copy」设计库，要求将 LingWu 前端视觉体系从自定义靛蓝紫主题（`#4F46E5` 系）迁移对齐到 TraeWork Light 模式设计语言。经确认执行两项决策：①彩色分类卡片统一为中性面（TraeWork「Quiet by default」）；②品牌主色同步替换 Logo/启动资源。
+用户通过 trae-design 插件选定「TraeWork」设计库，要求将 LingWu 前端视觉体系从自定义靛蓝紫主题（`#4F46E5` 系）迁移对齐到 TraeWork Light 模式设计语言。经确认执行两项决策：①彩色分类卡片统一为中性面（TraeWork「Quiet by default」）；②品牌主色同步替换 Logo/启动资源。
 
 **令牌映射（[ui.tsx](../apps/mobile/src/ui.tsx)）**
 

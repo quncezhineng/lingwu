@@ -1,5 +1,5 @@
 /**
- * 设计库图标注册表（Doubao Copy / V.3RSOA.PBS1K2）。
+ * 设计库图标注册表（Doubao / V.3RSOA.PBS1K2）。
  *
  * 这里登记的全部几何均逐字来自设计库 `assets/icons/*.svg`，未做任何删改：
  * 24×24 视图框、currentColor 描边、圆头圆角。

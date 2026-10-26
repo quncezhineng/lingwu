@@ -1,7 +1,7 @@
 /**
  * 统一图标模块。
  *
- * 图标几何来自 Doubao Copy 设计库（`library.ts`，40 枚资产逐字转写）与项目补齐
+ * 图标几何来自 Doubao 设计库（`library.ts`，40 枚资产逐字转写）与项目补齐
  * 图标（`project.ts`），渲染统一交给 react-native-svg，从而在 iOS / Android / Web
  * 三端得到一致的线宽与端点表现。
  *
