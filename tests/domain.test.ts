@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  createTaskSchema,
+  marketBriefingSchema,
+  priceAlertSchema,
+  researchReportSchema,
+  symbolSchema,
+  watchlistSchema,
+} from "../packages/domain/src/agent.ts";
+import {
   emailDraftSchema,
   eventDraftSchema,
   proposalSchema,
@@ -143,4 +151,100 @@ test("proposal schema discriminates on kind and validates nested data", () => {
     false,
   );
   assert.equal(proposalSchema.safeParse({ kind: "unknown.kind", data: {} }).success, false);
+});
+
+// ─── 投研智能体数据模型 ───
+
+const watchlist = {
+  id: "0b7f2a3c-1d4e-4f5a-8b9c-0d1e2f3a4b5c",
+  user_id: "1c8f3b4d-2e5f-4a6b-9c0d-1e2f3a4b5c6d",
+  name: "核心持仓",
+  symbols: ["AAPL", "600519.SH"],
+  created_at: "2026-10-26T00:00:00Z",
+  updated_at: "2026-10-26T01:00:00Z",
+};
+
+test("watchlist schema accepts a valid document and rejects an empty name", () => {
+  assert.equal(watchlistSchema.safeParse(watchlist).success, true);
+  assert.equal(watchlistSchema.safeParse({ ...watchlist, name: "" }).success, false);
+  assert.equal(watchlistSchema.safeParse({ ...watchlist, id: "not-a-uuid" }).success, false);
+});
+
+test("symbol schema requires a supported market", () => {
+  assert.equal(symbolSchema.safeParse({ code: "AAPL", name: "Apple", market: "US" }).success, true);
+  assert.equal(
+    symbolSchema.safeParse({ code: "AAPL", name: "Apple", market: "JP" }).success,
+    false,
+  );
+});
+
+test("market briefing requires 3 to 5 summary points and a date-only value", () => {
+  const briefing = {
+    id: "2d9f4c5e-3a6b-4c7d-8e9f-0a1b2c3d4e5f",
+    user_id: "1c8f3b4d-2e5f-4a6b-9c0d-1e2f3a4b5c6d",
+    date: "2026-10-26",
+    summary: ["a", "b", "c"],
+    content: "full text",
+    market_data: {},
+    symbol_updates: {},
+    events: [],
+    generated_at: "2026-10-26T00:00:00Z",
+  };
+  assert.equal(marketBriefingSchema.safeParse(briefing).success, true);
+  assert.equal(marketBriefingSchema.safeParse({ ...briefing, summary: ["a", "b"] }).success, false);
+  assert.equal(
+    marketBriefingSchema.safeParse({ ...briefing, summary: ["a", "b", "c", "d", "e", "f"] })
+      .success,
+    false,
+  );
+  assert.equal(
+    marketBriefingSchema.safeParse({ ...briefing, date: "2026-10-26T00:00:00Z" }).success,
+    false,
+  );
+});
+
+test("research report validates the six structured sections", () => {
+  const report = {
+    id: "3e0a5d6f-4b7c-4d8e-9f0a-1b2c3d4e5f6a",
+    user_id: "1c8f3b4d-2e5f-4a6b-9c0d-1e2f3a4b5c6d",
+    symbol_code: "AAPL",
+    title: "Apple 深度研究",
+    sections: {
+      company_overview: "overview",
+      financials: {},
+      news: [],
+      peer_comparison: [],
+      valuation: {},
+      risks: ["risk"],
+    },
+    generated_at: "2026-10-26T00:00:00Z",
+  };
+  assert.equal(researchReportSchema.safeParse(report).success, true);
+  const { risks: _risks, ...missingRisks } = report.sections;
+  assert.equal(
+    researchReportSchema.safeParse({ ...report, sections: missingRisks }).success,
+    false,
+  );
+});
+
+test("price alert defaults enabled to true and rejects unknown thresholds", () => {
+  const alert = {
+    id: "4f1b6e7a-5c8d-4e9f-8a1b-2c3d4e5f6a7b",
+    user_id: "1c8f3b4d-2e5f-4a6b-9c0d-1e2f3a4b5c6d",
+    symbol_code: "AAPL",
+    threshold_type: "PRICE_ABOVE",
+    threshold_value: 200,
+    created_at: "2026-10-26T00:00:00Z",
+  };
+  assert.equal(priceAlertSchema.parse(alert).enabled, true);
+  assert.equal(priceAlertSchema.safeParse({ ...alert, threshold_type: "VOLUME" }).success, false);
+});
+
+test("task creation accepts market_briefing and research kinds", () => {
+  assert.equal(
+    createTaskSchema.safeParse({ prompt: "生成今日简报", kind: "market_briefing" }).success,
+    true,
+  );
+  assert.equal(createTaskSchema.safeParse({ prompt: "研究 AAPL", kind: "research" }).success, true);
+  assert.equal(createTaskSchema.safeParse({ prompt: "x", kind: "unknown" }).success, false);
 });
