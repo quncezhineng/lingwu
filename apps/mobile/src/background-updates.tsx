@@ -1,8 +1,8 @@
-import { ArrowRight, Bell, X } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useAgentWorkspace } from "./agent-workspace";
 import { useTranslation } from "./i18n";
+import { ArrowRight, Bell, X } from "./icons";
 import { Button, Card, colors, ErrorNotice, resultSummary, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -38,10 +38,10 @@ export function BackgroundUpdates() {
     if (await markRead()) open({ type: "task", taskId: update.taskId });
   }
   return (
-    <Card style={{ backgroundColor: colors.sky, padding: 16, gap: 10 }}>
+    <Card style={{ padding: 16, gap: 10 }}>
       <View style={[s.between, { gap: 12 }]}>
         <View style={[s.row, { gap: 7 }]}>
-          <Bell size={14} strokeWidth={1.8} color={colors.blueDark} />
+          <Bell size={14} strokeWidth={1.8} color={colors.primary} />
           <Text style={s.small}>{t("tools.updateForYou")}</Text>
         </View>
         <Pressable

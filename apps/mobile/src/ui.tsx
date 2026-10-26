@@ -1,4 +1,3 @@
-import { ArrowUpRight, Check, ChevronRight, type LucideIcon, X } from "lucide-react-native";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -18,36 +17,37 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
+import { ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
 /**
- * TraeWork Light 设计令牌映射（LingWu 重构图腾）：
- * - 页面白底（--bg-base-default），卡片灰面（--bg-base-secondary），层级与原主题相反。
- * - 品牌主色 #4B3FE3（--bg-brand），稀缺使用；选中/按下态走中性 overlay 阶梯。
- * - 边框/分割线用中性 alpha（--border-neutral-l1/l2），聚焦用对比色。
- * - 状态色对应 TraeWork --status-* 语义，含配套 surface 浅底。
+ * 设计令牌（LingWu × Doubao Copy 设计系统）。
+ *
+ * 视觉结构对齐 Doubao Copy 的「紧凑型 AI Dashboard」：
+ * - 边框优先、弱阴影：卡片用 1px 描边区分层级，而不是靠灰面或投影。
+ * - 单一中性面阶梯：canvas(页面) → surface(次级面) → tertiary(输入/深一档填充)。
+ * - 单一圆角体系：面板 14、控件 10、按钮与 Chip 走胶囊形。
+ * - 操作层级清晰：主操作实心品牌色，次级操作中性面，危险操作语义红。
+ *
+ * 品牌色覆盖：设计库默认主色为蓝色 `--primary: #0065fd`，LingWu 继续保留
+ * 紫色品牌 #4B3FE3 与白色主题，设计库的边框、密度、圆角与操作层级照常沿用。
  */
 export const colors = {
-  canvas: "#FFFFFF", // --bg-base-default 页面背景
-  surface: "#F5F5F5", // --bg-base-secondary 卡片/灰面
-  card: "#F5F5F5", // 兼容别名：卡片灰面
-  tertiary: "#E5E5E5", // --bg-base-tertiary 次级灰面（次要按钮）
-  text: "#171717", // --text-default 主文字
-  muted: "#404040", // --text-secondary 次级文字
-  faint: "#737373", // --text-tertiary 三级文字/占位符
+  canvas: "#FFFFFF", // --background / --card：页面与卡片底色
+  surface: "#EFF1F4", // --muted / --secondary：次级面（搜索框、次级按钮）
+  tertiary: "#E7EAEF", // --input：深一档的次级填充（代码块、分段控件）
+  text: "#0E1115", // --foreground：主文字
+  muted: "#404040", // --text-secondary：次级文字
+  faint: "#737373", // --text-tertiary：占位符/三级文字
   disabled: "#A1A1A1", // --text-disabled
-  line: "rgba(115,115,115,0.12)", // --border-neutral-l1
-  lineStrong: "rgba(115,115,115,0.18)", // --border-neutral-l2
-  overlay1: "rgba(115,115,115,0.08)", // --bg-overlay-l1
+  line: "#E7EAEF", // --border / --input：统一描边
+  lineStrong: "#D5DBE3", // 派生描边：需要更清晰分隔时使用
+  overlay1: "rgba(115,115,115,0.08)", // --bg-overlay-l1：按下/悬停底色
   overlay2: "rgba(115,115,115,0.12)", // --bg-overlay-l2（悬停/选中）
   overlay3: "rgba(115,115,115,0.16)", // --bg-overlay-l3（按下）
-  // 品牌（--bg-brand 系）。`primary`/`blue` 为实心填充（配 onPrimary 前景），
-  // `primaryLight`/`blueDark` 为图标、链接与强调文字色。
+  // 品牌（--bg-brand 系）。`primary` 为实心填充（配 onPrimary 前景），
+  // 也是图标、链接与强调文字的统一色；`sky` 只用于小面积状态 Chip。
   primary: "#4B3FE3",
-  primaryLight: "#6A6FFF",
   onPrimary: "#FFFFFF",
-  blue: "#4B3FE3",
-  blueDark: "#6A6FFF",
-  sky: "#E5EAFF", // brand-100 浅品牌底（状态 Chip 等小面积使用）
-  lavender: "#E5EAFF", // 兼容别名 → brand-100
+  sky: "#E5EAFF", // --accent：品牌浅底（状态 Chip 等小面积使用）
   green: "rgba(64,176,139,0.12)", // status-success-surface-l1
   success: "#15A877", // status-success-default
   orange: "rgba(226,121,0,0.12)", // status-warning-surface-l1
@@ -55,6 +55,21 @@ export const colors = {
   errorSoft: "rgba(232,70,58,0.12)", // status-error-surface-l1
   modalShade: "rgba(23,23,23,0.4)", // 模态遮罩（弹窗/菜单背景）
 };
+
+/**
+ * 第三方服务品牌色。
+ *
+ * 仅用于 Connections 列表里的服务识别（Gmail / Google 日历 / 浏览器 / OpenBot），
+ * 让用户一眼认出对接的是哪个外部服务；它们不参与品牌主操作，
+ * 避免「紫色 = LingWu 自身操作」这一语义被稀释。
+ * `surface` 是配套的浅色底座，用于图标背板。
+ */
+export const serviceBrands = {
+  gmail: { fg: "#EA5B4D", surface: "rgba(234,91,77,0.12)" },
+  googleCalendar: { fg: "#4285F4", surface: "rgba(66,133,244,0.12)" },
+  browser: { fg: "#1987CF", surface: "rgba(25,135,207,0.12)" },
+  openbot: { fg: "#6866A6", surface: "rgba(104,102,166,0.12)" },
+} as const;
 export const s = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center" },
   between: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -70,76 +85,83 @@ export const s = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: 23, fontWeight: "600", letterSpacing: -0.7 },
   heading: { color: colors.text, fontSize: 16, fontWeight: "600", letterSpacing: -0.25 },
+  /** App Card：白底 + 1px 描边 + 14px 圆角 + 16px 内边距，靠边框而不是阴影分层。 */
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 0,
+    backgroundColor: colors.canvas,
+    borderRadius: 14,
+    borderWidth: 1,
     borderColor: colors.line,
-    padding: 20,
+    padding: 16,
   },
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: 18 },
+  divider: { height: 1, backgroundColor: colors.line, marginVertical: 16 },
   input: {
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     color: colors.text,
     fontSize: 16,
-    backgroundColor: "#FFF",
-    minHeight: 45,
+    backgroundColor: colors.canvas,
+    minHeight: 44,
   },
   field: { gap: 7, marginBottom: 16 },
+  /** 按钮：胶囊形 + 1px 描边，默认高度 38（small 32），与设计库 .btn 一致。 */
   button: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingHorizontal: 17,
-    minHeight: 42,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    minHeight: 38,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
-  primary: { backgroundColor: colors.blue },
-  secondary: { backgroundColor: colors.tertiary },
+  primary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  secondary: { backgroundColor: colors.surface, borderColor: colors.line },
+  dangerSurface: { backgroundColor: colors.errorSoft, borderColor: colors.errorSoft },
   buttonText: { fontSize: 14, fontWeight: "600" },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 999,
     alignSelf: "flex-start",
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
   },
   chipText: { fontSize: 10, fontWeight: "600", color: colors.muted },
+  /** 图标底座：44×44 / 13px 圆角（设计库 App Card 的 .ic 规格）。 */
   iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.surface,
   },
   error: {
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: colors.errorSoft,
     marginVertical: 10,
     gap: 4,
   },
   modalShade: {
     flex: 1,
-    backgroundColor: "rgba(23,23,23,0.4)",
+    backgroundColor: colors.modalShade,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
+  /** 弹窗面板：白底 + 1px 描边 + 14px 圆角，最大宽度对齐设计库 .panel 的 760。 */
   sheet: {
     backgroundColor: colors.canvas,
-    borderRadius: 12,
+    borderRadius: 14,
     width: "100%",
-    maxWidth: 790,
+    maxWidth: 760,
     maxHeight: "94%",
     overflow: "hidden",
     borderWidth: 1,
@@ -162,7 +184,7 @@ export function Button({
 }: {
   children: ReactNode;
   onPress: () => void;
-  icon?: LucideIcon;
+  icon?: IconComponent;
   primary?: boolean;
   disabled?: boolean;
   busy?: boolean;
@@ -182,8 +204,8 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         s.button,
-        primary ? s.primary : s.secondary,
-        small && { minHeight: 38, paddingVertical: 7, paddingHorizontal: 13 },
+        primary ? s.primary : danger ? s.dangerSurface : s.secondary,
+        small && { minHeight: 32, paddingVertical: 6, paddingHorizontal: 13 },
         style,
         {
           opacity: disabled ? 0.4 : busy && !quietBusy ? 0.75 : pressed ? 0.85 : 1,
@@ -195,7 +217,7 @@ export function Button({
       ) : Icon ? (
         <Icon size={15} strokeWidth={1.8} color={color} />
       ) : null}
-      <Text style={[s.buttonText, { color }]}>{children}</Text>
+      <Text style={[s.buttonText, small && { fontSize: 12 }, { color }]}>{children}</Text>
     </Pressable>
   );
 }
@@ -204,7 +226,7 @@ export function IconButton({
   label,
   onPress,
 }: {
-  icon: LucideIcon;
+  icon: IconComponent;
   label: string;
   onPress: () => void;
 }) {
@@ -215,16 +237,16 @@ export function IconButton({
       onPress={onPress}
       style={({ pressed }) => [
         {
-          width: 44,
-          height: 44,
+          width: 38,
+          height: 38,
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: 8,
-          backgroundColor: pressed ? colors.overlay2 : "#FFFFFF",
+          borderRadius: 10,
+          backgroundColor: pressed ? colors.overlay1 : "transparent",
         },
       ]}
     >
-      <Icon size={20} strokeWidth={1.8} color={colors.text} />
+      <Icon size={18} strokeWidth={1.8} color={colors.muted} />
     </Pressable>
   );
 }
@@ -261,15 +283,15 @@ export function Empty({
   detail,
   children,
 }: {
-  icon: LucideIcon;
+  icon: IconComponent;
   title: string;
   detail: string;
   children?: ReactNode;
 }) {
   return (
     <View style={{ alignItems: "center", padding: 40, gap: 13 }}>
-      <View style={[s.iconBox, { width: 55, height: 55, borderRadius: 12 }]}>
-        <Icon size={24} strokeWidth={1.8} color={colors.blueDark} />
+      <View style={[s.iconBox, { width: 55, height: 55, borderRadius: 14 }]}>
+        <Icon size={24} strokeWidth={1.8} color={colors.primary} />
       </View>
       <Text style={s.heading}>{title}</Text>
       <Text style={[s.muted, { textAlign: "center", maxWidth: 360 }]}>{detail}</Text>
@@ -358,7 +380,7 @@ export function Sheet({
           <View
             style={[
               s.between,
-              { padding: compact ? 20 : 24, borderBottomWidth: 1, borderBottomColor: colors.line },
+              { padding: compact ? 16 : 20, borderBottomWidth: 1, borderBottomColor: colors.line },
             ]}
           >
             <View style={{ flex: 1, gap: 4 }}>
@@ -372,8 +394,8 @@ export function Sheet({
             style={fullscreen ? { flex: 1 } : undefined}
             contentContainerStyle={
               fullscreen
-                ? { flexGrow: 1, padding: compact ? 20 : 24 }
-                : { padding: compact ? 20 : 24 }
+                ? { flexGrow: 1, padding: compact ? 16 : 20 }
+                : { padding: compact ? 16 : 20 }
             }
           >
             {children}
@@ -405,8 +427,8 @@ export function CheckRow({
           height: 19,
           borderRadius: 5,
           borderWidth: 1,
-          borderColor: checked ? colors.blue : colors.lineStrong,
-          backgroundColor: checked ? colors.blue : "#FFF",
+          borderColor: checked ? colors.primary : colors.lineStrong,
+          backgroundColor: checked ? colors.primary : colors.canvas,
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -448,7 +470,7 @@ export function LinkRow({
   title: string;
   detail?: string;
   onPress: () => void;
-  icon: LucideIcon;
+  icon: IconComponent;
   tint?: string;
 }) {
   return (
@@ -461,7 +483,7 @@ export function LinkRow({
         pressed && { backgroundColor: colors.overlay1 },
       ]}
     >
-      <View style={[s.iconBox, { backgroundColor: tint || colors.sky }]}>
+      <View style={[s.iconBox, { backgroundColor: tint || colors.surface }]}>
         <Icon size={19} strokeWidth={1.8} color={colors.text} />
       </View>
       <View style={{ flex: 1, gap: 3 }}>
@@ -506,12 +528,13 @@ export function Mascot({ size = 42, variant }: { size?: number; variant?: string
     );
   }
   // 兜底涂装：默认（无 variant）或旧版 sky/sand/lilac 仍渲染水豚。
+  // sand/lilac 是历史头像遗留值，保持原样以兼容已存数据；默认底色跟随品牌浅紫。
   const palette =
     {
-      sky: "#E5EAFF",
+      sky: colors.sky,
       sand: "#FAF0DF",
       lilac: "#F1ECF9",
-    }[variant ?? "sky"] ?? "#E5EAFF";
+    }[variant ?? "sky"] ?? colors.sky;
   return (
     <View accessibilityLabel={t("ui.capybaraLabel")} style={{ width: size, height: size }}>
       <View

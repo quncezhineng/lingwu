@@ -2,14 +2,16 @@
  * 把研究产物（AgentArtifact）渲染成一张自包含的静态 HTML 页面字符串。
  *
  * 该字符串直接交给 HtmlPreview（Web 端 iframe `srcDoc` / 原生端 WebView）
- * 展示，因此不依赖任何外部资源、不包含任何脚本：所有文本均转义，
- * 只生成语义结构与内联样式，保证跨端渲染一致且安全。
+ * 展示。外层页面只生成语义结构与内联样式；产物中的完整 HTML 文档会放进
+ * 隔离的嵌套 iframe，并通过 CSP 禁止外部网络请求后执行页面自带的脚本。
  *
  * 财务产物（kind === "finance"）有专属的「收入/支出/结余」统计卡与
  * 分类占比条形图；其余产物（计划/对比/报告）按数据结构通用渲染。
  */
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import { assistantMarkdown } from "./assistant-markdown";
 import { activeLocaleTag, statusLabel, tr } from "./i18n/translate";
+import { sandboxedDocument } from "./open-html-document";
 
 /** 转义为 HTML 安全文本。 */
 function escapeHtml(value: string): string {
@@ -23,6 +25,17 @@ function escapeHtml(value: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isHtmlDocument(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const source = value.trimStart();
+  return /^<!doctype\s+html(?:\s|>)/i.test(source) || /^<html(?:\s|>)/i.test(source);
+}
+
+/** Whether an artifact contains a complete HTML document that can be rendered live. */
+export function artifactHasHtmlPreview(artifact: AgentArtifact): boolean {
+  return Object.values(artifact.data).some(isHtmlDocument);
 }
 
 /**
@@ -136,6 +149,24 @@ function renderCell(value: unknown): string {
   return text(value, true);
 }
 
+/** Render a complete HTML artifact inside an isolated live-preview frame. */
+function htmlPreview(source: string, title: string): string {
+  return `
+    <div class="html-document">
+      <iframe
+        class="html-preview-frame"
+        title="${escapeHtml(title)}"
+        srcdoc="${escapeHtml(sandboxedDocument(source))}"
+        sandbox="allow-scripts allow-forms allow-modals allow-popups"
+        referrerpolicy="no-referrer"
+      ></iframe>
+      <details class="source">
+        <summary>${escapeHtml(tr("agent.artifactViewSource"))}</summary>
+        <pre class="code" data-lang="html">${highlightCode(source)}</pre>
+      </details>
+    </div>`;
+}
+
 /** 金额（带货币样式的数字文本）。 */
 function amount(value: unknown): string {
   const number = Number(value);
@@ -185,7 +216,9 @@ function renderGeneric(artifact: AgentArtifact): string {
   return Object.entries(artifact.data)
     .map(
       ([key, value]) =>
-        `<section class="block"><h2>${label(key)}</h2>${renderValue(value)}</section>`,
+        `<section class="block"><h2>${label(key)}</h2>${
+          isHtmlDocument(value) ? htmlPreview(value, artifact.title) : renderValue(value)
+        }</section>`,
     )
     .join("");
 }
@@ -213,24 +246,38 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
 <style>
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: #F5F5F5; color: #171717;
+    margin: 0; background: #EFF1F4; color: #0E1115;
     font: 14px/1.6 -apple-system, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
   }
-  .page { max-width: 780px; margin: 24px auto; background: #FFFFFF; border-radius: 12px; padding: 28px 32px; box-shadow: 0 8px 30px rgba(0,0,0,.08); }
+  .page { max-width: 780px; margin: 24px auto; background: #FFFFFF; border: 1px solid #E7EAEF; border-radius: 14px; padding: 28px 32px; }
   .chip { display: inline-block; padding: 3px 10px; border-radius: 8px; background: #E5EAFF; color: #4B3FE3; font-size: 12px; font-weight: 600; }
   h1 { margin: 10px 0 4px; font-size: 22px; line-height: 1.35; }
   .meta { margin: 0 0 18px; color: #737373; font-size: 13px; }
-  .summary { margin: 0 0 22px; padding: 14px 16px; background: #F5F5F5; border-left: 3px solid #4B3FE3; border-radius: 8px; color: #404040; white-space: pre-wrap; }
+  .summary { margin: 0 0 22px; padding: 14px 16px; background: #EFF1F4; border-left: 3px solid #4B3FE3; border-radius: 10px; color: #404040; }
+  .summary > :first-child { margin-top: 0; }
+  .summary > :last-child { margin-bottom: 0; }
+  .summary h1, .summary h2, .summary h3, .summary h4, .summary h5, .summary h6 { color: #0E1115; line-height: 1.4; margin: 18px 0 8px; }
+  .summary h1 { font-size: 20px; }
+  .summary h2 { font-size: 18px; }
+  .summary h3 { font-size: 16px; }
+  .summary p { margin: 0 0 10px; }
+  .summary ul, .summary ol { margin: 0 0 12px; padding-left: 22px; }
+  .summary li + li { margin-top: 4px; }
+  .summary a { color: #4B3FE3; }
+  .summary blockquote { margin: 12px 0; padding: 4px 0 4px 14px; border-left: 3px solid #D5DBE3; color: #737373; }
+  .summary code { padding: 1px 5px; border-radius: 4px; background: #E7EAEF; color: #4B3FE3; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .summary pre { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: #1F2430; color: #D7DAE0; overflow: auto; }
+  .summary pre code { padding: 0; background: transparent; color: inherit; }
   .block { margin-top: 24px; }
-  .block h2 { margin: 0 0 12px; padding-bottom: 6px; font-size: 16px; border-bottom: 1px solid #E5E5E5; }
+  .block h2 { margin: 0 0 12px; padding-bottom: 6px; font-size: 16px; border-bottom: 1px solid #E7EAEF; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .stat { padding: 14px 16px; border-radius: 12px; background: #F5F5F5; }
+  .stat { padding: 14px 16px; border-radius: 10px; background: #EFF1F4; }
   .stat-label { color: #737373; font-size: 12px; }
-  .stat-value { margin-top: 4px; font-size: 20px; font-weight: 700; color: #171717; font-variant-numeric: tabular-nums; }
+  .stat-value { margin-top: 4px; font-size: 20px; font-weight: 700; color: #0E1115; font-variant-numeric: tabular-nums; }
   .stat.positive .stat-value { color: #15A877; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 8px 10px; border-bottom: 1px solid #E5E5E5; text-align: left; vertical-align: top; }
-  th { background: #F5F5F5; font-weight: 600; color: #404040; white-space: nowrap; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #E7EAEF; text-align: left; vertical-align: top; }
+  th { background: #EFF1F4; font-weight: 600; color: #404040; white-space: nowrap; }
   dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; }
   dt { color: #737373; font-weight: 600; }
   dd { margin: 0; }
@@ -238,12 +285,17 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
   li + li { margin-top: 6px; }
   .bar-row { display: grid; grid-template-columns: minmax(90px, 22%) 1fr 90px; align-items: center; gap: 12px; margin: 8px 0; }
   .bar-name { font-size: 13px; color: #404040; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bar { height: 8px; border-radius: 6px; background: #E5E5E5; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #4B3FE3, #6A6FFF); }
+  .bar { height: 8px; border-radius: 6px; background: #E7EAEF; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; background: #4B3FE3; }
   .bar-value { font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
   .empty { color: #A1A1A1; }
   .note { color: #A1A1A1; font-size: 12px; }
-  pre { margin: 0; padding: 10px 12px; background: #F5F5F5; border-radius: 8px; overflow: auto; font-size: 12px; }
+  .html-document { display: grid; gap: 10px; }
+  .html-preview-frame { display: block; width: 100%; height: min(78vh, 860px); min-height: 520px; border: 1px solid #E7EAEF; border-radius: 14px; background: #FFFFFF; }
+  .source summary { width: fit-content; cursor: pointer; color: #737373; font-size: 13px; padding: 2px 0; user-select: none; }
+  .source[open] summary { margin-bottom: 8px; }
+  .source pre.code { max-height: 420px; }
+  pre { margin: 0; padding: 10px 12px; background: #E7EAEF; border-radius: 10px; overflow: auto; font-size: 12px; }
   /* 产物数据里的 JSON / 代码 / 长文本：深色代码块 + 语法高亮配色 */
   pre.code { margin: 0; padding: 12px 14px; background: #1F2430; color: #D7DAE0; border-radius: 10px; overflow: auto; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   pre.code .tok-key { color: #C792EA; }
@@ -253,10 +305,11 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
   pre.code .tok-punc { color: #7A8189; }
   pre.code .tok-url { color: #82AAFF; text-decoration: underline; }
   @media (max-width: 560px) {
-    .page { margin: 0; border-radius: 0; padding: 18px; }
+    .page { margin: 0; border-radius: 0; border-left: 0; border-right: 0; padding: 18px; }
     .stats { grid-template-columns: 1fr; }
     .bar-row { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; }
     .bar-value { grid-column: 2; text-align: left; }
+    .html-preview-frame { min-height: 440px; height: 68vh; }
   }
 </style>
 </head>
@@ -265,7 +318,7 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
     <span class="chip">${escapeHtml(kind)}</span>
     <h1>${escapeHtml(artifact.title)}</h1>
     <p class="meta">${escapeHtml(dateText)}</p>
-    ${artifact.summary ? `<p class="summary">${escapeHtml(artifact.summary)}</p>` : ""}
+    ${artifact.summary.trim() ? `<section class="summary markdown">${assistantMarkdown.render(artifact.summary)}</section>` : ""}
     ${body}
   </main>
 </body>

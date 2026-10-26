@@ -1,0 +1,93 @@
+/**
+ * 导出名 → 图标键的映射表。
+ *
+ * 独立成模块是为了让注册表校验可以在纯 Node 环境下运行（测试不需要加载
+ * react-native-svg），`index.tsx` 只负责把这些键渲染成组件。
+ *
+ * 设计库能直接命中的走 `library`，只有设计库缺失的语义才走 `project`；
+ * 同一语义有多个库内近似图标时，取与原用途最接近的一个。
+ */
+export const ICON_KEYS = {
+  Activity: "activity",
+  AlertTriangle: "triangle-alert",
+  Archive: "archive",
+  ArrowDown: "arrow-down",
+  ArrowDownToLine: "arrow-down-to-line",
+  ArrowLeft: "arrow-left",
+  ArrowRight: "arrow-right",
+  ArrowUp: "arrow-up",
+  ArrowUpRight: "arrow-up-right",
+  Bell: "bell",
+  Bot: "bot",
+  Brain: "brain",
+  CalendarClock: "calendar-clock",
+  CalendarDays: "calendar-days",
+  Check: "check",
+  CheckCheck: "check-check",
+  ChevronDown: "chevron-down",
+  ChevronLeft: "chevron-left",
+  ChevronRight: "chevron-right",
+  CircleDollarSign: "circle-dollar-sign",
+  CircleUserRound: "user",
+  CircleX: "circle-x",
+  Clock3: "clock",
+  Cpu: "cpu",
+  Download: "download",
+  Edit3: "pen-line",
+  ExternalLink: "external-link",
+  FilePlus2: "file-plus",
+  FileText: "file",
+  Folder: "folder",
+  FolderOpen: "folder-open",
+  FolderPlus: "folder-plus",
+  Globe2: "globe",
+  Hand: "hand",
+  Heart: "heart",
+  IdCard: "id-card",
+  Inbox: "inbox",
+  Languages: "languages",
+  Lightbulb: "lightbulb",
+  Link2: "link",
+  ListChecks: "list-checks",
+  LogOut: "log-out",
+  Mail: "mail",
+  Menu: "menu",
+  MessageCircle: "message-circle-more",
+  MessageCircleQuestion: "circle-question-mark",
+  Minus: "minus",
+  Monitor: "monitor",
+  MoreHorizontal: "more-horizontal",
+  PanelsTopLeft: "panels-top-left",
+  Pause: "circle-pause",
+  Pencil: "pen-line",
+  Play: "circle-play",
+  Plus: "plus",
+  Power: "power",
+  RefreshCw: "rotate-cw",
+  Reply: "reply",
+  RotateCcw: "rotate-ccw",
+  RotateCw: "rotate-cw",
+  Save: "save",
+  Search: "search",
+  Send: "send-horizontal",
+  Settings2: "settings",
+  Shapes: "shapes",
+  ShieldAlert: "shield-alert",
+  ShieldCheck: "shield-check",
+  Sparkles: "sparkles",
+  Square: "square",
+  SquareCheck: "square-check",
+  Target: "target",
+  Terminal: "terminal",
+  Trash2: "trash-2",
+  Upload: "upload",
+  UserRound: "user",
+  Users: "users",
+  X: "x",
+} as const satisfies Record<string, string>;
+
+/** 导出名列表。 */
+export const ICON_NAMES = Object.keys(ICON_KEYS) as (keyof typeof ICON_KEYS)[];
+
+/** 图标键列表（去重后）。 */
+export const ICON_KEY_VALUES = [...new Set(Object.values(ICON_KEYS))];

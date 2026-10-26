@@ -1,3 +1,8 @@
+import { useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import type { ActionProposal, Artifact } from "../../../packages/domain/src";
+import type { AgentTask } from "../../../packages/domain/src/agent";
+import { activeLocaleTag, localizeAgentName, statusLabel, useTranslation } from "./i18n";
 import {
   AlertTriangle,
   CalendarDays,
@@ -7,12 +12,7 @@ import {
   CircleX,
   Mail,
   ShieldAlert,
-} from "lucide-react-native";
-import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import type { ActionProposal, Artifact } from "../../../packages/domain/src";
-import type { AgentTask } from "../../../packages/domain/src/agent";
-import { activeLocaleTag, localizeAgentName, statusLabel, useTranslation } from "./i18n";
+} from "./icons";
 import { Button, colors, ErrorNotice } from "./ui";
 
 interface PreviewRow {
@@ -250,7 +250,7 @@ export function ApprovalCard({
             {sensitive && pending ? (
               <ShieldAlert size={22} strokeWidth={1.8} color={colors.danger} />
             ) : (
-              <Icon size={22} strokeWidth={1.8} color={colors.blueDark} />
+              <Icon size={22} strokeWidth={1.8} color={colors.primary} />
             )}
           </View>
           <View style={styles.headerText}>
@@ -259,9 +259,9 @@ export function ApprovalCard({
             {!!destination && (
               <View style={styles.destination}>
                 {action.kind === "email.send" ? (
-                  <Mail size={12} strokeWidth={1.8} color={colors.muted} />
+                  <Mail size={13} strokeWidth={1.8} color={colors.muted} />
                 ) : (
-                  <CalendarDays size={12} strokeWidth={1.8} color={colors.muted} />
+                  <CalendarDays size={13} strokeWidth={1.8} color={colors.muted} />
                 )}
                 <Text numberOfLines={1} style={styles.destinationText}>
                   {destination}
@@ -305,12 +305,13 @@ export function ApprovalCard({
               accessibilityState={{ expanded }}
               onPress={() => setExpanded((value) => !value)}
               hitSlop={8}
-              style={styles.more}
+              // 展开/收起是文字按钮，按压态用 overlay1，圆角 10。
+              style={({ pressed }) => [styles.more, pressed && styles.morePressed]}
             >
               {expanded ? (
-                <ChevronDown size={13} strokeWidth={1.8} color={colors.blueDark} />
+                <ChevronDown size={13} strokeWidth={1.8} color={colors.muted} />
               ) : (
-                <ChevronRight size={13} strokeWidth={1.8} color={colors.blueDark} />
+                <ChevronRight size={13} strokeWidth={1.8} color={colors.muted} />
               )}
               <Text style={styles.moreText}>
                 {expanded ? t("tools.approvalShowLess") : t("tools.approvalShowAll")}
@@ -374,26 +375,22 @@ export function ApprovalCard({
 
 const styles = StyleSheet.create({
   wrap: { alignSelf: "flex-start", width: "100%", maxWidth: 600 },
+  /** 审批卡：白底 + 1px 描边 + 14px 圆角，靠边框分层而不是阴影。 */
   card: {
     width: "100%",
     overflow: "hidden",
-    borderRadius: 22,
-    backgroundColor: colors.card,
+    borderRadius: 14,
+    backgroundColor: colors.canvas,
     borderWidth: 1,
     borderColor: colors.line,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
   },
   sensitiveCard: { borderColor: colors.errorSoft },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    padding: 16,
-    paddingBottom: 8,
+    padding: 14,
+    paddingBottom: 10,
   },
   iconBox: {
     width: 40,
@@ -401,13 +398,14 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 20,
-    backgroundColor: colors.lavender,
+    borderRadius: 13,
+    // 图标底座走中性面（surface），敏感操作才切到语义浅底。
+    backgroundColor: colors.surface,
   },
   sensitiveIconBox: { backgroundColor: colors.errorSoft },
   headerText: { flex: 1, minWidth: 0, gap: 2 },
-  eyebrow: { color: colors.muted, fontSize: 12.5, lineHeight: 18, fontWeight: "500" },
-  summary: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: "600" },
+  eyebrow: { color: colors.muted, fontSize: 12, lineHeight: 18, fontWeight: "500" },
+  summary: { color: colors.text, fontSize: 16, lineHeight: 22, fontWeight: "600" },
   destination: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
   destinationText: { flexShrink: 1, color: colors.muted, fontSize: 13, lineHeight: 18 },
   purpose: { color: colors.muted, fontSize: 13, lineHeight: 18, marginTop: 3 },
@@ -415,13 +413,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 6,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
   },
   warningText: { flex: 1, color: colors.danger, fontSize: 12.5, lineHeight: 17 },
-  previewOuter: { paddingHorizontal: 16, paddingBottom: 8 },
+  previewOuter: { paddingHorizontal: 14, paddingBottom: 10 },
+  /** 明细区：次级面填充 + 10px 圆角，与主卡形成面阶梯。 */
   preview: {
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -436,37 +435,52 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
-  rowValue: { color: colors.text, fontSize: 12.5, lineHeight: 18, fontFamily: "monospace" },
+  // 明细值用等宽数字对齐（tabular-nums），避免逐行参差。
+  rowValue: {
+    color: colors.text,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontVariant: ["tabular-nums"] as const,
+  },
   more: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     alignSelf: "flex-start",
-    paddingTop: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 10,
   },
-  moreText: { color: colors.blueDark, fontSize: 12.5, fontWeight: "500" },
-  actions: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16, gap: 8 },
-  fullButton: { width: "100%", minHeight: 46, borderRadius: 23 },
+  morePressed: { backgroundColor: colors.overlay1 },
+  moreText: { color: colors.text, fontSize: 12.5, fontWeight: "500" },
+  actions: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 14, gap: 8 },
+  fullButton: { width: "100%", minHeight: 38, borderRadius: 999 },
   detailsButton: {
     alignSelf: "center",
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 10,
   },
-  detailsPressed: { backgroundColor: colors.sky },
-  detailsText: { color: colors.blueDark, fontSize: 12.5, fontWeight: "500" },
-  onceNote: { color: colors.muted, fontSize: 12, lineHeight: 16, textAlign: "center" },
+  detailsPressed: { backgroundColor: colors.overlay1 },
+  // 链接型强调文字统一用品牌深紫（colors.primary）。
+  detailsText: { color: colors.primary, fontSize: 12.5, fontWeight: "500" },
+  onceNote: { color: colors.faint, fontSize: 12, lineHeight: 16, textAlign: "center" },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderTopWidth: 1,
     borderTopColor: colors.line,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 11,
   },
   statusText: { color: colors.muted, fontSize: 13, fontWeight: "500" },
   statusSucceeded: { color: colors.success },
-  time: { marginLeft: "auto", color: colors.muted, fontSize: 12 },
-  errorWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+  time: {
+    marginLeft: "auto",
+    color: colors.muted,
+    fontSize: 12,
+    fontVariant: ["tabular-nums"] as const,
+  },
+  errorWrap: { paddingHorizontal: 14, paddingBottom: 12 },
 });

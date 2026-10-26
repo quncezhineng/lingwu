@@ -4,9 +4,10 @@
  * 交互：按钮始终展示「当前语言」的简称（EN / 中），点击后弹出语言列表，
  * 选择任意语言后立即生效并写入本地存储，无需刷新页面。
  */
-import { Check, Languages } from "lucide-react-native";
+
 import { useCallback, useRef, useState } from "react";
 import { Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Check, Languages } from "../icons";
 import { colors } from "../ui";
 import { useTranslation } from "./index";
 import { LOCALE_LABELS, type Locale } from "./types";
@@ -71,8 +72,8 @@ export function LanguageSwitcher({
                 alignItems: "center",
                 gap: 3,
                 paddingVertical: 6,
-                borderRadius: 12,
-                backgroundColor: pressed ? colors.line : "transparent",
+                borderRadius: 10,
+                backgroundColor: pressed ? colors.overlay1 : "transparent",
               }
             : {
                 height: 38,
@@ -83,7 +84,7 @@ export function LanguageSwitcher({
                 borderRadius: 19,
                 borderWidth: 1,
                 borderColor: colors.line,
-                backgroundColor: pressed ? colors.overlay2 : "#FFFFFF",
+                backgroundColor: pressed ? colors.overlay2 : colors.canvas,
               }
         }
       >
@@ -126,16 +127,16 @@ export function LanguageSwitcher({
                 left: anchor.left,
                 bottom: anchor.bottom,
                 minWidth: 144,
-                backgroundColor: colors.card,
-                borderRadius: 20,
+                backgroundColor: colors.canvas,
+                borderRadius: 12,
                 borderWidth: 1,
                 borderColor: colors.line,
                 paddingVertical: 8,
                 shadowColor: "#000",
-                shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.12,
-                shadowRadius: 20,
-                elevation: 6,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.08,
+                shadowRadius: 12,
+                elevation: 5,
               }}
             >
               <Text
@@ -182,7 +183,7 @@ export function LanguageSwitcher({
                         {meta.native}
                       </Text>
                     </View>
-                    {selected && <Check size={15} strokeWidth={1.8} color={colors.blueDark} />}
+                    {selected && <Check size={15} strokeWidth={1.8} color={colors.primary} />}
                   </Pressable>
                 );
               })}

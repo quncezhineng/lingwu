@@ -1,6 +1,6 @@
-import { Bell, Clock3 } from "lucide-react-native";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { activeLocaleTag, type TranslationFn, useTranslation } from "./i18n";
+import { Bell, Clock3 } from "./icons";
 import type { ReminderItem, ReminderResult } from "./reminder-result";
 import { parseReminderResult } from "./reminder-result";
 import { colors } from "./ui";
@@ -32,7 +32,7 @@ export function ReminderToolCard({ result, loading }: { result: unknown; loading
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="small" color={colors.blueDark} />
+        <ActivityIndicator size="small" color={colors.primary} />
         <Text style={styles.muted}>{t("tools.remindersLoading")}</Text>
       </View>
     );
@@ -52,7 +52,7 @@ function ReminderList({ data, t }: { data: ReminderResult; t: TranslationFn }) {
       {data.reminders.map((reminder) => (
         <View key={reminder.id} style={styles.item}>
           <View style={styles.itemIcon}>
-            <Clock3 size={14} strokeWidth={1.8} color={colors.blueDark} />
+            <Clock3 size={14} strokeWidth={1.8} color={colors.primary} />
           </View>
           <View style={styles.itemBody}>
             <Text style={styles.itemTitle}>{reminder.title}</Text>
@@ -69,7 +69,7 @@ function ReminderList({ data, t }: { data: ReminderResult; t: TranslationFn }) {
           {data.alerts.map((alert) => (
             <View key={alert.id} style={styles.item}>
               <View style={styles.itemIcon}>
-                <Bell size={14} strokeWidth={1.8} color={colors.blueDark} />
+                <Bell size={14} strokeWidth={1.8} color={colors.primary} />
               </View>
               <View style={styles.itemBody}>
                 <Text style={styles.itemTitle}>{alert.title}</Text>
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.sky,
+    backgroundColor: colors.surface,
   },
   itemBody: { flex: 1, gap: 2 },
   itemTitle: { color: colors.text, fontSize: 13.5, lineHeight: 19, fontWeight: "500" },

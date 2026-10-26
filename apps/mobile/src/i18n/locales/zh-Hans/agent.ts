@@ -47,6 +47,7 @@ const agent = {
   "agent.artifactPreview": "研究产物预览",
   "agent.artifactEmpty": "这份产物没有可展示的数据。",
   "agent.artifactTruncated": "还有 {count} 项未显示。",
+  "agent.artifactViewSource": "查看原始 HTML",
   "agent.sources": "来源",
   "agent.timeline": "时间线",
   "agent.timelineEmpty": "工作进程会在这里记录每一步。",

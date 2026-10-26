@@ -1,16 +1,8 @@
 import { useThreads } from "@copilotkit/react-native/headless";
-import {
-  Archive,
-  CalendarDays,
-  FileText,
-  MessageCircle,
-  Monitor,
-  Plus,
-  Settings2,
-} from "lucide-react-native";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useTranslation } from "./i18n";
+import { Archive, CalendarDays, FileText, MessageCircle, Monitor, Plus, Settings2 } from "./icons";
 import { Button, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -175,7 +167,7 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
             {mainError ? (
               <Button onPress={retry}>{t("app.retryMainChat")}</Button>
             ) : (
-              <ActivityIndicator color={colors.blueDark} />
+              <ActivityIndicator color={colors.primary} />
             )}
           </>
         ) : enabled ? (
@@ -205,7 +197,7 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
                 {archived ? t("threads.showActive") : t("threads.archived")}
               </Button>
             </View>
-            {threads.isLoading && <ActivityIndicator color={colors.blueDark} />}
+            {threads.isLoading && <ActivityIndicator color={colors.primary} />}
             <ErrorNotice error={error || threads.error?.message} />
             {threads.error && (
               <Button small onPress={threads.refetchThreads}>
@@ -229,10 +221,10 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
               <View
                 key={thread.id}
                 style={{
-                  paddingVertical: 12,
+                  paddingVertical: 10,
                   borderBottomWidth: 1,
                   borderBottomColor: colors.line,
-                  gap: 10,
+                  gap: 8,
                 }}
               >
                 <Pressable
@@ -245,9 +237,18 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
                     select({ id: thread.id, existing: true });
                     onClose();
                   }}
-                  style={[s.row, { gap: 10 }]}
+                  // 会话列表行：行圆角 10，按压态用 overlay1
+                  style={({ pressed }) => [
+                    s.row,
+                    { gap: 10, paddingVertical: 4, borderRadius: 10 },
+                    pressed && { backgroundColor: colors.overlay1 },
+                  ]}
                 >
-                  <MessageCircle size={19} strokeWidth={1.8} color={colors.text} />
+                  <MessageCircle
+                    size={19}
+                    strokeWidth={1.8}
+                    color={selection.id === thread.id ? colors.primary : colors.muted}
+                  />
                   <Text style={[s.text, { flex: 1 }]}>
                     {thread.name || t("threads.untitledConversation")}
                   </Text>

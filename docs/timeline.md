@@ -5,11 +5,86 @@
 
 ## 变更记录
 
+### 2026-10-26 · 图标体系迁移至自有 SVG 图标层 + 全站视觉收敛「Doubao Copy」
+
+**背景**
+
+用户要求按选中的设计系统「Doubao Copy」（ID `V.3RSOA.PBS1K2`）重构 LingWu 前端视觉，并用该设计系统的图标替换现有图标，同时保留 LingWu 既有的紫色（`#4B3FE3`）与白色主题。
+
+**设计库可用性说明（重要）**
+
+本轮 Design Canvas 未启用 / 未选中 / 鉴权不可用，因此**未能通过 trae-design 插件正式读取并核验该设计库资产**。实际执行依据为：
+
+1. 本会话此前已确立并固化进代码的设计规范（`ui.tsx` 令牌 + 圆角 + 描边 + 密度规则）；
+2. 早期会话从本地目录 `/Users/luffy/.trae/design_libraries/Doubao Copy` 抓取的历史本地快照。
+
+历史快照中的 40 枚图标已登记为 `source: "library"`；其余 50 枚为设计库缺少对应语义时按同风格补齐，登记为 `source: "project"`。**Design Canvas 恢复后仍需重新通过插件核验资产清单与 token 映射。**
+
+**实现 · 图标层**
+
+- 新建 `apps/mobile/src/icons/`：`types.ts`（`IconDefinition` / `IconSource`）、`library.ts`（40 枚快照图标 + `LIBRARY_ICON_COUNT`）、`project.ts`（50 枚补齐图标）、`keys.ts`（纯数据映射表，可脱离 `react-native-svg` 在 Node 下测试）、`index.tsx`（渲染与注册表解析）。
+- 直接复用项目已有的 `react-native-svg` 15.12.1，**未新增依赖**；`apps/mobile/package.json` 已移除 `lucide-react-native`。
+- API 与 Lucide 保持兼容：`size` / `color` / `strokeWidth` / `fill` / `absoluteStrokeWidth`，并补齐 `accessibilityLabel`、`testID`。
+- 线宽语义不变：常规 `1.8`、强调 `2`、填充 `0`；`absoluteStrokeWidth` 按 24×24 viewBox 等比换算；统一 `strokeLinecap="round"` / `strokeLinejoin="round"`。
+- 未注册图标在模块加载时立即抛错，避免静默缺图。
+- 28 个使用 Lucide 的文件全部改为从 `./icons` 导入。
+
+**实现 · 视觉收敛**
+
+- 令牌（`ui.tsx`）：中性面阶梯 `canvas #FFFFFF → surface #EFF1F4 → tertiary #E7EAEF`；统一描边 `line #E7EAEF` / `lineStrong #D5DBE3`；品牌 `primary #4B3FE3` + `onPrimary #FFFFFF`；`sky #E5EAFF` 仅保留给小面积状态 Chip。清理了无源码调用的 `blue` / `blueDark` / `primaryLight` / `lavender` / `card` 别名。
+- 结构规范：边框优先、弱阴影；圆角收敛为面板 14 / 控件 10 / 小徽标 8 / 胶囊 999（对话气泡 18、语言切换器 19 为有意特例）。
+- 覆盖范围：`shell.tsx`（宽屏侧栏）、`chat.tsx`（对话流、输入器、队列、侧聊、产物面板）、`ui.tsx` 基础组件、`agent-ui.tsx`、`screens.tsx`、`account.tsx`、`details.tsx`、`threads.tsx`、`thread-artifacts.tsx`、`conversation-header.tsx`、`question-card.tsx`、`approval-card.tsx` 及全部工具卡（提醒 / 记忆 / 搜索 / 邮件 / 浏览器 / 桌面 / 通知 / JEV / 工具步骤）。
+- `artifact-html.ts` 自包含 HTML：页面改为白底 + 1px 描边 + 14px 圆角、移除重投影；摘要 / 统计 / 表头 / `pre` 改用 `surface` 与 `tertiary` 分层；`.bar-fill` 改为品牌紫纯色；深色代码块与语法高亮配色保留。CSP、iframe `sandbox`、`escapeHtml` 未改动。
+- `HtmlPreview`（Web / 原生）与 `BrowserConsole.web.tsx` 的硬编码 `#FFF` 统一为 `colors.canvas`。
+
+**安全与约束（全部保持）**
+
+- 产物 HTML 仍为自包含、无脚本注入，`escapeHtml` 强制生效。
+- 弹窗遮罩关闭 + 弹窗内部阻止冒泡；二级菜单按点击坐标动态定位并做边界检测。
+- 研究产物只展示标题行 + 摘要，详情走全屏 Sheet。
+- 对话发送 / 停止按钮位置不变、停止后恢复并保留草稿；消息队列、暂停队列、侧聊草稿行为未变。
+- 第三方服务品牌色经产品确认后保留：Connections 列表新增 `serviceBrands` 令牌（Gmail `#EA5B4D`、Google Calendar `#4285F4`、浏览器 `#1987CF`、OpenBot `#6866A6`，各带 12% 浅色图标底座），仅用于服务识别；LingWu 自身模型行继续使用品牌紫。
+
+**验证**
+
+- `pnpm test`：597 通过 / 0 失败（新增 `apps/mobile/test/icons.test.ts`，覆盖 40 枚快照数量、全部导出名可解析、来源标记、注册表无重复、几何数据完整性）。
+- `pnpm typecheck`、`pnpm lint`（266 文件）、`pnpm build:web`（1293 modules / index 3.78 MB）全部通过。
+- `biome.json` 增加 `.qoder` / `.qoder-collab-runtime` 忽略项，避免本地工具运行文件干扰仓库级 lint。
+
+### 2026-10-26 · 移动端业务页面视觉对齐「Doubao Copy 紧凑型 AI Dashboard」
+
+**背景**
+
+设计令牌已在 `ui.tsx` 中确立（`canvas / surface / tertiary` 中性面阶梯、边框优先、统一圆角），但 `screens.tsx`、`account.tsx`、`conversation-header.tsx`、`threads.tsx`、`thread-artifacts.tsx` 五个业务页面仍混用旧的灰面大面板、`colors.sky` 大块底色、`colors.blueDark` 强调色与松散间距，需要在不改任何业务逻辑的前提下收敛到同一套视觉语言。
+
+**实现**
+
+- **卡片 / 面板**：Today 看板小卡片、Browser 顶部面板、研究产物封面、文档预览底色统一为 `canvas` + 1px `line` 描边 + 14px 圆角；`colors.sky` 不再做大块面板底色，仅保留给 Activity 待审核状态 Chip 与 Connections 当前模型 Chip 这类小面积状态标签。
+- **数据表**：Connections 列表由灰色圆角面板改为白底描边数据表，表头使用 `s.label` 风格（11px、加粗、letterSpacing），表行使用 1px `colors.line` 分隔线 + 行圆角 10。
+- **分段控件**：日历周历由品牌浅底选中态改为 `surface` 容器 + `canvas` 选中项 + `line` 描边，选中文字与事件圆点统一 `colors.primary`。
+- **列表行 / 按压态**：邮件、日程、浏览器会话、Activity 操作与时间线、Connections 表行统一为紧凑密度（padding 10~12）、行圆角 10、按压态 `colors.overlay1`。
+- **图标底座**：全部图标底座回到中性面 `surface`；图标、链接文字、强调小标题、激活态图标统一 `colors.primary`，`colors.blueDark` 在这五个文件中已全部清零。
+- **产物条目**：对话内文件产物改为 `s.card` 承载的紧凑卡片（内边距 12、间距 8），字段区保持标题行 + 最多 4 行摘要，不展开大块内容；数值文本使用 `tabular-nums`。
+- **文件按钮**：`conversation-header.tsx` 顶部文件按钮的展开 / 按压态统一 `colors.overlay1`，激活图标 `colors.primary` + 线宽 2。
+- Connections 列表中 Gmail / Google 日历 / 浏览器 / OpenBot 的第三方品牌色已移除，统一使用 `colors.primary`，避免硬编码色值。（注：同日晚些时候的产品决策已恢复这些品牌色，详见上方「图标体系迁移至自有 SVG 图标层」条目。）
+
+**验证**
+
+- `pnpm --dir apps/mobile typecheck`（`tsc --noEmit`）退出码 0。
+- Grep 自查：这五个文件无 `strokeWidth={1.5}/{2.5}/{3}` 离群线宽、无 `shadowOpacity`/`shadowRadius`、无硬编码十六进制色值、无残留 `colors.blueDark`。
+- 影响面：仅样式与图标外观，未改动任何 `onPress` / `onChangeText` / 状态变量 / props / 翻译 key / 数据请求与导出符号。
+
+### 2026-10-26 · 通知正文支持 Markdown
+
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx) 的通知正文改用紧凑版 `AssistantResponse` 渲染，支持标题、粗体、列表、代码块、安全链接及对话中已有的文件引用。
+- 复用现有 `markdown-it` 安全配置与 `react-native-markdown-renderer`，不新增依赖。
+- `apps/mobile` 的 `tsc --noEmit` 通过；已在 Web 端通知弹窗核对标题、列表、粗体和行内代码的实际渲染。
+
 ### 2026-10-26 · 对话里的 HTML 文件可全屏打开
 
 **背景**
 
-LingTai 的 `FileViewer` 会把生成的 HTML 页面以 `srcDoc` 放进全屏 iframe，允许页面脚本运行但不授予同源权限。LingWu 此前只支持 PDF，点击对话里的 `.html` 文件名仍会进入 PDF 阅读器。REA 对 LingTai 约 506 KB 的生产 bundle 分析在 300 秒后超时，因此本次以 `web/src/components/FileViewer.tsx` 与相关源码作为逆向证据。
+LingWu 的 `FileViewer` 会把生成的 HTML 页面以 `srcDoc` 放进全屏 iframe，允许页面脚本运行但不授予同源权限。LingWu 此前只支持 PDF，点击对话里的 `.html` 文件名仍会进入 PDF 阅读器。REA 对 LingWu 约 506 KB 的生产 bundle 分析在 300 秒后超时，因此本次以 `web/src/components/FileViewer.tsx` 与相关源码作为逆向证据。
 
 **实现**
 

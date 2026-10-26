@@ -8,7 +8,6 @@ import {
   useRenderToolCall,
   useThreads,
 } from "@copilotkit/react-native/headless";
-import { ArrowDown, ArrowUp, FileText, Lightbulb, RotateCcw, Square, X } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Keyboard,
@@ -45,6 +44,7 @@ import { type ConversationDraft, useConversationStream, verifyDrafts } from "./c
 import { DesktopToolCard } from "./desktop-tool-card";
 import { type TranslationKey, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
+import { ArrowDown, ArrowUp, FileText, Lightbulb, Plus, RotateCcw, Square, X } from "./icons";
 import { confirmedJevSelection, displayJevUserMessage, latestJevPanelId } from "./jev-actions";
 import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
@@ -960,15 +960,15 @@ export function ChatScreen({
                             alignItems: "center",
                             gap: 7,
                             maxWidth: 260,
-                            paddingHorizontal: 11,
-                            paddingVertical: 8,
-                            borderRadius: 16,
+                            paddingHorizontal: 10,
+                            paddingVertical: 7,
+                            borderRadius: 10,
                             borderWidth: 1,
                             borderColor: colors.line,
-                            backgroundColor: pressed ? colors.overlay2 : "#FFFFFF",
+                            backgroundColor: pressed ? colors.overlay1 : colors.canvas,
                           })}
                         >
-                          <FileText size={14} strokeWidth={1.8} color={colors.blueDark} />
+                          <FileText size={14} strokeWidth={1.8} color={colors.primary} />
                           <Text
                             numberOfLines={1}
                             style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
@@ -985,10 +985,12 @@ export function ChatScreen({
                     style={{
                       paddingHorizontal: 16,
                       paddingVertical: 13,
-                      borderRadius: 22,
-                      borderBottomRightRadius: user ? 7 : 22,
-                      borderBottomLeftRadius: user ? 22 : 7,
-                      backgroundColor: user ? colors.blue : colors.surface,
+                      borderRadius: 18,
+                      borderBottomRightRadius: user ? 6 : 18,
+                      borderBottomLeftRadius: user ? 18 : 6,
+                      borderWidth: user ? 0 : 1,
+                      borderColor: colors.line,
+                      backgroundColor: user ? colors.primary : colors.canvas,
                     }}
                   >
                     {user ? (
@@ -1086,9 +1088,11 @@ export function ChatScreen({
               style={{
                 paddingHorizontal: 16,
                 paddingVertical: 13,
-                borderRadius: 22,
-                borderBottomLeftRadius: 7,
-                backgroundColor: colors.surface,
+                borderRadius: 18,
+                borderBottomLeftRadius: 6,
+                borderWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: colors.canvas,
               }}
             >
               <AssistantResponse
@@ -1193,10 +1197,13 @@ export function ChatScreen({
               {
                 alignSelf: "flex-start",
                 gap: 7,
-                paddingHorizontal: 19,
-                paddingVertical: 18,
-                backgroundColor: colors.surface,
-                borderRadius: 28,
+                paddingHorizontal: 18,
+                paddingVertical: 16,
+                backgroundColor: colors.canvas,
+                borderWidth: 1,
+                borderColor: colors.line,
+                borderRadius: 18,
+                borderBottomLeftRadius: 6,
               },
             ]}
           >
@@ -1267,14 +1274,37 @@ export function ChatScreen({
           </Button>
         )}
         {!!outbox.pending.length && (
-          <View style={{ padding: 12, gap: 6 }}>
+          <View
+            style={{
+              margin: 12,
+              marginBottom: 6,
+              padding: 12,
+              gap: 8,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: colors.canvas,
+            }}
+          >
             <Text style={s.small}>
               {t("chat.outboxStatus", {
                 state: outbox.paused ? t("chat.messagesOnHold") : t("chat.upNext"),
               })}
             </Text>
             {outbox.pending.map((message) => (
-              <View key={message.id} style={[s.row, { gap: 8 }]}>
+              <View
+                key={message.id}
+                style={[
+                  s.row,
+                  {
+                    gap: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    backgroundColor: colors.surface,
+                  },
+                ]}
+              >
                 <Text numberOfLines={2} style={[s.muted, { flex: 1 }]}>
                   {displayJevUserMessage(message.text, messages)}
                 </Text>
@@ -1312,7 +1342,7 @@ export function ChatScreen({
           </View>
         )}
         {picking && (
-          <Card style={{ marginBottom: 12, padding: 15 }}>
+          <Card style={{ marginBottom: 12, padding: 16 }}>
             <Text style={s.heading}>{t("chat.addDocument")}</Text>
             <ScrollView style={{ maxHeight: 230 }} keyboardShouldPersistTaps="handled">
               {w.files.length ? (
@@ -1345,16 +1375,11 @@ export function ChatScreen({
         )}
         <View
           style={{
-            backgroundColor: "#FFF",
-            borderRadius: 32,
+            backgroundColor: colors.canvas,
+            borderRadius: 22,
             borderWidth: 1,
-            borderColor: focused ? colors.text : colors.line,
+            borderColor: focused ? colors.primary : colors.line,
             padding: 8,
-            shadowColor: "#000",
-            shadowOpacity: focused ? 0.1 : 0.06,
-            shadowRadius: 20,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 4,
           }}
         >
           {attachments.length > 0 && (
@@ -1367,19 +1392,21 @@ export function ChatScreen({
                     accessibilityRole="button"
                     accessibilityLabel={t("chat.removeAttachment", { name: f.name })}
                     onPress={() => setAttachments((ids) => ids.filter((id) => id !== f.id))}
-                    style={[
+                    style={({ pressed }) => [
                       s.row,
                       {
                         gap: 7,
                         maxWidth: "100%",
-                        backgroundColor: colors.sky,
-                        borderRadius: 16,
-                        paddingHorizontal: 11,
-                        paddingVertical: 8,
+                        backgroundColor: pressed ? colors.overlay1 : colors.canvas,
+                        borderWidth: 1,
+                        borderColor: colors.line,
+                        borderRadius: 10,
+                        paddingHorizontal: 10,
+                        paddingVertical: 7,
                       },
                     ]}
                   >
-                    <FileText size={14} strokeWidth={1.8} color={colors.blueDark} />
+                    <FileText size={14} strokeWidth={1.8} color={colors.primary} />
                     <Text
                       numberOfLines={1}
                       style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
@@ -1402,13 +1429,11 @@ export function ChatScreen({
                 height: 44,
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 24,
-                backgroundColor: picking || pressed ? colors.sky : "transparent",
+                borderRadius: 22,
+                backgroundColor: picking || pressed ? colors.overlay1 : "transparent",
               })}
             >
-              <Text style={{ color: colors.text, fontSize: 29, fontWeight: "300", lineHeight: 32 }}>
-                +
-              </Text>
+              <Plus size={22} strokeWidth={1.8} color={colors.text} />
             </Pressable>
             <TextInput
               accessibilityLabel={t("chat.messageLingWu")}
@@ -1427,7 +1452,7 @@ export function ChatScreen({
                     : t("chat.messagePlaceholder")
               }
               placeholderTextColor={colors.faint}
-              selectionColor={colors.blueDark}
+              selectionColor={colors.primary}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               style={{
@@ -1467,8 +1492,8 @@ export function ChatScreen({
               style={({ pressed }) => ({
                 width: 44,
                 height: 44,
-                borderRadius: 24,
-                backgroundColor: replying || draft.trim() ? colors.blue : colors.tertiary,
+                borderRadius: 22,
+                backgroundColor: replying || draft.trim() ? colors.primary : colors.tertiary,
                 alignItems: "center",
                 justifyContent: "center",
                 transform: [{ scale: pressed ? 0.94 : 1 }],
@@ -1559,16 +1584,18 @@ function ArtifactsPanel({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: pressed ? colors.sky : "transparent",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: pressed ? colors.lineStrong : "transparent",
+    backgroundColor: pressed ? colors.canvas : "transparent",
   });
   const listSectionLabel: TextStyle = {
     fontSize: 12,
     fontWeight: "600",
     color: colors.muted,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingTop: 10,
     paddingBottom: 4,
   };
@@ -1599,14 +1626,14 @@ function ArtifactsPanel({
           bottom: 0,
           width: 320,
           maxWidth: "85%",
-          backgroundColor: colors.card,
+          backgroundColor: colors.canvas,
           borderLeftWidth: 1,
           borderLeftColor: colors.line,
           shadowColor: "#000",
-          shadowOffset: { width: -6, height: 0 },
-          shadowOpacity: 0.14,
-          shadowRadius: 18,
-          elevation: 16,
+          shadowOffset: { width: -4, height: 0 },
+          shadowOpacity: 0.08,
+          shadowRadius: 14,
+          elevation: 10,
         }}
       >
         <View
@@ -1632,8 +1659,8 @@ function ArtifactsPanel({
               height: 32,
               alignItems: "center",
               justifyContent: "center",
-              borderRadius: 16,
-              backgroundColor: pressed ? colors.sky : "transparent",
+              borderRadius: 10,
+              backgroundColor: pressed ? colors.overlay1 : "transparent",
             })}
           >
             <X size={17} strokeWidth={1.8} color={colors.muted} />
@@ -1665,16 +1692,16 @@ function ArtifactsPanel({
                       style={{
                         width: 40,
                         height: 40,
-                        borderRadius: 12,
-                        backgroundColor: colors.sky,
+                        borderRadius: 13,
+                        backgroundColor: colors.surface,
                         alignItems: "center",
                         justifyContent: "center",
                       }}
                     >
                       {artifact.kind === "finance" ? (
-                        <Lightbulb size={19} strokeWidth={1.8} color={colors.blueDark} />
+                        <Lightbulb size={19} strokeWidth={1.8} color={colors.primary} />
                       ) : (
-                        <FileText size={19} strokeWidth={1.8} color={colors.blueDark} />
+                        <FileText size={19} strokeWidth={1.8} color={colors.primary} />
                       )}
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
@@ -1707,13 +1734,13 @@ function ArtifactsPanel({
                       style={{
                         width: 40,
                         height: 40,
-                        borderRadius: 12,
-                        backgroundColor: colors.sky,
+                        borderRadius: 13,
+                        backgroundColor: colors.surface,
                         alignItems: "center",
                         justifyContent: "center",
                       }}
                     >
-                      <FileText size={19} strokeWidth={1.8} color={colors.blueDark} />
+                      <FileText size={19} strokeWidth={1.8} color={colors.primary} />
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text

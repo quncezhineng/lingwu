@@ -1,4 +1,3 @@
-import { ChevronRight, FileText } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { Artifact, BrowserSession } from "../../../packages/domain/src";
@@ -8,8 +7,9 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { BrowserThreadCard } from "./computer";
 import { fileKind } from "./file-kind";
 import { useTranslation } from "./i18n";
+import { ChevronRight, FileText } from "./icons";
 import { QuestionCard, taskHasQuestion } from "./question-card";
-import { Button, Card, colors, ErrorNotice, s } from "./ui";
+import { Button, colors, ErrorNotice, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
 export function FileThreadCard({ file }: { file: Artifact }) {
@@ -23,53 +23,56 @@ export function FileThreadCard({ file }: { file: Artifact }) {
         name: file.name,
       })}
       onPress={() => open({ type: "file", file })}
-      style={{ width: "100%", maxWidth: 440 }}
+      // 产物条目：白底 + 1px 描边的紧凑卡片，按压态用 overlay1
+      style={({ pressed }) => [
+        s.card,
+        { padding: 12, gap: 8, width: "100%", maxWidth: 440 },
+        pressed && { backgroundColor: colors.overlay1 },
+      ]}
     >
-      <Card style={{ padding: 18, backgroundColor: colors.surface, gap: 18 }}>
-        <View style={{ borderRadius: 12, padding: 22, backgroundColor: "#FFF", gap: 14 }}>
-          <Text style={[s.heading, { fontSize: 18 }]}>
-            {file.name.replace(/\.(pdf|html?)$/i, "")}
+      <View style={{ borderRadius: 10, padding: 12, backgroundColor: colors.surface, gap: 8 }}>
+        <Text style={s.heading}>{file.name.replace(/\.(pdf|html?)$/i, "")}</Text>
+        {file.fields?.length ? (
+          file.fields.slice(0, 4).map((field) => (
+            <View
+              key={field.name}
+              style={{
+                gap: 4,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.line,
+                paddingBottom: 8,
+              }}
+            >
+              <Text style={[s.small, { fontSize: 10 }]}>
+                {field.name.replace(/_/g, " ").toUpperCase()}
+              </Text>
+              <Text style={[s.text, { fontSize: 13, fontVariant: ["tabular-nums"] as const }]}>
+                {field.value || "—"}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={s.muted}>
+            {kind === "html"
+              ? t("tools.fileHtmlTap")
+              : file.pageCount === 1
+                ? t("tools.fileTapSingle")
+                : t("tools.fileTapPlural", { pageCount: file.pageCount })}
           </Text>
-          {file.fields?.length ? (
-            file.fields.slice(0, 4).map((field) => (
-              <View
-                key={field.name}
-                style={{
-                  gap: 5,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.line,
-                  paddingBottom: 9,
-                }}
-              >
-                <Text style={[s.small, { fontSize: 9 }]}>
-                  {field.name.replace(/_/g, " ").toUpperCase()}
-                </Text>
-                <Text style={[s.text, { fontSize: 12 }]}>{field.value || "—"}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={s.muted}>
-              {kind === "html"
-                ? t("tools.fileHtmlTap")
-                : file.pageCount === 1
-                  ? t("tools.fileTapSingle")
-                  : t("tools.fileTapPlural", { pageCount: file.pageCount })}
-            </Text>
-          )}
+        )}
+      </View>
+      <View style={[s.row, { gap: 12 }]}>
+        <View style={[s.iconBox, { width: 40, height: 40 }]}>
+          <FileText size={20} strokeWidth={1.8} color={colors.primary} />
         </View>
-        <View style={[s.row, { gap: 13 }]}>
-          <View style={{ backgroundColor: colors.primary, padding: 9, borderRadius: 9 }}>
-            <FileText size={23} strokeWidth={1.8} color={colors.onPrimary} />
-          </View>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text numberOfLines={2} style={s.heading}>
-              {file.name}
-            </Text>
-            <Text style={s.muted}>{kind === "html" ? "HTML" : "PDF"}</Text>
-          </View>
-          <ChevronRight size={18} strokeWidth={1.8} color={colors.muted} />
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text numberOfLines={2} style={s.heading}>
+            {file.name}
+          </Text>
+          <Text style={s.muted}>{kind === "html" ? "HTML" : "PDF"}</Text>
         </View>
-      </Card>
+        <ChevronRight size={18} strokeWidth={1.8} color={colors.muted} />
+      </View>
     </Pressable>
   );
 }

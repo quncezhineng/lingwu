@@ -93,11 +93,16 @@ const screens = {
   "screens.filesSubtitle": "研报与公告，留一点整理的空间。",
   "screens.filesImport": "导入 PDF 或 HTML",
   "screens.filesDocumentBadge": "文档",
+  "screens.filesResearchHeading": "研究产物",
+  "screens.filesDocumentsHeading": "文件",
+  "screens.filesResearchBadge": "研究文件",
+  "screens.filesGeneratedByAgent": "智能体生成",
+  "screens.filesOpenResearchArtifact": "打开研究产物：{name}",
   "screens.filesPage": "页",
   "screens.filesPages": "页",
   "screens.filesWebPage": "网页",
   "screens.filesEmptyTitle": "你的文档都在这里",
-  "screens.filesEmptyDetail": "导入 PDF 或打开邮件附件，即可阅读、填写支持的表单字段并分享副本。",
+  "screens.filesEmptyDetail": "对话生成的报告，以及导入的 PDF 或 HTML，都会出现在这里。",
 
   // Activity 动态
   "screens.activityFilterAll": "全部动态",

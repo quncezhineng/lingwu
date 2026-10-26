@@ -10,24 +10,6 @@
  * 窄屏仍沿用底部标签栏，两套外壳共用同一份状态与页面组件，不存在第二套实现。
  */
 import { useThreads } from "@copilotkit/react-native/headless";
-import {
-  Archive,
-  Bell,
-  Check,
-  CircleUserRound,
-  Lightbulb,
-  type LucideIcon,
-  MessageCircle,
-  MoreHorizontal,
-  PanelsTopLeft,
-  Pencil,
-  Plus,
-  Search,
-  Shapes,
-  SquareCheck,
-  Trash2,
-  X,
-} from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   Modal,
@@ -43,13 +25,31 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { useTranslation } from "./i18n";
 import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 import type { TranslationKey } from "./i18n/locales/en";
+import {
+  Archive,
+  Bell,
+  Check,
+  CircleUserRound,
+  type IconComponent,
+  Lightbulb,
+  MessageCircle,
+  MoreHorizontal,
+  PanelsTopLeft,
+  Pencil,
+  Plus,
+  Search,
+  Shapes,
+  SquareCheck,
+  Trash2,
+  X,
+} from "./icons";
 import { relativeDate } from "./relative-date";
 import { useLingWuThread } from "./threads";
 import { Button, colors, ErrorNotice, Mascot, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 图标栏中的导航项：都对应一个页面，点击切换到对应 section。 */
-export type NavItem = { id: Section; labelKey: TranslationKey; icon: LucideIcon };
+export type NavItem = { id: Section; labelKey: TranslationKey; icon: IconComponent };
 
 /** 图标栏中间的主页面（底部的「我的」单独列出，见 ACCOUNT_NAV）。 */
 export const SECTION_NAV: NavItem[] = [
@@ -74,7 +74,7 @@ function errorText(e: unknown) {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** 图标栏里的一项：图标在上、文字在下，选中时用品牌浅紫底与强调色图标。 */
+/** 图标栏里的一项：图标在上、文字在下，选中时用白色面 + 品牌色图标（对齐设计库侧栏激活态）。 */
 function RailItem({
   icon: Icon,
   label,
@@ -82,7 +82,7 @@ function RailItem({
   badge,
   onPress,
 }: {
-  icon: LucideIcon;
+  icon: IconComponent;
   label: string;
   active: boolean;
   badge?: number;
@@ -100,14 +100,16 @@ function RailItem({
         alignItems: "center",
         gap: 3,
         paddingVertical: 6,
-        borderRadius: 12,
-        backgroundColor: active ? colors.sky : pressed ? colors.line : "transparent",
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: active ? colors.line : "transparent",
+        backgroundColor: active ? colors.canvas : pressed ? colors.overlay1 : "transparent",
       })}
     >
       <Icon
-        size={21}
+        size={20}
         strokeWidth={active ? 2 : 1.8}
-        color={active ? colors.blueDark : colors.muted}
+        color={active ? colors.primary : colors.muted}
       />
       <Text
         numberOfLines={1}
@@ -135,7 +137,7 @@ function RailItem({
             backgroundColor: colors.danger,
           }}
         >
-          <Text style={{ fontSize: 10, fontWeight: "700", color: "#FFFFFF" }}>{badge}</Text>
+          <Text style={{ fontSize: 10, fontWeight: "700", color: colors.onPrimary }}>{badge}</Text>
         </View>
       )}
     </Pressable>
@@ -160,7 +162,7 @@ export function Rail({ name, pending }: { name: string; pending: number }) {
         alignItems: "center",
         borderRightWidth: 1,
         borderRightColor: colors.line,
-        backgroundColor: "#FFF",
+        backgroundColor: colors.canvas,
       }}
     >
       <Pressable
@@ -245,7 +247,7 @@ function MenuAction({
   danger,
   onPress,
 }: {
-  icon: LucideIcon;
+  icon: IconComponent;
   label: string;
   danger?: boolean;
   onPress: () => void;
@@ -260,13 +262,13 @@ function MenuAction({
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 4,
-        borderRadius: 12,
-        backgroundColor: pressed ? colors.line : "transparent",
+        paddingVertical: 10,
+        paddingHorizontal: 6,
+        borderRadius: 10,
+        backgroundColor: pressed ? colors.overlay1 : "transparent",
       })}
     >
-      <Icon size={17} strokeWidth={2} color={color} />
+      <Icon size={16} strokeWidth={1.8} color={color} />
       <Text style={{ fontSize: 14, fontWeight: "500", color }}>{label}</Text>
     </Pressable>
   );
@@ -302,16 +304,16 @@ function ThreadActionsMenu({
     left: Math.max(8, Math.min(anchor.x - menuWidth + 28, width - menuWidth - 8)),
     top: anchor.y + 10,
     width: menuWidth,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.canvas,
     padding: 6,
     shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   } as const;
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
@@ -412,10 +414,12 @@ function ThreadRow({
         disabled={editing}
         style={({ pressed }) => ({
           flex: 1,
-          paddingHorizontal: 12,
+          paddingHorizontal: 10,
           paddingVertical: 8,
-          borderRadius: 12,
-          backgroundColor: active ? colors.sky : pressed ? colors.line : "transparent",
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: active ? colors.line : "transparent",
+          backgroundColor: active ? colors.canvas : pressed ? colors.overlay1 : "transparent",
         })}
       >
         {editing ? (
@@ -434,7 +438,7 @@ function ThreadRow({
               color: colors.text,
               paddingVertical: 0,
               borderBottomWidth: 1,
-              borderBottomColor: colors.blueDark,
+              borderBottomColor: colors.primary,
             }}
           />
         ) : (
@@ -463,11 +467,11 @@ function ThreadRow({
             marginRight: 8,
             padding: 6,
             borderRadius: 10,
-            backgroundColor: pressed ? colors.line : "transparent",
+            backgroundColor: pressed ? colors.overlay1 : "transparent",
           })}
         >
           {editing ? (
-            <Check size={15} strokeWidth={2} color={colors.blueDark} />
+            <Check size={15} strokeWidth={2} color={colors.primary} />
           ) : (
             <MoreHorizontal size={15} strokeWidth={2} color={colors.muted} />
           )}
@@ -545,6 +549,7 @@ export function ChatsColumn() {
       .then(() => {
         setMenuAnchor(undefined);
         if (selection.id === id) select({ id: mainId, existing: true });
+        notify(t("threads.archivedNotice"));
       })
       .catch((e) => notify(errorText(e)));
   };
@@ -610,10 +615,10 @@ export function ChatsColumn() {
         flexShrink: 0,
         borderRightWidth: 1,
         borderRightColor: colors.line,
-        backgroundColor: colors.canvas,
+        backgroundColor: colors.surface,
       }}
     >
-      <View style={{ paddingHorizontal: 12, paddingTop: 16, paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8 }}>
         <Text
           style={{
             paddingHorizontal: 4,
@@ -629,23 +634,25 @@ export function ChatsColumn() {
           style={[
             s.row,
             {
-              gap: 8,
+              gap: 9,
               marginTop: 8,
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 12,
-              backgroundColor: colors.tertiary,
+              height: 38,
+              paddingHorizontal: 12,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: colors.canvas,
             },
           ]}
         >
-          <Search size={14} strokeWidth={1.8} color={colors.muted} />
+          <Search size={15} strokeWidth={1.8} color={colors.faint} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder={t("app.searchChatsPlaceholder")}
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={colors.faint}
             accessibilityLabel={t("app.searchChatsPlaceholder")}
-            style={{ flex: 1, minWidth: 0, fontSize: 13, color: colors.text, paddingVertical: 2 }}
+            style={{ flex: 1, minWidth: 0, fontSize: 13, color: colors.text, paddingVertical: 0 }}
           />
           {!!query && (
             <Pressable
@@ -702,7 +709,7 @@ export function ChatsColumn() {
                   alignItems: "center",
                   justifyContent: "center",
                   borderRadius: 12,
-                  backgroundColor: pressed ? colors.line : "transparent",
+                  backgroundColor: pressed ? colors.overlay1 : "transparent",
                 })}
               >
                 <Plus size={15} strokeWidth={1.8} color={colors.muted} />
@@ -757,15 +764,17 @@ export function ChatsColumn() {
           onChangeText={setTitle}
           onSubmitEditing={() => create(title)}
           placeholder={t("app.newSideChatPlaceholder")}
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={colors.faint}
           accessibilityLabel={t("app.newSideChatPlaceholder")}
           style={{
             flex: 1,
             minWidth: 0,
+            height: 36,
             paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 12,
-            backgroundColor: colors.tertiary,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: colors.canvas,
             fontSize: 13,
             color: colors.text,
           }}
@@ -775,12 +784,12 @@ export function ChatsColumn() {
           accessibilityLabel={t("app.createSideChatLabel")}
           onPress={() => create(title)}
           style={({ pressed }) => ({
-            width: 34,
-            height: 34,
+            width: 36,
+            height: 36,
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: 12,
-            backgroundColor: colors.blue,
+            borderRadius: 18,
+            backgroundColor: colors.primary,
             opacity: pressed ? 0.85 : 1,
           })}
         >
@@ -805,7 +814,7 @@ const columnHeading = {
   fontWeight: "600" as const,
   letterSpacing: 0.6,
   color: colors.muted,
-  paddingHorizontal: 12,
+  paddingHorizontal: 10,
   paddingTop: 10,
   paddingBottom: 4,
 };

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assistantMarkdown, isSafeAssistantUrl } from "../src/assistant-markdown.ts";
+import {
+  assistantMarkdown,
+  inlineHtmlDocuments,
+  inlineHtmlFileName,
+  isSafeAssistantUrl,
+  scanInlineDocuments,
+} from "../src/assistant-markdown.ts";
 import { markFileMentions } from "../src/chat-content.ts";
 
 test("assistant Markdown structures the reported response", () => {
@@ -33,4 +39,51 @@ test("bare file names survive Markdown formatting as inline file references", ()
   ]);
   const html = assistantMarkdown.render(source);
   assert.match(html, /<strong><code>byd-stock-brief\.html<\/code><\/strong>/);
+});
+
+test("an inline HTML filename opens the fenced source that follows it", () => {
+  const source = [
+    "把下面内容存为 `reports/比亚迪月报.html`，双击打开即可。",
+    "",
+    "```html",
+    "<!doctype html><html><body><h1>销量月报</h1></body></html>",
+    "```",
+    "",
+    "完成后再打开 `later.html`。",
+  ].join("\n");
+  const scan = scanInlineDocuments(source);
+  assert.equal(scan.documents.get("比亚迪月报.html")?.kind, "html");
+  assert.match(scan.documents.get("比亚迪月报.html")?.source ?? "", /销量月报/);
+  assert.equal(scan.documents.has("later.html"), false);
+  assert.match(scan.markdown, /reports\/比亚迪月报\.html/);
+  assert.doesNotMatch(scan.markdown, /<!doctype html>/);
+});
+
+test("an inline Markdown filename hides its source and keeps a rendered preview", () => {
+  const source = [
+    "把分析保存为 `analysis.md`。",
+    "",
+    "```markdown",
+    "# 一季报结论",
+    "",
+    "- 收入增长",
+    "- 关注现金流",
+    "```",
+  ].join("\n");
+  const scan = scanInlineDocuments(source);
+  assert.equal(scan.documents.get("analysis.md")?.kind, "markdown");
+  assert.match(scan.documents.get("analysis.md")?.source ?? "", /# 一季报结论/);
+  assert.match(scan.markdown, /analysis\.md/);
+  assert.doesNotMatch(scan.markdown, /# 一季报结论/);
+});
+
+test("inline HTML matching ignores other code fences and normalizes paths", () => {
+  const source = ["保存为 `./report.htm?version=1`。", "", "```js", "console.log('x')", "```"].join(
+    "\n",
+  );
+  assert.equal(inlineHtmlFileName("./report.htm?version=1"), "report.htm");
+  assert.equal(inlineHtmlDocuments(source).has("report.htm"), false);
+  const scan = scanInlineDocuments(source);
+  assert.equal(scan.documents.size, 0);
+  assert.match(scan.markdown, /console\.log\('x'\)/);
 });

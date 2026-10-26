@@ -1,9 +1,9 @@
-import { Search } from "lucide-react-native";
 import { useContext, useState } from "react";
 import { ActivityIndicator, Linking, Text, View } from "react-native";
 import { z } from "zod";
 import { BrowserRunContext } from "./browser-tool-card";
 import { useTranslation } from "./i18n";
+import { Search } from "./icons";
 import { Card, colors, ErrorNotice, s } from "./ui";
 
 const resultSchema = z.object({
@@ -41,16 +41,15 @@ export function SearchToolCard({ result, loading }: { result: unknown; loading: 
       style={{
         padding: 14,
         gap: 10,
-        backgroundColor: colors.surface,
         maxWidth: 440,
         width: "100%",
       }}
     >
       <View style={[s.row, { gap: 10 }]}>
         {working ? (
-          <ActivityIndicator size="small" color={colors.blueDark} />
+          <ActivityIndicator size="small" color={colors.primary} />
         ) : (
-          <Search size={18} strokeWidth={1.8} color={colors.blueDark} />
+          <Search size={18} strokeWidth={1.8} color={colors.primary} />
         )}
         <Text style={s.text}>
           {failure
@@ -72,7 +71,7 @@ export function SearchToolCard({ result, loading }: { result: unknown; loading: 
             <Text
               key={source.url}
               accessibilityRole="link"
-              style={[s.text, { color: colors.blueDark }]}
+              style={[s.text, { color: colors.primary }]}
               onPress={() => {
                 setLinkError("");
                 void Linking.openURL(source.url).catch(() =>
