@@ -743,12 +743,20 @@ export class PortfoliosService {
               weight: position.market_value ?? 0,
             })),
           );
+          // Anchor the curve at the first bar shared by every holding so all daily returns count.
+          const portfolioStartDate = bars
+            .map((history) => history[0]?.date)
+            .filter((value): value is string => Boolean(value))
+            .sort()
+            .at(-1);
           return computeRiskMetrics({
             currency,
             benchmark,
             portfolioCloses: equityCurve(portfolioReturns),
             portfolioReturns,
             benchmarkReturns: toReturns(benchmarkBars),
+            ...(portfolioStartDate ? { portfolioStartDate } : {}),
+            ...(benchmarkBars[0]?.date ? { benchmarkStartDate: benchmarkBars[0].date } : {}),
           });
         } catch (error) {
           return unavailableMetrics(

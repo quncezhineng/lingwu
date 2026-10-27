@@ -293,6 +293,8 @@ export const investmentNoteSchema = z.object({
   user_id: z.string(),
   symbol_code: z.string(),
   type: z.enum(["BUY_REASON", "SELL_REASON", "RESEARCH", "THESIS"]),
+  /** Optional short title (≤80 chars); lists fall back to the content's first line. */
+  title: z.string().max(80).optional(),
   content: z.string().min(1).max(20000),
   /** 论点状态；仅 THESIS 类型使用。 */
   status: z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]).optional(),

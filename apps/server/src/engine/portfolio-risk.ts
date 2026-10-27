@@ -125,6 +125,9 @@ export interface ComputeRiskInput {
   portfolioCloses: number[];
   portfolioReturns: ReturnPoint[];
   benchmarkReturns: ReturnPoint[];
+  /** First bar date (V0). Series anchors NAV=1.0 here so all daily returns count. */
+  portfolioStartDate?: string;
+  benchmarkStartDate?: string;
   riskFreeRate?: number;
 }
 
@@ -147,13 +150,18 @@ export function computeRiskMetrics(input: ComputeRiskInput): RiskMetrics {
   let annualizedReturn: number | undefined;
   let annualizedVolatility: number | undefined;
 
-  // Normalized NAV curves: the first aligned day is the base point (NAV=1),
-  // subsequent days accumulate daily returns. Downsampled to ≤120 points for charts.
+  // Normalized NAV curves anchored at the first bar (V0) with NAV=1, then every
+  // aligned daily return is applied. Downsampled to ≤120 points for charts.
   let portfolioNav = 1;
   let benchmarkNav = 1;
   const rawSeries: RiskSeriesPoint[] = [];
-  if (aligned[0]) rawSeries.push({ date: aligned[0].date, portfolio: 1, benchmark: 1 });
-  for (const point of aligned.slice(1)) {
+  const baseDate =
+    [input.portfolioStartDate, input.benchmarkStartDate]
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1) ?? (aligned[0] ? shiftDate(aligned[0].date, -1) : undefined);
+  if (baseDate) rawSeries.push({ date: baseDate, portfolio: 1, benchmark: 1 });
+  for (const point of aligned) {
     portfolioNav *= 1 + point.ret;
     benchmarkNav *= 1 + (benchmarkByDate.get(point.date) ?? 0);
     rawSeries.push({
@@ -221,6 +229,13 @@ export const CURRENCY_BENCHMARKS: Record<string, string> = {
   USD: "^GSPC",
   HKD: "^HSI",
 };
+
+/** Shift an ISO date by whole days (UTC), used only when no explicit start date is given. */
+export function shiftDate(date: string, days: number): string {
+  const base = new Date(`${date}T00:00:00Z`);
+  base.setUTCDate(base.getUTCDate() + days);
+  return base.toISOString().slice(0, 10);
+}
 
 /** Keep at most `max` points, preserving the last point so the endpoint stays exact. */
 export function downsampleSeries(points: RiskSeriesPoint[], max: number): RiskSeriesPoint[] {
