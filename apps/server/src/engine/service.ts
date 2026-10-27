@@ -46,6 +46,7 @@ import {
   pageLines,
   withoutRelativeTimes,
 } from "./page-diff.ts";
+import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
 import { generateResearchReport, researchSymbolSchema } from "./research.ts";
 import { WatchlistsService } from "./watchlists.ts";
@@ -61,6 +62,7 @@ export class AgentService {
   readonly search: SearchService;
   readonly market: MarketDataService;
   readonly watchlists: WatchlistsService;
+  readonly portfolios: PortfoliosService;
   readonly priceAlerts: PriceAlertsService;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
   private maintenance?: ReturnType<typeof setInterval>;
@@ -79,6 +81,7 @@ export class AgentService {
     this.search = search ?? new SearchService(db);
     this.market = market;
     this.watchlists = new WatchlistsService(db, market);
+    this.portfolios = new PortfoliosService(db, market);
     this.priceAlerts = new PriceAlertsService(db, market);
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
       settled: (owner, task) => this.publishOutcome(owner, task),
