@@ -45,6 +45,7 @@ import {
   pageLines,
   withoutRelativeTimes,
 } from "./page-diff.ts";
+import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
 import { generateResearchReport, researchSymbolSchema } from "./research.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
@@ -59,6 +60,7 @@ export class AgentService {
   readonly search: SearchService;
   readonly market: MarketDataService;
   readonly watchlists: WatchlistsService;
+  readonly priceAlerts: PriceAlertsService;
   private maintenance?: ReturnType<typeof setInterval>;
   private refreshing = false;
   constructor(
@@ -75,6 +77,7 @@ export class AgentService {
     this.search = search ?? new SearchService(db);
     this.market = market;
     this.watchlists = new WatchlistsService(db, market);
+    this.priceAlerts = new PriceAlertsService(db, market);
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
       settled: (owner, task) => this.publishOutcome(owner, task),
     });
@@ -105,6 +108,12 @@ export class AgentService {
         await this.publishOutcome(owner, value);
       for (const { owner, value } of await this.db.scan<Monitor>("monitors"))
         await this.activateMonitor(owner, value);
+      for (const { owner, value } of await this.db.scan<PriceAlertRecord>("price_alerts")) {
+        if (!PriceAlertsService.isDue(value)) continue;
+        await this.priceAlerts
+          .check(owner, value.id, this.alertNotifier(owner))
+          .catch((error) => backgroundFailure("price alert check", error));
+      }
       for (const { owner, value } of await this.db.scan<Idea>("ideas"))
         if (
           value.status === "accepted" &&
@@ -760,6 +769,12 @@ export class AgentService {
       { status: "accepted", taskId: task.id },
     );
     return this.db.get<Idea>(owner, "ideas", id);
+  }
+  private alertNotifier(owner: string): AlertNotifier {
+    return async (title, body, key) => {
+      await this.notify(owner, title, body, undefined, key);
+      return { id: hash(key), title, body };
+    };
   }
   async notify(owner: string, title: string, body: string, taskId?: string, key?: string) {
     const value: AgentNotification = {

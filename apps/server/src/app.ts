@@ -21,6 +21,7 @@ import { computerRoutes } from "./computer-routes.ts";
 import { assertApiDeploymentConfig, type Config } from "./config.ts";
 import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
+import { priceAlertRoutes } from "./engine/price-alert-routes.ts";
 import { researchRoutes } from "./engine/research-routes.ts";
 import { agentRoutes } from "./engine/routes.ts";
 import { AgentService } from "./engine/service.ts";
@@ -378,6 +379,7 @@ export async function createApp(
   app.route("/api/symbols", symbolRoutes(agent));
   app.route("/api/briefings", briefingRoutes(agent));
   app.route("/api/research", researchRoutes(agent));
+  app.route("/api/price-alerts", priceAlertRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));
   app.route("/api/computer", computerRoutes(computer, files));
   app.get("/api/calendars", async (c) => c.json(await workspace.calendars(c.get("owner"))));
