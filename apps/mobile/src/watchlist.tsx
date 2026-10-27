@@ -535,13 +535,12 @@ function SegmentedTabs({
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             onPress={() => onChange(filter.id)}
-            hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
             style={({ pressed }) => [
               s.row,
               {
                 gap: 5,
                 paddingHorizontal: 12,
-                minHeight: 36,
+                minHeight: 44,
                 borderRadius: 999,
                 borderWidth: 1,
                 borderColor: selected ? colors.primary : colors.line,
@@ -870,13 +869,12 @@ export function WatchlistScreen() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected }}
                 onPress={() => selectWatchlist(api, item.id)}
-                hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                 style={({ pressed }) => [
                   s.row,
                   {
                     gap: 6,
                     paddingHorizontal: 12,
-                    minHeight: 36,
+                    minHeight: 44,
                     borderRadius: 999,
                     borderWidth: 1,
                     borderColor: selected ? colors.primary : colors.line,
@@ -905,8 +903,7 @@ export function WatchlistScreen() {
           small
           primary
           icon={Plus}
-          hitSlop={4}
-          style={{ minHeight: 36 }}
+          style={{ minHeight: 44 }}
           onPress={() => setSheet("create")}
         >
           {t("markets.watchlistNew")}
