@@ -14,6 +14,7 @@ export type Section =
   | "goals"
   | "watchlist"
   | "portfolio"
+  | "notes"
   | "apps"
   | "account";
 export interface Mail {
