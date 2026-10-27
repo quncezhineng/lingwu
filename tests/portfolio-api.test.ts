@@ -48,6 +48,14 @@ const provider: MarketDataProvider = {
   },
   searchSymbols: async () => [],
   getIndexData: async () => [],
+  getHistory: async () => {
+    // 260 trading days so Beta/Sharpe/MaxDD all have enough observations.
+    return Array.from({ length: 260 }, (_, i) => {
+      const date = new Date(Date.UTC(2025, 9, 1) + i * 86_400_000).toISOString().slice(0, 10);
+      const close = 100 + Math.sin(i / 7) * 5 + i * 0.05;
+      return { date, close: Number(close.toFixed(4)) };
+    });
+  },
 };
 
 const market = () =>
@@ -258,11 +266,13 @@ test("CSV import partially imports valid rows, merges duplicates and reports err
   ].join("\n");
   const result = await post<{
     portfolio: { id: string };
+    rows_accepted: number;
     imported_count: number;
     merged_count: number;
     errors: { row: number; field: string; reason: string }[];
   }>("/portfolios/import", { csv, name: "导入组合" }, 201);
 
+  assert.equal(result.rows_accepted, 3);
   assert.equal(result.imported_count, 2);
   assert.equal(result.merged_count, 1);
   assert.deepEqual(result.errors, [{ row: 4, field: "symbol", reason: "invalid: BAD!SYMBOL" }]);
@@ -282,12 +292,48 @@ test("CSV import partially imports valid rows, merges duplicates and reports err
     "CNY",
   );
 
-  const again = await post<{ imported_count: number; merged_count: number }>("/portfolios/import", {
+  const again = await post<{
+    imported_count: number;
+    merged_count: number;
+    duplicate_import: boolean;
+  }>("/portfolios/import", {
     csv: "symbol,quantity,cost_price,buy_date\nAAPL,10,200,2026-03-04",
     portfolio_id: result.portfolio.id,
   });
   assert.equal(again.imported_count, 0);
   assert.equal(again.merged_count, 1);
+  assert.equal(again.duplicate_import, false);
+});
+
+test("re-importing the same CSV within 24h is a no-op", async () => {
+  const csv = "symbol,quantity,cost_price,buy_date\nAAPL,10,100,2026-01-02";
+  const first = await post<{
+    portfolio: { id: string };
+    rows_accepted: number;
+    imported_count: number;
+    duplicate_import: boolean;
+    content_hash: string;
+  }>("/portfolios/import", { csv });
+  assert.equal(first.duplicate_import, false);
+  assert.equal(first.content_hash.length, 64);
+  assert.equal(first.rows_accepted, 1);
+
+  const second = await post<{
+    rows_accepted: number;
+    imported_count: number;
+    duplicate_import: boolean;
+    content_hash: string;
+  }>("/portfolios/import", { csv, portfolio_id: first.portfolio.id });
+  assert.equal(second.duplicate_import, true);
+  assert.equal(second.imported_count, first.imported_count);
+  assert.equal(second.rows_accepted, first.rows_accepted);
+  assert.equal(second.content_hash, first.content_hash);
+
+  const detail = await call<{ holdings: { symbol_code: string; quantity: number }[] }>(
+    `/portfolios/${first.portfolio.id}`,
+  );
+  assert.equal(detail.holdings.length, 1);
+  assert.equal(detail.holdings[0]?.quantity, 10);
 });
 
 test("summary aggregates per currency without FX conversion", async () => {
@@ -301,14 +347,31 @@ test("summary aggregates per currency without FX conversion", async () => {
 
   const summary = await call<{
     fx_note: string;
-    totals: { currency: string; cost: number; market_value: number; pnl: number }[];
+    totals: {
+      currency: string;
+      cost: number;
+      market_value: number;
+      pnl: number;
+      valued_positions: number;
+      unvalued: { count: number; cost_total: number };
+      valuation_coverage: number;
+    }[];
     positions: { symbol_code: string; market_value?: number; error?: string; currency: string }[];
     allocation: {
       currency: string;
       total_market_value: number;
       by_symbol: { key: string; weight: number }[];
+      excluded_symbols: string[];
     }[];
     top_holdings: { currency: string; items: { key: string }[] }[];
+    risk: {
+      currency: string;
+      benchmark: string;
+      observations: number;
+      beta?: number;
+      max_drawdown?: number;
+      unavailable: { metric: string; reason: string }[];
+    }[];
     unavailable: string[];
   }>(`/portfolios/${imported.portfolio.id}/summary`);
 
@@ -316,21 +379,39 @@ test("summary aggregates per currency without FX conversion", async () => {
   assert.deepEqual(summary.totals.map((total) => total.currency).sort(), ["CNY", "USD"]);
   const usd = summary.totals.find((total) => total.currency === "USD");
   assert.equal(usd?.cost, 1510);
-  // HANG has no quote, so its market value falls back to cost (10).
-  assert.equal(usd?.market_value, 1910);
+  // Failed quotes are excluded from market value and disclosed, never cost-filled.
+  assert.equal(usd?.market_value, 1900);
+  // PnL only covers valued positions (AAPL cost 1500).
   assert.equal(usd?.pnl, 400);
+  assert.equal(usd?.valued_positions, 1);
+  assert.deepEqual(usd?.unvalued, { count: 1, cost_total: 10 });
+  assert.ok(Math.abs((usd?.valuation_coverage ?? 0) - 1900 / 1910) < 1e-6);
   const cny = summary.totals.find((total) => total.currency === "CNY");
   assert.equal(cny?.market_value, 180000);
 
   assert.deepEqual(summary.unavailable, ["HANG"]);
   const hang = summary.positions.find((position) => position.symbol_code === "HANG");
   assert.equal(hang?.error, "timeout");
+  assert.equal(hang?.market_value, undefined);
 
   const usdAllocation = summary.allocation.find((entry) => entry.currency === "USD");
+  assert.equal(usdAllocation?.total_market_value, 1900);
+  assert.equal(usdAllocation?.by_symbol.length, 1);
   assert.equal(usdAllocation?.by_symbol[0]?.key, "AAPL");
-  assert.ok((usdAllocation?.by_symbol[0]?.weight ?? 0) > 99);
+  // Weights are percentages (0-100), not fractions.
+  assert.equal(usdAllocation?.by_symbol[0]?.weight, 100);
+  assert.deepEqual(usdAllocation?.excluded_symbols, ["HANG"]);
   assert.equal(
     summary.top_holdings.find((entry) => entry.currency === "USD")?.items[0]?.key,
     "AAPL",
   );
+
+  // Risk is computed per currency bucket, never combined across currencies.
+  assert.deepEqual(summary.risk.map((entry) => entry.currency).sort(), ["CNY", "USD"]);
+  const usdRisk = summary.risk.find((entry) => entry.currency === "USD");
+  assert.equal(usdRisk?.benchmark, "^GSPC");
+  assert.ok((usdRisk?.observations ?? 0) >= 120);
+  assert.ok((usdRisk?.max_drawdown ?? 0) > 0);
+  const cnyRisk = summary.risk.find((entry) => entry.currency === "CNY");
+  assert.equal(cnyRisk?.benchmark, "000300.SS");
 });

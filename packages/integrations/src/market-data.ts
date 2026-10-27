@@ -52,12 +52,38 @@ export class MarketDataError extends Error {
   }
 }
 
+export interface BatchQuoteItem {
+  symbol: string;
+  name?: string;
+  market: Market;
+  currency?: string;
+  price?: number;
+  previousClose?: number;
+  change?: number;
+  changePercent?: number;
+  volume?: number;
+  asOf?: string;
+  stale?: boolean;
+  source?: string;
+  error?: MarketDataErrorKind | "provider_error";
+}
+
+export interface HistoryBar {
+  /** Trading date in YYYY-MM-DD. */
+  date: string;
+  close: number;
+}
+
+export type HistoryRange = "1y" | "2y";
+
 export interface MarketDataProvider {
   readonly id: "yahoo" | "akshare";
   supports(market: Market): boolean;
   getQuote(symbol: string): Promise<Quote>;
   searchSymbols(query: string, limit: number): Promise<SymbolMatch[]>;
   getIndexData(): Promise<Quote[]>;
+  /** Optional: providers that cannot serve daily history simply omit it. */
+  getHistory?(symbol: string, range?: HistoryRange): Promise<HistoryBar[]>;
 }
 
 export type PythonRunner = (script: string, timeoutMs: number) => Promise<string>;
@@ -122,10 +148,15 @@ export function resolveMarket(symbol: string): Market {
   return "US";
 }
 
-/** Yahoo uses `.SS` for Shanghai; accept `.SH` from callers and normalize it. */
+/**
+ * Yahoo uses `.SS` for Shanghai and 4-digit HK codes.
+ * Accept `.SH` from callers and normalize 5-digit broker codes (00700.HK → 0700.HK).
+ */
 export function normalizeYahooSymbol(symbol: string): string {
   const trimmed = symbol.trim();
   if (/\.SH$/i.test(trimmed)) return `${trimmed.slice(0, -3).toUpperCase()}.SS`;
+  const hk = /^(\d{4,5})\.HK$/i.exec(trimmed);
+  if (hk?.[1]) return `${hk[1].replace(/^0+/, "").padStart(4, "0")}.HK`;
   return trimmed.toUpperCase();
 }
 
@@ -308,6 +339,43 @@ export class YahooFinanceProvider implements MarketDataProvider {
     );
     return quotes;
   }
+
+  async getHistory(symbol: string, range: HistoryRange = "1y"): Promise<HistoryBar[]> {
+    const normalized = normalizeYahooSymbol(symbol);
+    if (!SYMBOL_PATTERN.test(normalized))
+      throw new MarketDataError("unsupported", `Invalid symbol: ${symbol}`);
+    const url = `${this.baseUrl}/v8/finance/chart/${encodeURIComponent(normalized)}?range=${range}&interval=1d`;
+    const response = await this.request(url);
+    const payload = (await readJson(response)) as {
+      chart?: {
+        result?: {
+          timestamp?: number[];
+          indicators?: { quote?: { close?: (number | null)[] }[] };
+        }[];
+        error?: { code?: string; description?: string } | null;
+      };
+    };
+    const chartError = payload.chart?.error;
+    if (chartError)
+      throw new MarketDataError(
+        chartError.code === "Not Found" ? "not_found" : "parse",
+        chartError.description ?? "Yahoo Finance chart error",
+      );
+    const result = payload.chart?.result?.[0];
+    const timestamps = result?.timestamp ?? [];
+    const closes = result?.indicators?.quote?.[0]?.close ?? [];
+    const bars: HistoryBar[] = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const timestamp = timestamps[i];
+      const close = closes[i];
+      if (typeof timestamp !== "number" || typeof close !== "number" || !Number.isFinite(close))
+        continue;
+      bars.push({ date: new Date(timestamp * 1000).toISOString().slice(0, 10), close });
+    }
+    if (bars.length === 0)
+      throw new MarketDataError("not_found", `No daily history found for ${symbol}`);
+    return bars;
+  }
 }
 
 export interface AkshareProviderOptions {
@@ -421,6 +489,10 @@ export class AkshareProvider implements MarketDataProvider {
   async getIndexData(): Promise<Quote[]> {
     throw new MarketDataError("unsupported", "AKShare index data is not implemented");
   }
+
+  async getHistory(): Promise<HistoryBar[]> {
+    throw new MarketDataError("unsupported", "AKShare history is not implemented");
+  }
 }
 
 interface CacheEntry {
@@ -440,6 +512,10 @@ export interface MarketDataServiceOptions {
   quoteTimeoutMs?: number;
   /** Deadline for one symbol search (product threshold: 5s). */
   searchTimeoutMs?: number;
+  /** Deadline for one daily-history request. */
+  historyTimeoutMs?: number;
+  /** Daily-history cache TTL (default 30 minutes). */
+  historyCacheTtlMs?: number;
   /** Set false to skip the AKShare fallback entirely. */
   akshareEnabled?: boolean;
   /** Set false to skip returning an expired cache when providers fail. */
@@ -474,10 +550,16 @@ export class MarketDataService {
   private readonly maxCacheEntries: number;
   private readonly quoteTimeoutMs: number;
   private readonly searchTimeoutMs: number;
+  private readonly historyTimeoutMs: number;
+  private readonly historyCacheTtlMs: number;
   private readonly staleFallbackEnabled: boolean;
   private readonly now: () => number;
   private readonly onError: (context: MarketDataLogContext, error: unknown) => void;
   private readonly cache = new Map<string, CacheEntry>();
+  private readonly historyCache = new Map<
+    string,
+    { value: HistoryBar[]; expiresAt: number; staleUntil: number }
+  >();
 
   constructor(options: MarketDataServiceOptions = {}) {
     this.yahoo = options.yahoo ?? new YahooFinanceProvider({ fetch: options.fetch });
@@ -497,6 +579,10 @@ export class MarketDataService {
       options.quoteTimeoutMs ?? envNumber("MARKET_DATA_QUOTE_TIMEOUT_MS", DEFAULT_QUOTE_TIMEOUT_MS);
     this.searchTimeoutMs =
       options.searchTimeoutMs ?? envNumber("MARKET_DATA_SEARCH_TIMEOUT_MS", REQUEST_TIMEOUT_MS);
+    this.historyTimeoutMs =
+      options.historyTimeoutMs ?? envNumber("MARKET_DATA_HISTORY_TIMEOUT_MS", 10_000);
+    this.historyCacheTtlMs =
+      options.historyCacheTtlMs ?? envNumber("MARKET_DATA_HISTORY_CACHE_TTL_MS", 30 * 60_000);
     this.staleFallbackEnabled =
       options.staleFallbackEnabled ?? process.env.MARKET_DATA_STALE_CACHE_ENABLED !== "false";
     this.now = options.now ?? Date.now;
@@ -602,6 +688,60 @@ export class MarketDataService {
     return Promise.all(unique.map((symbol) => this.getQuote(symbol)));
   }
 
+  /**
+   * Batch quotes for cards: deduplicates, preserves first-seen order and never throws.
+   * Per-symbol failures land in `error`; the whole batch is bounded by `timeoutMs`.
+   */
+  async getBatchQuotes(
+    symbols: string[],
+    options: { timeoutMs?: number } = {},
+  ): Promise<BatchQuoteItem[]> {
+    const unique = [
+      ...new Set(
+        symbols
+          .map((symbol) => symbol.trim())
+          .filter(Boolean)
+          .map((symbol) => normalizeYahooSymbol(symbol)),
+      ),
+    ];
+    const deadline = this.now() + (options.timeoutMs ?? 10_000);
+    const settled = await Promise.allSettled(
+      unique.map((symbol) => {
+        const remaining = Math.max(1, deadline - this.now());
+        return withTimeout(
+          this.getQuote(symbol),
+          remaining,
+          `Timed out loading a quote for ${symbol}`,
+        );
+      }),
+    );
+    return unique.map((symbol, i) => {
+      const result = settled[i];
+      if (result?.status === "fulfilled") {
+        const quote = result.value;
+        return {
+          symbol,
+          name: quote.name,
+          market: quote.market,
+          currency: quote.currency,
+          price: quote.price,
+          previousClose: quote.previousClose,
+          change: quote.change,
+          changePercent: quote.changePercent,
+          volume: quote.volume,
+          asOf: quote.asOf,
+          stale: quote.stale ?? false,
+          source: quote.source,
+        };
+      }
+      const error =
+        result?.status === "rejected" && result.reason instanceof MarketDataError
+          ? result.reason.kind
+          : "provider_error";
+      return { symbol, market: resolveMarket(symbol), error };
+    });
+  }
+
   async searchSymbols(query: string, limit = 10): Promise<SymbolMatch[]> {
     if (!query.trim()) return [];
     try {
@@ -616,6 +756,38 @@ export class MarketDataService {
       throw error instanceof MarketDataError
         ? error
         : new MarketDataError("network", "Symbol search failed");
+    }
+  }
+
+  /** Daily closes with a long-lived cache; stale history is acceptable for risk metrics. */
+  async getHistory(symbol: string, range: HistoryRange = "1y"): Promise<HistoryBar[]> {
+    const key = `history:${normalizeYahooSymbol(symbol)}:${range}`;
+    const cached = this.historyCache.get(key);
+    const at = this.now();
+    if (cached && cached.expiresAt > at) return cached.value;
+    if (!this.yahoo.getHistory)
+      throw new MarketDataError("unsupported", "History is not supported by this provider");
+    try {
+      const bars = await withTimeout(
+        this.yahoo.getHistory(symbol, range),
+        this.historyTimeoutMs,
+        `Timed out loading history for ${symbol}`,
+      );
+      this.historyCache.set(key, {
+        value: bars,
+        expiresAt: at + this.historyCacheTtlMs,
+        staleUntil: at + this.historyCacheTtlMs * 4,
+      });
+      return bars;
+    } catch (error) {
+      this.report(
+        { phase: "getHistory", provider: "yahoo", kind: "provider_error", symbol },
+        error,
+      );
+      if (cached && cached.staleUntil > at) return cached.value;
+      throw error instanceof MarketDataError
+        ? error
+        : new MarketDataError("network", `Unable to load history for ${symbol}`);
     }
   }
 

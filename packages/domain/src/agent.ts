@@ -278,6 +278,15 @@ export const holdingSchema = z.object({
 });
 export type Holding = z.infer<typeof holdingSchema>;
 
+/** 论点检验结果。source=manual 表示用户确认，自动周检不得覆盖。 */
+export const noteCheckSchema = z.object({
+  outcome: z.enum(["valid", "invalid", "inconclusive", "pending_confirmation"]),
+  source: z.enum(["automated", "manual"]),
+  checked_at: z.string().datetime(),
+  note: z.string().max(500).optional(),
+});
+export type NoteCheck = z.infer<typeof noteCheckSchema>;
+
 /** 投资笔记 / 论点 */
 export const investmentNoteSchema = z.object({
   id: z.string().uuid(),
@@ -285,11 +294,11 @@ export const investmentNoteSchema = z.object({
   symbol_code: z.string(),
   type: z.enum(["BUY_REASON", "SELL_REASON", "RESEARCH", "THESIS"]),
   content: z.string().min(1).max(20000),
-  /** 仅 THESIS 类型使用；其它类型为空。 */
-  thesis_status: z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]).optional(),
-  /** 每周检验结果：未接入模型时记为 needs_review，绝不伪造结论。 */
-  review_status: z.enum(["PENDING", "CONFIRMED", "NEEDS_MANUAL_REVIEW"]).optional(),
-  last_reviewed_at: z.string().datetime().optional(),
+  /** 论点状态；仅 THESIS 类型使用。 */
+  status: z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]).optional(),
+  /** 最近一次检验；无模型时 outcome=pending_confirmation，绝不伪造结论。 */
+  check: noteCheckSchema.optional(),
+  last_checked_at: z.string().datetime().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });

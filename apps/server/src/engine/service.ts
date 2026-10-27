@@ -37,8 +37,10 @@ import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
 import { createBriefingScheduler } from "./briefing-scheduler.ts";
 import { analyzeSpending } from "./finance.ts";
+import { FinancialsService } from "./financials.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { executeModelTask } from "./model.ts";
+import { NotesService } from "./notes.ts";
 import {
   countPageDiff,
   describePageDiff,
@@ -63,6 +65,8 @@ export class AgentService {
   readonly market: MarketDataService;
   readonly watchlists: WatchlistsService;
   readonly portfolios: PortfoliosService;
+  readonly notes: NotesService;
+  readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
   private maintenance?: ReturnType<typeof setInterval>;
@@ -82,6 +86,8 @@ export class AgentService {
     this.market = market;
     this.watchlists = new WatchlistsService(db, market);
     this.portfolios = new PortfoliosService(db, market);
+    this.notes = new NotesService(db);
+    this.financials = new FinancialsService(db);
     this.priceAlerts = new PriceAlertsService(db, market);
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
       settled: (owner, task) => this.publishOutcome(owner, task),
@@ -140,6 +146,15 @@ export class AgentService {
       await this.briefings
         .runOnce()
         .catch((error) => backgroundFailure("briefing schedule", error));
+      const thesisOwners = new Set(
+        (await this.db.scan<{ id: string; type: string }>("notes")).map(({ owner }) => owner),
+      );
+      for (const owner of thesisOwners)
+        await this.notes
+          .runThesisCheck(owner, {
+            notify: async (title, body, key) => this.notify(owner, title, body, undefined, key),
+          })
+          .catch((error) => backgroundFailure("thesis check", error));
       for (const { owner, value } of await this.db.scan<Idea>("ideas"))
         if (
           value.status === "accepted" &&

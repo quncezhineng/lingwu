@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Holding, Portfolio } from "../../../../packages/domain/src/agent.ts";
 import {
@@ -11,6 +11,15 @@ import {
 } from "../../../../packages/integrations/src/market-data.ts";
 import type { Store } from "../db.ts";
 import { AppError } from "../errors.ts";
+import {
+  CURRENCY_BENCHMARKS,
+  computeRiskMetrics,
+  equityCurve,
+  type RiskMetrics,
+  riskFreeRate,
+  toReturns,
+  weightedReturns,
+} from "./portfolio-risk.ts";
 
 const PORTFOLIO_KIND = "portfolios";
 const HOLDING_KIND = "holdings";
@@ -83,16 +92,24 @@ export interface Position extends Holding {
 
 export interface CurrencyTotal {
   currency: string;
+  /** Cost of all positions in this currency, including unvalued ones. */
   cost: number;
+  /** Market value of valued positions only. Failed quotes are excluded, never cost-filled. */
   market_value: number;
+  /** PnL of valued positions only (market_value - valued cost). */
   pnl: number;
   pnl_pct: number | null;
   positions: number;
+  valued_positions: number;
+  unvalued: { count: number; cost_total: number };
+  /** valued market value / (valued market value + unvalued cost), ratio 0-1. */
+  valuation_coverage: number;
 }
 
 export interface AllocationSlice {
   key: string;
   market_value: number;
+  /** Percentage 0-100 within the currency bucket. */
   weight: number;
 }
 
@@ -111,6 +128,8 @@ export interface PortfolioSummary {
     by_market: AllocationSlice[];
   }[];
   top_holdings: { currency: string; items: AllocationSlice[] }[];
+  /** Risk metrics per currency bucket; never combined across currencies. */
+  risk: RiskMetrics[];
   unavailable: string[];
 }
 
@@ -145,10 +164,32 @@ export interface CsvPreview {
 
 export interface CsvImportResult {
   portfolio: Portfolio;
+  /** Rows that passed validation, including rows merged into an existing symbol. */
+  rows_accepted: number;
+  /** New symbols created. */
+  imported_count: number;
+  /** Rows merged into an existing symbol (within the file or the portfolio). */
+  merged_count: number;
+  errors: { row: number; field: string; reason: string }[];
+  /** sha256 of the uploaded CSV; the idempotency key component. */
+  content_hash: string;
+  /** True when the same content was already applied to this portfolio within 24h. */
+  duplicate_import: boolean;
+}
+
+interface ImportBatch {
+  id: string;
+  portfolio_id: string;
+  content_hash: string;
+  rows_accepted: number;
   imported_count: number;
   merged_count: number;
   errors: { row: number; field: string; reason: string }[];
+  created_at: string;
 }
+
+const IMPORT_BATCH_KIND = "portfolio_imports";
+const IMPORT_DEDUPE_MS = 24 * 60 * 60 * 1000;
 
 function inferCurrency(symbol: string): "CNY" | "USD" | "HKD" {
   const market = resolveMarket(symbol);
@@ -426,12 +467,30 @@ export class PortfoliosService {
     input: { csv: string; portfolio_id?: string; name?: string; base_currency?: string },
   ): Promise<CsvImportResult> {
     const preview = parseHoldingsCsv(input.csv);
+    const contentHash = createHash("sha256").update(input.csv, "utf8").digest("hex");
     const portfolio = input.portfolio_id
       ? await this.requirePortfolio(owner, input.portfolio_id)
       : await this.create(owner, {
           name: input.name ?? "导入组合",
           base_currency: currencySchema.parse(input.base_currency ?? "CNY"),
         });
+
+    // Batch idempotency: the same content applied to the same portfolio within 24h is a no-op.
+    const batchId = createHash("sha256")
+      .update(`portfolio-import:${owner}:${portfolio.id}:${contentHash}`)
+      .digest("hex");
+    const previous = await this.db.get<ImportBatch>(owner, IMPORT_BATCH_KIND, batchId);
+    if (previous && Date.now() - Date.parse(previous.created_at) < IMPORT_DEDUPE_MS)
+      return {
+        portfolio,
+        rows_accepted: previous.rows_accepted,
+        imported_count: previous.imported_count,
+        merged_count: previous.merged_count,
+        errors: previous.errors,
+        content_hash: contentHash,
+        duplicate_import: true,
+      };
+
     let imported = 0;
     let merged = 0;
     // Cache existing holdings so a 1000-row file does not re-read the store per row.
@@ -461,13 +520,27 @@ export class PortfoliosService {
         imported++;
       }
     }
-    return {
-      portfolio,
+    const errors = preview.rows
+      .filter((row) => row.status === "error")
+      .flatMap((row) => row.errors.map((error) => ({ row: row.row, ...error })));
+    await this.db.put<ImportBatch>(owner, IMPORT_BATCH_KIND, {
+      id: batchId,
+      portfolio_id: portfolio.id,
+      content_hash: contentHash,
+      rows_accepted: preview.valid,
       imported_count: imported,
       merged_count: merged,
-      errors: preview.rows
-        .filter((row) => row.status === "error")
-        .flatMap((row) => row.errors.map((error) => ({ row: row.row, ...error }))),
+      errors,
+      created_at: new Date().toISOString(),
+    });
+    return {
+      portfolio,
+      rows_accepted: preview.valid,
+      imported_count: imported,
+      merged_count: merged,
+      errors,
+      content_hash: contentHash,
+      duplicate_import: false,
     };
   }
 
@@ -506,6 +579,7 @@ export class PortfoliosService {
               ? settled.reason.kind
               : "provider_error"
             : "provider_error";
+        // Never cost-fill a failed quote: callers must show it as unvalued.
         return { ...holding, cost, error };
       }
       const marketValue = holding.quantity * quote.price;
@@ -526,16 +600,25 @@ export class PortfoliosService {
     const currencies = [...new Set(positions.map((position) => position.currency))];
     const totals: CurrencyTotal[] = currencies.map((currency) => {
       const items = positions.filter((position) => position.currency === currency);
+      const valued = items.filter((item) => item.market_value !== undefined);
+      const unvalued = items.filter((item) => item.market_value === undefined);
       const cost = items.reduce((sum, item) => sum + item.cost, 0);
-      const marketValue = items.reduce((sum, item) => sum + (item.market_value ?? item.cost), 0);
-      const pnl = marketValue - cost;
+      const valuedCost = valued.reduce((sum, item) => sum + item.cost, 0);
+      const marketValue = valued.reduce((sum, item) => sum + (item.market_value ?? 0), 0);
+      const pnl = marketValue - valuedCost;
+      const unvaluedCost = unvalued.reduce((sum, item) => sum + item.cost, 0);
+      const coverage =
+        marketValue + unvaluedCost === 0 ? 0 : marketValue / (marketValue + unvaluedCost);
       return {
         currency,
         cost: Number(cost.toFixed(2)),
         market_value: Number(marketValue.toFixed(2)),
         pnl: Number(pnl.toFixed(2)),
-        pnl_pct: cost === 0 ? null : Number(((pnl / cost) * 100).toFixed(4)),
+        pnl_pct: valuedCost === 0 ? null : Number(((pnl / valuedCost) * 100).toFixed(4)),
         positions: items.length,
+        valued_positions: valued.length,
+        unvalued: { count: unvalued.length, cost_total: Number(unvaluedCost.toFixed(2)) },
+        valuation_coverage: Number(coverage.toFixed(6)),
       };
     });
 
@@ -562,6 +645,11 @@ export class PortfoliosService {
         by_symbol: slice((item) => item.symbol_code),
         by_sector: slice((item) => item.sector ?? "未分类"),
         by_market: slice((item) => item.market),
+        excluded_symbols: positions
+          .filter(
+            (position) => position.currency === currency && position.market_value === undefined,
+          )
+          .map((position) => position.symbol_code),
       };
     });
 
@@ -569,6 +657,69 @@ export class PortfoliosService {
       currency: entry.currency,
       items: entry.by_symbol.slice(0, 5),
     }));
+
+    const risk = await Promise.all(
+      currencies.map(async (currency): Promise<RiskMetrics> => {
+        const benchmark =
+          portfolio.benchmark ??
+          CURRENCY_BENCHMARKS[currency] ??
+          CURRENCY_BENCHMARKS.USD ??
+          "^GSPC";
+        const items = positions.filter(
+          (position) => position.currency === currency && position.market_value !== undefined,
+        );
+        const unavailableMetrics = (reason: string): RiskMetrics => ({
+          currency,
+          benchmark,
+          risk_free_rate: riskFreeRate(),
+          observations: 0,
+          unavailable: [{ metric: "*", reason }],
+        });
+        if (items.length === 0) return unavailableMetrics("no_positions_with_quotes");
+        const remaining = deadline - Date.now();
+        if (remaining < 500) return unavailableMetrics("timeout");
+        try {
+          const settled = await Promise.allSettled(
+            items.map((position) => {
+              const left = Math.max(1, deadline - Date.now());
+              return withTimeout(
+                this.market.getHistory(position.symbol_code, "1y"),
+                left,
+                `Timed out loading history for ${position.symbol_code}`,
+              );
+            }),
+          );
+          if (settled.some((result) => result.status === "rejected"))
+            return unavailableMetrics("history_unavailable");
+          const benchmarkBars = await withTimeout(
+            this.market.getHistory(benchmark, "1y"),
+            Math.max(1, deadline - Date.now()),
+            `Timed out loading benchmark ${benchmark}`,
+          );
+          const bars = settled.map(
+            (result) => (result as PromiseFulfilledResult<{ date: string; close: number }[]>).value,
+          );
+          const portfolioReturns = weightedReturns(
+            items.map((position, i) => ({
+              returns: toReturns(bars[i] ?? []),
+              weight: position.market_value ?? 0,
+            })),
+          );
+          return computeRiskMetrics({
+            currency,
+            benchmark,
+            portfolioCloses: equityCurve(portfolioReturns),
+            portfolioReturns,
+            benchmarkReturns: toReturns(benchmarkBars),
+          });
+        } catch (error) {
+          return unavailableMetrics(
+            error instanceof MarketDataError ? error.kind : "history_unavailable",
+          );
+        }
+      }),
+    );
+    risk.sort((a, b) => a.currency.localeCompare(b.currency));
 
     return {
       portfolio,
@@ -578,6 +729,7 @@ export class PortfoliosService {
       positions,
       allocation,
       top_holdings: topHoldings,
+      risk,
       unavailable,
     };
   }

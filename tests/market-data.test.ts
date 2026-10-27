@@ -101,6 +101,8 @@ test("yahoo normalizes Shanghai .SH suffix to .SS", async () => {
   await provider.getQuote("600519.SH");
   assert.match(fetchImpl.calls[0] ?? "", /600519\.SS/);
   assert.equal(normalizeYahooSymbol("600519.sh"), "600519.SS");
+  assert.equal(normalizeYahooSymbol("00700.HK"), "0700.HK");
+  assert.equal(normalizeYahooSymbol("9988.hk"), "9988.HK");
   assert.equal(resolveMarket("600519.SS"), "CN");
   assert.equal(resolveMarket("0700.HK"), "HK");
   assert.equal(resolveMarket("AAPL"), "US");
