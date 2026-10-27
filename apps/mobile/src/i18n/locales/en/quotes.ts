@@ -8,6 +8,7 @@ const quotes = {
   "quotes.closed": "Closed",
   "quotes.volume": "Vol {value}",
   "quotes.unavailable": "Quote unavailable",
+  "quotes.fetching": "Fetching quotes…",
   "quotes.retry": "Retry",
   "quotes.errorNetwork": "Network error",
   "quotes.errorTimeout": "Request timed out",

@@ -130,6 +130,77 @@ export async function fetchQuotes(
   }
 }
 
+export interface InlineQuoteView {
+  symbol: string;
+  name?: string;
+  market?: string;
+  currency?: string;
+  availability: QuoteAvailability;
+}
+
+/**
+ * 对话内联行情（`get_quote` 工具）：
+ * - 单标的优先取 `quote`，多标的取 `quotes[]`；
+ * - error 七类复用 QuoteError，缺价但不带 error 时按解析失败处理；
+ * - asOf 缺失保持 undefined，不编造时间。
+ */
+export function parseToolQuotes(payload: unknown): InlineQuoteView[] {
+  let value = payload;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      return [];
+    }
+  }
+  if (!isRecord(value)) return [];
+  const single = isRecord(value.quote) ? value.quote : undefined;
+  const list = single ? [single] : Array.isArray(value.quotes) ? value.quotes : [];
+  return list.flatMap((item): InlineQuoteView[] => {
+    if (!isRecord(item)) return [];
+    const symbol = str(item.symbol);
+    if (!symbol) return [];
+    const price = num(item.price);
+    const error = str(item.error);
+    const currency = str(item.currency);
+    if (price === undefined) {
+      return [
+        {
+          symbol,
+          name: str(item.name),
+          market: str(item.market),
+          currency,
+          availability: {
+            status: "unavailable",
+            reason: error && QUOTE_ERRORS.has(error) ? (error as QuoteError) : "parse",
+            retryable: false,
+          },
+        },
+      ];
+    }
+    return [
+      {
+        symbol,
+        name: str(item.name),
+        market: str(item.market),
+        currency,
+        availability: {
+          status: "ready",
+          quote: {
+            price,
+            change: num(item.change),
+            changePercent: num(item.changePercent),
+            volume: num(item.volume),
+            currency,
+            asOf: str(item.asOf) ?? str(item.as_of),
+            stale: item.stale === true,
+          },
+        },
+      },
+    ];
+  });
+}
+
 export function useQuotes(api: LingWuApi, symbols: string[], options: { refreshMs?: number } = {}) {
   const key = useMemo(() => [...new Set(symbols.filter(Boolean))].sort().join(","), [symbols]);
   const [quotes, setQuotes] = useState<Record<string, QuoteAvailability>>(() => {

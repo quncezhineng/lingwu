@@ -7,6 +7,7 @@ import {
   formatDelayMinutes,
   formatVolume,
   parseBatchQuotes,
+  parseToolQuotes,
 } from "../src/quotes.ts";
 
 test("批量报价解析：逐项 ready / unavailable 与错误映射", () => {
@@ -33,6 +34,49 @@ test("批量报价解析：逐项 ready / unavailable 与错误映射", () => {
   assert.equal(parsed.ZZZZ?.status, "unavailable");
   assert.equal(parsed.ZZZZ?.status === "unavailable" ? parsed.ZZZZ.reason : "", "not_found");
   assert.equal(parsed.HANG?.status === "unavailable" ? parsed.HANG.reason : "", "timeout");
+});
+
+test("对话内联行情：单标的优先 quote，多标的取 quotes 并保留错误", () => {
+  const single = parseToolQuotes({
+    quote: {
+      symbol: "AAPL",
+      name: "Apple Inc.",
+      market: "US",
+      price: 343.91,
+      changePercent: 1.2,
+      asOf: "2026-10-27T13:00:00.000Z",
+      stale: true,
+    },
+    quotes: [],
+  });
+  assert.equal(single.length, 1);
+  assert.equal(single[0]?.symbol, "AAPL");
+  assert.equal(single[0]?.availability.status, "ready");
+  assert.equal(
+    single[0]?.availability.status === "ready" ? single[0].availability.quote.stale : false,
+    true,
+  );
+
+  const multi = parseToolQuotes(
+    JSON.stringify({
+      quotes: [
+        { symbol: "AAPL", price: 343.91, currency: "USD" },
+        { symbol: "ZZZZ", error: "not_found" },
+        { symbol: "HANG", error: "timeout" },
+      ],
+    }),
+  );
+  assert.equal(multi.length, 3);
+  assert.equal(multi[1]?.availability.status, "unavailable");
+  assert.equal(
+    multi[1]?.availability.status === "unavailable" ? multi[1].availability.reason : "",
+    "not_found",
+  );
+  assert.equal(
+    multi[0]?.availability.status === "ready" ? multi[0].availability.quote.asOf : "x",
+    undefined,
+  );
+  assert.deepEqual(parseToolQuotes("not json"), []);
 });
 
 test("summary 报价 → 卡片可用性：缺失报价且标记不可用", () => {

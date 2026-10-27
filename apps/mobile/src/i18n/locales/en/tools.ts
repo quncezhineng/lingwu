@@ -32,6 +32,8 @@ const tools = {
   "tools.toolStepMemory": "Saved memory",
   "tools.toolStepMemoryText": "Saved memory · {text}",
   "tools.toolStepCalendar": "Read calendar",
+  "tools.toolStepQuote": "Fetch quotes",
+  "tools.toolStepQuoteFor": "Fetch quotes: {symbols}",
   "tools.toolStepUnknown": "Tool · {tool}",
   "tools.toolStepArguments": "Arguments",
   "tools.toolStepResult": "Result",

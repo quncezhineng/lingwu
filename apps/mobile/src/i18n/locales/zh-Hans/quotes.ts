@@ -8,6 +8,7 @@ const quotes = {
   "quotes.closed": "已收盘",
   "quotes.volume": "成交量 {value}",
   "quotes.unavailable": "行情不可用",
+  "quotes.fetching": "正在获取行情…",
   "quotes.retry": "重试",
   "quotes.errorNetwork": "网络异常",
   "quotes.errorTimeout": "请求超时",

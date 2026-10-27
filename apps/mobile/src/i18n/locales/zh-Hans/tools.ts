@@ -32,6 +32,8 @@ const tools = {
   "tools.toolStepMemory": "保存记忆",
   "tools.toolStepMemoryText": "保存记忆：{text}",
   "tools.toolStepCalendar": "读取日历",
+  "tools.toolStepQuote": "查询行情",
+  "tools.toolStepQuoteFor": "查询行情：{symbols}",
   "tools.toolStepUnknown": "工具 · {tool}",
   "tools.toolStepArguments": "参数",
   "tools.toolStepResult": "结果",
