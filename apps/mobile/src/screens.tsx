@@ -21,6 +21,7 @@ import type {
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
 import { API_URL } from "./api";
+import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
 import { fileKind } from "./file-kind";
@@ -261,6 +262,7 @@ export function TodayScreen() {
           </Pressable>
         ))}
       </View>
+      <MarketBriefingCard />
       <View style={{ flexDirection: wide ? "row" : "column", gap: 16 }}>
         <Card style={{ flex: 1 }}>
           <SectionHeading

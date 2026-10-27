@@ -5,6 +5,7 @@ import chat from "./chat";
 import common from "./common";
 import computer from "./computer";
 import details from "./details";
+import markets from "./markets";
 import screens from "./screens";
 import status from "./status";
 import threads from "./threads";
@@ -24,6 +25,7 @@ export const en = {
   ...screens,
   ...status,
   ...details,
+  ...markets,
   ...computer,
   ...threads,
   ...tools,

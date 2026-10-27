@@ -54,6 +54,20 @@ export const colors = {
   danger: "#E8463A", // status-error-default
   errorSoft: "rgba(232,70,58,0.12)", // status-error-surface-l1
   modalShade: "rgba(23,23,23,0.4)", // 模态遮罩（弹窗/菜单背景）
+  // 行情语义色：遵循中国市场惯例（涨红跌绿），与 danger/success 同色值但语义独立，
+  // 避免行情涨跌被误读为「错误 / 成功」状态。
+  marketUp: "#E8463A", // 涨（红）：圆点/图形
+  marketDown: "#15A877", // 跌（绿）：圆点/图形
+  marketFlat: "#737373", // 平（灰）
+  marketUpSurface: "rgba(232,70,58,0.12)", // 涨底色
+  marketDownSurface: "rgba(64,176,139,0.12)", // 跌底色
+  // 文本专用深色变体：上两者直接作为正文色时对白底只有 ~3.9:1 / ~3.0:1，
+  // 这里压深到 ≥4.5:1（WCAG AA 正文），图形与浅底仍用上面的原始色。
+  marketUpText: "#D0342A",
+  marketDownText: "#0E7A55",
+  alertVolume: "#E27900", // 成交量异动（橙）：图标/圆点
+  alertVolumeText: "#994F00", // 成交量异动正文（对 surface 底 ≥4.5:1）
+  alertVolumeSurface: "rgba(226,121,0,0.12)", // 成交量异动底色
 };
 
 /**

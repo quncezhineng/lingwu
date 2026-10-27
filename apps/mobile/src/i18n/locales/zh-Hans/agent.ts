@@ -227,6 +227,7 @@ const agent = {
   "agent.searchApps": "搜索应用",
   "agent.searchConnectors": "搜索连接器",
   "agent.onYourComputer": "在你的电脑上",
+  "agent.shortcutWatchlistDetail": "行情、异动与每日动态",
   "agent.shortcutMailDetail": "阅读邮件并准备回复",
   "agent.shortcutCalendarDetail": "日程与复核过的邀请",
   "agent.shortcutBrowserDetail": "持久的浏览器会话",

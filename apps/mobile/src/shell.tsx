@@ -39,6 +39,7 @@ import {
   Plus,
   Search,
   Shapes,
+  Sparkles,
   SquareCheck,
   Trash2,
   X,
@@ -53,6 +54,7 @@ export type NavItem = { id: Section; labelKey: TranslationKey; icon: IconCompone
 
 /** 图标栏中间的主页面（底部的「我的」单独列出，见 ACCOUNT_NAV）。 */
 export const SECTION_NAV: NavItem[] = [
+  { id: "today", labelKey: "app.navToday", icon: Sparkles },
   { id: "chat", labelKey: "app.navChat", icon: MessageCircle },
   { id: "activity", labelKey: "app.navActivity", icon: PanelsTopLeft },
   { id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb },
