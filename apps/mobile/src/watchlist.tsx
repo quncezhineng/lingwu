@@ -12,7 +12,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  type StyleProp,
   Text,
   TextInput,
   type TextStyle,
@@ -50,13 +49,9 @@ import {
   useWatchlistState,
   type WatchlistSymbol,
 } from "./market";
-import {
-  currencySymbol,
-  defaultCurrency,
-  directionOf,
-  formatPercent,
-  formatPrice,
-} from "./market-format";
+import { directionOf } from "./market-format";
+import { QuoteCard } from "./quote-card";
+import { availabilityFromQuote, type QuoteAvailability, useQuotes } from "./quotes";
 import {
   Button,
   Card,
@@ -213,117 +208,39 @@ const dotStyle = {
 function SymbolCard({
   item,
   style,
-  compact,
+  availability,
+  onRetry,
   onPress,
 }: {
   item: WatchlistSymbol;
-  style?: StyleProp<ViewStyle>;
-  /** 移动端单列时用两行布局，避免价格与涨跌幅互相挤压。 */
-  compact?: boolean;
+  style?: ViewStyle;
+  availability?: QuoteAvailability;
+  onRetry?: () => void;
   onPress: () => void;
 }) {
   const { t } = useTranslation();
   const { symbol, quote, alerts, unavailable } = item;
-  const currency = quote?.currency ?? defaultCurrency(symbol.market);
-  const dayDirection = directionOf(quote?.changePercent ?? 0);
-  const weekDirection = directionOf(quote?.weekChangePercent ?? 0);
-  const dayColor = marketDirectionColor(dayDirection);
-  const arrow = dayDirection === "up" ? "▲" : dayDirection === "down" ? "▼" : "—";
   const alert = alerts[0];
-  const priceText = quote ? formatPrice(quote.price, currency) : "—";
-  const changeText =
-    quote?.change === undefined
-      ? "—"
-      : `${quote.change >= 0 ? "+" : "-"}${currencySymbol(currency)}${Math.abs(quote.change).toFixed(2)}`;
-  const percentText = quote?.changePercent === undefined ? "—" : formatPercent(quote.changePercent);
-
+  const summary = availabilityFromQuote(quote, unavailable);
+  // 批量报价提供 asOf/volume/stale；失败时回落到 summary 报价。
+  const merged = availability?.status === "ready" ? availability : summary;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${symbol.code} ${symbol.name}, ${priceText}, ${percentText}`}
+    <QuoteCard
+      symbol={{ code: symbol.code, name: symbol.name, market: symbol.market }}
+      availability={merged}
+      size="standard"
+      narrow
+      onRetry={onRetry}
       onPress={onPress}
-      style={({ pressed }) => [s.card, style, pressed && { backgroundColor: colors.overlay1 }]}
-    >
-      {compact ? (
-        <View style={{ gap: 8 }}>
-          <View style={s.between}>
-            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-              <Text style={[s.heading, { fontSize: 16 }]} numberOfLines={1}>
-                {symbol.code}
-              </Text>
-              <Text style={[s.muted, { fontSize: 13, lineHeight: 19 }]} numberOfLines={1}>
-                {symbol.name}
-              </Text>
-            </View>
-            <View style={{ alignItems: "flex-end", gap: 2 }}>
-              <Text style={[s.metric, { fontSize: 19, fontWeight: "600", color: colors.text }]}>
-                {priceText}
-              </Text>
-              <Text style={[s.metric, { fontSize: 11, color: dayColor }]}>
-                {t("markets.dayChange", { value: changeText })}
-              </Text>
-            </View>
-          </View>
-          <View style={[s.between, { gap: 8 }]}>
-            {quote?.weekChangePercent !== undefined ? (
-              <Text style={[s.metric, s.small, { color: marketDirectionColor(weekDirection) }]}>
-                {t("markets.weekChange", { value: formatPercent(quote.weekChangePercent) })}
-              </Text>
-            ) : (
-              <View />
-            )}
-            <Text style={[s.metric, { fontSize: 16, fontWeight: "600", color: dayColor }]}>
-              {arrow} {percentText}
-            </Text>
-          </View>
-        </View>
-      ) : (
-        <View style={[s.row, { alignItems: "flex-start", gap: 8 }]}>
-          <View style={{ flex: 2, gap: 2, minWidth: 0 }}>
-            <Text style={[s.heading, { fontSize: 16 }]} numberOfLines={1}>
-              {symbol.code}
-            </Text>
-            <Text style={[s.muted, { fontSize: 13, lineHeight: 19 }]} numberOfLines={1}>
-              {symbol.name}
-            </Text>
-          </View>
-          <View style={{ flex: 1.5, alignItems: "flex-end", gap: 2 }}>
-            <Text style={[s.metric, { fontSize: 19, fontWeight: "600", color: colors.text }]}>
-              {priceText}
-            </Text>
-            <Text style={[s.metric, { fontSize: 11, color: dayColor }]}>
-              {t("markets.dayChange", { value: changeText })}
-            </Text>
-          </View>
-          <View style={{ flex: 1, alignItems: "flex-end", gap: 2 }}>
-            <Text style={[s.metric, { fontSize: 16, fontWeight: "600", color: dayColor }]}>
-              {arrow} {percentText}
-            </Text>
-            {quote?.weekChangePercent !== undefined && (
-              <Text
-                style={[s.metric, { fontSize: 11, color: marketDirectionColor(weekDirection) }]}
-                numberOfLines={1}
-              >
-                {t("markets.weekChange", { value: formatPercent(quote.weekChangePercent) })}
-              </Text>
-            )}
-          </View>
-        </View>
-      )}
-      {(alert || unavailable || !quote) && (
-        <View
-          style={{ borderTopWidth: 1, borderTopColor: colors.line, marginTop: 12, paddingTop: 8 }}
-        >
-          {alert ? (
-            <AlertBadge alert={alert} />
-          ) : (
-            <Text style={s.small}>
-              {t(unavailable ? "markets.quoteUnavailable" : "markets.loading")}
-            </Text>
-          )}
-        </View>
-      )}
-    </Pressable>
+      style={style}
+      footer={
+        alert ? (
+          <AlertBadge alert={alert} />
+        ) : unavailable && !quote ? (
+          <Text style={s.small}>{t("markets.quoteUnavailable")}</Text>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -801,6 +718,11 @@ export function WatchlistScreen() {
   }, [query]);
 
   const list = activeWatchlist();
+  const quoteSymbols = useMemo(
+    () => (list?.symbols ?? []).map((entry) => entry.symbol.code),
+    [list],
+  );
+  const { quotes, retry } = useQuotes(api, quoteSymbols, { refreshMs: 60_000 });
   const columns = width >= 900 ? 3 : width >= 600 ? 2 : 1;
   const cardWidth = columns === 1 ? "100%" : columns === 2 ? "48%" : "31.5%";
 
@@ -954,7 +876,8 @@ export function WatchlistScreen() {
             <SymbolCard
               key={item.symbol.code}
               item={item}
-              compact={columns === 1}
+              availability={quotes[item.symbol.code]}
+              onRetry={retry}
               style={{
                 width: cardWidth,
                 flexGrow: columns === 1 ? 0 : 1,
