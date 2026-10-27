@@ -305,6 +305,41 @@ test("CSV import partially imports valid rows, merges duplicates and reports err
   assert.equal(again.duplicate_import, false);
 });
 
+test("CSV preview and import accept raw headers plus an explicit mapping", async () => {
+  const csv = [
+    "代码,持有数量,成本价,买入日期",
+    "AAPL,10,100,2026-01-02",
+    "600519.SH,100,1500,2026-01-02",
+  ].join("\n");
+  const mapping = {
+    symbol: "代码",
+    quantity: "持有数量",
+    cost_price: "成本价",
+    buy_date: "买入日期",
+  };
+
+  const preview = await post<{
+    valid: number;
+    invalid: number;
+    rows: { parsed?: { symbol_code: string } }[];
+  }>("/portfolios/import/preview", { csv, mapping }, 200);
+  assert.equal(preview.valid, 2);
+  assert.equal(preview.invalid, 0);
+  assert.equal(preview.rows[1]?.parsed?.symbol_code, "600519.SS");
+
+  const imported = await post<{ imported_count: number; portfolio: { id: string } }>(
+    "/portfolios/import",
+    { csv, mapping, name: "映射导入" },
+  );
+  assert.equal(imported.imported_count, 2);
+
+  await post(
+    "/portfolios/import/preview",
+    { csv, mapping: { ...mapping, quantity: "不存在的列" } },
+    422,
+  );
+});
+
 test("re-importing the same CSV within 24h is a no-op", async () => {
   const csv = "symbol,quantity,cost_price,buy_date\nAAPL,10,100,2026-01-02";
   const first = await post<{
@@ -370,6 +405,9 @@ test("summary aggregates per currency without FX conversion", async () => {
       observations: number;
       beta?: number;
       max_drawdown?: number;
+      benchmark_return?: number;
+      excess_return?: number;
+      series?: { date: string; portfolio: number; benchmark: number }[];
       unavailable: { metric: string; reason: string }[];
     }[];
     unavailable: string[];
@@ -412,6 +450,9 @@ test("summary aggregates per currency without FX conversion", async () => {
   assert.equal(usdRisk?.benchmark, "^GSPC");
   assert.ok((usdRisk?.observations ?? 0) >= 120);
   assert.ok((usdRisk?.max_drawdown ?? 0) > 0);
+  assert.ok(usdRisk?.series && usdRisk.series.length > 1);
+  assert.equal(usdRisk?.series?.[0]?.portfolio, 1);
+  assert.equal(typeof usdRisk?.benchmark_return, "number");
   const cnyRisk = summary.risk.find((entry) => entry.currency === "CNY");
   assert.equal(cnyRisk?.benchmark, "000300.SS");
 });

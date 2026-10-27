@@ -16,6 +16,13 @@ export interface RiskUnavailable {
   reason: string;
 }
 
+export interface RiskSeriesPoint {
+  date: string;
+  /** Normalized NAV starting at 1.0 on the first aligned day. */
+  portfolio: number;
+  benchmark: number;
+}
+
 export interface RiskMetrics {
   currency: string;
   benchmark: string;
@@ -28,6 +35,14 @@ export interface RiskMetrics {
   max_drawdown?: number;
   annualized_return?: number;
   annualized_volatility?: number;
+  /** Cumulative portfolio return over the aligned window, percent. */
+  portfolio_return?: number;
+  /** Cumulative benchmark return over the aligned window, percent. */
+  benchmark_return?: number;
+  /** portfolio_return - benchmark_return, percentage points. */
+  excess_return?: number;
+  /** Normalized NAV curves for the frontend chart (start 1.0, ≤120 points). */
+  series?: RiskSeriesPoint[];
   unavailable: RiskUnavailable[];
 }
 
@@ -132,6 +147,24 @@ export function computeRiskMetrics(input: ComputeRiskInput): RiskMetrics {
   let annualizedReturn: number | undefined;
   let annualizedVolatility: number | undefined;
 
+  // Normalized NAV curves: the first aligned day is the base point (NAV=1),
+  // subsequent days accumulate daily returns. Downsampled to ≤120 points for charts.
+  let portfolioNav = 1;
+  let benchmarkNav = 1;
+  const rawSeries: RiskSeriesPoint[] = [];
+  if (aligned[0]) rawSeries.push({ date: aligned[0].date, portfolio: 1, benchmark: 1 });
+  for (const point of aligned.slice(1)) {
+    portfolioNav *= 1 + point.ret;
+    benchmarkNav *= 1 + (benchmarkByDate.get(point.date) ?? 0);
+    rawSeries.push({
+      date: point.date,
+      portfolio: Number(portfolioNav.toFixed(6)),
+      benchmark: Number(benchmarkNav.toFixed(6)),
+    });
+  }
+  const series = downsampleSeries(rawSeries, 120);
+  const lastPoint = rawSeries.at(-1);
+
   if (observations >= MIN_OBSERVATIONS) {
     const window = aligned.slice(-BETA_WINDOW);
     const portfolioWindow = window.map((point) => point.ret);
@@ -171,6 +204,14 @@ export function computeRiskMetrics(input: ComputeRiskInput): RiskMetrics {
     ...(drawdown !== undefined ? { max_drawdown: drawdown } : {}),
     ...(annualizedReturn !== undefined ? { annualized_return: annualizedReturn } : {}),
     ...(annualizedVolatility !== undefined ? { annualized_volatility: annualizedVolatility } : {}),
+    ...(lastPoint
+      ? {
+          portfolio_return: Number(((lastPoint.portfolio - 1) * 100).toFixed(4)),
+          benchmark_return: Number(((lastPoint.benchmark - 1) * 100).toFixed(4)),
+          excess_return: Number(((lastPoint.portfolio - lastPoint.benchmark) * 100).toFixed(4)),
+        }
+      : {}),
+    ...(series.length > 0 ? { series } : {}),
     unavailable,
   };
 }
@@ -180,6 +221,16 @@ export const CURRENCY_BENCHMARKS: Record<string, string> = {
   USD: "^GSPC",
   HKD: "^HSI",
 };
+
+/** Keep at most `max` points, preserving the last point so the endpoint stays exact. */
+export function downsampleSeries(points: RiskSeriesPoint[], max: number): RiskSeriesPoint[] {
+  if (points.length <= max) return points;
+  const step = Math.ceil(points.length / max);
+  const sampled = points.filter((_, index) => index % step === 0);
+  const last = points.at(-1);
+  if (last && sampled.at(-1)?.date !== last.date) sampled.push(last);
+  return sampled;
+}
 
 /** Equity curve from weighted returns so MaxDD can be computed without FX conversion. */
 export function equityCurve(returns: ReturnPoint[]): number[] {
