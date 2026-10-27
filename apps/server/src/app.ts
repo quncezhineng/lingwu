@@ -38,6 +38,7 @@ import { GoogleAuth } from "./google-auth.ts";
 import { getMarketDataHealth } from "./market-data-health.ts";
 import { applyModel, isOfferedModel, modelChoices } from "./models.ts";
 import { resolveTaskNotifications } from "./notifications.ts";
+import { getPdfHealth } from "./pdf-health.ts";
 import { createRateLimitStore, rateLimit } from "./rate-limit.ts";
 import type { SearchService } from "./search.ts";
 import { createSupabaseAuth } from "./supabase-auth.ts";
@@ -149,6 +150,8 @@ export async function createApp(
       // 行情数据源自检：A 股缺 AKShare 时会静默回落到 Yahoo（延迟约 15 分钟），
       // 所以在健康检查里显式暴露状态，部署后据此判定 A 股链路是否完整。
       market_data: getMarketDataHealth().snapshot(),
+      // 财报 PDF 解析依赖 pdftotext：缺失时解析接口返回 422，部署核对时看这个字段。
+      pdf: getPdfHealth().snapshot(),
     }),
   );
   /** 登录风控：按客户端 IP 与邮箱账号两个维度限流，防暴力破解与撞库。 */
