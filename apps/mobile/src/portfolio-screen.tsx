@@ -286,10 +286,12 @@ function RiskSection({
   const betaUnavailable = insufficient || risk?.beta === undefined || missingMetric("beta");
   const sharpeUnavailable = insufficient || risk?.sharpe === undefined || missingMetric("sharpe");
   const drawdownUnavailable = risk?.maxDrawdown === undefined || missingMetric("max_drawdown");
-  const returnUnavailable = risk?.return1y === undefined;
+  const rangeReturn = risk?.cumulativeReturn ?? risk?.return1y;
+  const returnUnavailable = rangeReturn === undefined;
   const pricedIncomplete = group.pricedCount < group.totalCount;
   const benchmarkItem = BENCHMARKS[group.currency].find((item) => item.id === benchmark);
-  const benchmarkReturn = risk?.benchmark?.return1y;
+  const benchmarkReturn = risk?.benchmarkReturn ?? risk?.benchmark?.return1y;
+  const rangeReturnForCompare = risk?.cumulativeReturn ?? risk?.return1y;
   const excess =
     risk?.return1y !== undefined && benchmarkReturn !== undefined
       ? risk.return1y - benchmarkReturn
@@ -388,14 +390,10 @@ function RiskSection({
           <RiskMetricTile
             label={t("portfolio.riskReturn")}
             value={
-              returnUnavailable
-                ? t("portfolio.insufficientData")
-                : formatPercent(risk.return1y ?? 0)
+              returnUnavailable ? t("portfolio.insufficientData") : formatPercent(rangeReturn ?? 0)
             }
             color={
-              returnUnavailable
-                ? colors.faint
-                : marketDirectionColor(directionOf(risk.return1y ?? 0))
+              returnUnavailable ? colors.faint : marketDirectionColor(directionOf(rangeReturn ?? 0))
             }
           />
         </View>
@@ -414,12 +412,14 @@ function RiskSection({
               onSelect={onBenchmark}
             />
           </View>
-          {benchmarkMatches && risk.return1y !== undefined && benchmarkReturn !== undefined ? (
+          {benchmarkMatches &&
+          rangeReturnForCompare !== undefined &&
+          benchmarkReturn !== undefined ? (
             <Text style={s.small}>
               {t("portfolio.benchmarkCompare", {
-                portfolio: formatPercent(risk.return1y),
+                portfolio: formatPercent(rangeReturnForCompare),
                 benchmark: formatPercent(benchmarkReturn),
-                excess: `${excess !== undefined && excess > 0 ? "+" : ""}${(excess ?? 0).toFixed(1)}pp`,
+                excess: `${(risk?.excessReturn ?? excess ?? 0) > 0 ? "+" : ""}${(risk?.excessReturn ?? excess ?? 0).toFixed(1)}pp`,
               })}
             </Text>
           ) : benchmarkMatches ? (
@@ -434,7 +434,8 @@ function RiskSection({
             emptyLabel={t("portfolio.chartEmpty")}
             tableLabel={t("portfolio.chartTable")}
             chartLabel={t("portfolio.chartLabel", {
-              portfolio: risk.return1y === undefined ? "—" : formatPercent(risk.return1y),
+              portfolio:
+                rangeReturnForCompare === undefined ? "—" : formatPercent(rangeReturnForCompare),
               benchmark: benchmarkItem ? t(benchmarkItem.labelKey) : "",
               benchmarkReturn: benchmarkReturn === undefined ? "—" : formatPercent(benchmarkReturn),
               excess: `${(excess ?? 0).toFixed(1)}`,

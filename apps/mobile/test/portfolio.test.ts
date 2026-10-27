@@ -167,10 +167,17 @@ test("B1 汇总解析：totals/positions/allocation/unvalued/risk 分币种映�
         CNY: {
           beta: 1.08,
           sharpe: 1.24,
-          max_drawdown: -18.6,
-          return_1y: 12.4,
-          samples: 252,
-          benchmark: { symbol: "000300.SS", name: "沪深300", return_1y: 8.1 },
+          max_drawdown: 18.6,
+          annualized_return: 12.4,
+          portfolio_return: 22.5,
+          benchmark_return: 18.2,
+          excess_return: 4.3,
+          observations: 250,
+          benchmark: "000300.SS",
+          series: [
+            { date: "2026-01-02", portfolio: 1, benchmark: 1 },
+            { date: "2026-10-27", portfolio: 1.225, benchmark: 1.182 },
+          ],
         },
       },
     },
@@ -187,7 +194,14 @@ test("B1 汇总解析：totals/positions/allocation/unvalued/risk 分币种映�
   assert.equal(cny?.valuationCoverage, 0.9737);
   assert.deepEqual(cny?.excludedSymbols, ["000858.SZ"]);
   assert.equal(cny?.risk?.beta, 1.08);
-  assert.equal(cny?.risk?.benchmark?.return1y, 8.1);
+  assert.equal(cny?.risk?.maxDrawdown, 18.6);
+  assert.equal(cny?.risk?.cumulativeReturn, 22.5);
+  assert.equal(cny?.risk?.benchmarkReturn, 18.2);
+  assert.equal(cny?.risk?.excessReturn, 4.3);
+  assert.equal(cny?.risk?.samples, 250);
+  assert.equal(cny?.risk?.benchmarkSymbol, "000300.SS");
+  assert.equal(cny?.risk?.series?.length, 2);
+  assert.equal(cny?.risk?.series?.[1]?.portfolio, 1.225);
   const usd = summary?.groups[1];
   assert.equal(usd?.currency, "USD");
   assert.equal(usd?.risk, undefined);

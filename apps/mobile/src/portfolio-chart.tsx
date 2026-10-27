@@ -19,10 +19,16 @@ function normalize(points: RiskSeriesPoint[]) {
   const base = points[0];
   const portfolioBase = base?.portfolio ?? 0;
   const benchmarkBase = base?.benchmark ?? 0;
+  // B2 返回归一化净值（起点 1.0）；mock 返回累计百分比（起点 0）。
+  const nav = Math.abs(portfolioBase) <= 2 && Math.abs(benchmarkBase) <= 2;
   return points.map((point) => ({
     date: point.date,
-    portfolio: point.portfolio - portfolioBase,
-    benchmark: point.benchmark - benchmarkBase,
+    portfolio: nav
+      ? (point.portfolio / (portfolioBase || 1) - 1) * 100
+      : point.portfolio - portfolioBase,
+    benchmark: nav
+      ? (point.benchmark / (benchmarkBase || 1) - 1) * 100
+      : point.benchmark - benchmarkBase,
   }));
 }
 

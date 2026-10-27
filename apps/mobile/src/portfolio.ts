@@ -80,6 +80,12 @@ export interface RiskSummary {
   maxDrawdown?: number;
   /** 年化收益（%）。 */
   return1y?: number;
+  /** 区间累计收益（%，B2 portfolio_return）。 */
+  cumulativeReturn?: number;
+  /** 基准区间累计收益（%，B2 benchmark_return）。 */
+  benchmarkReturn?: number;
+  /** 超额（pp，B2 excess_return）。 */
+  excessReturn?: number;
   annualizedVolatility?: number;
   samples?: number;
   riskFreeRate?: number;
@@ -854,6 +860,9 @@ function parseRisk(value: unknown): RiskSummary | undefined {
     sharpe: num(value.sharpe),
     maxDrawdown: num(value.max_drawdown) ?? num(value.maxDrawdown),
     return1y: num(value.annualized_return) ?? num(value.return_1y) ?? num(value.return1y),
+    cumulativeReturn: num(value.portfolio_return),
+    benchmarkReturn: num(value.benchmark_return),
+    excessReturn: num(value.excess_return),
     annualizedVolatility: num(value.annualized_volatility),
     samples: num(value.observations) ?? num(value.samples),
     riskFreeRate: num(value.risk_free_rate),
