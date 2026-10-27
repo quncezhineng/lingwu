@@ -6,7 +6,10 @@ import { after, before, beforeEach, test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
-import { buildBriefingSummary } from "../apps/server/src/engine/market-briefing.ts";
+import {
+  buildBriefingSummary,
+  generateMarketBriefing,
+} from "../apps/server/src/engine/market-briefing.ts";
 import {
   BRIEFING_INDEXES,
   MarketDataError,
@@ -51,7 +54,10 @@ function quoteFor(symbol: string): Quote {
 const provider: MarketDataProvider = {
   id: "yahoo",
   supports: () => true,
-  getQuote: async (symbol) => quoteFor(symbol),
+  getQuote: async (symbol) => {
+    if (symbol === "HANG") return new Promise(() => {});
+    return quoteFor(symbol);
+  },
   searchSymbols: async () => [],
   getIndexData: async () =>
     BRIEFING_INDEXES.map((index) => ({ ...quoteFor(index.symbol), name: index.name })),
@@ -170,6 +176,8 @@ test("generate persists today's briefing with indexes and watchlist updates", as
     symbol_updates: Record<string, { price: number }>;
     events_status: string;
     events_note?: string;
+    data_status: string;
+    unavailable: string[];
   }>("/briefings/generate", { method: "POST", body: JSON.stringify({}) });
 
   assert.equal(briefing.date, today());
@@ -178,6 +186,8 @@ test("generate persists today's briefing with indexes and watchlist updates", as
   assert.equal(briefing.symbol_updates.AAPL?.price, 190);
   assert.equal(briefing.events_status, "not_implemented");
   assert.match(briefing.events_note ?? "", /P0 暂未接入/);
+  assert.equal(briefing.data_status, "complete");
+  assert.deepEqual(briefing.unavailable, []);
   assert.match(briefing.content, /每日市场简报/);
 
   const todayBriefing = await call<{ id: string }>("/briefings/today");
@@ -226,4 +236,27 @@ test("market_briefing task kind runs through the worker and stores an artifact",
   assert.equal(detail.task.status, "succeeded");
   assert.ok(detail.task.artifactIds.length >= 1);
   assert.match(detail.task.result ?? "", /不构成投资建议/);
+});
+
+test("briefing generation returns partial data within its budget when a quote hangs", async () => {
+  await call(
+    "/watchlists",
+    {
+      method: "POST",
+      body: JSON.stringify({ name: "超时", symbols: ["AAPL", "HANG"] }),
+    },
+    201,
+  );
+  const started = Date.now();
+  const briefing = await generateMarketBriefing(
+    "local-user",
+    { db, market: market(), briefingTimeoutMs: 200, marketPhaseTimeoutMs: 120 },
+    { date: "2026-01-15" },
+  );
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed < 1500, `elapsed ${elapsed}ms`);
+  assert.equal(briefing.data_status, "partial");
+  assert.ok(briefing.unavailable.includes("HANG"));
+  assert.equal((briefing.symbol_updates.AAPL as { price: number } | undefined)?.price, 190);
+  assert.match(briefing.content, /数据不完整/);
 });

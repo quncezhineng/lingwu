@@ -355,3 +355,25 @@ test("akshareEnabled=false skips the A-share fallback", async () => {
     (error: unknown) => error instanceof MarketDataError && error.kind === "not_found",
   );
 });
+
+test("searchSymbols rejects a hanging provider within the search deadline", async () => {
+  const hanging: MarketDataProvider = {
+    id: "yahoo",
+    supports: () => true,
+    getQuote: async () => quoteOf(100, 99),
+    searchSymbols: () => new Promise(() => {}),
+    getIndexData: async () => [],
+  };
+  const service = new MarketDataService({
+    yahoo: hanging,
+    akshare: null,
+    searchTimeoutMs: 25,
+    onError: () => undefined,
+  });
+  const started = Date.now();
+  await assert.rejects(
+    () => service.searchSymbols("AAPL"),
+    (error: unknown) => error instanceof MarketDataError && error.kind === "timeout",
+  );
+  assert.ok(Date.now() - started < 1000);
+});

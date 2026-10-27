@@ -1,15 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type { MarketBriefing } from "../../../../packages/domain/src/agent.ts";
 import {
+  BRIEFING_INDEXES,
   type MarketDataService,
   type Quote,
   resolveMarket,
+  withTimeout,
 } from "../../../../packages/integrations/src/market-data.ts";
 import type { Store } from "../db.ts";
 
 const BRIEFING_KIND = "market_briefings";
 const WATCHLIST_KIND = "watchlists";
 const MAX_WATCHLIST_SYMBOLS = 50;
+/** Product threshold: POST /api/briefings/generate must return within 20s. */
+export const DEFAULT_BRIEFING_TIMEOUT_MS = 20_000;
+/** Market-data phase gets at most 10s of the total budget. */
+export const DEFAULT_BRIEFING_MARKET_TIMEOUT_MS = 10_000;
 
 interface WatchlistRecord {
   id: string;
@@ -22,6 +28,13 @@ export interface BriefingDeps {
   market: MarketDataService;
   /** Injectable clock for tests. */
   now?: () => Date;
+  briefingTimeoutMs?: number;
+  marketPhaseTimeoutMs?: number;
+}
+
+function envNumber(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function dateOf(now: Date): string {
@@ -90,7 +103,7 @@ export function buildBriefingSummary(input: {
 
   if (unavailable.length > 0) {
     bullets.push(
-      `有 ${unavailable.length} 个标的行情暂不可用（${unavailable.slice(0, 3).join("、")}），已跳过相关分析。`,
+      `有 ${unavailable.length} 项行情数据暂不可用（${unavailable.slice(0, 3).join("、")}），已跳过相关分析。`,
     );
   } else if (indexes.length > 0) {
     const best = sortedIndexes[0];
@@ -109,7 +122,11 @@ export function buildBriefingSummary(input: {
   return bullets.slice(0, 5);
 }
 
-function renderContent(summary: string[], marketData: Record<string, unknown>): string {
+function renderContent(
+  summary: string[],
+  marketData: Record<string, unknown>,
+  unavailable: string[] = [],
+): string {
   const lines = ["# 每日市场简报", ""];
   for (let i = 0; i < summary.length; i++) lines.push(`${i + 1}. ${summary[i]}`);
   const indexes = marketData.indexes as
@@ -122,6 +139,8 @@ function renderContent(summary: string[], marketData: Record<string, unknown>): 
         `| ${index.name ?? index.symbol} | ${index.price.toLocaleString("en-US")} | ${percent(index.changePercent)} |`,
       );
   }
+  if (unavailable.length > 0)
+    lines.push("", `> 数据不完整：${unavailable.join("、")} 暂不可用，可在稍后重新生成。`);
   lines.push("", "> 数据来源：Yahoo Finance / AKShare，延迟约 15 分钟。不构成投资建议。");
   return lines.join("\n");
 }
@@ -148,7 +167,7 @@ export async function findLatestBriefing(db: Store, owner: string): Promise<Mark
 export async function generateMarketBriefing(
   owner: string,
   deps: BriefingDeps,
-  options: { date?: string; force?: boolean } = {},
+  options: { date?: string; force?: boolean; timeoutMs?: number } = {},
 ): Promise<MarketBriefing> {
   const now = deps.now?.() ?? new Date();
   const date = options.date ?? dateOf(now);
@@ -157,11 +176,40 @@ export async function generateMarketBriefing(
     if (existing) return existing;
   }
 
+  const startedAt = Date.now();
+  const totalBudget =
+    options.timeoutMs ??
+    deps.briefingTimeoutMs ??
+    envNumber("MARKET_DATA_BRIEFING_TIMEOUT_MS", DEFAULT_BRIEFING_TIMEOUT_MS);
+  const marketBudget = Math.max(
+    1,
+    Math.min(
+      deps.marketPhaseTimeoutMs ??
+        envNumber("MARKET_DATA_BRIEFING_MARKET_TIMEOUT_MS", DEFAULT_BRIEFING_MARKET_TIMEOUT_MS),
+      totalBudget - (Date.now() - startedAt),
+    ),
+  );
+
   const symbols = await collectWatchlistSymbols(deps.db, owner);
+  const indexRequest = withTimeout(
+    deps.market.getIndexData(),
+    marketBudget,
+    "Timed out loading market indexes",
+  ).catch(() => [] as Quote[]);
   const [indexes, watchlistQuotes] = await Promise.all([
-    deps.market.getIndexData().catch(() => [] as Quote[]),
+    indexRequest,
     Promise.allSettled(
-      symbols.map(async (symbol) => ({ symbol, quote: await deps.market.getQuote(symbol) })),
+      symbols.map(async (symbol) => {
+        const remaining = Math.max(1, startedAt + marketBudget - Date.now());
+        return {
+          symbol,
+          quote: await withTimeout(
+            deps.market.getQuote(symbol),
+            remaining,
+            `Timed out loading ${symbol}`,
+          ),
+        };
+      }),
     ),
   ]);
 
@@ -170,6 +218,11 @@ export async function generateMarketBriefing(
     if (result.status === "fulfilled") quotes.push(result.value);
   }
   const unavailableSymbols = symbols.filter((_, i) => watchlistQuotes[i]?.status === "rejected");
+  const loadedIndexSymbols = new Set(indexes.map((quote) => quote.symbol));
+  const unavailableIndexes = BRIEFING_INDEXES.filter(
+    (index) => !loadedIndexSymbols.has(index.symbol),
+  ).map((index) => index.symbol);
+  const unavailable = [...unavailableIndexes, ...unavailableSymbols];
 
   const movers = quotes
     .filter(({ quote }) => Math.abs(quote.changePercent) >= 2)
@@ -179,7 +232,7 @@ export async function generateMarketBriefing(
     indexes,
     movers,
     watchlistCount: symbols.length,
-    unavailable: unavailableSymbols,
+    unavailable,
   });
 
   const marketData = {
@@ -213,12 +266,14 @@ export async function generateMarketBriefing(
     user_id: owner,
     date,
     summary,
-    content: renderContent(summary, marketData),
+    content: renderContent(summary, marketData, unavailable),
     market_data: marketData,
     symbol_updates: symbolUpdates,
     events: [],
     events_status: "not_implemented",
     events_note: "今日事件依赖日历/公告数据源，P0 暂未接入；events 为空不代表今日无事件。",
+    data_status: unavailable.length === 0 ? "complete" : "partial",
+    unavailable,
     generated_at: now.toISOString(),
   };
   await deps.db.put(owner, BRIEFING_KIND, briefing);
