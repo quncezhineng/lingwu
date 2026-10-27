@@ -39,6 +39,7 @@ const provider: MarketDataProvider = {
       volume: isCn ? 1_000_000 : 40_000_000,
       asOf: "2026-10-27T08:00:00.000Z",
       source: "yahoo",
+      marketState: "regular",
     };
     return quote;
   },
@@ -127,6 +128,7 @@ test("batch quotes dedupe, preserve order and include display fields", async () 
       stale?: boolean;
       error?: string;
       currency?: string;
+      marketState?: string;
     }[];
   }>("/market/quotes", {
     method: "POST",
@@ -143,6 +145,7 @@ test("batch quotes dedupe, preserve order and include display fields", async () 
   assert.equal(aapl?.asOf, "2026-10-27T08:00:00.000Z");
   assert.equal(aapl?.stale, false);
   assert.equal(aapl?.currency, "USD");
+  assert.equal(aapl?.marketState, "regular");
   assert.equal(result.quotes[2]?.error, "not_found");
   assert.equal(result.quotes[3]?.error, "timeout");
 });

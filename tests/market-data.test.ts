@@ -5,6 +5,7 @@ import {
   MarketDataError,
   type MarketDataProvider,
   MarketDataService,
+  normalizeMarketState,
   normalizeYahooSymbol,
   resolveMarket,
   YahooFinanceProvider,
@@ -106,6 +107,28 @@ test("yahoo normalizes Shanghai .SH suffix to .SS", async () => {
   assert.equal(resolveMarket("600519.SS"), "CN");
   assert.equal(resolveMarket("0700.HK"), "HK");
   assert.equal(resolveMarket("AAPL"), "US");
+});
+
+test("market state normalizes Yahoo values and derives from the regular session", () => {
+  assert.equal(normalizeMarketState("PRE"), "pre");
+  assert.equal(normalizeMarketState("REGULAR"), "regular");
+  assert.equal(normalizeMarketState("POST"), "post");
+  assert.equal(normalizeMarketState("POSTPOST"), "post");
+  assert.equal(normalizeMarketState("CLOSED"), "closed");
+  assert.equal(normalizeMarketState(undefined), "unknown");
+  assert.equal(normalizeMarketState("weird"), "unknown");
+  const period = { start: 100, end: 200 };
+  assert.equal(normalizeMarketState(undefined, period, 50_000), "pre");
+  assert.equal(normalizeMarketState(undefined, period, 150_000), "regular");
+  assert.equal(normalizeMarketState(undefined, period, 250_000), "post");
+});
+
+test("yahoo quotes carry the normalized market state", async () => {
+  const provider = new YahooFinanceProvider({
+    fetch: fakeFetch(() => json(chartPayload({ marketState: "POSTPOST" }))),
+  });
+  const quote = await provider.getQuote("AAPL");
+  assert.equal(quote.marketState, "post");
 });
 
 test("yahoo reports not_found when the chart returns an error", async () => {
