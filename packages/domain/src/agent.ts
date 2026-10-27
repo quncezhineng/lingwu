@@ -27,7 +27,7 @@ export interface AgentTask {
   id: string;
   title: string;
   prompt: string;
-  kind: "agent" | "document" | "monitor" | "finance" | "plan";
+  kind: "agent" | "document" | "monitor" | "finance" | "plan" | "market_briefing" | "research";
   status: TaskStatus;
   /** 发起该任务的对话 threadId（对话内 delegate_task 创建的任务才有；独立入口创建的任务为空）。 */
   threadId?: string;
@@ -103,7 +103,7 @@ export interface AgentMemory {
 export interface AgentArtifact {
   id: string;
   taskId: string;
-  kind: "plan" | "comparison" | "finance" | "report";
+  kind: "plan" | "comparison" | "finance" | "report" | "market_briefing" | "research_report";
   title: string;
   summary: string;
   data: Record<string, unknown>;
@@ -137,7 +137,9 @@ export interface AgentWorkspace {
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
   prompt: z.string().trim().min(1).max(12000),
-  kind: z.enum(["agent", "document", "monitor", "finance", "plan"]).default("agent"),
+  kind: z
+    .enum(["agent", "document", "monitor", "finance", "plan", "market_briefing", "research"])
+    .default("agent"),
   goalId: z.string().optional(),
   milestoneId: z.string().min(1).max(200).optional(),
   input: z.record(z.string(), z.unknown()).default({}),
@@ -166,3 +168,71 @@ export const goalInputSchema = z.object({
   category: z.string().max(80).default("Personal"),
   milestones: z.array(z.string().min(1).max(200)).max(20).default([]),
 });
+
+// ─── 投研智能体数据模型 ───
+
+/** 观察列表 */
+export const watchlistSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  symbols: z.array(z.string()),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type Watchlist = z.infer<typeof watchlistSchema>;
+
+/** 标的元数据 */
+export const symbolSchema = z.object({
+  code: z.string(),
+  name: z.string(),
+  market: z.enum(["US", "CN", "HK"]),
+  sector: z.string().optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+export type Symbol = z.infer<typeof symbolSchema>;
+
+/** 市场简报 */
+export const marketBriefingSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  date: z.string().date(),
+  summary: z.array(z.string()).min(3).max(5),
+  content: z.string(),
+  market_data: z.record(z.string(), z.any()),
+  symbol_updates: z.record(z.string(), z.any()),
+  events: z.array(z.any()),
+  generated_at: z.string().datetime(),
+});
+export type MarketBriefing = z.infer<typeof marketBriefingSchema>;
+
+/** 研究报告 */
+export const researchReportSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  symbol_code: z.string(),
+  title: z.string(),
+  sections: z.object({
+    company_overview: z.string(),
+    financials: z.record(z.string(), z.any()),
+    news: z.array(z.any()),
+    peer_comparison: z.array(z.any()),
+    valuation: z.record(z.string(), z.any()),
+    risks: z.array(z.string()),
+  }),
+  pdf_url: z.string().optional(),
+  generated_at: z.string().datetime(),
+});
+export type ResearchReport = z.infer<typeof researchReportSchema>;
+
+/** 价格提醒 */
+export const priceAlertSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  symbol_code: z.string(),
+  threshold_type: z.enum(["PRICE_ABOVE", "PRICE_BELOW", "CHANGE_PCT"]),
+  threshold_value: z.number(),
+  enabled: z.boolean().default(true),
+  created_at: z.string().datetime(),
+});
+export type PriceAlert = z.infer<typeof priceAlertSchema>;
