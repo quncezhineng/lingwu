@@ -1,6 +1,8 @@
 import { createApp } from "./app.ts";
 import { readConfig } from "./config.ts";
 import { createStore } from "./db.ts";
+import { backgroundFailure } from "./log.ts";
+import { getMarketDataHealth } from "./market-data-health.ts";
 
 const config = readConfig();
 if (!config.databaseUrl)
@@ -10,6 +12,10 @@ if (!config.databaseUrl)
 const db = await createStore({ databaseUrl: config.databaseUrl });
 const { agent } = await createApp(db, config);
 agent.start();
+// The worker generates briefings and quotes; log A-share helper availability here too.
+void getMarketDataHealth()
+  .refresh(true)
+  .catch((error) => backgroundFailure("startup self-check", error));
 console.log("LingWu task worker running");
 let stopping = false;
 const stop = async () => {
