@@ -40,6 +40,7 @@ const portfolio = {
   "portfolio.chartDate": "日期",
   "portfolio.chartTable": "查看数据表",
   "portfolio.chartEmpty": "样本不足，暂无法绘制曲线",
+  "portfolio.chartNormalized": "首个对齐日归一为 0%（净值 1.0），其后按累计收益绘制",
   "portfolio.chartLabel":
     "近一年组合收益 {portfolio}，基准 {benchmark} {benchmarkReturn}，超额 {excess} 个百分点",
   "portfolio.allocationTitle": "资产配置",
@@ -140,6 +141,10 @@ const portfolio = {
   "portfolio.previewValid": "有效 {count}",
   "portfolio.previewWarning": "警告 {count}",
   "portfolio.previewError": "错误 {count}",
+  "portfolio.serverPreviewLoading": "服务端校验中…",
+  "portfolio.serverPreviewReady": "已使用服务端校验结果",
+  "portfolio.serverPreviewFailed": "服务端校验失败，暂不能导入",
+  "portfolio.serverPreviewRetry": "重新校验",
   "portfolio.rowLabel": "第 {row} 行",
   "portfolio.mergedRows": "{symbol} 出现 {count} 行，导入时将合并（数量求和、成本价按数量加权）",
   "portfolio.mergedRowsGeneric":
@@ -162,6 +167,7 @@ const portfolio = {
   "portfolio.confirmMergeTitle": "与现有持仓合并？",
   "portfolio.confirmMergeDetail": "导入数量将累加到现有持仓。",
   "portfolio.duplicateImport": "检测到重复导入，现有持仓未变更",
+  "portfolio.duplicateImportTitle": "检测到重复导入",
   "portfolio.discardTitle": "放弃本次导入？",
   "portfolio.discardDetail": "已选择的文件与字段映射将丢失。",
   "portfolio.discardContinue": "继续导入",

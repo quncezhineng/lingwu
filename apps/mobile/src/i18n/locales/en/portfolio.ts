@@ -28,7 +28,8 @@ const portfolio = {
   "portfolio.benchmarkCompare": "Portfolio {portfolio} · Benchmark {benchmark} · Excess {excess}",
   "portfolio.benchmarkUnavailable": "Benchmark data unavailable",
   "portfolio.benchmarkDataUnavailable": "Benchmark data unavailable",
-  "portfolio.benchmarkReturnMissing": "The API doesn’t return benchmark returns yet, so excess return is not shown.",
+  "portfolio.benchmarkReturnMissing":
+    "The API doesn’t return benchmark returns yet, so excess return is not shown.",
   "portfolio.benchmarkCsi300": "CSI 300",
   "portfolio.benchmarkSse": "SSE Composite",
   "portfolio.benchmarkSp500": "S&P 500",
@@ -41,6 +42,8 @@ const portfolio = {
   "portfolio.chartDate": "Date",
   "portfolio.chartTable": "View data table",
   "portfolio.chartEmpty": "Not enough samples to draw the curve",
+  "portfolio.chartNormalized":
+    "Normalized to 0% (NAV 1.0) on the first aligned day, then cumulative returns",
   "portfolio.chartLabel":
     "One-year portfolio return {portfolio}; benchmark {benchmark} {benchmarkReturn}; excess {excess} percentage points",
   "portfolio.allocationTitle": "Allocation",
@@ -141,6 +144,10 @@ const portfolio = {
   "portfolio.previewValid": "Valid {count}",
   "portfolio.previewWarning": "Warnings {count}",
   "portfolio.previewError": "Errors {count}",
+  "portfolio.serverPreviewLoading": "Validating with the server…",
+  "portfolio.serverPreviewReady": "Server validation applied",
+  "portfolio.serverPreviewFailed": "Server validation failed — import is paused",
+  "portfolio.serverPreviewRetry": "Validate again",
   "portfolio.rowLabel": "Row {row}",
   "portfolio.mergedRows":
     "{symbol} appears {count} times; rows merge on import (quantities add, cost averaged)",
@@ -164,6 +171,7 @@ const portfolio = {
   "portfolio.confirmMergeTitle": "Merge with existing holdings?",
   "portfolio.confirmMergeDetail": "Imported quantities will be added to your current holdings.",
   "portfolio.duplicateImport": "Duplicate import detected — existing holdings were left unchanged",
+  "portfolio.duplicateImportTitle": "Duplicate import detected",
   "portfolio.discardTitle": "Discard this import?",
   "portfolio.discardDetail": "Your file and mapping will be lost.",
   "portfolio.discardContinue": "Keep importing",

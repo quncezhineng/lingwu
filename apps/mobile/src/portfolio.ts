@@ -886,6 +886,53 @@ function parseRisk(value: unknown): RiskSummary | undefined {
   };
 }
 
+/** 服务端 CSV 预览（POST /api/portfolios/import/preview）的宽松解析。 */
+export interface ServerPreviewRow {
+  row: number;
+  status: "ok" | "error";
+  errors: { field: string; reason: string }[];
+}
+
+export interface ServerPreview {
+  total: number;
+  valid: number;
+  invalid: number;
+  rows: ServerPreviewRow[];
+}
+
+export function parseServerPreview(payload: unknown): ServerPreview | undefined {
+  if (!isRecord(payload) || !Array.isArray(payload.rows)) return undefined;
+  const rows = payload.rows.flatMap((entry): ServerPreviewRow[] => {
+    if (!isRecord(entry) || typeof entry.row !== "number") return [];
+    const errors = Array.isArray(entry.errors)
+      ? entry.errors.flatMap((error) =>
+          isRecord(error) && typeof error.field === "string"
+            ? [{ field: error.field, reason: str(error.reason) ?? "" }]
+            : [],
+        )
+      : [];
+    return [
+      {
+        row: entry.row,
+        status: entry.status === "error" ? "error" : "ok",
+        errors,
+      },
+    ];
+  });
+  if (!rows.length) return undefined;
+  return {
+    total: num(payload.total) ?? rows.length,
+    valid: num(payload.valid) ?? rows.filter((row) => row.status === "ok").length,
+    invalid: num(payload.invalid) ?? rows.filter((row) => row.status === "error").length,
+    rows,
+  };
+}
+
+/** 服务端 errors 是「字段错误」列表，按物理行去重才是跳过的行数。 */
+export function skippedRowCount(errors: { row: number }[] | undefined) {
+  return new Set((errors ?? []).map((error) => error.row)).size;
+}
+
 function parseSlices(value: unknown, keyName: "symbol" | "key"): AllocationSlice[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {

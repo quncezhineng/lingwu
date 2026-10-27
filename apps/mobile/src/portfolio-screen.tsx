@@ -293,8 +293,8 @@ function RiskSection({
   const benchmarkReturn = risk?.benchmarkReturn ?? risk?.benchmark?.return1y;
   const rangeReturnForCompare = risk?.cumulativeReturn ?? risk?.return1y;
   const excess =
-    risk?.return1y !== undefined && benchmarkReturn !== undefined
-      ? risk.return1y - benchmarkReturn
+    rangeReturnForCompare !== undefined && benchmarkReturn !== undefined
+      ? rangeReturnForCompare - benchmarkReturn
       : undefined;
   const benchmarkMatches =
     risk?.benchmark?.symbol === benchmark || risk?.benchmarkSymbol === benchmark;
@@ -438,7 +438,7 @@ function RiskSection({
                 rangeReturnForCompare === undefined ? "—" : formatPercent(rangeReturnForCompare),
               benchmark: benchmarkItem ? t(benchmarkItem.labelKey) : "",
               benchmarkReturn: benchmarkReturn === undefined ? "—" : formatPercent(benchmarkReturn),
-              excess: `${(excess ?? 0).toFixed(1)}`,
+              excess: `${(risk?.excessReturn ?? excess ?? 0).toFixed(1)}`,
             })}
             labels={{
               portfolio: t("portfolio.chartPortfolio"),
@@ -446,6 +446,7 @@ function RiskSection({
               date: t("portfolio.chartDate"),
             }}
           />
+          <Text style={s.small}>{t("portfolio.chartNormalized")}</Text>
         </View>
       )}
     </View>
@@ -835,6 +836,7 @@ function HoldingsSection({
               <IconButton
                 icon={MoreHorizontal}
                 label={t("portfolio.portfolioMenu")}
+                size={44}
                 onPress={() => onMenu(position)}
               />
             </View>
@@ -884,6 +886,7 @@ function HoldingsSection({
                   <IconButton
                     icon={MoreHorizontal}
                     label={t("portfolio.portfolioMenu")}
+                    size={44}
                     onPress={() => onMenu(position)}
                   />
                 </View>

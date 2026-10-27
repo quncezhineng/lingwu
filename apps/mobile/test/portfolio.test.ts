@@ -3,13 +3,22 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { autoMap, parseCsv, toCanonicalCsv, toErrorCsv, validateRows } from "../src/csv.ts";
+import {
+  autoMap,
+  parseCsv,
+  prepareServerCsv,
+  toCanonicalCsv,
+  toErrorCsv,
+  validateRows,
+} from "../src/csv.ts";
 import { normalizeCode } from "../src/market.ts";
 import {
   buildAllocationSlices,
   buildMockSummary,
   type Portfolio,
+  parseServerPreview,
   parseSummary,
+  skippedRowCount,
 } from "../src/portfolio.ts";
 
 const PORTFOLIO: Portfolio = {
@@ -77,6 +86,57 @@ test("规范 CSV：跳过错误行、缺省买入日期与币种推断", () => {
   const errors = toErrorCsv(preview.rows);
   assert.match(errors, /BAD/);
   assert.match(errors, /quantity/);
+});
+
+test("服务端载荷：原始 CSV + 表头名映射，买入日期缺省补今天", () => {
+  const raw = "symbol,quantity,cost_price,buy_date\nAAPL,10,180,2026-01-02\n";
+  const table = parseCsv(raw);
+  const payload = prepareServerCsv(raw, table, autoMap(table.headers));
+  assert.equal(payload.csv, raw);
+  assert.deepEqual(payload.mapping, {
+    symbol: "symbol",
+    quantity: "quantity",
+    cost_price: "cost_price",
+    buy_date: "buy_date",
+  });
+  assert.equal(payload.filledDates, 0);
+
+  const noDateRaw = "symbol,quantity,cost_price\nAAPL,10,180\n";
+  const noDateTable = parseCsv(noDateRaw);
+  const filled = prepareServerCsv(noDateRaw, noDateTable, autoMap(noDateTable.headers));
+  assert.equal(filled.mapping.buy_date, "__buy_date");
+  assert.equal(filled.filledDates, 1);
+  assert.match(filled.csv.split("\n")[0] ?? "", /__buy_date$/);
+  assert.match(filled.csv.split("\n")[1] ?? "", /,\d{4}-\d{2}-\d{2}$/);
+
+  const semicolon = "symbol;quantity;cost_price\nAAPL;10;180\n";
+  const semicolonTable = parseCsv(semicolon);
+  const rebuilt = prepareServerCsv(semicolon, semicolonTable, autoMap(semicolonTable.headers));
+  assert.match(rebuilt.csv, /^symbol,quantity,cost_price/);
+  assert.equal(rebuilt.filledDates, 1);
+});
+
+test("服务端预览解析与跳过行去重", () => {
+  const preview = parseServerPreview({
+    total: 2,
+    valid: 1,
+    invalid: 1,
+    rows: [
+      { row: 2, status: "ok", errors: [] },
+      {
+        row: 3,
+        status: "error",
+        errors: [
+          { field: "quantity", reason: "must be > 0" },
+          { field: "buy_date", reason: "expected YYYY-MM-DD" },
+        ],
+      },
+    ],
+  });
+  assert.equal(preview?.valid, 1);
+  assert.equal(preview?.rows[1]?.errors.length, 2);
+  assert.equal(parseServerPreview({ rows: [] }), undefined);
+  assert.equal(skippedRowCount([{ row: 3 }, { row: 3 }, { row: 4 }]), 2);
 });
 
 test("配置聚合：Top 6 + 其他，<1% 并入其他且权重归一", () => {

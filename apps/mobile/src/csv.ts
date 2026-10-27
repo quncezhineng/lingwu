@@ -278,6 +278,91 @@ export function toCanonicalCsv(rows: ImportRow[]): string {
   return `${lines.join("\n")}\n`;
 }
 
+/** 服务端字段名（成本价在导入契约里叫 cost_price）。 */
+export type ServerCsvField =
+  | "symbol"
+  | "quantity"
+  | "cost_price"
+  | "buy_date"
+  | "name"
+  | "sector"
+  | "market"
+  | "currency";
+
+export type ServerCsvMapping = Partial<Record<ServerCsvField, string>>;
+
+const SERVER_FIELD: Record<PortfolioField, ServerCsvField> = {
+  symbol: "symbol",
+  name: "name",
+  quantity: "quantity",
+  avg_cost: "cost_price",
+  buy_date: "buy_date",
+  currency: "currency",
+  sector: "sector",
+  market: "market",
+};
+
+function serializeTable(headers: string[], rows: string[][]) {
+  return `${[headers, ...rows].map((cells) => cells.map(escapeCell).join(",")).join("\n")}\n`;
+}
+
+/**
+ * 生成服务端预览/导入载荷（原始 CSV + 表头名映射）。
+ *
+ * 服务端只接受逗号分隔且必须有 buy_date 列；因此仅在「缺少买入日期列/单元格为空」
+ * 或「原文件不是逗号分隔」时重建 CSV，其余情况原样透传，让服务端按原始内容计算
+ * `content_hash`。缺失的日期按产品口径补今天。
+ */
+export function prepareServerCsv(
+  raw: string,
+  table: CsvTable,
+  mapping: Partial<Record<PortfolioField, number>>,
+) {
+  const serverMapping: ServerCsvMapping = {};
+  for (const field of PORTFOLIO_FIELDS) {
+    const index = mapping[field];
+    const header = index === undefined ? "" : (table.headers[index] ?? "").trim();
+    if (header) serverMapping[SERVER_FIELD[field]] = header;
+  }
+
+  const dateIndex = mapping.buy_date;
+  const dateHeader = dateIndex === undefined ? "" : (table.headers[dateIndex] ?? "").trim();
+  const missingDates =
+    !dateHeader || table.rows.some((cells) => !(cells[dateIndex ?? -1] ?? "").trim());
+  const firstLine =
+    stripBom(raw)
+      .split(/\r?\n/)
+      .find((line) => line.trim().length > 0) ?? "";
+  const needsComma = table.headers.length > 1 && !firstLine.includes(",");
+
+  if (!missingDates && !needsComma) return { csv: raw, mapping: serverMapping, filledDates: 0 };
+
+  const fallbackDate = today();
+  let headers: string[];
+  let rows: string[][];
+  let filledDates = 0;
+  if (!dateHeader) {
+    // 没有可用的日期列：追加一列内部表头，避免与用户已有列名冲突。
+    const synthetic = "__buy_date";
+    headers = [...table.headers, synthetic];
+    rows = table.rows.map((cells) => [...cells, fallbackDate]);
+    filledDates = table.rows.length;
+    serverMapping.buy_date = synthetic;
+  } else {
+    headers = [...table.headers];
+    rows = table.rows.map((cells) => {
+      const next = [...cells];
+      if (!(next[dateIndex ?? -1] ?? "").trim()) {
+        next[dateIndex ?? -1] = fallbackDate;
+        filledDates += 1;
+      }
+      return next;
+    });
+    serverMapping.buy_date = dateHeader;
+  }
+  return { csv: serializeTable(headers, rows), mapping: serverMapping, filledDates };
+}
+
 /** 错误行 CSV（附原因列），供「下载错误行」使用。 */
 export function toErrorCsv(rows: ImportRow[]): string {
   const lines = ["row,symbol,quantity,cost_price,reasons"];

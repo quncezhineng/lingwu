@@ -5,7 +5,7 @@
  * 客户端负责解析/映射/逐行校验与「现有 → 导入后」投影；提交仍由后端二次校验
  * （mock 模式本地合并）。部分成功必须二次确认。
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import type { LingWuApi } from "./api";
 import { CsvDropzone } from "./CsvDropzone";
@@ -17,10 +17,11 @@ import {
   PORTFOLIO_FIELDS,
   type PortfolioField,
   parseCsv,
+  prepareServerCsv,
   projectedQuantities,
   REQUIRED_FIELDS,
+  type ServerCsvMapping,
   templateCsv,
-  toCanonicalCsv,
   toErrorCsv,
   validateRows,
 } from "./csv";
@@ -33,7 +34,10 @@ import {
   commitMockImport,
   type Portfolio,
   type PortfolioSource,
+  parseServerPreview,
   projectedHoldingQuantities,
+  type ServerPreview,
+  skippedRowCount,
 } from "./portfolio";
 import { Button, colors, ErrorNotice, Sheet, s } from "./ui";
 
@@ -248,6 +252,16 @@ export function ImportWizard({
   const [table, setTable] = useState<CsvTable>();
   const [mapping, setMapping] = useState<Mapping>({});
   const [preview, setPreview] = useState<ImportPreview>();
+  const [serverCheck, setServerCheck] = useState<
+    | { status: "idle" | "loading" }
+    | { status: "ready"; preview: ServerPreview }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
+  const [serverPayload, setServerPayload] = useState<{
+    csv: string;
+    mapping: ServerCsvMapping;
+  }>();
+  const serverRequest = useRef(0);
   const [pickerField, setPickerField] = useState<PortfolioField>();
   const [expandedRow, setExpandedRow] = useState<number>();
   const [busy, setBusy] = useState(false);
@@ -277,21 +291,55 @@ export function ImportWizard({
   const missingRequired = REQUIRED_FIELDS.filter((field) => mapping[field] === undefined);
   const canMap = !duplicateColumn && missingRequired.length === 0;
 
-  const validRows = preview?.rows.filter((row) => row.status !== "error") ?? [];
-  const errorRows = preview?.rows.filter((row) => row.status === "error") ?? [];
+  const serverPreview = serverCheck.status === "ready" ? serverCheck.preview : undefined;
+  const serverReady = source !== "api" || !!serverPreview;
+  const displayPreview = useMemo(() => {
+    if (!preview) return undefined;
+    if (!serverPreview) return preview;
+    const rows = preview.rows.map((row, index) => {
+      const checked = serverPreview.rows[index];
+      if (!checked) return row;
+      if (checked.status === "error") {
+        return {
+          ...row,
+          status: "error" as const,
+          issues: checked.errors.map((issue) => ({
+            field: issue.field,
+            reason: issue.reason,
+          })),
+        };
+      }
+      if (row.status === "warning") return row;
+      return { ...row, status: "valid" as const, issues: [] };
+    });
+    return {
+      rows,
+      summary: {
+        valid: serverPreview.valid,
+        warning: rows.filter((row) => row.status === "warning").length,
+        error: serverPreview.invalid,
+        merged: preview.summary.merged,
+      },
+    };
+  }, [preview, serverPreview]);
+  const activePreview = displayPreview ?? preview;
+  const validRows = activePreview?.rows.filter((row) => row.status !== "error") ?? [];
+  const errorRows = activePreview?.rows.filter((row) => row.status === "error") ?? [];
   const projected = useMemo(() => {
-    if (!preview) return [];
-    const totals = projectedQuantities(preview.rows);
-    return projectedHoldingQuantities(totals);
-  }, [preview]);
+    if (!activePreview) return [];
+    return projectedHoldingQuantities(projectedQuantities(activePreview.rows));
+  }, [activePreview]);
   const willAccumulate = projected.some((row) => row.current > 0);
 
   function reset() {
+    serverRequest.current += 1;
     setStep(1);
     setFile(undefined);
     setTable(undefined);
     setMapping({});
     setPreview(undefined);
+    setServerCheck({ status: "idle" });
+    setServerPayload(undefined);
     setError("");
     setResult(undefined);
     setExpandedRow(undefined);
@@ -326,17 +374,49 @@ export function ImportWizard({
     if (!table) return;
     setPreview(validateRows(table, mapping));
     setStep(3);
+    void checkWithServer();
+  }
+
+  /** 客户端校验只做即时反馈；最终行状态以服务端预览为准。 */
+  async function checkWithServer() {
+    if (!file || !table || source !== "api") return;
+    const requestId = serverRequest.current + 1;
+    serverRequest.current = requestId;
+    const request = prepareServerCsv(file.text, table, mapping);
+    setServerPayload({ csv: request.csv, mapping: request.mapping });
+    setServerCheck({ status: "loading" });
+    try {
+      const payload = await api.request<unknown>("/api/portfolios/import/preview", {
+        csv: request.csv,
+        mapping: request.mapping,
+      });
+      if (serverRequest.current !== requestId) return;
+      const parsed = parseServerPreview(payload);
+      if (!parsed) throw new Error(t("portfolio.serverPreviewFailed"));
+      setServerCheck({ status: "ready", preview: parsed });
+    } catch (cause) {
+      if (serverRequest.current !== requestId) return;
+      setServerCheck({
+        status: "error",
+        message: cause instanceof Error ? cause.message : t("portfolio.serverPreviewFailed"),
+      });
+    }
   }
 
   async function submit() {
-    if (!preview) return;
+    if (!activePreview) return;
+    if (source === "api" && !serverPayload) {
+      setError(t("portfolio.serverPreviewFailed"));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const csv = toCanonicalCsv(preview.rows);
-      if (source === "api") {
+      if (source === "api" && serverPayload) {
+        // 提交原始 CSV + 表头映射，content_hash 与幂等由服务端按原内容计算。
         const payload = await api.request<unknown>("/api/portfolios/import", {
-          csv,
+          csv: serverPayload.csv,
+          mapping: serverPayload.mapping,
           portfolio_id: portfolio.id,
         });
         const record =
@@ -344,10 +424,18 @@ export function ImportWizard({
         const imported =
           typeof record.imported_count === "number" ? record.imported_count : validRows.length;
         const merged =
-          typeof record.merged_count === "number" ? record.merged_count : preview.summary.merged;
-        const skipped = Array.isArray(record.errors) ? record.errors.length : errorRows.length;
+          typeof record.merged_count === "number"
+            ? record.merged_count
+            : activePreview.summary.merged;
+        const errors = Array.isArray(record.errors)
+          ? (record.errors as { row: number }[]).filter((item) => typeof item?.row === "number")
+          : [];
+        // 跳过行数按服务端字段错误去重；契约缺失时回退到预览错误行数，不能落成 0。
+        const skipped = skippedRowCount(errors) || errorRows.length;
         const accepted =
-          typeof record.rows_accepted === "number" ? record.rows_accepted : imported + merged;
+          typeof record.rows_accepted === "number"
+            ? record.rows_accepted
+            : (serverPreview?.valid ?? imported + merged);
         setResult({
           accepted,
           imported,
@@ -370,15 +458,17 @@ export function ImportWizard({
         setResult({
           accepted: validRows.length,
           imported: validRows.length,
-          merged: preview.summary.merged,
+          merged: activePreview.summary.merged,
           skipped: errorRows.length,
           duplicateImport: false,
         });
         onImported();
       }
       setStep(4);
-    } catch {
-      setError(t("portfolio.importFailedDetail"));
+    } catch (cause) {
+      setError(
+        cause instanceof Error && cause.message ? cause.message : t("portfolio.importFailedDetail"),
+      );
     } finally {
       setBusy(false);
     }
@@ -548,25 +638,55 @@ export function ImportWizard({
         </View>
       )}
 
-      {step === 3 && preview && (
+      {step === 3 && activePreview && (
         <View style={{ gap: 10 }}>
           <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
             <View style={[s.chip, { backgroundColor: colors.surface }]}>
               <Text style={s.chipText}>
-                {t("portfolio.previewValid", { count: preview.summary.valid })}
+                {t("portfolio.previewValid", { count: activePreview.summary.valid })}
               </Text>
             </View>
             <View style={[s.chip, { backgroundColor: colors.alertVolumeSurface }]}>
               <Text style={[s.chipText, { color: colors.alertVolumeText }]}>
-                {t("portfolio.previewWarning", { count: preview.summary.warning })}
+                {t("portfolio.previewWarning", { count: activePreview.summary.warning })}
               </Text>
             </View>
             <View style={[s.chip, { backgroundColor: colors.errorSoft }]}>
               <Text style={[s.chipText, { color: colors.danger }]}>
-                {t("portfolio.previewError", { count: preview.summary.error })}
+                {t("portfolio.previewError", { count: activePreview.summary.error })}
               </Text>
             </View>
           </View>
+
+          {source === "api" && (
+            <Text
+              accessibilityRole={serverCheck.status === "error" ? "alert" : undefined}
+              style={[
+                s.small,
+                {
+                  color: serverCheck.status === "error" ? colors.danger : colors.muted,
+                },
+              ]}
+            >
+              {serverCheck.status === "ready"
+                ? t("portfolio.serverPreviewReady")
+                : serverCheck.status === "loading"
+                  ? t("portfolio.serverPreviewLoading")
+                  : t("portfolio.serverPreviewFailed")}
+            </Text>
+          )}
+          {serverCheck.status === "error" && (
+            <View style={{ gap: 8 }}>
+              <ErrorNotice error={serverCheck.message} />
+              <Button
+                small
+                style={{ minHeight: 44, alignSelf: "flex-start" }}
+                onPress={() => void checkWithServer()}
+              >
+                {t("portfolio.serverPreviewRetry")}
+              </Button>
+            </View>
+          )}
 
           <View
             style={{
@@ -588,7 +708,7 @@ export function ImportWizard({
               <Text style={[s.small, { flex: 1 }]}>{t("portfolio.fieldAvgCost")}</Text>
               <Text style={[s.small, { width: 64 }]}>{t("portfolio.fieldCurrency")}</Text>
             </View>
-            {preview.rows.map((row) => {
+            {activePreview.rows.map((row) => {
               const isError = row.status === "error";
               const isWarning = row.status === "warning";
               return (
@@ -676,9 +796,9 @@ export function ImportWizard({
             })}
           </View>
 
-          {preview.summary.merged > 0 && (
+          {activePreview.summary.merged > 0 && (
             <Text style={[s.small, { color: colors.alertVolumeText }]}>
-              {t("portfolio.mergedRowsGeneric", { count: preview.summary.merged })}
+              {t("portfolio.mergedRowsGeneric", { count: activePreview.summary.merged })}
             </Text>
           )}
 
@@ -703,7 +823,7 @@ export function ImportWizard({
             <Pressable
               accessibilityRole="button"
               onPress={() =>
-                void saveTextFile("lingwu-import-errors.csv", toErrorCsv(preview.rows))
+                void saveTextFile("lingwu-import-errors.csv", toErrorCsv(activePreview.rows))
               }
               style={{ minHeight: 44, justifyContent: "center" }}
             >
@@ -722,6 +842,7 @@ export function ImportWizard({
               <Button
                 primary
                 busy={busy}
+                disabled={!serverReady}
                 style={{ minHeight: 44 }}
                 onPress={() => setConfirmSkip(true)}
               >
@@ -731,6 +852,7 @@ export function ImportWizard({
               <Button
                 primary
                 busy={busy}
+                disabled={!serverReady}
                 style={{ minHeight: 44 }}
                 onPress={() => (willAccumulate ? setConfirmMerge(true) : void submit())}
               >
@@ -750,37 +872,44 @@ export function ImportWizard({
                 width: 55,
                 height: 55,
                 borderRadius: 14,
-                backgroundColor: result.accepted > 0 ? colors.green : colors.errorSoft,
+                backgroundColor:
+                  result.duplicateImport || result.accepted > 0 ? colors.green : colors.errorSoft,
               },
             ]}
           >
-            {result.accepted > 0 ? (
+            {result.duplicateImport || result.accepted > 0 ? (
               <Check size={26} strokeWidth={2} color={colors.success} />
             ) : (
               <CircleX size={26} strokeWidth={2} color={colors.danger} />
             )}
           </View>
           <Text style={s.heading}>
-            {result.accepted > 0 ? t("portfolio.importSuccessTitle") : t("portfolio.importFailed")}
+            {result.duplicateImport
+              ? t("portfolio.duplicateImportTitle")
+              : result.accepted > 0
+                ? t("portfolio.importSuccessTitle")
+                : t("portfolio.importFailed")}
           </Text>
           <Text style={[s.muted, { textAlign: "center" }]}>
-            {result.accepted > 0
-              ? t("portfolio.importSuccessDetail", { count: result.accepted, name: portfolio.name })
-              : t("portfolio.importFailedDetail")}
+            {result.duplicateImport
+              ? t("portfolio.duplicateImport")
+              : result.accepted > 0
+                ? t("portfolio.importSuccessDetail", {
+                    count: result.accepted,
+                    name: portfolio.name,
+                  })
+                : t("portfolio.importFailedDetail")}
           </Text>
-          {result.accepted > 0 && (result.merged > 0 || result.skipped > 0) && (
-            <Text style={s.small}>
-              {t("portfolio.importPartialDetail", {
-                merged: result.merged,
-                skipped: result.skipped,
-              })}
-            </Text>
-          )}
-          {result.duplicateImport && (
-            <Text style={[s.small, { color: colors.alertVolumeText }]}>
-              {t("portfolio.duplicateImport")}
-            </Text>
-          )}
+          {!result.duplicateImport &&
+            result.accepted > 0 &&
+            (result.merged > 0 || result.skipped > 0) && (
+              <Text style={s.small}>
+                {t("portfolio.importPartialDetail", {
+                  merged: result.merged,
+                  skipped: result.skipped,
+                })}
+              </Text>
+            )}
           <View
             style={[s.row, { gap: 10, marginTop: 10, flexWrap: "wrap", justifyContent: "center" }]}
           >
@@ -790,11 +919,11 @@ export function ImportWizard({
             <Button style={{ minHeight: 44 }} onPress={reset}>
               {t("portfolio.continueImport")}
             </Button>
-            {result.skipped > 0 && preview && (
+            {!result.duplicateImport && result.skipped > 0 && activePreview && (
               <Button
                 style={{ minHeight: 44 }}
                 onPress={() =>
-                  void saveTextFile("lingwu-import-errors.csv", toErrorCsv(preview.rows))
+                  void saveTextFile("lingwu-import-errors.csv", toErrorCsv(activePreview.rows))
                 }
               >
                 {t("portfolio.downloadErrors")}
@@ -821,7 +950,7 @@ export function ImportWizard({
         />
       )}
 
-      {confirmSkip && preview && (
+      {confirmSkip && activePreview && (
         <ConfirmModal
           title={t("portfolio.stepPreview")}
           detail={t("portfolio.skipConfirm", { count: errorRows.length, valid: validRows.length })}
