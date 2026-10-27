@@ -25,6 +25,7 @@ const markets = {
     "“{name}” will be removed. The symbols themselves are not deleted.",
   "markets.watchlistDeleteCancel": "Cancel",
   "markets.watchlistDeleteConfirm": "Delete list",
+  "markets.watchlistDeleteError": "Couldn’t delete this list. Try again.",
   "markets.watchlistSearchPlaceholder": "Search a ticker or company",
   "markets.watchlistSearchEmpty": "No matching symbols",
   "markets.watchlistSearchHint": "Type a ticker or company name to add a symbol.",

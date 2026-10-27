@@ -27,6 +27,8 @@ const research = {
   "research.save": "保存",
   "research.cancel": "取消",
   "research.deleteAlert": "删除",
+  "research.deleteConfirm": "确定删除该提醒？",
+  "research.deleteConfirmAction": "确认删除",
   "research.checkNow": "立即检查",
   "research.checkTriggered": "已触发并推送通知。",
   "research.checkNotTriggered": "暂未触发。",

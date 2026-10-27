@@ -28,6 +28,8 @@ const research = {
   "research.save": "Save",
   "research.cancel": "Cancel",
   "research.deleteAlert": "Delete",
+  "research.deleteConfirm": "Delete this alert?",
+  "research.deleteConfirmAction": "Delete alert",
   "research.checkNow": "Check now",
   "research.checkTriggered": "Triggered and notified.",
   "research.checkNotTriggered": "Not triggered yet.",

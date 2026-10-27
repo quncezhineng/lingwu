@@ -8,6 +8,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { LingWuApi } from "../src/api.ts";
 import {
+  activeWatchlist,
+  deleteWatchlist,
+  loadWatchlists,
   mergeSummary,
   normalizeCode,
   parseBriefing,
@@ -16,10 +19,11 @@ import {
   searchSymbols,
 } from "../src/market.ts";
 
-function fakeApi(handler: (path: string) => unknown): LingWuApi {
+function fakeApi(handler: (path: string, body?: unknown, method?: string) => unknown): LingWuApi {
   return {
     token: "test-token",
-    request: async (path: string) => handler(path),
+    request: async (path: string, body?: unknown, method?: string) =>
+      handler(path, body, method ?? (body === undefined ? "GET" : "POST")),
   } as unknown as LingWuApi;
 }
 
@@ -260,4 +264,22 @@ test("标的搜索：接口失败时回落到内置目录", async () => {
   const fallback = await searchSymbols(api, "600519");
   assert.equal(fallback[0]?.code, "600519.SS");
   assert.equal(fallback[0]?.name, "贵州茅台");
+});
+
+test("删除观察列表：接口失败回滚并抛出，成功则移除", async () => {
+  const payload = { watchlists: [{ id: "wl-del", name: "待删", symbols: ["AAPL"] }] };
+  const api = fakeApi((path) => (path === "/api/watchlists" ? payload : {}));
+  await loadWatchlists(api, "zh-Hans", true);
+  assert.equal(activeWatchlist()?.id, "wl-del");
+
+  const failing = fakeApi((_path, _body, method) => {
+    if (method === "DELETE") throw new Error("boom");
+    return {};
+  });
+  await assert.rejects(() => deleteWatchlist(failing, "wl-del"), /boom/);
+  assert.equal(activeWatchlist()?.id, "wl-del", "失败后应回滚乐观删除");
+
+  const ok = fakeApi(() => undefined);
+  await deleteWatchlist(ok, "wl-del");
+  assert.equal(activeWatchlist(), undefined);
 });

@@ -197,6 +197,7 @@ export function Button({
   small,
   danger,
   style,
+  hitSlop,
 }: {
   children: ReactNode;
   onPress: () => void;
@@ -209,6 +210,8 @@ export function Button({
   small?: boolean;
   danger?: boolean;
   style?: ViewStyle;
+  /** 扩大触控热区（视觉尺寸不变）；小尺寸按钮用于达到 44px 触控目标。 */
+  hitSlop?: number;
 }) {
   const color = danger ? colors.danger : primary ? colors.onPrimary : colors.text;
 
@@ -217,6 +220,7 @@ export function Button({
       accessibilityRole="button"
       disabled={disabled || busy}
       accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
+      hitSlop={hitSlop}
       onPress={onPress}
       style={({ pressed }) => [
         s.button,

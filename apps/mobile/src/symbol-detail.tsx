@@ -117,17 +117,23 @@ function SectionLabel({ children }: { children: string }) {
 function AlertRow({
   alert,
   busy,
+  confirming,
   onToggle,
   onCheck,
   onEdit,
-  onDelete,
+  onRequestDelete,
+  onConfirmDelete,
+  onCancelDelete,
 }: {
   alert: PriceAlertRecord;
   busy: boolean;
+  confirming: boolean;
   onToggle: (enabled: boolean) => void;
   onCheck: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onRequestDelete: () => void;
+  onConfirmDelete: () => void;
+  onCancelDelete: () => void;
 }) {
   const { t } = useTranslation();
   const label =
@@ -157,14 +163,30 @@ function AlertRow({
           accessibilityLabel={t("research.enabled")}
         />
       </View>
-      <View style={[s.row, { gap: 8 }]}>
-        <Button small busy={busy} onPress={onCheck} icon={RefreshCw}>
-          {t("research.checkNow")}
-        </Button>
-        <Button small danger icon={Trash2} onPress={onDelete}>
-          {t("research.deleteAlert")}
-        </Button>
-      </View>
+      {confirming ? (
+        <View style={{ gap: 8 }}>
+          <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
+            {t("research.deleteConfirm")}
+          </Text>
+          <View style={[s.row, { gap: 8 }]}>
+            <Button small danger busy={busy} hitSlop={6} icon={Trash2} onPress={onConfirmDelete}>
+              {t("research.deleteConfirmAction")}
+            </Button>
+            <Button small hitSlop={6} onPress={onCancelDelete}>
+              {t("research.cancel")}
+            </Button>
+          </View>
+        </View>
+      ) : (
+        <View style={[s.row, { gap: 8 }]}>
+          <Button small busy={busy} hitSlop={6} onPress={onCheck} icon={RefreshCw}>
+            {t("research.checkNow")}
+          </Button>
+          <Button small danger hitSlop={6} icon={Trash2} onPress={onRequestDelete}>
+            {t("research.deleteAlert")}
+          </Button>
+        </View>
+      )}
     </View>
   );
 }
@@ -532,6 +554,7 @@ export function SymbolDetailSheet({
   const [alerts, setAlerts] = useState<PriceAlertRecord[]>();
   const [alertsError, setAlertsError] = useState("");
   const [alertBusyId, setAlertBusyId] = useState<string>();
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string>();
   const [form, setForm] = useState<{
     mode: "create" | "edit";
     id?: string;
@@ -556,6 +579,7 @@ export function SymbolDetailSheet({
     try {
       const all = await listPriceAlerts(api);
       setAlerts(all.filter((alert) => alert.symbol_code === target));
+      setConfirmDeleteId(undefined);
     } catch (error) {
       setAlertsError(errorText(error));
       setAlerts([]);
@@ -838,6 +862,7 @@ export function SymbolDetailSheet({
         <Button
           small
           icon={Plus}
+          hitSlop={6}
           onPress={() =>
             setForm({
               mode: "create",
@@ -855,6 +880,7 @@ export function SymbolDetailSheet({
             small
             danger
             icon={Trash2}
+            hitSlop={6}
             onPress={() => {
               removeSymbol(api, watchlist.id, symbol.code);
               notify(t("research.removedFromList", { name: watchlist.name }));
@@ -881,7 +907,7 @@ export function SymbolDetailSheet({
       {alertsError ? (
         <View style={{ gap: 8 }}>
           <ErrorNotice error={t("research.alertsError")} />
-          <Button small icon={RefreshCw} onPress={() => void loadAlerts()}>
+          <Button small icon={RefreshCw} hitSlop={6} onPress={() => void loadAlerts()}>
             {t("research.alertsRetry")}
           </Button>
         </View>
@@ -894,9 +920,15 @@ export function SymbolDetailSheet({
               key={alert.id}
               alert={alert}
               busy={alertBusyId === alert.id}
+              confirming={confirmDeleteId === alert.id}
               onToggle={(enabled) => void toggleAlert(alert, enabled)}
               onCheck={() => void checkAlert(alert)}
-              onDelete={() => void removeAlert(alert)}
+              onRequestDelete={() => setConfirmDeleteId(alert.id)}
+              onConfirmDelete={() => {
+                setConfirmDeleteId(undefined);
+                void removeAlert(alert);
+              }}
+              onCancelDelete={() => setConfirmDeleteId(undefined)}
               onEdit={() =>
                 setForm({
                   mode: "edit",
@@ -1022,7 +1054,13 @@ export function SymbolDetailSheet({
       ) : (
         <View style={{ gap: 8 }}>
           <Text style={s.muted}>{t("research.newsEmpty")}</Text>
-          <Button small icon={Sparkles} busy={starting} onPress={() => void runResearch()}>
+          <Button
+            small
+            icon={Sparkles}
+            busy={starting}
+            hitSlop={6}
+            onPress={() => void runResearch()}
+          >
             {t("research.runResearch")}
           </Button>
         </View>

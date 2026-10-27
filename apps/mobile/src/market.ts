@@ -623,16 +623,24 @@ export function updateWatchlist(
   }
 }
 
-export function deleteWatchlist(api: LingWuApi, id: string) {
-  const lists = watchlistState.lists.filter((list) => list.id !== id);
+/**
+ * 删除观察列表：先乐观移除，接口失败时回滚并抛出，由 UI 提示错误。
+ * 不吞错——否则用户会以为列表已删除（与 F-08 同类问题）。
+ */
+export async function deleteWatchlist(api: LingWuApi, id: string): Promise<void> {
+  const previousLists = watchlistState.lists;
+  const previousActiveId = watchlistState.activeId;
+  const lists = previousLists.filter((list) => list.id !== id);
   setWatchlistState({
     lists,
-    activeId: watchlistState.activeId === id ? lists[0]?.id : watchlistState.activeId,
+    activeId: previousActiveId === id ? lists[0]?.id : previousActiveId,
   });
-  if (watchlistState.source === "api") {
-    void api
-      .request(`/api/watchlists/${encodeURIComponent(id)}`, undefined, "DELETE")
-      .catch(() => undefined);
+  if (watchlistState.source !== "api") return;
+  try {
+    await api.request(`/api/watchlists/${encodeURIComponent(id)}`, undefined, "DELETE");
+  } catch (error) {
+    setWatchlistState({ lists: previousLists, activeId: previousActiveId });
+    throw error;
   }
 }
 
