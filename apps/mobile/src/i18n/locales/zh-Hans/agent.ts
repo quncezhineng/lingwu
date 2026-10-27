@@ -228,6 +228,7 @@ const agent = {
   "agent.searchConnectors": "搜索连接器",
   "agent.onYourComputer": "在你的电脑上",
   "agent.shortcutPortfolioDetail": "持仓、盈亏与配置分析",
+  "agent.shortcutNotesDetail": "买入/卖出理由、研究心得与论点追踪",
   "agent.shortcutWatchlistDetail": "行情、异动与每日动态",
   "agent.shortcutMailDetail": "阅读邮件并准备回复",
   "agent.shortcutCalendarDetail": "日程与复核过的邀请",

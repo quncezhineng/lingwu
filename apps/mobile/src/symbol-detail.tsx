@@ -26,6 +26,8 @@ import type { TranslationKey } from "./i18n/locales/en";
 import { FileText, MessageCircle, Plus, RefreshCw, Sparkles, Trash2 } from "./icons";
 import { type Quote, removeSymbol, type SymbolMeta } from "./market";
 import { defaultCurrency, directionOf, formatPercent, formatPrice } from "./market-format";
+import { SymbolNotesSection } from "./note-ui";
+import { setNotesIntent } from "./notes";
 import {
   checkPriceAlert,
   createPriceAlert,
@@ -549,7 +551,7 @@ export function SymbolDetailSheet({
   quote?: Quote;
   watchlist?: { id: string; name: string };
 }) {
-  const { api, close, ask, notify, refresh } = useWorkspace();
+  const { api, close, ask, navigate, notify, refresh } = useWorkspace();
   const { t } = useTranslation();
   const [alerts, setAlerts] = useState<PriceAlertRecord[]>();
   const [alertsError, setAlertsError] = useState("");
@@ -1031,6 +1033,17 @@ export function SymbolDetailSheet({
           </View>
         </Card>
       )}
+
+      {/* 投资笔记（位于价格提醒之后、新闻之前） */}
+      <SymbolNotesSection
+        api={api}
+        symbolCode={symbol.code}
+        onOpenTheses={() => {
+          setNotesIntent({ tab: "theses", symbol: symbol.code });
+          close();
+          navigate("notes");
+        }}
+      />
 
       {/* 近期新闻（来自最新研报） */}
       <SectionLabel>{t("research.newsSection")}</SectionLabel>
