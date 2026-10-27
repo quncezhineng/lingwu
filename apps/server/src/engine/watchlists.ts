@@ -7,6 +7,7 @@ import {
   type MarketDataService,
   type Quote,
   resolveMarket,
+  withTimeout,
 } from "../../../../packages/integrations/src/market-data.ts";
 import type { Store } from "../db.ts";
 import { AppError } from "../errors.ts";
@@ -15,6 +16,8 @@ const WATCHLIST_KIND = "watchlists";
 const SYMBOL_KIND = "symbols";
 /** Movers are symbols whose daily change exceeds this percentage. */
 const MOVER_THRESHOLD_PERCENT = 2;
+/** Whole-summary budget; per-symbol quotes are already bounded by MarketDataService. */
+const SUMMARY_TIMEOUT_MS = Number(process.env.MARKET_DATA_SUMMARY_TIMEOUT_MS ?? 10_000);
 
 const nameSchema = z.string().trim().min(1).max(100);
 const codeSchema = z
@@ -188,11 +191,19 @@ export class WatchlistsService {
   /** Quote every symbol and flag the day's movers. Partial failures are reported per symbol. */
   async summary(owner: string, id: string): Promise<WatchlistSummary> {
     const watchlist = await this.require(owner, id);
+    const deadline = Date.now() + SUMMARY_TIMEOUT_MS;
     const settled = await Promise.allSettled(
-      watchlist.symbols.map(async (symbol) => ({
-        symbol,
-        quote: await this.market.getQuote(symbol),
-      })),
+      watchlist.symbols.map(async (symbol) => {
+        const remaining = Math.max(1, deadline - Date.now());
+        return {
+          symbol,
+          quote: await withTimeout(
+            this.market.getQuote(symbol),
+            remaining,
+            `Timed out loading ${symbol}`,
+          ),
+        };
+      }),
     );
     const quotes: WatchlistQuote[] = [];
     const unavailable: string[] = [];

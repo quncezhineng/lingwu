@@ -45,6 +45,8 @@ import {
   pageLines,
   withoutRelativeTimes,
 } from "./page-diff.ts";
+import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
+import { generateResearchReport, researchSymbolSchema } from "./research.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
 
@@ -58,6 +60,7 @@ export class AgentService {
   readonly search: SearchService;
   readonly market: MarketDataService;
   readonly watchlists: WatchlistsService;
+  readonly priceAlerts: PriceAlertsService;
   private maintenance?: ReturnType<typeof setInterval>;
   private refreshing = false;
   constructor(
@@ -69,10 +72,12 @@ export class AgentService {
     readonly browser: BrowserService,
     readonly computer: ComputerService = new ComputerService(db, config),
     market: MarketDataService = new MarketDataService(),
+    search?: SearchService,
   ) {
-    this.search = new SearchService(db);
+    this.search = search ?? new SearchService(db);
     this.market = market;
     this.watchlists = new WatchlistsService(db, market);
+    this.priceAlerts = new PriceAlertsService(db, market);
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
       settled: (owner, task) => this.publishOutcome(owner, task),
     });
@@ -103,6 +108,12 @@ export class AgentService {
         await this.publishOutcome(owner, value);
       for (const { owner, value } of await this.db.scan<Monitor>("monitors"))
         await this.activateMonitor(owner, value);
+      for (const { owner, value } of await this.db.scan<PriceAlertRecord>("price_alerts")) {
+        if (!PriceAlertsService.isDue(value)) continue;
+        await this.priceAlerts
+          .check(owner, value.id, this.alertNotifier(owner))
+          .catch((error) => backgroundFailure("price alert check", error));
+      }
       for (const { owner, value } of await this.db.scan<Idea>("ideas"))
         if (
           value.status === "accepted" &&
@@ -237,12 +248,19 @@ export class AgentService {
             ? ["Validate transactions", "Calculate the summary", "Save your tracker"]
             : input.kind === "market_briefing"
               ? ["Collect overnight market data", "Scan your watchlists", "Write the briefing"]
-              : [
-                  "Understand the outcome",
-                  "Plan the work",
-                  "Use connected tools",
-                  "Return a result",
-                ];
+              : input.kind === "research"
+                ? [
+                    "Load market data",
+                    "Gather news and peer quotes",
+                    "Estimate a valuation range",
+                    "Write the report",
+                  ]
+                : [
+                    "Understand the outcome",
+                    "Plan the work",
+                    "Use connected tools",
+                    "Return a result",
+                  ];
     const task: AgentTask = {
       id,
       title: input.title ?? input.prompt.slice(0, 90),
@@ -752,6 +770,12 @@ export class AgentService {
     );
     return this.db.get<Idea>(owner, "ideas", id);
   }
+  private alertNotifier(owner: string): AlertNotifier {
+    return async (title, body, key) => {
+      await this.notify(owner, title, body, undefined, key);
+      return { id: hash(key), title, body };
+    };
+  }
   async notify(owner: string, title: string, body: string, taskId?: string, key?: string) {
     const value: AgentNotification = {
       id: key ? hash(key) : randomUUID(),
@@ -897,6 +921,25 @@ export class AgentService {
           },
         };
       }
+    }
+    if (task.kind === "research") {
+      const symbol = researchSymbolSchema.parse(String(task.input.symbol ?? ""));
+      const report = await generateResearchReport(
+        owner,
+        symbol,
+        { db: this.db, market: this.market, search: this.search },
+        (step, detail) => context.event("step", step, detail),
+      );
+      const artifact = await this.artifact(
+        owner,
+        task,
+        "research_report",
+        report.title,
+        `${report.symbol_code} · ${report.sections.news.length} news · ${report.sections.peer_comparison.length} peers`,
+        report as unknown as Record<string, unknown>,
+      );
+      task = await context.checkpoint({ artifactIds: [artifact.id] });
+      return this.finish(task, context, `${report.title}\n\n${report.sections.company_overview}`);
     }
     if (task.kind === "market_briefing") {
       await context.event("step", "Collecting overnight market data and watchlist moves");
