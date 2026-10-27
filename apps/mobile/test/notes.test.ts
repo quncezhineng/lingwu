@@ -6,14 +6,17 @@ import test from "node:test";
 import type { LingWuApi } from "../src/api.ts";
 import {
   bucketOf,
+  createNote,
   groupNotesByDate,
   type InvestmentNote,
   loadNotes,
   notesSnapshot,
   parseNote,
+  parseNoteChecks,
   parseThesisCheck,
   runThesisCheck,
   sortTheses,
+  updateNote,
 } from "../src/notes.ts";
 
 function fakeApi(handler: (path: string, body?: unknown, method?: string) => unknown): LingWuApi {
@@ -28,6 +31,7 @@ const NOTE_PAYLOAD = {
   id: "n-1",
   symbol_code: "AAPL",
   type: "THESIS",
+  title: "服务收入占比",
   content: "服务业务将在 2027 年贡献 30% 营收。",
   status: "ACTIVE",
   check: {
@@ -46,6 +50,7 @@ test("笔记解析：B3 契约字段与「待人工确认」检验态", () => {
   assert.ok(note);
   assert.equal(note?.symbolCode, "AAPL");
   assert.equal(note?.type, "THESIS");
+  assert.equal(note?.title, "服务收入占比");
   assert.equal(note?.status, "ACTIVE");
   assert.equal(note?.check?.outcome, "pending_confirmation");
   assert.equal(note?.check?.source, "automated");
@@ -78,6 +83,34 @@ test("检验记录解析：items 与 pending/manual_updates", () => {
   assert.equal(record?.pending, 2);
   assert.equal(record?.items[0]?.previousStatus, "ACTIVE");
   assert.equal(record?.items[1]?.source, "manual");
+});
+
+test("检验历史：按时间倒序，failed 保留原因而非结论", () => {
+  const checks = parseNoteChecks({
+    checks: [
+      {
+        week: "2026-W43",
+        checked_at: "2026-10-20T08:00:00.000Z",
+        outcome: "pending_confirmation",
+        source: "automated",
+        status: "ok",
+      },
+      {
+        week: "2026-W44",
+        checked_at: "2026-10-27T08:00:00.000Z",
+        outcome: "invalid",
+        source: "automated",
+        status: "failed",
+        error: "model timeout",
+      },
+    ],
+  });
+  assert.equal(checks.length, 2);
+  assert.equal(checks[0]?.week, "2026-W44");
+  assert.equal(checks[0]?.status, "failed");
+  assert.equal(checks[0]?.error, "model timeout");
+  assert.equal(checks[1]?.status, "ok");
+  assert.equal(parseNoteChecks({ checks: [{ outcome: "weird" }] }).length, 0);
 });
 
 test("日期分组：今天/昨天/本周/更早", () => {
@@ -150,4 +183,19 @@ test("接口不可用时回落 mock 且不伪造结论", async () => {
   const record = await runThesisCheck(api);
   assert.ok(record.items.length >= 1);
   assert.equal(record.pending, 1);
+});
+
+test("标题可选：创建时写入，清空后回退正文摘要", async () => {
+  const api = fakeApi(() => {
+    throw new Error("offline");
+  });
+  const created = await createNote(api, {
+    symbolCode: "AAPL",
+    type: "RESEARCH",
+    title: "  毛利率修复  ",
+    content: "正文内容",
+  });
+  assert.equal(created.title, "毛利率修复");
+  const cleared = await updateNote(api, created.id, { title: "" });
+  assert.equal(cleared.title, undefined);
 });

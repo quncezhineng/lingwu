@@ -3,7 +3,7 @@
  * 标的详情内嵌笔记区。
  */
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from "react-native";
 import type { LingWuApi } from "./api";
 import { type TranslationFn, useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
@@ -28,8 +28,11 @@ import {
   createNote,
   deleteNote,
   type InvestmentNote,
+  loadNoteChecks,
   loadNotes,
   NOTE_TYPES,
+  type NoteCheck,
+  type NoteCheckEntry,
   type NoteType,
   type ThesisStatus,
   updateNote,
@@ -143,14 +146,18 @@ export function ThesisCheckChip({ note }: { note: InvestmentNote }) {
   );
 }
 
+export function checkEntrySummary(check: NoteCheck, t: TranslationFn) {
+  if (check.outcome === "pending_confirmation") return t("notes.checkPendingDetail");
+  if (check.outcome === "inconclusive") return t("notes.checkInconclusive");
+  if (check.source === "manual") return t("notes.checkManual");
+  const suggestion = t(check.outcome === "valid" ? "notes.suggestValid" : "notes.suggestInvalid");
+  return `${suggestion} · ${t("notes.checkAuto")}`;
+}
+
 export function checkSummary(note: InvestmentNote, t: TranslationFn) {
   const check = note.check;
   if (!check) return t("notes.neverChecked");
-  const source = t(check.source === "manual" ? "notes.checkManual" : "notes.checkAuto");
-  if (check.outcome === "pending_confirmation") return t("notes.checkPendingDetail");
-  if (check.outcome === "inconclusive") return t("notes.checkInconclusive");
-  const suggestion = t(check.outcome === "valid" ? "notes.suggestValid" : "notes.suggestInvalid");
-  return `${suggestion} · ${source}`;
+  return checkEntrySummary(check, t);
 }
 
 /** 检验行完整文案：最近检验 + 来源/建议，避免「人工确认」重复出现。 */
@@ -183,7 +190,7 @@ export function NoteCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${t(TYPE_LABEL[note.type])}, ${note.symbolCode}, ${note.content.slice(0, 40)}, ${new Date(note.createdAt).toLocaleDateString()}`}
+      accessibilityLabel={`${t(TYPE_LABEL[note.type])}, ${note.symbolCode}, ${(note.title ?? note.content).slice(0, 40)}, ${new Date(note.createdAt).toLocaleDateString()}`}
       onPress={onPress}
       style={({ pressed }) => [
         s.card,
@@ -209,7 +216,15 @@ export function NoteCard({
       <Text style={[s.muted, { fontSize: 12 }]} numberOfLines={1}>
         {symbolName}
       </Text>
-      <Text style={[s.text, { fontSize: 14, lineHeight: 21 }]} numberOfLines={compact ? 1 : 2}>
+      {!!note.title && (
+        <Text style={[s.text, { fontSize: 14, fontWeight: "600" }]} numberOfLines={1}>
+          {note.title}
+        </Text>
+      )}
+      <Text
+        style={[s.text, { fontSize: 14, lineHeight: 21 }]}
+        numberOfLines={note.title ? 1 : compact ? 1 : 2}
+      >
         {note.content}
       </Text>
       {note.type === "THESIS" && (
@@ -370,12 +385,16 @@ export function NoteEditorSheet({
   const [symbol, setSymbol] = useState<SymbolMeta | undefined>(
     initial ? metaFor(initial.symbolCode) : defaultSymbol ? metaFor(defaultSymbol) : undefined,
   );
+  const [title, setTitle] = useState(initial?.title ?? "");
   const [content, setContent] = useState(initial?.content ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
-  const dirty = content !== (initial?.content ?? "") || (!initial && !!symbol);
+  const dirty =
+    content !== (initial?.content ?? "") ||
+    title !== (initial?.title ?? "") ||
+    (!initial && !!symbol);
   const contentError = !content.trim()
     ? t("notes.contentRequired")
     : type === "THESIS" && content.trim().length < 10
@@ -393,6 +412,22 @@ export function NoteEditorSheet({
 
   return (
     <Sheet title={t(initial ? "notes.editNote" : "notes.writeNote")} onClose={requestClose}>
+      <Text style={[s.small, { fontWeight: "600", color: colors.text, marginBottom: 7 }]}>
+        {t("notes.titleLabel")}
+      </Text>
+      <TextInput
+        value={title}
+        onChangeText={(text) => setTitle(text.slice(0, 80))}
+        placeholder={t("notes.titlePlaceholder")}
+        placeholderTextColor={colors.faint}
+        accessibilityLabel={t("notes.titleLabel")}
+        style={[s.input, { marginBottom: 4 }]}
+      />
+      <Text
+        style={[s.small, s.metric, { color: colors.faint, textAlign: "right", marginBottom: 12 }]}
+      >
+        {t("notes.titleCounter", { count: title.length })}
+      </Text>
       <Text style={[s.small, { fontWeight: "600", color: colors.text, marginBottom: 8 }]}>
         {t("notes.contentLabel")}
       </Text>
@@ -497,11 +532,15 @@ export function NoteEditorSheet({
               setError("");
               try {
                 if (initial) {
-                  await updateNote(api, initial.id, { content: content.trim() });
+                  await updateNote(api, initial.id, {
+                    title: title.trim(),
+                    content: content.trim(),
+                  });
                 } else {
                   await createNote(api, {
                     symbolCode: symbol.code,
                     type,
+                    title: title.trim() || undefined,
                     content: content.trim(),
                     status: type === "THESIS" ? "ACTIVE" : undefined,
                   });
@@ -553,32 +592,106 @@ export function NoteEditorSheet({
 }
 
 export function CheckHistorySheet({
+  api,
   note,
   onClose,
 }: {
+  api: LingWuApi;
   note: InvestmentNote;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const entries = note.check ? [note.check] : [];
+  const [entries, setEntries] = useState<NoteCheckEntry[]>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    void loadNoteChecks(api, note)
+      .then((list) => {
+        if (cancelled) return;
+        setEntries(list);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // 接口失败时保留最近一次检验，避免时间线整块消失。
+        setEntries(note.check ? [{ ...note.check, week: "", status: "ok" }] : []);
+        setError(t("notes.checkHistoryError"));
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, note, attempt, t]);
+
   return (
     <Sheet title={t("notes.historyTitle", { symbol: note.symbolCode })} onClose={onClose}>
-      {entries.length ? (
-        entries.map((check) => (
-          <View
-            key={check.checkedAt}
-            accessibilityLabel={`${new Date(check.checkedAt).toLocaleString()}, ${noteCheckLine(note, t)}`}
-            style={{ borderTopWidth: 1, borderTopColor: colors.line, paddingVertical: 12, gap: 3 }}
-          >
-            <Text style={s.small}>{new Date(check.checkedAt).toLocaleString()}</Text>
-            <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]}>
-              {checkSummary(note, t)}
-            </Text>
-            {!!check.note && <Text style={[s.muted, { fontSize: 12 }]}>{check.note}</Text>}
-          </View>
-        ))
+      {loading ? (
+        <View style={[s.row, { gap: 8, paddingVertical: 12 }]}>
+          <ActivityIndicator color={colors.primary} size="small" />
+          <Text style={s.muted}>{t("notes.checkHistoryLoading")}</Text>
+        </View>
       ) : (
-        <Text style={s.muted}>{t("notes.historyEmpty")}</Text>
+        <>
+          {!!error && (
+            <View style={{ gap: 8, marginBottom: 10 }}>
+              <ErrorNotice error={error} />
+              <Button
+                small
+                style={{ minHeight: 44, alignSelf: "flex-start" }}
+                onPress={() => setAttempt((value) => value + 1)}
+              >
+                {t("notes.checkHistoryRetry")}
+              </Button>
+            </View>
+          )}
+          {entries?.length ? (
+            entries.map((check) => {
+              const failed = check.status === "failed";
+              const summary = failed ? t("notes.checkFailedLabel") : checkEntrySummary(check, t);
+              return (
+                <View
+                  key={`${check.checkedAt}-${check.week}`}
+                  accessibilityLabel={`${new Date(check.checkedAt).toLocaleString()}, ${summary}`}
+                  style={{
+                    borderTopWidth: 1,
+                    borderTopColor: colors.line,
+                    paddingVertical: 12,
+                    gap: 3,
+                  }}
+                >
+                  <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                    <Text style={s.small}>{new Date(check.checkedAt).toLocaleString()}</Text>
+                    {!!check.week && <Chip>{check.week}</Chip>}
+                  </View>
+                  <Text
+                    style={[
+                      s.text,
+                      { fontSize: 13, fontWeight: "600" },
+                      failed && { color: colors.danger },
+                    ]}
+                  >
+                    {summary}
+                  </Text>
+                  {failed && (
+                    <Text style={[s.small, { color: colors.danger }]}>
+                      {t("notes.checkFailedReason", { error: check.error || "—" })}
+                    </Text>
+                  )}
+                  {!failed && !!check.note && (
+                    <Text style={[s.muted, { fontSize: 12 }]}>{check.note}</Text>
+                  )}
+                </View>
+              );
+            })
+          ) : (
+            <Text style={s.muted}>{t("notes.historyEmpty")}</Text>
+          )}
+        </>
       )}
       <Text style={[s.small, { color: colors.faint, marginTop: 14 }]}>{t("notes.aiNotice")}</Text>
     </Sheet>
@@ -710,6 +823,7 @@ export function NoteDetailSheet({
         {note.type === "THESIS" && <ThesisStatusChip status={note.status} />}
         {note.type === "THESIS" && <ThesisCheckChip note={note} />}
       </View>
+      {!!note.title && <Text style={[s.heading, { marginBottom: 8 }]}>{note.title}</Text>}
       <Text style={[s.text, { fontSize: 15, lineHeight: 24 }]}>{note.content}</Text>
       {note.type === "THESIS" && (
         <View
@@ -837,7 +951,9 @@ export function NoteDetailSheet({
           </Pressable>
         </Modal>
       )}
-      {historyOpen && <CheckHistorySheet note={note} onClose={() => setHistoryOpen(false)} />}
+      {historyOpen && (
+        <CheckHistorySheet api={api} note={note} onClose={() => setHistoryOpen(false)} />
+      )}
       {confirmStatus && (
         <ConfirmStatusSheet
           api={api}
@@ -890,7 +1006,9 @@ export function SymbolNotesSection({
 
   const filteredNotes = query.trim()
     ? symbolNotes.filter((note) =>
-        `${note.content} ${note.symbolCode}`.toLowerCase().includes(query.trim().toLowerCase()),
+        `${note.title ?? ""} ${note.content} ${note.symbolCode}`
+          .toLowerCase()
+          .includes(query.trim().toLowerCase()),
       )
     : symbolNotes;
 

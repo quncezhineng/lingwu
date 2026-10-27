@@ -203,6 +203,11 @@ function ThesisCard({
           {new Date(note.createdAt).toLocaleDateString()}
         </Text>
       </View>
+      {!!note.title && (
+        <Text style={[s.text, { fontSize: 15, fontWeight: "600" }]} numberOfLines={2}>
+          {note.title}
+        </Text>
+      )}
       <Text
         style={[s.text, { fontSize: 15, lineHeight: 22 }]}
         numberOfLines={expanded ? undefined : 4}
@@ -288,7 +293,9 @@ export function NotesScreen() {
         if (typeFilter !== "all" && note.type !== typeFilter) return false;
         if (symbolFilter && note.symbolCode !== symbolFilter) return false;
         if (!debounced) return true;
-        return `${note.content} ${note.symbolCode}`.toLowerCase().includes(debounced);
+        return `${note.title ?? ""} ${note.content} ${note.symbolCode}`
+          .toLowerCase()
+          .includes(debounced);
       }),
     [state.notes, typeFilter, symbolFilter, debounced],
   );
@@ -740,6 +747,7 @@ export function NotesScreen() {
       )}
       {historyTarget && (
         <CheckHistorySheet
+          api={api}
           note={state.notes.find((note) => note.id === historyTarget.id) ?? historyTarget}
           onClose={() => setHistoryTarget(undefined)}
         />

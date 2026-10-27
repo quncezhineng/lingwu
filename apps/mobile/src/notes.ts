@@ -28,10 +28,18 @@ export interface NoteCheck {
   note?: string;
 }
 
+/** 单条论点检验记录（GET /api/notes/:id/checks）。failed 表示检验本身失败。 */
+export interface NoteCheckEntry extends NoteCheck {
+  week: string;
+  status: "ok" | "failed";
+  error?: string;
+}
+
 export interface InvestmentNote {
   id: string;
   symbolCode: string;
   type: NoteType;
+  title?: string;
   content: string;
   status?: ThesisStatus;
   check?: NoteCheck;
@@ -115,6 +123,7 @@ export function parseNote(value: unknown): InvestmentNote | undefined {
     id,
     symbolCode,
     type,
+    title: str(value.title),
     content,
     status: thesisStatus(value.status),
     check:
@@ -165,6 +174,30 @@ export function parseThesisCheck(value: unknown): ThesisCheckRecord | undefined 
     manualUpdates: typeof value.manual_updates === "number" ? value.manual_updates : 0,
     note: str(value.note) ?? "",
   };
+}
+
+/** 解析检验历史；failed 记录保留 error，绝不映射成「不成立」。 */
+export function parseNoteChecks(payload: unknown): NoteCheckEntry[] {
+  const raw = isRecord(payload) && Array.isArray(payload.checks) ? payload.checks : [];
+  return raw
+    .flatMap((entry): NoteCheckEntry[] => {
+      if (!isRecord(entry)) return [];
+      const outcome = checkOutcome(entry.outcome);
+      const checkedAt = str(entry.checked_at) ?? str(entry.checkedAt);
+      if (!outcome || !checkedAt) return [];
+      return [
+        {
+          outcome,
+          source: entry.source === "manual" ? "manual" : "automated",
+          checkedAt,
+          note: str(entry.note),
+          week: str(entry.week) ?? "",
+          status: entry.status === "failed" ? "failed" : "ok",
+          error: str(entry.error),
+        },
+      ];
+    })
+    .sort((a, b) => b.checkedAt.localeCompare(a.checkedAt));
 }
 
 /* ------------------------------------------------------------------ *
@@ -404,14 +437,36 @@ function localId() {
   return `note-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
 }
 
+/** 单条笔记的检验时间线；mock 模式回退到最近一次检验。 */
+export async function loadNoteChecks(
+  api: LingWuApi,
+  note: InvestmentNote,
+  limit = 50,
+): Promise<NoteCheckEntry[]> {
+  if (state.source === "mock")
+    return note.check ? [{ ...note.check, week: "mock", status: "ok" }] : [];
+  const payload = await api.request<unknown>(
+    `/api/notes/${encodeURIComponent(note.id)}/checks?limit=${limit}`,
+  );
+  return parseNoteChecks(payload);
+}
+
 export async function createNote(
   api: LingWuApi,
-  input: { symbolCode: string; type: NoteType; content: string; status?: ThesisStatus },
+  input: {
+    symbolCode: string;
+    type: NoteType;
+    title?: string;
+    content: string;
+    status?: ThesisStatus;
+  },
 ): Promise<InvestmentNote> {
+  const title = input.title?.trim();
   if (state.source === "api") {
     const payload = await api.request<unknown>("/api/notes", {
       symbol_code: input.symbolCode,
       type: input.type,
+      ...(title ? { title } : {}),
       content: input.content,
       ...(input.type === "THESIS" ? { status: input.status ?? "ACTIVE" } : {}),
     });
@@ -425,6 +480,7 @@ export async function createNote(
     id: localId(),
     symbolCode: input.symbolCode,
     type: input.type,
+    ...(title ? { title } : {}),
     content: input.content,
     ...(input.type === "THESIS" ? { status: input.status ?? "ACTIVE" } : {}),
     createdAt: now,
@@ -437,12 +493,13 @@ export async function createNote(
 export async function updateNote(
   api: LingWuApi,
   id: string,
-  patch: { content?: string; status?: ThesisStatus },
+  patch: { title?: string; content?: string; status?: ThesisStatus },
 ): Promise<InvestmentNote> {
   if (state.source === "api") {
     const payload = await api.request<unknown>(
       `/api/notes/${encodeURIComponent(id)}`,
       {
+        ...(patch.title === undefined ? {} : { title: patch.title }),
         ...(patch.content === undefined ? {} : { content: patch.content }),
         ...(patch.status === undefined ? {} : { status: patch.status }),
       },
@@ -457,6 +514,7 @@ export async function updateNote(
   if (!existing) throw new Error("Note not found");
   const updated: InvestmentNote = {
     ...existing,
+    ...(patch.title === undefined ? {} : { title: patch.title.trim() || undefined }),
     ...(patch.content === undefined ? {} : { content: patch.content }),
     ...(patch.status === undefined ? {} : { status: patch.status }),
     updatedAt: new Date().toISOString(),
