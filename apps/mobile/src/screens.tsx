@@ -1,26 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import {
-  ArrowDownToLine,
-  ArrowUpRight,
-  CalendarDays,
-  Check,
-  CheckCheck,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Cpu,
-  FileText,
-  Globe2,
-  Inbox,
-  Link2,
-  Mail,
-  Plus,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Upload,
-} from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -39,12 +18,37 @@ import type {
   CalendarEvent,
   EmailDraft,
 } from "../../../packages/domain/src";
+import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import { useAgentWorkspace } from "./agent-workspace";
 import { API_URL } from "./api";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
 import { fileKind } from "./file-kind";
+import { buildFileLibrary, markdownExcerpt } from "./file-library";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel } from "./i18n/translate";
+import {
+  ArrowDownToLine,
+  ArrowUpRight,
+  CalendarDays,
+  Check,
+  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  Clock3,
+  Cpu,
+  FileText,
+  Globe2,
+  Inbox,
+  Link2,
+  Mail,
+  Plus,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+} from "./icons";
 import {
   Button,
   Card,
@@ -61,6 +65,7 @@ import {
   SectionHeading,
   Sheet,
   s,
+  serviceBrands,
   timeLabel,
 } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -83,36 +88,42 @@ export function TodayScreen() {
     .filter((e) => eventDate(e) === today)
     .sort((a, b) => a.start.localeCompare(b.start));
   return (
-    <View style={{ gap: 25 }}>
+    <View style={{ gap: 20 }}>
       <View
         style={[
           {
-            backgroundColor: colors.tertiary,
-            borderRadius: 24,
-            padding: 32,
-            minHeight: 228,
+            backgroundColor: colors.canvas,
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: 14,
+            padding: 20,
+            minHeight: 196,
             overflow: "hidden",
           },
           s.row,
         ]}
       >
-        <View style={{ flex: 1, gap: 15, zIndex: 1 }}>
+        <View style={{ flex: 1, gap: 12, zIndex: 1 }}>
           <View style={[s.row, { gap: 7 }]}>
-            <Sparkles size={13} strokeWidth={1.8} color={colors.blueDark} />
-            <Text style={[s.label, { color: colors.blueDark }]}>{t("screens.todayEyebrow")}</Text>
+            <Sparkles size={13} strokeWidth={1.8} color={colors.primary} />
+            <Text style={[s.label, { color: colors.primary, fontSize: 11, letterSpacing: 1.2 }]}>
+              {t("screens.todayEyebrow")}
+            </Text>
           </View>
           <Text
             style={{
-              fontSize: wide ? 39 : 29,
-              lineHeight: wide ? 45 : 36,
-              letterSpacing: -1.7,
-              fontWeight: "500",
+              fontSize: wide ? 28 : 24,
+              lineHeight: wide ? 34 : 30,
+              letterSpacing: -0.8,
+              fontWeight: "600",
               color: colors.text,
             }}
           >
             {t("screens.todayHeroTitle")}
           </Text>
-          <Text style={[s.muted, { maxWidth: 420, color: colors.faint }]}>
+          <Text
+            style={[s.muted, { maxWidth: 420, color: colors.faint, fontSize: 13, lineHeight: 20 }]}
+          >
             {events.length
               ? t("screens.todayEventsCount", { count: events.length })
               : t("screens.todayCalendarRoom")}
@@ -135,8 +146,8 @@ export function TodayScreen() {
                 position: "absolute",
                 width: 190,
                 height: 190,
-                borderRadius: 100,
-                backgroundColor: colors.sky,
+                borderRadius: 999,
+                backgroundColor: colors.surface,
               }}
             />
             <View
@@ -144,7 +155,7 @@ export function TodayScreen() {
                 position: "absolute",
                 width: 145,
                 height: 145,
-                borderRadius: 80,
+                borderRadius: 999,
                 borderWidth: 1,
                 borderColor: colors.lineStrong,
               }}
@@ -157,10 +168,13 @@ export function TodayScreen() {
                   position: "absolute",
                   top: 17,
                   left: -19,
-                  padding: 11,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
                   gap: 7,
-                  backgroundColor: "#FFF",
-                  borderRadius: 13,
+                  backgroundColor: colors.canvas,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  borderRadius: 999,
                   transform: [{ rotate: "-7deg" }],
                 },
               ]}
@@ -175,15 +189,18 @@ export function TodayScreen() {
                   position: "absolute",
                   bottom: 18,
                   right: -8,
-                  padding: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
                   gap: 8,
-                  backgroundColor: "#FFF",
-                  borderRadius: 13,
+                  backgroundColor: colors.canvas,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  borderRadius: 999,
                   transform: [{ rotate: "5deg" }],
                 },
               ]}
             >
-              <CalendarDays size={17} strokeWidth={1.8} color={colors.blueDark} />
+              <CalendarDays size={17} strokeWidth={1.8} color={colors.primary} />
               <Text style={s.small}>{t("screens.todayEverythingTogether")}</Text>
             </View>
           </View>
@@ -197,7 +214,6 @@ export function TodayScreen() {
             note: t("screens.todayStatUnreadNote"),
             icon: Mail,
             section: "mail" as const,
-            tint: colors.sky,
           },
           {
             label: t("screens.todayStatCalendarLabel"),
@@ -205,7 +221,6 @@ export function TodayScreen() {
             note: t("screens.todayStatCalendarNote"),
             icon: CalendarDays,
             section: "calendar" as const,
-            tint: colors.green,
           },
           {
             label: t("screens.todayStatPendingLabel"),
@@ -213,36 +228,40 @@ export function TodayScreen() {
             note: t("screens.todayStatPendingNote"),
             icon: ShieldCheck,
             section: "activity" as const,
-            tint: colors.lavender,
           },
         ].map((item) => (
           <Pressable
             key={item.label}
             accessibilityRole="button"
             onPress={() => navigate(item.section)}
-            style={{ flex: 1, minWidth: 180 }}
+            // 看板小卡片：白底 + 1px 描边分层（不靠阴影），按压态用 overlay1
+            style={({ pressed }) => [
+              s.card,
+              { flex: 1, minWidth: 190, padding: 14, height: 112 },
+              pressed && { backgroundColor: colors.overlay1 },
+            ]}
           >
-            <Card style={{ padding: 21, height: 126 }}>
-              <View style={s.between}>
-                <Text style={[s.label, { fontSize: 9, letterSpacing: 1 }]}>{item.label}</Text>
-                <View
-                  style={[
-                    s.iconBox,
-                    { width: 31, height: 31, borderRadius: 10, backgroundColor: item.tint },
-                  ]}
-                >
-                  <item.icon size={15} strokeWidth={1.8} color={colors.text} />
-                </View>
+            <View style={s.between}>
+              {/* 表头式小标签：s.label 风格（11px、加粗、letterSpacing） */}
+              <Text style={[s.label, { fontSize: 11, letterSpacing: 1 }]}>{item.label}</Text>
+              {/* 图标底座统一用 surface，品牌浅底只留给小面积状态 Chip */}
+              <View style={[s.iconBox, { width: 34, height: 34, borderRadius: 10 }]}>
+                <item.icon size={15} strokeWidth={1.8} color={colors.primary} />
               </View>
-              <Text style={{ fontSize: 29, color: colors.text, letterSpacing: -1, marginTop: -2 }}>
-                {String(item.value).padStart(2, "0")}
-              </Text>
-              <Text style={[s.small, { fontSize: 10, marginTop: 3 }]}>{item.note}</Text>
-            </Card>
+            </View>
+            <Text
+              style={[
+                s.metric,
+                { fontSize: 24, color: colors.text, letterSpacing: -0.6, marginTop: 2 },
+              ]}
+            >
+              {String(item.value).padStart(2, "0")}
+            </Text>
+            <Text style={[s.small, { marginTop: 3 }]}>{item.note}</Text>
           </Pressable>
         ))}
       </View>
-      <View style={{ flexDirection: wide ? "row" : "column", gap: 22 }}>
+      <View style={{ flexDirection: wide ? "row" : "column", gap: 16 }}>
         <Card style={{ flex: 1 }}>
           <SectionHeading
             title={t("screens.todayCalendarHeading")}
@@ -260,15 +279,17 @@ export function TodayScreen() {
           )}
           <Pressable
             onPress={() => open({ type: "event" })}
-            style={[
+            style={({ pressed }) => [
               s.row,
               {
                 gap: 8,
-                paddingTop: 15,
-                marginTop: 9,
+                paddingTop: 12,
+                marginTop: 8,
                 borderTopWidth: 1,
                 borderTopColor: colors.line,
+                borderRadius: 10,
               },
+              pressed && { backgroundColor: colors.overlay1 },
             ]}
           >
             <Plus size={15} strokeWidth={1.8} color={colors.muted} />
@@ -286,21 +307,24 @@ export function TodayScreen() {
               <Pressable
                 key={m.id}
                 onPress={() => open({ type: "mail", mail: m })}
-                style={[
+                // 列表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+                style={({ pressed }) => [
                   s.row,
                   {
-                    gap: 12,
-                    paddingVertical: 13,
+                    gap: 10,
+                    paddingVertical: 10,
                     borderTopWidth: i ? 1 : 0,
                     borderTopColor: colors.line,
+                    borderRadius: 10,
                   },
+                  pressed && { backgroundColor: colors.overlay1 },
                 ]}
               >
                 <Avatar name={m.sender} index={i} />
                 <View style={{ flex: 1, gap: 3 }}>
                   <View style={s.between}>
                     <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>{m.sender}</Text>
-                    <Text style={[s.small, { fontSize: 10 }]}>{timeLabel(m.date)}</Text>
+                    <Text style={[s.small, { fontSize: 10 }, s.metric]}>{timeLabel(m.date)}</Text>
                   </View>
                   <Text numberOfLines={1} style={[s.text, { fontSize: 12, lineHeight: 18 }]}>
                     {m.subject}
@@ -312,10 +336,10 @@ export function TodayScreen() {
                 {m.unread && (
                   <View
                     style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: 4,
-                      backgroundColor: colors.blueDark,
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: colors.primary,
                     }}
                   />
                 )}
@@ -330,10 +354,12 @@ export function TodayScreen() {
           )}
         </Card>
       </View>
-      <View style={{ flexDirection: wide ? "row" : "column", gap: 22 }}>
-        <Card style={{ flex: 1, backgroundColor: colors.surface }}>
+      <View style={{ flexDirection: wide ? "row" : "column", gap: 16 }}>
+        <Card style={{ flex: 1 }}>
           <SectionHeading title={t("screens.todayHelpHeading")} />
-          <Text style={[s.muted, { marginBottom: 15 }]}>{t("screens.todayHelpSubtitle")}</Text>
+          <Text style={[s.muted, { marginBottom: 12, fontSize: 13, lineHeight: 20 }]}>
+            {t("screens.todayHelpSubtitle")}
+          </Text>
           {[
             t("screens.todayPromptAttention"),
             t("screens.todayPromptInbox"),
@@ -342,9 +368,15 @@ export function TodayScreen() {
             <Pressable
               key={prompt}
               onPress={() => ask(prompt)}
-              style={[
+              style={({ pressed }) => [
                 s.between,
-                { borderTopWidth: 1, borderTopColor: colors.line, paddingVertical: 13 },
+                {
+                  borderTopWidth: 1,
+                  borderTopColor: colors.line,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                },
+                pressed && { backgroundColor: colors.overlay1 },
               ]}
             >
               <Text style={[s.text, { fontSize: 12 }]}>{prompt}</Text>
@@ -361,22 +393,24 @@ export function TodayScreen() {
             onPress={() => navigate("activity")}
           />
           {pending.length
-            ? pending
-                .slice(0, 3)
-                .map((a) => (
-                  <LinkRow
-                    key={a.id}
-                    title={runtimeLabel(a.title)}
-                    detail={t("screens.todayReviewDetail")}
-                    onPress={() => open({ type: "review", action: a })}
-                    icon={ShieldCheck}
-                    tint={colors.lavender}
-                  />
-                ))
+            ? pending.slice(0, 3).map((a) => (
+                <LinkRow
+                  key={a.id}
+                  title={runtimeLabel(a.title)}
+                  detail={t("screens.todayReviewDetail")}
+                  onPress={() => open({ type: "review", action: a })}
+                  icon={ShieldCheck}
+                  // 图标底座回到中性面 surface，品牌浅底只用于小面积状态 Chip
+                  tint={colors.surface}
+                />
+              ))
             : w.activity.slice(0, 3).map((a) => (
-                <View key={a.id} style={[s.row, { gap: 13, paddingVertical: 12 }]}>
+                <View key={a.id} style={[s.row, { gap: 12, paddingVertical: 10 }]}>
                   <View
-                    style={[s.iconBox, { width: 32, height: 32, backgroundColor: colors.green }]}
+                    style={[
+                      s.iconBox,
+                      { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.green },
+                    ]}
                   >
                     <Check size={14} strokeWidth={1.8} color={colors.text} />
                   </View>
@@ -400,8 +434,8 @@ function Avatar({ name, index = 0 }: { name: string; index?: number }) {
       style={{
         width: 35,
         height: 35,
-        borderRadius: 12,
-        backgroundColor: [colors.orange, colors.lavender, colors.green, colors.sky][index % 4],
+        borderRadius: 10,
+        backgroundColor: [colors.surface, colors.tertiary, colors.green, colors.orange][index % 4],
         justifyContent: "center",
         alignItems: "center",
       }}
@@ -428,21 +462,26 @@ export function AgendaRow({
   return (
     <Pressable
       onPress={() => open({ type: "event", event: e, neighbors })}
-      style={[s.row, { gap: 16, paddingVertical: 14 }]}
+      // 列表行：行圆角 10，按压态用 overlay1
+      style={({ pressed }) => [
+        s.row,
+        { gap: 12, paddingVertical: 10, borderRadius: 10 },
+        pressed && { backgroundColor: colors.overlay1 },
+      ]}
     >
-      <View style={{ width: 65 }}>
-        <Text style={[s.text, { fontSize: 11 }]}>
+      <View style={{ width: 60 }}>
+        <Text style={[s.text, { fontSize: 11 }, s.metric]}>
           {e.allDay ? t("screens.agendaAllDay") : timeLabel(e.start, e.timeZone)}
         </Text>
         {!e.allDay && (
-          <Text style={[s.small, { fontSize: 10 }]}>{timeLabel(e.end, e.timeZone)}</Text>
+          <Text style={[s.small, { fontSize: 10 }, s.metric]}>{timeLabel(e.end, e.timeZone)}</Text>
         )}
       </View>
       <View
         style={{
           width: 3,
-          height: 42,
-          borderRadius: 4,
+          height: 36,
+          borderRadius: 2,
           backgroundColor: colors.lineStrong,
         }}
       />
@@ -499,11 +538,11 @@ export function MailScreen() {
               gap: 9,
               flex: 1,
               minWidth: 200,
-              backgroundColor: "#FFF",
+              backgroundColor: colors.surface,
               borderWidth: 1,
               borderColor: colors.line,
-              borderRadius: 12,
-              paddingHorizontal: 14,
+              borderRadius: 10,
+              paddingHorizontal: 12,
             },
           ]}
         >
@@ -511,10 +550,10 @@ export function MailScreen() {
           <TextInput
             accessibilityLabel={t("screens.mailSearchLabel")}
             placeholder={t("screens.mailSearchPlaceholder")}
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={colors.faint}
             value={query}
             onChangeText={setQuery}
-            style={{ flex: 1, paddingVertical: 13, fontSize: 13, color: colors.text }}
+            style={{ flex: 1, paddingVertical: 11, fontSize: 13, color: colors.text }}
           />
         </View>
         <Button onPress={() => open({ type: "email" })} primary icon={Plus}>
@@ -560,9 +599,17 @@ export function MailScreen() {
             <Pressable
               key={m.id}
               onPress={() => open({ type: "mail", mail: m })}
-              style={[
+              // 列表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+              style={({ pressed }) => [
                 s.row,
-                { gap: 15, paddingVertical: 20, borderTopWidth: 1, borderTopColor: colors.line },
+                {
+                  gap: 12,
+                  paddingVertical: 10,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.line,
+                  borderRadius: 10,
+                },
+                pressed && { backgroundColor: colors.overlay1 },
               ]}
             >
               <Avatar name={m.sender} index={i} />
@@ -577,7 +624,7 @@ export function MailScreen() {
                 </Text>
                 {!!m.attachments.length && (
                   <View style={[s.row, { gap: 4, marginTop: 2 }]}>
-                    <FileText size={12} strokeWidth={1.8} color={colors.muted} />
+                    <FileText size={13} strokeWidth={1.8} color={colors.muted} />
                     <Text style={s.small}>
                       {m.attachments.length}{" "}
                       {t(
@@ -591,7 +638,7 @@ export function MailScreen() {
               </View>
               {m.unread && (
                 <View
-                  style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: colors.blueDark }}
+                  style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }}
                 />
               )}
             </Pressable>
@@ -726,7 +773,9 @@ export function CalendarScreen() {
       </View>
       {calendars.length > 0 && (
         <View style={{ gap: 9 }}>
-          <Text style={s.label}>{t("screens.calendarYourCalendars")}</Text>
+          <Text style={[s.label, { fontSize: 11, letterSpacing: 1 }]}>
+            {t("screens.calendarYourCalendars")}
+          </Text>
           <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
             {calendars.map((c) => (
               <Button
@@ -742,13 +791,23 @@ export function CalendarScreen() {
           </View>
         </View>
       )}
-      <Card style={{ padding: 12 }}>
-        <View style={{ flexDirection: "row", gap: 5 }}>
+      {/* 周历分段控件：容器用 surface 中性面，选中项用 canvas 白底 + 1px 描边（不用品牌浅底做大块底色） */}
+      <Card style={{ padding: 8 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 4,
+            backgroundColor: colors.surface,
+            borderRadius: 14,
+            padding: 4,
+          }}
+        >
           {dates.map((day) => {
             const key = localDateTime(
               day.toISOString(),
               Intl.DateTimeFormat().resolvedOptions().timeZone,
             ).date;
+            const selected = key === date;
             return (
               <Pressable
                 key={key}
@@ -759,10 +818,12 @@ export function CalendarScreen() {
                 style={{
                   flex: 1,
                   alignItems: "center",
-                  paddingVertical: 17,
-                  gap: 9,
-                  borderRadius: 14,
-                  backgroundColor: key === date ? colors.sky : "transparent",
+                  paddingVertical: 10,
+                  gap: 6,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: selected ? colors.line : "transparent",
+                  backgroundColor: selected ? colors.canvas : "transparent",
                 }}
               >
                 <Text style={s.small}>
@@ -771,7 +832,7 @@ export function CalendarScreen() {
                 <Text
                   style={[
                     s.title,
-                    { fontSize: 22, color: key === date ? colors.blueDark : colors.text },
+                    { fontSize: 20, color: selected ? colors.primary : colors.text },
                   ]}
                 >
                   {day.getDate()}
@@ -784,7 +845,7 @@ export function CalendarScreen() {
                     backgroundColor: [...events, ...w.events].some(
                       (e) => e.calendarId === calendarId && eventDate(e) === key,
                     )
-                      ? colors.blueDark
+                      ? colors.primary
                       : "transparent",
                   }}
                 />
@@ -816,13 +877,17 @@ export function CalendarScreen() {
         )}
         {loading ? (
           <View style={[s.row, { gap: 10, paddingVertical: 35, justifyContent: "center" }]}>
-            <ActivityIndicator size="small" color={colors.blueDark} />
+            <ActivityIndicator size="small" color={colors.primary} />
             <Text style={s.muted}>{t("screens.calendarChecking")}</Text>
           </View>
         ) : events.length ? (
           events.map((e) => (
             <View key={e.id}>
-              {all && <Text style={[s.label, { marginTop: 16 }]}>{dateLabel(e.start)}</Text>}
+              {all && (
+                <Text style={[s.label, { marginTop: 16, fontSize: 11, letterSpacing: 1 }]}>
+                  {dateLabel(e.start)}
+                </Text>
+              )}
               <AgendaRow event={e} neighbors={events} />
               <Text style={[s.small, { marginLeft: 84, marginBottom: 8 }]}>{e.timeZone}</Text>
             </View>
@@ -872,9 +937,10 @@ export function BrowserScreen() {
   }
   return (
     <View style={{ gap: 22 }}>
-      <Card style={{ backgroundColor: colors.sky }}>
+      {/* 面板统一白底 + 1px 描边（不用品牌浅底做大块底色） */}
+      <Card>
         <View style={[s.row, { gap: 12, marginBottom: 15 }]}>
-          <Globe2 size={22} strokeWidth={1.8} color={colors.blueDark} />
+          <Globe2 size={22} strokeWidth={1.8} color={colors.primary} />
           <View>
             <Text style={s.heading}>{t("screens.browserHeading")}</Text>
             <Text style={s.muted}>{t("screens.browserSubtitle")}</Text>
@@ -910,16 +976,21 @@ export function BrowserScreen() {
             <Pressable
               key={b.id}
               onPress={() => open({ type: "browser", browser: b })}
-              style={{
-                borderTopWidth: 1,
-                borderTopColor: colors.line,
-                paddingVertical: 20,
-                gap: 12,
-              }}
+              // 列表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+              style={({ pressed }) => [
+                {
+                  borderTopWidth: 1,
+                  borderTopColor: colors.line,
+                  paddingVertical: 14,
+                  gap: 12,
+                  borderRadius: 10,
+                },
+                pressed && { backgroundColor: colors.overlay1 },
+              ]}
             >
               <View style={[s.row, { gap: 14 }]}>
                 <View style={s.iconBox}>
-                  <Globe2 size={20} strokeWidth={1.8} color={colors.blueDark} />
+                  <Globe2 size={20} strokeWidth={1.8} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.heading}>{b.title || t("screens.browserSessionFallback")}</Text>
@@ -939,7 +1010,7 @@ export function BrowserScreen() {
                   style={{
                     height: 180,
                     width: "100%",
-                    borderRadius: 12,
+                    borderRadius: 10,
                     backgroundColor: colors.canvas,
                   }}
                 />
@@ -959,9 +1030,11 @@ export function BrowserScreen() {
 }
 export function FilesScreen() {
   const { workspace: w, api, refresh, open } = useWorkspace();
+  const { data: agent, error: agentError } = useAgentWorkspace();
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const library = buildFileLibrary(w.files, agent?.artifacts || []);
   async function upload() {
     setError("");
     setBusy(true);
@@ -1009,81 +1082,97 @@ export function FilesScreen() {
           {t("screens.filesImport")}
         </Button>
       </View>
-      <ErrorNotice error={error} />
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 18 }}>
-        {w.files.map((f) => {
-          const kind = fileKind(f);
-          return (
-            <Pressable
-              key={f.id}
-              onPress={() => open({ type: "file", file: f })}
-              style={{ flexGrow: 1, flexBasis: 250, maxWidth: 430 }}
-            >
-              <Card style={{ padding: 0, overflow: "hidden" }}>
-                <View
-                  style={{
-                    height: 175,
-                    backgroundColor: colors.tertiary,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
+      <ErrorNotice error={error || agentError} />
+      {library.artifacts.length > 0 && (
+        <View style={{ gap: 2 }}>
+          <SectionHeading title={t("screens.filesResearchHeading")} />
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 18 }}>
+            {library.artifacts.map((artifact) => (
+              <ResearchArtifactCard key={artifact.id} artifact={artifact} />
+            ))}
+          </View>
+        </View>
+      )}
+      {library.files.length > 0 && (
+        <View style={{ gap: 2 }}>
+          <SectionHeading title={t("screens.filesDocumentsHeading")} />
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 18 }}>
+            {library.files.map((f) => {
+              const kind = fileKind(f);
+              return (
+                <Pressable
+                  key={f.id}
+                  onPress={() => open({ type: "file", file: f })}
+                  style={{ flexGrow: 1, flexBasis: 250, maxWidth: 430 }}
                 >
-                  <View
-                    style={{
-                      width: 93,
-                      height: 121,
-                      borderRadius: 5,
-                      backgroundColor: "#FFF",
-                      padding: 14,
-                      transform: [{ rotate: "-4deg" }],
-                      borderWidth: 1,
-                      borderColor: colors.line,
-                    }}
-                  >
-                    <View style={[s.row, { gap: 5, marginBottom: 15 }]}>
-                      <FileText size={13} strokeWidth={1.8} color={colors.blueDark} />
-                      <Text style={{ fontSize: 7, color: colors.blueDark }}>
-                        {t("screens.filesDocumentBadge")}
-                      </Text>
-                    </View>
-                    {[100, 75, 90, 95, 60].map((width, i) => (
+                  <Card style={{ padding: 0, overflow: "hidden" }}>
+                    <View
+                      style={{
+                        height: 175,
+                        backgroundColor: colors.tertiary,
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
                       <View
-                        key={width}
                         style={{
-                          height: 3,
-                          backgroundColor: i === 0 ? colors.blueDark : colors.tertiary,
-                          width: `${width}%`,
-                          marginBottom: 7,
-                          borderRadius: 3,
+                          width: 93,
+                          height: 121,
+                          borderRadius: 5,
+                          backgroundColor: colors.canvas,
+                          padding: 14,
+                          transform: [{ rotate: "-4deg" }],
+                          borderWidth: 1,
+                          borderColor: colors.line,
                         }}
-                      />
-                    ))}
-                  </View>
-                  <View style={{ position: "absolute", bottom: 12, right: 14 }}>
-                    <Chip>{kind === "html" ? "HTML" : "PDF"}</Chip>
-                  </View>
-                </View>
-                <View style={{ padding: 21, gap: 6 }}>
-                  <Text numberOfLines={1} style={[s.heading, { fontSize: 14 }]}>
-                    {f.name}
-                  </Text>
-                  <Text style={s.small}>
-                    {kind === "html"
-                      ? t("screens.filesWebPage")
-                      : `${f.pageCount} ${t(f.pageCount === 1 ? "screens.filesPage" : "screens.filesPages")}`}{" "}
-                    · {Math.max(1, Math.round(f.size / 1024))} KB
-                  </Text>
-                  <View style={[s.between, { marginTop: 9 }]}>
-                    <Chip>{f.source}</Chip>
-                    <Text style={s.small}>{dateLabel(f.createdAt)}</Text>
-                  </View>
-                </View>
-              </Card>
-            </Pressable>
-          );
-        })}
-      </View>
-      {!w.files.length && (
+                      >
+                        <View style={[s.row, { gap: 5, marginBottom: 15 }]}>
+                          <FileText size={13} strokeWidth={1.8} color={colors.primary} />
+                          <Text style={{ fontSize: 7, color: colors.primary }}>
+                            {t("screens.filesDocumentBadge")}
+                          </Text>
+                        </View>
+                        {[100, 75, 90, 95, 60].map((width, i) => (
+                          <View
+                            key={width}
+                            style={{
+                              height: 3,
+                              backgroundColor: i === 0 ? colors.primary : colors.tertiary,
+                              width: `${width}%`,
+                              marginBottom: 7,
+                              borderRadius: 3,
+                            }}
+                          />
+                        ))}
+                      </View>
+                      <View style={{ position: "absolute", bottom: 12, right: 14 }}>
+                        <Chip>{kind === "html" ? "HTML" : "PDF"}</Chip>
+                      </View>
+                    </View>
+                    {/* 卡片正文收紧到紧凑密度：内边距 14、间距 6 */}
+                    <View style={{ padding: 14, gap: 6 }}>
+                      <Text numberOfLines={1} style={[s.heading, { fontSize: 14 }]}>
+                        {f.name}
+                      </Text>
+                      <Text style={s.small}>
+                        {kind === "html"
+                          ? t("screens.filesWebPage")
+                          : `${f.pageCount} ${t(f.pageCount === 1 ? "screens.filesPage" : "screens.filesPages")}`}{" "}
+                        · {Math.max(1, Math.round(f.size / 1024))} KB
+                      </Text>
+                      <View style={[s.between, { marginTop: 9 }]}>
+                        <Chip>{f.source}</Chip>
+                        <Text style={s.small}>{dateLabel(f.createdAt)}</Text>
+                      </View>
+                    </View>
+                  </Card>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+      {!library.artifacts.length && !library.files.length && (
         <Card>
           <Empty
             icon={FileText}
@@ -1093,6 +1182,95 @@ export function FilesScreen() {
         </Card>
       )}
     </View>
+  );
+}
+function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
+  const { open } = useWorkspace();
+  const { t } = useTranslation();
+  const Icon = artifact.kind === "finance" ? CircleDollarSign : FileText;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t("screens.filesOpenResearchArtifact", { name: artifact.title })}
+      onPress={() => open({ type: "artifact", artifact })}
+      style={{ flexGrow: 1, flexBasis: 250, maxWidth: 430 }}
+    >
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        {/* 封面用中性面 tertiary，品牌浅底只留给小面积状态 Chip */}
+        <View
+          style={{
+            height: 175,
+            backgroundColor: colors.tertiary,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: 103,
+              height: 127,
+              borderRadius: 8,
+              backgroundColor: colors.canvas,
+              padding: 15,
+              transform: [{ rotate: "2deg" }],
+              borderWidth: 1,
+              borderColor: colors.line,
+              gap: 9,
+            }}
+          >
+            <View style={[s.row, { gap: 7 }]}>
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 8,
+                  backgroundColor: colors.surface,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Sparkles size={13} strokeWidth={1.8} color={colors.primary} />
+              </View>
+              <Text style={{ flex: 1, fontSize: 7, color: colors.primary }}>
+                {t("screens.filesResearchBadge")}
+              </Text>
+            </View>
+            {[92, 76, 98, 66].map((width, index) => (
+              <View
+                key={width}
+                style={{
+                  height: 4,
+                  borderRadius: 4,
+                  width: `${width}%`,
+                  backgroundColor: index === 0 ? colors.primary : colors.tertiary,
+                }}
+              />
+            ))}
+          </View>
+          <View style={{ position: "absolute", bottom: 12, right: 14 }}>
+            <Chip tint={colors.canvas}>{statusLabel(artifact.kind)}</Chip>
+          </View>
+        </View>
+        {/* 卡片正文收紧到紧凑密度：内边距 14、间距 6 */}
+        <View style={{ padding: 14, gap: 6 }}>
+          <View style={[s.row, { gap: 8 }]}>
+            <Icon size={15} strokeWidth={1.8} color={colors.primary} />
+            <Text numberOfLines={1} style={[s.heading, { flex: 1, fontSize: 14 }]}>
+              {artifact.title}
+            </Text>
+          </View>
+          <Text numberOfLines={2} style={[s.small, { minHeight: 34 }]}>
+            {artifact.summary
+              ? markdownExcerpt(artifact.summary)
+              : t("screens.filesGeneratedByAgent")}
+          </Text>
+          <View style={[s.between, { marginTop: 9 }]}>
+            <Chip>{t("screens.filesGeneratedByAgent")}</Chip>
+            <Text style={s.small}>{dateLabel(artifact.createdAt)}</Text>
+          </View>
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 export function ActivityScreen() {
@@ -1118,22 +1296,30 @@ export function ActivityScreen() {
             <Pressable
               key={a.id}
               onPress={() => open({ type: "review", action: a })}
-              style={[
+              // 列表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+              style={({ pressed }) => [
                 s.row,
-                { gap: 15, paddingVertical: 17, borderTopWidth: 1, borderTopColor: colors.line },
+                {
+                  gap: 14,
+                  paddingVertical: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.line,
+                  borderRadius: 10,
+                },
+                pressed && { backgroundColor: colors.overlay1 },
               ]}
             >
               <View
                 style={[
                   s.iconBox,
                   {
-                    backgroundColor:
-                      a.status === "awaiting_review" ? colors.lavender : colors.green,
+                    // 图标底座用中性面；品牌浅底只留给下面的小面积状态 Chip
+                    backgroundColor: a.status === "awaiting_review" ? colors.surface : colors.green,
                   },
                 ]}
               >
                 {a.status === "awaiting_review" ? (
-                  <ShieldCheck size={18} strokeWidth={1.8} color={colors.text} />
+                  <ShieldCheck size={18} strokeWidth={1.8} color={colors.primary} />
                 ) : (
                   <CheckCheck size={18} strokeWidth={1.8} color={colors.text} />
                 )}
@@ -1147,7 +1333,7 @@ export function ActivityScreen() {
                   a.status === "failed"
                     ? colors.errorSoft
                     : a.status === "awaiting_review"
-                      ? colors.lavender
+                      ? colors.sky
                       : colors.canvas
                 }
               >
@@ -1169,8 +1355,8 @@ export function ActivityScreen() {
                   s.row,
                   {
                     alignItems: "flex-start",
-                    gap: 17,
-                    paddingVertical: 18,
+                    gap: 14,
+                    paddingVertical: 12,
                     borderTopWidth: i ? 1 : 0,
                     borderTopColor: colors.line,
                   },
@@ -1268,21 +1454,30 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
   const google = w.connections.find((c) => c.id === "google");
   const connected = google?.status === "connected" || google?.status === "sample";
   const modelOptions = w.runtime.modelOptions ?? [];
+  // `brand` 指向 serviceBrands：第三方服务保留各自品牌色用于识别，
+  // 没有 brand 的行（LingWu 自身模型）继续使用品牌紫。
   const rows = [
     {
       id: "model",
       name: t("screens.connectionsModelLabel"),
       icon: Cpu,
-      color: colors.primary,
+      brand: undefined,
       connected: Boolean(w.runtime.model) && modelOptions.length > 0,
       group: "model",
     },
-    { id: "gmail", name: "Gmail", icon: Mail, color: "#EA5B4D", connected, group: "google" },
+    {
+      id: "gmail",
+      name: "Gmail",
+      icon: Mail,
+      brand: "gmail" as const,
+      connected,
+      group: "google",
+    },
     {
       id: "calendar",
       name: "Google Calendar",
       icon: CalendarDays,
-      color: "#4285F4",
+      brand: "googleCalendar" as const,
       connected,
       group: "google",
     },
@@ -1290,7 +1485,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
       id: "browser",
       name: t("threads.agentComputer"),
       icon: Globe2,
-      color: "#1987CF",
+      brand: "browser" as const,
       connected: w.connections.some((c) => c.id === "browser" && c.status === "connected"),
       group: "browser",
     },
@@ -1298,7 +1493,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
       id: "openbot",
       name: "OpenBot",
       icon: Sparkles,
-      color: "#6866A6",
+      brand: "openbot" as const,
       connected: false,
       group: "openbot",
     },
@@ -1310,15 +1505,24 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
         if (!group.length) return null;
         return (
           <View key={String(isConnected)} style={{ gap: 8 }}>
-            <Text style={[s.small, { marginLeft: 12 }]}>
+            {/* 表头：s.label 风格小字（11px、加粗、letterSpacing） */}
+            <Text style={[s.label, { marginLeft: 2, fontSize: 11, letterSpacing: 1 }]}>
               {isConnected
                 ? w.mode === "sample"
                   ? t("screens.connectionsYourConnections")
                   : t("screens.connectionsConnected")
                 : t("screens.connectionsAvailable")}
             </Text>
+            {/* 表格面板：白底 + 1px 描边 + 14px 圆角，靠边框分层 */}
             <View
-              style={{ paddingHorizontal: 16, borderRadius: 23, backgroundColor: colors.surface }}
+              style={{
+                paddingHorizontal: 14,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: colors.canvas,
+                overflow: "hidden",
+              }}
             >
               {group.map((row, index) => (
                 <Pressable
@@ -1328,27 +1532,36 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                   onPress={() =>
                     row.group === "browser" ? open({ type: "computer" }) : setSelected(row.group)
                   }
-                  style={[
+                  // 数据表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+                  style={({ pressed }) => [
                     s.row,
                     {
-                      gap: 14,
-                      minHeight: 61,
+                      gap: 12,
+                      minHeight: 56,
                       borderBottomWidth: index < group.length - 1 ? 1 : 0,
                       borderBottomColor: colors.line,
+                      borderRadius: 10,
                     },
+                    pressed && { backgroundColor: colors.overlay1 },
                   ]}
                 >
                   <View
                     style={{
                       width: 29,
                       height: 29,
-                      borderRadius: 7,
-                      backgroundColor: "#FFF",
+                      borderRadius: 8,
+                      backgroundColor: row.brand
+                        ? serviceBrands[row.brand].surface
+                        : colors.surface,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    <row.icon size={23} strokeWidth={1.8} color={row.color} />
+                    <row.icon
+                      size={23}
+                      strokeWidth={1.8}
+                      color={row.brand ? serviceBrands[row.brand].fg : colors.primary}
+                    />
                   </View>
                   <Text style={[s.text, { flex: 1 }]}>{row.name}</Text>
                   {row.connected && row.group === "google" && w.mode === "sample" && (
@@ -1363,7 +1576,8 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                     <Text
                       style={{
                         fontSize: 13,
-                        color: row.group === "google" ? colors.blueDark : colors.muted,
+                        // 链接型操作文字统一用品牌强调色 primary
+                        color: row.group === "google" ? colors.primary : colors.muted,
                       }}
                     >
                       {row.group === "google"
@@ -1465,7 +1679,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                           >
                             <Chip tint={current ? colors.sky : undefined}>{shortModel(spec)}</Chip>
                             {current && (
-                              <Check size={13} strokeWidth={1.8} color={colors.blueDark} />
+                              <Check size={13} strokeWidth={1.8} color={colors.primary} />
                             )}
                           </Pressable>
                         );
@@ -1498,7 +1712,7 @@ function SettingsLine({ label, value }: { label: string; value: string }) {
     <View
       style={[
         s.between,
-        { gap: 15, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line },
+        { gap: 15, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
       ]}
     >
       <Text style={s.muted}>{label}</Text>

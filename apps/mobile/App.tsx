@@ -1,6 +1,5 @@
 import { CopilotKitProvider } from "@copilotkit/react-native/headless";
 import { StatusBar } from "expo-status-bar";
-import { Bell, Check, Menu, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -39,6 +38,7 @@ import { I18nProvider, localizeAgentName, useTranslation } from "./src/i18n";
 import { LanguageSwitcher } from "./src/i18n/LanguageSwitcher";
 import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
+import { Bell, Check, Menu, X } from "./src/icons";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
 import { ACCOUNT_NAV, ChatsColumn, Rail, SECTION_NAV } from "./src/shell";
 import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
@@ -192,7 +192,7 @@ function Root() {
             </Text>
             <Text style={[s.muted, { textAlign: "center" }]}>{t("app.welcomeSubtitle")}</Text>
             {authMode === null ? (
-              <ActivityIndicator color={colors.blueDark} />
+              <ActivityIndicator color={colors.primary} />
             ) : (
               <Card style={{ width: "100%" }}>
                 <ErrorNotice error={error} />
@@ -333,7 +333,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
           </>
         ) : (
           <>
-            <ActivityIndicator color={colors.blueDark} />
+            <ActivityIndicator color={colors.primary} />
             <Text style={s.muted}>{t("app.openingWorkspace")}</Text>
           </>
         )}
@@ -516,7 +516,7 @@ function WorkspaceShell({
                             position: "absolute",
                             top: 7,
                             right: 9,
-                            backgroundColor: colors.blueDark,
+                            backgroundColor: colors.primary,
                           }}
                         />
                       )}
@@ -565,7 +565,7 @@ function WorkspaceShell({
                       {threadsError ? (
                         <Button onPress={retryThreads}>{t("app.retryMainChat")}</Button>
                       ) : threadsLoading ? (
-                        <ActivityIndicator color={colors.blueDark} />
+                        <ActivityIndicator color={colors.primary} />
                       ) : null}
                       {/* visited 由 ThreadsProvider 维护（去重追加），但并发/重试下仍会
                           出现瞬时重复 id，这里按 id 先去重再渲染，避免 React 重复 key 告警。 */}
@@ -628,11 +628,15 @@ function WorkspaceShell({
                             height: 47,
                             alignItems: "center",
                             justifyContent: "center",
-                            backgroundColor: active ? colors.sky : "transparent",
+                            backgroundColor: active ? colors.surface : "transparent",
                             borderRadius: 28,
                           }}
                         >
-                          <item.icon size={23} strokeWidth={1.8} color={colors.text} />
+                          <item.icon
+                            size={23}
+                            strokeWidth={active ? 2 : 1.8}
+                            color={active ? colors.primary : colors.muted}
+                          />
                         </Pressable>
                       );
                     })}
@@ -659,14 +663,14 @@ function WorkspaceShell({
                 },
               ]}
             >
-              <Check size={16} strokeWidth={1.8} color={colors.sky} />
-              <Text style={{ color: "#FFF", fontSize: 13, flexShrink: 1 }}>{toast}</Text>
+              <Check size={16} strokeWidth={1.8} color={colors.onPrimary} />
+              <Text style={{ color: colors.onPrimary, fontSize: 13, flexShrink: 1 }}>{toast}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("app.dismissNotification")}
                 onPress={clearToast}
               >
-                <X size={16} strokeWidth={1.8} color="#FFF" />
+                <X size={16} strokeWidth={1.8} color={colors.onPrimary} />
               </Pressable>
             </View>
           </View>

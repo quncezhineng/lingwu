@@ -48,6 +48,7 @@ const agent = {
   "agent.artifactPreview": "Artifact preview",
   "agent.artifactEmpty": "This artifact has no data to display.",
   "agent.artifactTruncated": "{count} more entries not shown.",
+  "agent.artifactViewSource": "View raw HTML",
   "agent.sources": "Sources",
   "agent.timeline": "Timeline",
   "agent.timelineEmpty": "The worker will record each step here.",

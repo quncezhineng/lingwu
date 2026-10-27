@@ -1,6 +1,6 @@
-import { FileText } from "lucide-react-native";
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, Text, View } from "react-native";
+import { FileText } from "./icons";
 import { colors } from "./ui";
 
 export type ConversationHeaderState = "ready" | "working" | "reconnecting" | "error";
@@ -70,14 +70,14 @@ export function ConversationHeader({
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           numberOfLines={1}
-          style={{ fontSize: 14.5, fontWeight: "600", color: colors.text, letterSpacing: -0.2 }}
+          style={{ fontSize: 14, fontWeight: "600", color: colors.text, letterSpacing: -0.2 }}
         >
           {title}
         </Text>
         <Text
           accessibilityLiveRegion="polite"
           numberOfLines={1}
-          style={{ marginTop: 1, fontSize: 11.5, color: colors.muted }}
+          style={{ marginTop: 1, fontSize: 11, color: colors.muted }}
         >
           {status}
         </Text>
@@ -94,11 +94,18 @@ export function ConversationHeader({
             height: 32,
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: 16,
-            backgroundColor: filesOpen || pressed ? colors.sky : "transparent",
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: filesOpen ? colors.line : "transparent",
+            // 按压 / 展开态统一用 overlay1 底色，不再用品牌浅底或灰面
+            backgroundColor: pressed || filesOpen ? colors.overlay1 : "transparent",
           })}
         >
-          <FileText size={17} strokeWidth={1.8} color={filesOpen ? colors.blueDark : colors.muted} />
+          <FileText
+            size={17}
+            strokeWidth={filesOpen ? 2 : 1.8}
+            color={filesOpen ? colors.primary : colors.muted}
+          />
         </Pressable>
       )}
     </View>

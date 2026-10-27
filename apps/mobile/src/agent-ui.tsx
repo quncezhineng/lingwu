@@ -1,3 +1,21 @@
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Image, Linking, Modal, Pressable, Text, View } from "react-native";
+import type { Artifact, BrowserSession } from "../../../packages/domain/src";
+import type {
+  AgentArtifact,
+  AgentMemory,
+  AgentTask,
+  Evidence,
+  Goal,
+  Idea,
+  Monitor,
+  RunEvent,
+} from "../../../packages/domain/src/agent";
+import { useAgentWorkspace } from "./agent-workspace";
+import { AssistantResponse } from "./assistant-response";
+import { fileKind } from "./file-kind";
+import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
+import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
 import {
   ArrowRight,
   Bell,
@@ -20,24 +38,7 @@ import {
   Target,
   Users,
   X,
-} from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, Linking, Modal, Pressable, Text, View } from "react-native";
-import type { Artifact, BrowserSession } from "../../../packages/domain/src";
-import type {
-  AgentArtifact,
-  AgentMemory,
-  AgentTask,
-  Evidence,
-  Goal,
-  Idea,
-  Monitor,
-  RunEvent,
-} from "../../../packages/domain/src/agent";
-import { useAgentWorkspace } from "./agent-workspace";
-import { fileKind } from "./file-kind";
-import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
-import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
+} from "./icons";
 import { ActivityScreen, ConnectionsScreen } from "./screens";
 import {
   Button,
@@ -91,7 +92,7 @@ export function AgentStatus() {
           {t("agent.reconnectAgent")}
         </Button>
       )}
-      {!data && !error && <ActivityIndicator color={colors.blueDark} />}
+      {!data && !error && <ActivityIndicator color={colors.primary} />}
       {data && !data.worker.running && <Text style={s.small}>{t("agent.workerOffline")}</Text>}
     </View>
   );
@@ -110,6 +111,10 @@ export function TaskCard({
   const done = task.plan.filter((step) => step.status === "succeeded").length;
   const next = task.plan.find((step) => ["running", "waiting"].includes(step.status));
   const waiting = ["waiting_input", "waiting_approval"].includes(task.status);
+  const summary =
+    runtimeLabel(task.question) ||
+    task.error ||
+    resultSummary(runtimeLabel(task.result || next?.title || ""));
   return (
     <Pressable
       accessibilityRole="button"
@@ -121,24 +126,30 @@ export function TaskCard({
     >
       <Card
         style={{
-          padding: compact ? 15 : 20,
-          gap: 11,
-          borderRadius: 22,
-          backgroundColor: colors.surface,
+          padding: compact ? 14 : 16,
+          gap: 12,
+          borderRadius: 14,
+          backgroundColor: colors.canvas,
         }}
       >
         <View style={[s.row, { gap: 10 }]}>
           <View
             style={[
               s.iconBox,
-              { width: 34, height: 34, backgroundColor: waiting ? colors.orange : colors.sky },
+              {
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                // 图标底座走中性面（surface）；等待态用语义浅底做小面积状态提示。
+                backgroundColor: waiting ? colors.orange : colors.surface,
+              },
             ]}
           >
-            <ListChecks size={18} strokeWidth={1.8} color={colors.blueDark} />
+            <ListChecks size={18} strokeWidth={1.8} color={colors.primary} />
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={s.heading}>{task.title}</Text>
-            <Text style={s.small}>
+            <Text style={[s.small, s.metric]}>
               {statusLabel(task.status)}
               {task.plan.length
                 ? t("agent.planStepsProgress", { done, total: task.plan.length })
@@ -153,21 +164,23 @@ export function TaskCard({
               style={{
                 height: 4,
                 width: `${Math.round((done / task.plan.length) * 100)}%`,
-                backgroundColor: colors.blueDark,
+                backgroundColor: colors.primary,
                 borderRadius: 4,
               }}
             />
           </View>
         )}
-        {(task.question || task.result || task.error || next?.title) && (
-          <Text numberOfLines={compact ? 2 : 4} style={s.muted}>
-            {runtimeLabel(task.question) ||
-              task.error ||
-              resultSummary(runtimeLabel(task.result || next?.title || ""))}
-          </Text>
+        {!!summary && (
+          <View
+            accessible={false}
+            pointerEvents="none"
+            style={{ maxHeight: compact ? 40 : 82, overflow: "hidden" }}
+          >
+            <AssistantResponse content={summary} compact />
+          </View>
         )}
         {waiting && (
-          <Text style={[s.small, { color: colors.blueDark, fontWeight: "600" }]}>
+          <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
             {task.status === "waiting_approval"
               ? t("agent.reviewRequested")
               : t("agent.inputNeeded")}
@@ -242,7 +255,8 @@ export function EvidenceList({ items }: { items: Evidence[] }) {
       {items.map((item) => (
         <View
           key={item.id}
-          style={{ borderLeftWidth: 2, borderLeftColor: colors.blue, paddingLeft: 12, gap: 4 }}
+          // 证据条目用左侧品牌色竖线做层级标记，强调色统一为 colors.primary。
+          style={{ borderLeftWidth: 2, borderLeftColor: colors.primary, paddingLeft: 12, gap: 4 }}
         >
           <Text style={[s.small, { color: colors.text, fontWeight: "600" }]}>{item.title}</Text>
           <Text selectable style={s.small}>
@@ -406,7 +420,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
     >
       <ErrorNotice error={error} />
       {!task ? (
-        <ActivityIndicator color={colors.blueDark} />
+        <ActivityIndicator color={colors.primary} />
       ) : (
         <View style={{ gap: 20 }}>
           <Text selectable style={s.text}>
@@ -465,7 +479,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
             )}
           </View>
           {task.status === "waiting_approval" && (
-            <Card style={{ backgroundColor: colors.lavender, gap: 12 }}>
+            <Card style={{ gap: 12 }}>
               <Text style={s.heading}>{t("agent.readyForReview")}</Text>
               <Text style={s.muted}>{t("agent.reviewBeforeProceed")}</Text>
               <Button primary busy={busy} onPress={() => void review()}>
@@ -474,7 +488,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
             </Card>
           )}
           {task.status === "waiting_input" && (
-            <Card style={{ backgroundColor: colors.sky, gap: 10 }}>
+            <Card style={{ gap: 10 }}>
               <Text style={s.heading}>
                 {runtimeLabel(task.question) || t("agent.detailNeeded")}
               </Text>
@@ -536,18 +550,17 @@ export function TaskDetail({ taskId }: { taskId: string }) {
             </Card>
           )}
           {!!task.plan.length && (
-            <Card style={{ gap: 15 }}>
+            <Card style={{ gap: 12 }}>
               <Text style={s.heading}>{t("agent.plan")}</Text>
               {task.plan.map((step, index) => (
                 <View key={step.id} style={[s.row, { gap: 10, alignItems: "flex-start" }]}>
-                  <Text
-                    style={[
-                      s.text,
-                      { color: step.status === "succeeded" ? colors.blueDark : colors.muted },
-                    ]}
-                  >
-                    {step.status === "succeeded" ? "✓" : `${index + 1}.`}
-                  </Text>
+                  {step.status === "succeeded" ? (
+                    <Check size={16} strokeWidth={2} color={colors.success} />
+                  ) : (
+                    <Text style={[s.metric, { fontSize: 13, lineHeight: 21, color: colors.muted }]}>
+                      {index + 1}.
+                    </Text>
+                  )}
                   <View style={{ flex: 1, gap: 3 }}>
                     <Text style={s.text}>{runtimeLabel(step.title)}</Text>
                     <Text style={s.small}>
@@ -560,10 +573,12 @@ export function TaskDetail({ taskId }: { taskId: string }) {
             </Card>
           )}
           {!!task.result && (
-            <Card style={{ backgroundColor: colors.green }}>
-              <Text selectable style={s.text}>
-                {resultSummary(task.result)}
-              </Text>
+            <Card>
+              <AssistantResponse
+                content={task.result}
+                files={detail?.files?.length ? detail.files : workspace.files}
+                onOpenFile={(file) => open({ type: "file", file })}
+              />
             </Card>
           )}
           <ErrorNotice error={task.error ?? undefined} />
@@ -575,7 +590,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
                 <Image
                   accessibilityLabel={t("agent.agentBrowserPreview")}
                   source={{ uri: api.url(browser.previewUrl) }}
-                  style={{ width: "100%", aspectRatio: 1.6, borderRadius: 12 }}
+                  style={{ width: "100%", aspectRatio: 1.6, borderRadius: 10 }}
                 />
               )}
               <Button
@@ -623,7 +638,7 @@ export function TaskDetail({ taskId }: { taskId: string }) {
             <ArtifactCard key={artifact.id} artifact={artifact} />
           ))}
           {!!task.evidence.length && (
-            <View style={{ gap: 14 }}>
+            <View style={{ gap: 12 }}>
               <Text style={s.heading}>{t("agent.sources")}</Text>
               <EvidenceList items={task.evidence} />
             </View>
@@ -747,7 +762,7 @@ export function DelegateSheet({ goalId, milestoneId }: { goalId?: string; milest
         }
       />
       {kind === "document" && (
-        <View style={{ gap: 8, marginBottom: 18 }}>
+        <View style={{ gap: 8, marginBottom: 16 }}>
           <Text style={s.heading}>{t("agent.chooseEmailPdf")}</Text>
           {workspace.mail
             .filter((mail) => mail.attachments.length)
@@ -905,38 +920,32 @@ const GOAL_TEMPLATES: Record<string, GoalTemplate[]> = {
  * 一条通用研究任务并打开任务详情，与云端灵感的启动路径一致。
  */
 type IdeaSuggestion = {
-  emoji: string;
   titleKey: TranslationKey;
   reasonKey: TranslationKey;
   promptKey: TranslationKey;
 };
 const IDEA_SUGGESTIONS: IdeaSuggestion[] = [
   {
-    emoji: "📊",
     titleKey: "agent.tplIdeaStockTitle",
     reasonKey: "agent.tplIdeaStockReason",
     promptKey: "agent.tplIdeaStockPrompt",
   },
   {
-    emoji: "🌅",
     titleKey: "agent.tplIdeaBriefingTitle",
     reasonKey: "agent.tplIdeaBriefingReason",
     promptKey: "agent.tplIdeaBriefingPrompt",
   },
   {
-    emoji: "🧾",
     titleKey: "agent.tplIdeaEarningsTitle",
     reasonKey: "agent.tplIdeaEarningsReason",
     promptKey: "agent.tplIdeaEarningsPrompt",
   },
   {
-    emoji: "🏛️",
     titleKey: "agent.tplIdeaRatesTitle",
     reasonKey: "agent.tplIdeaRatesReason",
     promptKey: "agent.tplIdeaRatesPrompt",
   },
   {
-    emoji: "⚖️",
     titleKey: "agent.tplIdeaPeerTitle",
     reasonKey: "agent.tplIdeaPeerReason",
     promptKey: "agent.tplIdeaPeerPrompt",
@@ -1012,7 +1021,6 @@ export function IdeasScreen() {
                 }}
               >
                 <View style={s.row}>
-                  <Text style={{ fontSize: 22, width: 32, paddingTop: 2 }}>{suggestion.emoji}</Text>
                   <View style={{ flex: 1, gap: 4 }}>
                     <Text style={[s.heading, { fontSize: 15, lineHeight: 21 }]}>
                       {t(suggestion.titleKey)}
@@ -1082,33 +1090,40 @@ function IdeaCard({ idea }: { idea: Idea }) {
       setBusy(false);
     }
   }
+  // 灵感类别图标：按标题关键词挑选线性图标，取代早前的 emoji 字符。
+  const IdeaIcon = /document|permission|form/i.test(idea.title)
+    ? FileText
+    : /money|spend|saving/i.test(idea.title)
+      ? CircleDollarSign
+      : /goal|plan|training/i.test(idea.title)
+        ? Target
+        : /dinner|table/i.test(idea.title)
+          ? CalendarDays
+          : Lightbulb;
   return (
-    <View style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+    // 灵感列表行：紧凑内边距 + 底部描边分隔，整行可点击展开。
+    <View style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("agent.viewIdeaLabel", { title: idea.title })}
         accessibilityState={{ expanded }}
         onPress={() => setExpanded(!expanded)}
-        style={{ flexDirection: "row", gap: 14 }}
+        // 可点击行按压态用 overlay1，圆角 10 与控件体系一致。
+        style={({ pressed }) => [
+          { flexDirection: "row", gap: 12, borderRadius: 10 },
+          pressed && { backgroundColor: colors.overlay1 },
+        ]}
       >
-        <Text style={{ fontSize: 27, width: 34, paddingTop: 3 }}>
-          {/document|permission|form/i.test(idea.title)
-            ? "📋"
-            : /money|spend|saving/i.test(idea.title)
-              ? "💸"
-              : /goal|plan|training/i.test(idea.title)
-                ? "👟"
-                : /dinner|table/i.test(idea.title)
-                  ? "🍽️"
-                  : "💡"}
-        </Text>
-        <View style={{ flex: 1, gap: 5 }}>
-          <Text style={[s.heading, { fontSize: 16, lineHeight: 23 }]}>{idea.title}</Text>
+        <View style={{ width: 34, alignItems: "center", justifyContent: "center" }}>
+          <IdeaIcon size={22} strokeWidth={1.8} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={[s.heading, { fontSize: 15, lineHeight: 21 }]}>{idea.title}</Text>
           <Text style={s.muted}>{idea.reason}</Text>
         </View>
       </Pressable>
       {expanded && (
-        <View style={{ gap: 15, marginTop: 18, paddingLeft: 48 }}>
+        <View style={{ gap: 12, marginTop: 12, paddingLeft: 46 }}>
           <EvidenceList items={idea.evidence} />
           {editing && (
             <Field
@@ -1163,7 +1178,8 @@ export function GoalsScreen() {
                 height: 16,
                 borderRadius: 8,
                 borderWidth: 5,
-                borderColor: colors.green,
+                // 状态点用实心成功色，避免半透明语义底导致几乎不可见。
+                borderColor: colors.success,
                 backgroundColor: colors.success,
               }}
             />
@@ -1179,18 +1195,23 @@ export function GoalsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t("agent.openTrackingLabel", { title: item.title })}
             onPress={() => setSelectedMonitor(item.id)}
-            style={[s.row, { gap: 12, paddingVertical: 13 }]}
+            // 可点击列表行：紧凑内边距 + overlay1 按压态 + 10px 圆角。
+            style={({ pressed }) => [
+              s.row,
+              { gap: 12, paddingVertical: 12, borderRadius: 10 },
+              pressed && { backgroundColor: colors.overlay1 },
+            ]}
           >
-            <Square size={21} strokeWidth={1.8} color={colors.faint} />
+            <Square size={21} strokeWidth={1.8} color={colors.muted} />
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={s.text}>{item.title}</Text>
-              <Text numberOfLines={1} style={s.muted}>
+              <Text numberOfLines={1} style={[s.muted, s.metric]}>
                 {item.status === "active"
                   ? t("agent.checkingEvery", { minutes: item.intervalMinutes })
                   : statusLabel(item.status)}
               </Text>
             </View>
-            <ChevronRight size={18} strokeWidth={1.8} color={colors.faint} />
+            <ChevronRight size={18} strokeWidth={1.8} color={colors.muted} />
           </Pressable>
         ))}
         {!monitors.length && (
@@ -1212,10 +1233,10 @@ export function GoalsScreen() {
               borderRadius: 8,
               borderWidth: 5,
               borderColor: colors.lineStrong,
-              backgroundColor: colors.blueDark,
+              backgroundColor: colors.primary,
             }}
           />
-          <Text style={[s.heading, { color: colors.blueDark }]}>{t("app.titleGoals")}</Text>
+          <Text style={[s.heading, { color: colors.primary }]}>{t("app.titleGoals")}</Text>
         </View>
         {data?.goals.map((item) => (
           <Pressable
@@ -1223,13 +1244,19 @@ export function GoalsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t("agent.openGoalLabel", { title: item.title })}
             onPress={() => setSelectedGoal(item.id)}
-            style={[s.row, { gap: 12, paddingVertical: 13 }]}
+            // 可点击列表行：紧凑内边距 + overlay1 按压态 + 10px 圆角。
+            style={({ pressed }) => [
+              s.row,
+              { gap: 12, paddingVertical: 12, borderRadius: 10 },
+              pressed && { backgroundColor: colors.overlay1 },
+            ]}
           >
             <Square
               size={21}
               strokeWidth={1.8}
-              color={colors.faint}
-              fill={item.status === "completed" ? colors.green : "transparent"}
+              color={colors.muted}
+              // 完成态用实心成功色填充，避免半透明语义底几乎不可见。
+              fill={item.status === "completed" ? colors.success : "none"}
             />
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={s.text}>{item.title}</Text>
@@ -1237,7 +1264,7 @@ export function GoalsScreen() {
                 {item.description || statusLabel(item.status)}
               </Text>
             </View>
-            <ChevronRight size={18} strokeWidth={1.8} color={colors.faint} />
+            <ChevronRight size={18} strokeWidth={1.8} color={colors.muted} />
           </Pressable>
         ))}
         {!data?.goals.length && (
@@ -1259,11 +1286,16 @@ export function GoalsScreen() {
           accessibilityRole="button"
           accessibilityLabel={t("agent.createGoalA11y", { category: t(item.key) })}
           onPress={() => setAdding(item.name)}
-          style={[s.row, { gap: 12, minHeight: 38 }]}
+          // 可点击行：overlay1 按压态 + 10px 圆角。
+          style={({ pressed }) => [
+            s.row,
+            { gap: 12, minHeight: 38, borderRadius: 10 },
+            pressed && { backgroundColor: colors.overlay1 },
+          ]}
         >
-          <item.icon size={23} strokeWidth={1.8} color={colors.faint} />
+          <item.icon size={23} strokeWidth={1.8} color={colors.muted} />
           <Text style={[s.text, { flex: 1, color: colors.muted }]}>{t(item.key)}</Text>
-          <Plus size={18} strokeWidth={1.8} color={colors.faint} />
+          <Plus size={18} strokeWidth={1.8} color={colors.muted} />
         </Pressable>
       ))}
       <View style={{ height: 1, backgroundColor: colors.line }} />
@@ -1272,11 +1304,16 @@ export function GoalsScreen() {
         accessibilityRole="button"
         accessibilityLabel={t("threads.delegateTask")}
         onPress={() => open({ type: "delegate" })}
-        style={[s.row, { gap: 12, minHeight: 38 }]}
+        // 可点击行：overlay1 按压态 + 10px 圆角。
+        style={({ pressed }) => [
+          s.row,
+          { gap: 12, minHeight: 38, borderRadius: 10 },
+          pressed && { backgroundColor: colors.overlay1 },
+        ]}
       >
-        <Send size={23} strokeWidth={1.8} color={colors.faint} />
+        <Send size={23} strokeWidth={1.8} color={colors.muted} />
         <Text style={[s.text, { flex: 1, color: colors.muted }]}>{t("threads.delegateTask")}</Text>
-        <ChevronRight size={18} strokeWidth={1.8} color={colors.faint} />
+        <ChevronRight size={18} strokeWidth={1.8} color={colors.muted} />
       </Pressable>
       {adding && (
         <Sheet
@@ -1422,7 +1459,7 @@ function GoalCard({ goal, onOpenTask }: { goal: Goal; onOpenTask?: () => void })
         </Chip>
       </View>
       <Text style={s.muted}>{goal.description}</Text>
-      <Text style={s.small}>
+      <Text style={[s.small, s.metric]}>
         {t("agent.milestonesProgress", { done, total: goal.milestones.length })}
       </Text>
       {goal.milestones.map((milestone) => (
@@ -1615,7 +1652,7 @@ function MonitorCard({ monitor, onOpenTask }: { monitor: Monitor; onOpenTask?: (
     }
   }
   return (
-    <Card style={{ gap: 13 }}>
+    <Card style={{ gap: 12 }}>
       <View style={s.between}>
         <Text style={[s.heading, { flex: 1 }]}>{monitor.title}</Text>
         <Chip tint={colors.sky}>{statusLabel(monitor.status)}</Chip>
@@ -1630,7 +1667,7 @@ function MonitorCard({ monitor, onOpenTask }: { monitor: Monitor; onOpenTask?: (
             ? t("agent.watchForText", { value: monitor.value })
             : t("agent.priceBelow", { value: monitor.value })}
       </Text>
-      <Text style={s.small}>
+      <Text style={[s.small, s.metric]}>
         {t("agent.monitorInterval", { minutes: monitor.intervalMinutes, checks: monitor.checks })}
       </Text>
       <Text style={s.small}>
@@ -1690,18 +1727,18 @@ export function NotificationsSheet() {
       subtitle={t("agent.notificationsSubtitle")}
       onClose={close}
     >
-      <View style={{ gap: 14 }}>
+      <View style={{ gap: 12 }}>
         <ErrorNotice error={error} />
         {data?.notifications.map((item) => (
           <Card
             key={item.id}
-            style={{ gap: 8, backgroundColor: item.read ? colors.card : colors.sky }}
+            style={{ gap: 8, borderColor: item.read ? colors.line : colors.lineStrong }}
           >
             <View style={s.between}>
               <Text style={s.heading}>{item.title}</Text>
               {!item.read && <Chip>{t("agent.newChip")}</Chip>}
             </View>
-            <Text style={s.muted}>{item.body}</Text>
+            <AssistantResponse content={item.body} compact />
             <Text style={s.small}>{stamp(item.createdAt)}</Text>
             <Button small onPress={() => void read(item.id, item.taskId)}>
               {item.taskId
@@ -1764,7 +1801,7 @@ export function AppsScreen() {
       />
       <ConnectionsScreen query={query} />
       <Text style={s.heading}>{t("agent.onYourComputer")}</Text>
-      <Card style={{ paddingVertical: 3, backgroundColor: colors.tertiary }}>
+      <Card style={{ paddingVertical: 6 }}>
         {shortcuts
           .filter((item) =>
             `${item.title} ${item.detail}`.toLowerCase().includes(query.toLowerCase()),
@@ -1842,7 +1879,7 @@ export function AgentPersonalitySheet() {
         <View style={{ gap: 22 }}>
           <Card style={{ gap: 10 }}>
             <SectionHeading title={t("agent.yourAgent")} />
-            <View style={[s.row, { gap: 16, justifyContent: "center", marginBottom: 12 }]}>
+            <View style={[s.row, { gap: 12, justifyContent: "center", marginBottom: 12 }]}>
               {AVATAR_OPTIONS.map((item) => (
                 <Pressable
                   key={item}
@@ -1851,9 +1888,11 @@ export function AgentPersonalitySheet() {
                   accessibilityState={{ checked: avatar === item }}
                   onPress={() => setAvatar(item)}
                   style={{
-                    padding: 7,
-                    borderRadius: 24,
-                    backgroundColor: avatar === item ? colors.sky : colors.canvas,
+                    padding: 4,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: avatar === item ? colors.primary : colors.line,
+                    backgroundColor: avatar === item ? colors.surface : colors.canvas,
                   }}
                 >
                   <Mascot size={62} variant={item} />
@@ -1929,15 +1968,12 @@ export function AgentPersonalitySheet() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 10,
-                paddingVertical: 14,
-                paddingHorizontal: 22,
-                borderRadius: 16,
-                backgroundColor: "#FFFFFF",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.18,
-                shadowRadius: 18,
-                elevation: 6,
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: colors.canvas,
               }}
             >
               <View
@@ -1983,7 +2019,7 @@ function MemoryRow({ memory }: { memory: AgentMemory }) {
   }
   return (
     <View
-      style={{ gap: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.line }}
+      style={{ gap: 8, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.line }}
     >
       {editing ? (
         <Field label={t("agent.memory")} value={text} onChangeText={setText} />

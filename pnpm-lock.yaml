@@ -117,9 +117,6 @@ importers:
       expo-status-bar:
         specifier: ~3.0.0
         version: 3.0.9(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)
-      lucide-react-native:
-        specifier: ^0.468.0
-        version: 0.468.0(react-native-svg@15.12.1(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)
       markdown-it:
         specifier: 14.1.0
         version: 14.1.0
@@ -4380,13 +4377,6 @@ packages:
 
   lru-memoizer@3.0.0:
     resolution: {integrity: sha512-m83w/cYXLdUIboKSPxzPAGfYnk+vqeDYXuoSrQRw1q+yVEd8IXhvMufN8Q5TIPe7e2jyX4SRNrDJI2Skw1yznQ==}
-
-  lucide-react-native@0.468.0:
-    resolution: {integrity: sha512-prIIqt6HDqPZh8Tk1eelKE9iJtA6uJJIFG3BqGZcjp9ZidnAKtyvySRMmkG8h9tJTZs+BsyUSAM/AtgdRdRO7Q==}
-    peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0
-      react-native: '*'
-      react-native-svg: ^12.0.0 || ^13.0.0 || ^14.0.0 || ^15.0.0
 
   lucide-react@0.525.0:
     resolution: {integrity: sha512-Tm1txJ2OkymCGkvwoHt33Y2JpN5xucVq1slHcgE6Lk0WjDfjgKWor5CdVER8U6DvcfMwh4M8XxmpTiyzfmfDYQ==}
@@ -11502,12 +11492,6 @@ snapshots:
     dependencies:
       lodash.clonedeep: 4.5.0
       lru-cache: 11.5.2
-
-  lucide-react-native@0.468.0(react-native-svg@15.12.1(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0):
-    dependencies:
-      react: 19.1.0
-      react-native: 0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1)
-      react-native-svg: 15.12.1(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)
 
   lucide-react@0.525.0(react@19.1.0):
     dependencies:

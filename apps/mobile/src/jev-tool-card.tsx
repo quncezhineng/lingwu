@@ -1,8 +1,8 @@
-import { Check, ExternalLink } from "lucide-react-native";
 import { createContext, useContext, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
 import type { JevOption, JevPanel } from "../../../packages/domain/src/jev";
 import { useTranslation } from "./i18n";
+import { Check, ExternalLink } from "./icons";
 import {
   choiceAvailability,
   parseJevResult,
@@ -46,10 +46,10 @@ function SourceLink({ title, url }: { title: string; url: string }) {
       onPress={() => void Linking.openURL(url)}
       style={({ pressed }) => [s.row, { gap: 4, opacity: pressed ? 0.65 : 1 }]}
     >
-      <Text style={[s.small, { color: colors.blueDark, textDecorationLine: "underline" }]}>
+      <Text style={[s.small, { color: colors.primary, textDecorationLine: "underline" }]}>
         {title}
       </Text>
-      <ExternalLink size={12} strokeWidth={1.8} color={colors.blueDark} />
+      <ExternalLink size={12} strokeWidth={1.8} color={colors.primary} />
     </Pressable>
   );
 }
@@ -89,7 +89,7 @@ function ChoiceButton({
         onPress={() => onChoose(option.id)}
         style={({ pressed }) => [
           s.button,
-          { alignSelf: "flex-start", backgroundColor: colors.blue },
+          { alignSelf: "flex-start", backgroundColor: colors.primary },
           (disabled || pending) && { opacity: 0.5 },
           pressed && { transform: [{ scale: 0.98 }] },
         ]}
@@ -127,7 +127,7 @@ export function JevToolCard({ result, loading }: { result: unknown; loading: boo
   if (loading) {
     return (
       <View style={[s.row, { gap: 10, padding: 14 }]}>
-        <ActivityIndicator size="small" color={colors.blueDark} />
+        <ActivityIndicator size="small" color={colors.primary} />
         <Text style={s.muted}>{t("tools.preparingChoices")}</Text>
       </View>
     );
@@ -231,7 +231,14 @@ export function JevToolCard({ result, loading }: { result: unknown; loading: boo
           {panel.options.map((option, index) => (
             <View
               key={option.id}
-              style={{ borderRadius: 16, padding: 14, gap: 9, backgroundColor: colors.surface }}
+              style={{
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: colors.line,
+                padding: 13,
+                gap: 9,
+                backgroundColor: colors.surface,
+              }}
             >
               <Text style={[s.text, { fontWeight: "600" }]}>{option.label}</Text>
               {!!option.details.length && (

@@ -1,12 +1,3 @@
-import {
-  FileText,
-  FolderOpen,
-  Globe2,
-  Monitor,
-  Plus,
-  RefreshCw,
-  Terminal,
-} from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { AppState, Image, Pressable, Text, View } from "react-native";
 import type { BrowserSession } from "../../../packages/domain/src";
@@ -17,6 +8,7 @@ import { computerStatus } from "./computer-status";
 import { LinuxWorkspace } from "./computer-workspace";
 import { fileKind } from "./file-kind";
 import { useTranslation } from "./i18n";
+import { FileText, FolderOpen, Globe2, Monitor, Plus, RefreshCw, Terminal } from "./icons";
 import { Button, Card, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -79,7 +71,7 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 9 }]}>
-          <Globe2 size={21} strokeWidth={1.8} color={colors.blueDark} />
+          <Globe2 size={21} strokeWidth={1.8} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("app.titleBrowser")}</Text>
@@ -96,7 +88,12 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
         <Image
           accessibilityLabel={t("computer.browserPreviewLabel", { title: browser.title })}
           source={{ uri: browser.previewUrl }}
-          style={{ width: "100%", aspectRatio: 1.6, borderRadius: 11, backgroundColor: "#FFF" }}
+          style={{
+            width: "100%",
+            aspectRatio: 1.6,
+            borderRadius: 11,
+            backgroundColor: colors.canvas,
+          }}
           resizeMode="contain"
           onError={() => setFailed(true)}
         />
@@ -105,7 +102,7 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
           style={{
             padding: 24,
             borderRadius: 12,
-            backgroundColor: "#FFF",
+            backgroundColor: colors.canvas,
             alignItems: "center",
             gap: 10,
           }}
@@ -194,9 +191,19 @@ export function ComputerSheet() {
       <View style={{ gap: 20 }}>
         {shown === "Browser" && (
           <View
-            style={[s.row, { gap: 12, padding: 18, borderRadius: 20, backgroundColor: colors.sky }]}
+            style={[
+              s.row,
+              {
+                gap: 12,
+                padding: 16,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: colors.canvas,
+              },
+            ]}
           >
-            <Monitor size={28} strokeWidth={1.8} color={colors.blueDark} />
+            <Monitor size={28} strokeWidth={1.8} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={s.heading}>
                 {available ? t("computer.browserConnected") : t("computer.browserOffline")}

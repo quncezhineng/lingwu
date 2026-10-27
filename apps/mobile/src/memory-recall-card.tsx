@@ -1,6 +1,6 @@
-import { Brain } from "lucide-react-native";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "./i18n";
+import { Brain } from "./icons";
 import { parseMemoryRecallResult, type RecalledMemory } from "./memory-recall-result";
 import { colors } from "./ui";
 
@@ -10,7 +10,7 @@ export function MemoryRecallCard({ result, loading }: { result: unknown; loading
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="small" color={colors.blueDark} />
+        <ActivityIndicator size="small" color={colors.primary} />
         <Text style={styles.muted}>{t("tools.memoryRecallLoading")}</Text>
       </View>
     );
@@ -34,7 +34,7 @@ function MemoryRow({ memory }: { memory: RecalledMemory }) {
   return (
     <View style={styles.memory}>
       <View style={styles.icon}>
-        <Brain size={14} strokeWidth={1.8} color={colors.blueDark} />
+        <Brain size={14} strokeWidth={1.8} color={colors.primary} />
       </View>
       <View style={styles.body}>
         <Text selectable style={styles.text}>
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.sky,
+    backgroundColor: colors.surface,
   },
   body: { flex: 1, gap: 2 },
   text: { color: colors.text, fontSize: 13.5, lineHeight: 19 },

@@ -1,22 +1,3 @@
-import {
-  Activity,
-  Bell,
-  Bot,
-  Brain,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Globe2,
-  ListChecks,
-  type LucideIcon,
-  Mail,
-  Monitor,
-  Search,
-  Send,
-  Target,
-  X,
-} from "lucide-react-native";
 import { type ReactNode, useState } from "react";
 import {
   ActivityIndicator,
@@ -28,6 +9,25 @@ import {
   View,
 } from "react-native";
 import { type TranslationFn, useTranslation } from "./i18n";
+import {
+  Activity,
+  Bell,
+  Bot,
+  Brain,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Globe2,
+  type IconComponent,
+  ListChecks,
+  Mail,
+  Monitor,
+  Search,
+  Send,
+  Target,
+  X,
+} from "./icons";
 import { colors } from "./ui";
 
 export type ToolStepStatus = "inProgress" | "executing" | "complete";
@@ -36,7 +36,7 @@ type ToolArguments = Readonly<Record<string, unknown>>;
 
 const RESULT_LIMIT = 12_000;
 
-const toolIcons: Record<string, LucideIcon> = {
+const toolIcons: Record<string, IconComponent> = {
   search_web: Search,
   search_mail: Mail,
   read_mail_thread: Mail,
@@ -284,7 +284,7 @@ export function ToolStep({
         {failed ? (
           <X size={14} strokeWidth={1.8} color={colors.danger} />
         ) : running ? (
-          <ActivityIndicator size="small" color={colors.blueDark} style={styles.spinner} />
+          <ActivityIndicator size="small" color={colors.primary} style={styles.spinner} />
         ) : (
           <Check size={14} strokeWidth={1.8} color={colors.success} />
         )}
@@ -353,9 +353,9 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 17,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.lineStrong,
+    borderColor: colors.line,
     backgroundColor: colors.surface,
   },
   headerPressed: {
@@ -382,10 +382,10 @@ const styles = StyleSheet.create({
     gap: 13,
     paddingHorizontal: 13,
     paddingVertical: 12,
-    borderRadius: 17,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.lineStrong,
-    backgroundColor: colors.tertiary,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
   },
   section: {
     gap: 6,
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   outputScroll: {
     maxHeight: 260,
     borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.canvas,
   },
   outputContent: {
     padding: 10,

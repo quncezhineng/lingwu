@@ -94,12 +94,17 @@ const screens = {
   "screens.filesSubtitle": "Reports and filings, with room to organize.",
   "screens.filesImport": "Import PDF or HTML",
   "screens.filesDocumentBadge": "DOCUMENT",
+  "screens.filesResearchHeading": "Research outputs",
+  "screens.filesDocumentsHeading": "Files",
+  "screens.filesResearchBadge": "RESEARCH",
+  "screens.filesGeneratedByAgent": "Created by agent",
+  "screens.filesOpenResearchArtifact": "Open research output: {name}",
   "screens.filesPage": "page",
   "screens.filesPages": "pages",
   "screens.filesWebPage": "Web page",
   "screens.filesEmptyTitle": "Your documents live here",
   "screens.filesEmptyDetail":
-    "Import a PDF or open a mail attachment to read, fill supported form fields, and share a copy.",
+    "Reports created in chat, plus imported PDFs and HTML pages, will appear here.",
 
   // Activity 动态
   "screens.activityFilterAll": "All activity",

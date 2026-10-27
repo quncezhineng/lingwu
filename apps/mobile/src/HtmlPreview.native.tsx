@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { WebView } from "react-native-webview";
-import { ErrorNotice } from "./ui";
+import { colors, ErrorNotice } from "./ui";
 
 /**
  * 研究产物 HTML 网页的原生渲染：用 WebView 的 `source={{ html }}` 展示
@@ -26,7 +26,7 @@ export default function HtmlPreview({
         javaScriptEnabled={interactive}
         domStorageEnabled={interactive}
         onError={(event) => setError(event.nativeEvent.description)}
-        style={{ flex: 1, borderRadius: 12, backgroundColor: "#FFF" }}
+        style={{ flex: 1, borderRadius: 12, backgroundColor: colors.canvas }}
       />
     </View>
   );

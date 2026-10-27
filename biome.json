@@ -10,7 +10,9 @@
       "!**/ios",
       "!**/android",
       "!**/.lingwu",
-      "!**/artifacts"
+      "!**/artifacts",
+      "!**/.qoder",
+      "!**/.qoder-collab-runtime"
     ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "lineWidth": 100 },

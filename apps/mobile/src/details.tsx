@@ -1,5 +1,31 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Image, Linking, Platform, Text, View } from "react-native";
+import {
+  type ActionProposal,
+  type Artifact,
+  type BrowserSession,
+  type CalendarEvent,
+  type EmailDraft,
+  type EventDraft,
+  emailDraftSchema,
+  eventDraftSchema,
+  type Mail,
+  type ProposalInput,
+} from "../../../packages/domain/src";
+import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import { AgentPersonalitySheet, DelegateSheet, NotificationsSheet, TaskDetail } from "./agent-ui";
+import { artifactHasHtmlPreview, renderArtifactHtml } from "./artifact-html";
+import BrowserConsole from "./BrowserConsole";
+import { browserAddress, browserSite } from "./browser-address";
+import { ComputerSheet } from "./computer";
+import DateTimeEditor from "./DateTimeEditor";
+import { localDateTime, zonedInstant } from "./date-time";
+import { fileKind } from "./file-kind";
+import HtmlPreview from "./HtmlPreview";
+import { activeLocaleTag, useTranslation } from "./i18n";
+import { statusLabel } from "./i18n/translate";
 import {
   CalendarDays,
   Check,
@@ -17,33 +43,7 @@ import {
   ShieldCheck,
   Trash2,
   X,
-} from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Linking, Platform, Text, View } from "react-native";
-import {
-  type ActionProposal,
-  type Artifact,
-  type BrowserSession,
-  type CalendarEvent,
-  type EmailDraft,
-  type EventDraft,
-  emailDraftSchema,
-  eventDraftSchema,
-  type Mail,
-  type ProposalInput,
-} from "../../../packages/domain/src";
-import type { AgentArtifact } from "../../../packages/domain/src/agent";
-import { AgentPersonalitySheet, DelegateSheet, NotificationsSheet, TaskDetail } from "./agent-ui";
-import { renderArtifactHtml } from "./artifact-html";
-import BrowserConsole from "./BrowserConsole";
-import { browserAddress, browserSite } from "./browser-address";
-import { ComputerSheet } from "./computer";
-import DateTimeEditor from "./DateTimeEditor";
-import { localDateTime, zonedInstant } from "./date-time";
-import { fileKind } from "./file-kind";
-import HtmlPreview from "./HtmlPreview";
-import { activeLocaleTag, useTranslation } from "./i18n";
-import { statusLabel } from "./i18n/translate";
+} from "./icons";
 import PdfReader from "./PdfReader";
 import {
   Button,
@@ -163,14 +163,14 @@ function MailDetail({ mail: m }: { mail: Mail }) {
       onClose={close}
     >
       {loading && (
-        <View style={[s.row, { gap: 10, paddingBottom: 20 }]}>
-          <ActivityIndicator color={colors.blueDark} />
+        <View style={[s.row, { gap: 10, paddingBottom: 16 }]}>
+          <ActivityIndicator color={colors.primary} />
           <Text style={s.muted}>{t("details.loadingConversation")}</Text>
         </View>
       )}
       {thread.map((message) => (
-        <Card key={message.id} style={{ marginBottom: 16 }}>
-          <View style={s.between}>
+        <Card key={message.id} style={{ marginBottom: 12 }}>
+          <View style={[s.between, { gap: 12 }]}>
             <View style={{ gap: 4, flex: 1 }}>
               <Text style={s.heading}>{message.sender}</Text>
               <Text style={s.small}>{message.from}</Text>
@@ -178,12 +178,12 @@ function MailDetail({ mail: m }: { mail: Mail }) {
                 {t("details.toLine", { recipients: message.to.join(", ") })}
               </Text>
             </View>
-            <Text style={s.small}>
+            <Text style={[s.small, s.metric]}>
               {dateLabel(message.date)} · {timeLabel(message.date)}
             </Text>
           </View>
           <View style={s.divider} />
-          <Text selectable style={[s.text, { lineHeight: 25 }]}>
+          <Text selectable style={s.text}>
             {message.body}
           </Text>
           {message.attachments.map((id) => {
@@ -314,7 +314,7 @@ function EmailEditor({ draft }: { draft?: Partial<EmailDraft> & { id?: string } 
         autoCapitalize="none"
         keyboardType="email-address"
       />
-      <View style={{ flexDirection: "row", gap: 16 }}>
+      <View style={{ flexDirection: "row", gap: 12 }}>
         <View style={{ flex: 1 }}>
           <Field
             label={t("details.cc")}
@@ -349,8 +349,8 @@ function EmailEditor({ draft }: { draft?: Partial<EmailDraft> & { id?: string } 
         style={{ minHeight: 210 }}
       />
       {w.files.length > 0 && (
-        <Card style={{ padding: 16, marginBottom: 18 }}>
-          <Text style={[s.heading, { fontSize: 13, marginBottom: 5 }]}>
+        <Card style={{ marginBottom: 14 }}>
+          <Text style={[s.heading, { fontSize: 13, marginBottom: 4 }]}>
             {t("details.attachments")}
           </Text>
           {w.files.map((f) => (
@@ -633,14 +633,14 @@ function ReviewDetail({ initial }: { initial: ActionProposal }) {
       onClose={close}
     >
       <View style={[s.row, { gap: 13, marginBottom: 21 }]}>
-        <View style={[s.iconBox, { backgroundColor: colors.lavender }]}>
-          <ShieldCheck size={22} strokeWidth={1.8} color={colors.text} />
+        <View style={[s.iconBox, { backgroundColor: colors.surface }]}>
+          <ShieldCheck size={22} strokeWidth={1.8} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={s.heading}>{action.title}</Text>
           <Text style={s.small}>{action.kind.replace(".", " · ")}</Text>
         </View>
-        <Chip tint={pending ? colors.lavender : colors.green}>{statusLabel(action.status)}</Chip>
+        <Chip tint={pending ? colors.surface : colors.green}>{statusLabel(action.status)}</Chip>
       </View>
       <Card style={{ gap: 13 }}>
         <ReviewLine label={t("details.account")} value={action.account || w.profile.email} />
@@ -960,6 +960,7 @@ function FileDetail({ file: f }: { file: Artifact }) {
 function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
   const { close } = useWorkspace();
   const html = useMemo(() => renderArtifactHtml(artifact), [artifact]);
+  const hasHtmlPreview = useMemo(() => artifactHasHtmlPreview(artifact), [artifact]);
   return (
     <Sheet
       title={artifact.title}
@@ -967,7 +968,7 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
       onClose={close}
       fullscreen
     >
-      <HtmlPreview html={html} title={artifact.title} />
+      <HtmlPreview html={html} title={artifact.title} interactive={hasHtmlPreview} />
     </Sheet>
   );
 }
@@ -1087,7 +1088,7 @@ function BrowserDetail({ initial }: { initial: BrowserSession }) {
             <Button onPress={() => setRetry(retry + 1)}>{t("details.retryConnection")}</Button>
           ) : (
             <>
-              <ActivityIndicator color={colors.blueDark} />
+              <ActivityIndicator color={colors.primary} />
               <Text style={s.muted}>{t("details.connectingBrowser")}</Text>
             </>
           )}

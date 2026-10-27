@@ -1,3 +1,14 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, AppState, Platform, Text, View } from "react-native";
+import type { Artifact } from "../../../packages/domain/src";
+import type {
+  ComputerCommand,
+  ComputerDirectory,
+  ComputerSnapshot,
+} from "../../../packages/domain/src/computer";
+import { useComputerDraft } from "./computer-drafts";
+import { DesktopStream } from "./desktop-stream";
+import { useTranslation } from "./i18n";
 import {
   ArrowLeft,
   FilePlus2,
@@ -11,18 +22,7 @@ import {
   Save,
   Terminal,
   Upload,
-} from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, AppState, Platform, Text, View } from "react-native";
-import type { Artifact } from "../../../packages/domain/src";
-import type {
-  ComputerCommand,
-  ComputerDirectory,
-  ComputerSnapshot,
-} from "../../../packages/domain/src/computer";
-import { useComputerDraft } from "./computer-drafts";
-import { DesktopStream } from "./desktop-stream";
-import { useTranslation } from "./i18n";
+} from "./icons";
 import { Button, Card, colors, Empty, ErrorNotice, Field, LinkRow, s, timeLabel } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -154,9 +154,9 @@ export function LinuxWorkspace({
   const commandRunning = executing || snapshot?.commands.some((item) => item.status === "running");
   return (
     <View style={{ gap: 16 }}>
-      <Card style={{ backgroundColor: colors.sky, gap: 12 }}>
+      <Card style={{ gap: 12 }}>
         <View style={[s.row, { gap: 12 }]}>
-          <Terminal size={24} strokeWidth={1.8} color={colors.blueDark} />
+          <Terminal size={24} strokeWidth={1.8} color={colors.primary} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={s.heading}>{t("computer.yourLinuxWorkspace")}</Text>
             <Text style={s.muted}>
@@ -171,7 +171,7 @@ export function LinuxWorkspace({
                       : t("computer.statusConnecting")}
             </Text>
           </View>
-          {!snapshot && !error && <ActivityIndicator color={colors.blueDark} />}
+          {!snapshot && !error && <ActivityIndicator color={colors.primary} />}
         </View>
         {!!snapshot?.message && <Text style={s.small}>{snapshot.message}</Text>}
         {snapshot?.enabled && (
@@ -216,7 +216,14 @@ export function LinuxWorkspace({
           <View style={{ display: tab === "Terminal" ? "flex" : "none", gap: 16 }}>
             {editingCommand || command.length > 0 || snapshot.commands.length === 0 ? (
               <View
-                style={{ borderRadius: 22, backgroundColor: colors.surface, padding: 18, gap: 8 }}
+                style={{
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  backgroundColor: colors.surface,
+                  padding: 16,
+                  gap: 8,
+                }}
               >
                 <Text style={{ color: colors.muted, fontSize: 12, fontFamily: mono }}>
                   {t("computer.terminalLabel")}
@@ -342,7 +349,7 @@ function CommandReceipt({ run }: { run: ComputerCommand }) {
                 run.status === "succeeded"
                   ? colors.success
                   : run.status === "running"
-                    ? colors.blueDark
+                    ? colors.primary
                     : colors.danger,
             },
           ]}
@@ -525,7 +532,7 @@ function ComputerFiles({ running, active }: { running: boolean; active: boolean 
     <View style={{ gap: 12 }}>
       <View style={s.between}>
         <Text style={s.heading}>{t("computer.workspaceFiles")}</Text>
-        {(busy || loading) && <ActivityIndicator color={colors.blueDark} />}
+        {(busy || loading) && <ActivityIndicator color={colors.primary} />}
       </View>
       <Text selectable style={[s.small, { fontFamily: mono }]}>
         {editor?.path || path}

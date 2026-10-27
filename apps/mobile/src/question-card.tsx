@@ -1,9 +1,9 @@
-import { MessageCircleQuestion } from "lucide-react-native";
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import type { AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
 import { localizeAgentName, runtimeLabel, useTranslation } from "./i18n";
+import { MessageCircleQuestion } from "./icons";
 import { Button, colors, ErrorNotice } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -62,7 +62,7 @@ export function QuestionCard({ task, agentName }: { task: AgentTask; agentName?:
     <View style={styles.wrap}>
       <View style={styles.card}>
         <View style={styles.header}>
-          <MessageCircleQuestion size={14} strokeWidth={1.8} color={colors.blueDark} />
+          <MessageCircleQuestion size={14} strokeWidth={1.8} color={colors.primary} />
           <Text style={styles.headerText}>{t("tools.questionAsks", { name })}</Text>
         </View>
         <Text selectable style={styles.question}>
@@ -87,7 +87,7 @@ export function QuestionCard({ task, agentName }: { task: AgentTask; agentName?:
               multiline
               onChangeText={setAnswer}
               placeholder={t("tools.questionPlaceholder")}
-              placeholderTextColor={colors.muted}
+              placeholderTextColor={colors.faint}
               style={styles.input}
               textAlignVertical="top"
               value={answer}
@@ -119,29 +119,30 @@ export function QuestionCard({ task, agentName }: { task: AgentTask; agentName?:
 
 const styles = StyleSheet.create({
   wrap: { alignSelf: "flex-start", width: "100%", maxWidth: 600 },
+  /** 提问卡：白底 + 1px 描边 + 14px 圆角，靠边框分层。 */
   card: {
     width: "100%",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderRadius: 20,
-    borderBottomLeftRadius: 7,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
-    backgroundColor: colors.card,
-  },
-  header: { flexDirection: "row", alignItems: "center", gap: 6 },
-  headerText: { color: colors.blueDark, fontSize: 12.5, lineHeight: 18, fontWeight: "600" },
-  question: { color: colors.text, fontSize: 15, lineHeight: 21 },
-  hint: { color: colors.muted, fontSize: 12.5, lineHeight: 18, marginTop: 2 },
-  answerBox: { gap: 8, marginTop: 6 },
-  input: {
-    minHeight: 52,
-    maxHeight: 160,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.tertiary,
+    backgroundColor: colors.canvas,
+  },
+  header: { flexDirection: "row", alignItems: "center", gap: 6 },
+  headerText: { color: colors.muted, fontSize: 12, lineHeight: 18, fontWeight: "600" },
+  question: { color: colors.text, fontSize: 15, lineHeight: 21 },
+  hint: { color: colors.muted, fontSize: 12.5, lineHeight: 18, marginTop: 2 },
+  answerBox: { gap: 8, marginTop: 6 },
+  /** 回答输入框：次级面（surface）+ 10px 圆角 + 1px 描边。 */
+  input: {
+    minHeight: 52,
+    maxHeight: 160,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: colors.text,

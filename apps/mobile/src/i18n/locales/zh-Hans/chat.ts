@@ -62,6 +62,7 @@ const chat = {
   "chat.artifactRow": "打开产物：{name}",
   "chat.researchArtifacts": "研究产物",
   "chat.filesGroup": "文件",
+  "chat.documentOpenError": "无法在新页面打开预览，请允许弹出窗口后重试。",
 } satisfies Dictionary;
 
 export default chat;

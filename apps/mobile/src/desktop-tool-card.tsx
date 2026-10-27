@@ -1,4 +1,3 @@
-import { Monitor, Play } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, AppState, Image, Platform, Text, View } from "react-native";
 import { z } from "zod";
@@ -6,6 +5,7 @@ import type { ComputerSnapshot } from "../../../packages/domain/src/computer";
 import { useComputerDraft } from "./computer-drafts";
 import { DesktopStream } from "./desktop-stream";
 import { useTranslation } from "./i18n";
+import { Monitor, Play } from "./icons";
 import { Button, Card, colors, ErrorNotice, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -94,7 +94,6 @@ export function DesktopToolCard({
     <Card
       style={{
         padding: 13,
-        backgroundColor: colors.surface,
         gap: 12,
         width: "100%",
         maxWidth: 640,
@@ -102,7 +101,7 @@ export function DesktopToolCard({
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 10 }]}>
-          <Monitor size={21} strokeWidth={1.8} color={colors.blueDark} />
+          <Monitor size={21} strokeWidth={1.8} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("tools.desktopTitle")}</Text>
@@ -114,7 +113,7 @@ export function DesktopToolCard({
                 : (value?.action ?? t("tools.desktopStep"))}
           </Text>
         </View>
-        {loading && <ActivityIndicator size="small" color={colors.blueDark} />}
+        {loading && <ActivityIndicator size="small" color={colors.primary} />}
       </View>
       <ErrorNotice error={value?.error || error} />
       {latest && snapshot && !running ? (

@@ -1,5 +1,6 @@
 import { View } from "react-native";
 import { useTranslation } from "./i18n";
+import { colors } from "./ui";
 
 /**
  * 研究产物 HTML 网页的 Web 渲染：把构建好的 HTML 字符串通过 `srcDoc`
@@ -24,7 +25,13 @@ export default function HtmlPreview({
         srcDoc={html}
         sandbox={interactive ? "allow-scripts allow-popups allow-forms allow-modals" : ""}
         referrerPolicy="no-referrer"
-        style={{ height: "100%", width: "100%", border: 0, borderRadius: 12, background: "#FFF" }}
+        style={{
+          height: "100%",
+          width: "100%",
+          border: 0,
+          borderRadius: 12,
+          background: colors.canvas,
+        }}
       />
     </View>
   );

@@ -1,10 +1,10 @@
-import { Check, Globe2, Hand, RotateCw } from "lucide-react-native";
 import { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, AppState, Image, Text, View } from "react-native";
 import { z } from "zod";
 import type { BrowserSession } from "../../../packages/domain/src";
 import { useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
+import { Check, Globe2, Hand, RotateCw } from "./icons";
 import { Button, Card, colors, ErrorNotice, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -98,7 +98,6 @@ export function BrowserToolCard({
     <Card
       style={{
         padding: 13,
-        backgroundColor: colors.surface,
         gap: 12,
         width: "100%",
         maxWidth: 440,
@@ -106,7 +105,7 @@ export function BrowserToolCard({
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 10 }]}>
-          <Globe2 size={21} strokeWidth={1.8} color={colors.blueDark} />
+          <Globe2 size={21} strokeWidth={1.8} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("app.titleBrowser")}</Text>
@@ -121,16 +120,26 @@ export function BrowserToolCard({
           </Text>
         </View>
         {working ? (
-          <ActivityIndicator size="small" color={colors.blueDark} />
+          <ActivityIndicator size="small" color={colors.primary} />
         ) : visited ? (
-          <Check size={17} strokeWidth={1.8} color={colors.success} accessibilityLabel={t("tools.pageRead")} />
+          <Check
+            size={17}
+            strokeWidth={1.8}
+            color={colors.success}
+            accessibilityLabel={t("tools.pageRead")}
+          />
         ) : null}
       </View>
       {preview ? (
         <Image
           accessibilityLabel={t("tools.browserPreview", { title: visited?.title ?? "" })}
           source={{ uri: api.url(preview) }}
-          style={{ width: "100%", aspectRatio: 1.7, borderRadius: 12, backgroundColor: "#FFF" }}
+          style={{
+            width: "100%",
+            aspectRatio: 1.7,
+            borderRadius: 12,
+            backgroundColor: colors.canvas,
+          }}
           resizeMode="contain"
           onError={() => setPreviewFailed(true)}
         />
@@ -144,7 +153,7 @@ export function BrowserToolCard({
               {(["90%", "74%", "84%"] as const).map((width) => (
                 <View
                   key={width}
-                  style={{ height: 7, width, borderRadius: 4, backgroundColor: colors.sky }}
+                  style={{ height: 7, width, borderRadius: 4, backgroundColor: colors.tertiary }}
                 />
               ))}
             </View>

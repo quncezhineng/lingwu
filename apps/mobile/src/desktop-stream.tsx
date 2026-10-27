@@ -1,8 +1,8 @@
-import { ExternalLink } from "lucide-react-native";
 import { memo, useEffect, useState } from "react";
 import { ActivityIndicator, AppState, Linking, Platform, View } from "react-native";
 import BrowserConsole from "./BrowserConsole";
 import { useTranslation } from "./i18n";
+import { ExternalLink } from "./icons";
 import { Button, colors, ErrorNotice } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -94,7 +94,7 @@ export const DesktopStream = memo(function DesktopStream({
   return (
     <View style={{ gap: 12 }}>
       <ErrorNotice error={error} />
-      {embedded && !url && !error && <ActivityIndicator color={colors.blueDark} />}
+      {embedded && !url && !error && <ActivityIndicator color={colors.primary} />}
       {!!url && embed && Platform.OS === "web" && (
         <BrowserConsole url={url} title={t("tools.computerDesktop")} sandboxed />
       )}

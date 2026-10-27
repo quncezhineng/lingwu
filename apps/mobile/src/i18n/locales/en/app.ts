@@ -28,6 +28,10 @@ const app = {
   "app.profileSessionExpires": "Session expires",
   "app.profileUnset": "Not set",
   "app.profileLoading": "Loading your account…",
+  "app.conversationManagement": "Conversation management",
+  "app.archivedConversations": "Archived conversations",
+  "app.archivedConversationsDetail": "Restore or permanently delete archived chats.",
+  "app.backToAccount": "Back to Account",
   "app.localWorkspaceHint":
     "Local workspaces open without a key. Make sure your LingWu server is running at {url}.",
   "app.openingWorkspace": "Opening your workspace…",

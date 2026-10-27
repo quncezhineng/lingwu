@@ -65,6 +65,7 @@ const chat = {
   "chat.artifactRow": "Open artifact: {name}",
   "chat.researchArtifacts": "Research outputs",
   "chat.filesGroup": "Files",
+  "chat.documentOpenError": "Could not open the preview. Allow pop-ups and try again.",
 } satisfies Dictionary;
 
 export default chat;
