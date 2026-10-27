@@ -5,6 +5,137 @@
 
 ## 变更记录
 
+### 2026-10-27 · 未读通知卡片添加浅紫色背景提示
+
+**背景**
+
+用户选中「通知」列表中的未读通知卡片（含「新」Chip、来源 Markdown 摘要、时间戳与「查看任务」按钮），希望未读卡片以浅紫色背景与已读卡片区分，形成更直接的视觉提示。
+
+**实现**
+
+- `apps/mobile/src/agent-ui.tsx`：`NotificationsSheet` 中通知卡片新增条件背景色——未读（`!item.read`）使用品牌浅紫 `colors.sky`（#E5EAFF），已读回到 `colors.canvas` 白底；描边继续按未读/已读在 `lineStrong` / `line` 间切换。背景色沿用设计令牌，未硬编码色值。
+
+**验证**
+
+- `pnpm --filter mobile typecheck`（`tsc --noEmit`）退出码 0。
+- `pnpm test`：686 项测试全部通过 / 0 失败。
+
+### 2026-10-27 · 任务来源卡片支持 Markdown 语法渲染
+
+**背景**
+
+用户选中「查看任务」详情页「来源」区域内的摘要文本，内容为市场快讯的 Markdown 原文（`##` 标题、`**加粗**`、`* 列表`、链接等），语法被原样显示。该区域由 `EvidenceList` 渲染，同时服务于任务详情与灵感（Idea）详情的来源列表。
+
+**根因**
+
+[agent-ui.tsx](apps/mobile/src/agent-ui.tsx) 中 `EvidenceList` 组件使用 `<Text selectable style={s.small}>{item.excerpt}</Text>` 将来源摘要纯文本直出，Markdown 原始语法未被解析。
+
+**实现**
+
+- `apps/mobile/src/agent-ui.tsx`：
+  - 引入 `react-native-markdown-renderer` 的 `Markdown` 组件，并复用 `assistantMarkdown`（`html: false`，禁用原始 HTML 注入）与 `isSafeAssistantUrl` 安全校验。
+  - 新增模块级 `evidenceMarkdownStyle`：正文沿用原 `s.small` 规格（`colors.muted`、11px、行高 17），标题逐级缩小至 12.5/12/11.5px 并去除默认下边框，段落与列表边距压缩至 1-2px，链接使用品牌主色 `colors.primary` + 下划线，行内代码/代码块使用 `colors.tertiary` 浅底区隔，引用块与分隔线同样按小卡片尺度收敛。
+  - 新增 `evidenceMarkdownRules`：`textgroup` 节点保持 `selectable`，来源摘要仍可整段复制。
+  - 新增 `openEvidenceLink`：链接统一经 `isSafeAssistantUrl` 校验后调用 `Linking.openURL`，拦截 `javascript:` 等危险协议。
+  - `EvidenceList` 的 `item.excerpt` 改用 `<Markdown>` 输出；来源标题、打开来源/查看邮件/查看文件按钮与来源链接行为保持不变。
+
+**验证**
+
+- `pnpm typecheck`（server + mobile）退出码 0。
+- `pnpm test`：686 项测试全部通过 / 0 失败。
+- 真实浏览器验证（Chrome DevTools + sample QA 环境）：任务「Availability watch」来源卡片中，`##` 标题已按标题样式分段、`**加粗**` 已加粗、`* 列表` 已转为列表符号、`[链接](url)` 已剥离 URL 变为可点击文本、行内代码已去掉反引号呈现等宽底色，Markdown 语法全部闭环渲染，原始标记不再以字面文本显示。
+- 补充修复：来源摘要在服务端生成时也会被 `\s+` 折叠为单行（见 `apps/server/src/engine/service.ts`），破坏标题/列表/引用的块级结构。`runMonitor` 现将折叠后文本仅用于 hash 匹配与条件判定，证据摘要 `excerpt` 单独派生自原始观察文本并保留换行结构，确保 Markdown 块级语法可正常渲染。
+
+### 2026-10-27 · 对话回复卡片加宽
+
+**背景**
+
+用户选中对话流中一条助手回复卡片（含序号列表与要点说明）及其下的工具结果卡片，要求「对话回复的卡片宽度拉长一些」。原助手消息列 `maxWidth` 为 720，在高分屏下（内容列 61.8% 可达 890+）留白明显；工具结果卡片另有一层 `maxWidth: 640`，比正文更窄，形成视觉阶梯。
+
+**实现**
+
+- [chat.tsx](apps/mobile/src/chat.tsx)：助手消息容器 `maxWidth` 由 `720` 提升至 `860`（用户气泡仍为 `560` 不变）。
+- [tool-step.tsx](apps/mobile/src/tool-step.tsx)：`wrap` 的 `maxWidth` 由 `640` 提升至 `860`，与助手回复卡片同宽，消除工具卡片窄一截的错位。
+- 布局宽度本身仍受主内容区 61.8% 列宽约束，窄屏下自动收窄，不影响移动端。
+
+**验证**
+
+- `pnpm typecheck`（server + mobile）退出码 0。
+- `pnpm test`：678 项测试全部通过 / 0 失败。
+
+### 2026-10-27 · 对话流记忆回顾卡片支持 Markdown 语法渲染
+
+**背景**
+
+用户选中对话流中一条「Closing Bell: Nasdaq / S&P 500」市场快讯（内容为完整的 Markdown 原文，含 `##` 标题、`**加粗**`、`* 列表`、时间戳与被截断的段落），其外层 DOM class 为 react-native-web 的原子类（`r-userSelect-1xnzce8` 提示由 RN `<Text selectable>` 渲染纯文本），原始语法全部原样显示。经与用户确认，该区域定位为对话流里的「记忆回顾卡片」。
+
+**根因**
+
+[memory-recall-card.tsx](apps/mobile/src/memory-recall-card.tsx) 中 `MemoryRow` 组件第 40-41 行使用 `<Text selectable style={styles.text}>{memory.text}</Text>` 将记忆内容纯文本直出，`##`、`**`、`*`、`[](url)` 等原始语法被原样展示。
+
+**实现**
+
+- `apps/mobile/src/memory-recall-card.tsx`：
+  - 引入 `react-native-markdown-renderer` 的 `Markdown` 组件与 `assistantMarkdown` / `isSafeAssistantUrl`（复用助手消息同一 markdown-it 实例与安全 URL 校验）。
+  - 新增模块级 `memoryMarkdownStyle`：正文沿用原 `styles.text`（`colors.text`、13.5px、行高 19），标题逐级缩小、链接品牌主色下划线、行内代码/代码块浅紫底（`tertiary`）区隔。
+  - 自定义 `memoryMarkdownRules`：`textgroup` 节点显式 `selectable`，长文本记忆仍可整段复制（与 `AssistantResponse` 行为一致）。
+  - 链接点击统一走 `openSafeLink`（`isSafeAssistantUrl` 校验后 `Linking.openURL`），拦截外部地址与危险协议。
+  - 移除不再使用的 `styles.text` 样式条目。
+- 保持原卡片容器样式（Canvas 表面色图标、圆角、`flex: 1` 正文列）不变。
+
+**验证**
+
+- `pnpm typecheck`（server `tsc --noEmit` + mobile `tsc --noEmit`）退出码 0。
+- `pnpm test`：651 项测试全部通过 / 0 失败。
+- 真实记忆卡片渲染需在已登录浏览器中触发 `recall_memory` 工具后确认。
+
+### 2026-10-27 · 对话页用户消息气泡支持 Markdown 语法渲染
+
+**背景**
+
+用户选中对话流中一条「国际金融市场快讯」消息（内容为完整的 Markdown 原文，含 `##` 标题、`* [链接](url)` 列表、行内链接），其外层 DOM class 为 react-native-web 的原子类，说明该文本此前由 RN `<Text>` 组件以纯文本直出，`##`、`*`、`[]()` 等原始语法全部原样显示。用户要求对该区域（div）添加 Markdown 语法渲染。
+
+**根因**
+
+[chat.tsx](apps/mobile/src/chat.tsx) 中消息渲染分两条路径：`assistant` 消息已走 `<AssistantResponse>`（Markdown 渲染），而 `user` 消息走 `<Text selectable>{text}</Text>` 纯文本直出——用户在输入框中粘贴/发送含 Markdown 原文的内容（如研究快讯）时，原文被原样展示。
+
+**实现**
+
+- `apps/mobile/src/chat.tsx`：
+  - 引入 `react-native-markdown-renderer` 的 `Markdown` 组件与 `assistantMarkdown` / `isSafeAssistantUrl`（复用助手消息同一 markdown-it 实例与安全 URL 校验）。
+  - 新增用户气泡专用样式 `userMarkdownStyle`（模块级常量）：文字反白为 `colors.onPrimary`（品牌色紫底上保持白色），标题 1/2/3 白色加粗放大、链接白色下划线、行内代码/代码块保留浅紫底（`tertiary`）做区隔。
+  - 自定义 `userMarkdownRules`：`textgroup` 节点显式 `selectable`，保证长文本可复制（与 `AssistantResponse` 行为一致）。
+  - 链接点击统一走 `openSafeLink`（`isSafeAssistantUrl` 校验后 `Linking.openURL`），拦截外部地址与危险协议。
+  - 纯文本短消息渲染效果与原来一致（`paragraph` margin 归零 + 气泡内边距不变）。
+
+**验证**
+
+- `pnpm typecheck`（server `tsc --noEmit` + mobile `tsc --noEmit`）退出码 0；顺带修复了遗留未跟踪文件 `apps/server/src/market-data-health.ts` 中 `??` 与 `||` 混用导致的 TS5076 报错（仅补括号，语义不变）。
+- `pnpm test`：658 项测试全部通过 / 0 失败。
+- 页面在 8081 正常编译渲染，无 React 运行时错误（MCP 浏览器上下文无法访问 8787 后端，真实消息渲染需在已登录浏览器中刷新确认）。
+
+### 2026-10-27 · 对话页主内容区宽度调整为整页 61.8% + 产物面板改为右侧停靠栏
+
+**背景**
+
+用户先要求对话页主内容区在宽屏下占整个网页宽度的 70%（而非固定 900px），随后将比例缩短为 61.8%（黄金分割比）；且点击页头文件图标（`FileText` svg）后，产物面板从「覆盖式弹窗」（带遮罩、浮在内容上）改为「停靠在主对话列右侧的侧边栏」，与主内容区并排分栏、不遮挡。
+
+**实现**
+
+- `apps/mobile/App.tsx`：`WorkspaceShell` 中计算 `contentMax = desktop ? Math.max(760, Math.round(width * 0.618)) : 760`，主内容区 `maxWidth` 由固定 `900` 改为 `contentMax`——桌面端占整页 61.8%（下限 760 防止窄桌面过挤），移动端保持窄列不变。
+- `apps/mobile/src/chat.tsx`：
+  - 引入 `useWindowDimensions`，按 `wide = windowWidth >= 900`（与 App 外壳的 desktop 判断一致）区分宽/窄屏。
+  - 宽屏且产物栏展开时，`ChatScreen` 根节点切换为 `flexDirection: "row"` 分栏：主对话列（`flex: 1, minWidth: 0`）与右侧停靠栏并排，其余情况保持独占整列。
+  - `ThreadArtifactsPanel` / `ArtifactsPanel` 增加 `mode: "docked" | "overlay"` 双模式：
+    - `docked`（宽屏）：右侧停靠，宽 340 / `maxWidth: 42%`，无遮罩、无阴影、无 `accessibilityViewIsModal`。
+    - `overlay`（窄屏）：保留原覆盖式行为（宽 320 / `maxWidth: 85%`，带 `modalShade` 遮罩、阴影与 `accessibilityViewIsModal`），避免移动端对话列被压缩。
+- 产品/业务逻辑零改动：面板内容、产物列表、打开/关闭行为均不变。
+
+**验证**
+
+- `pnpm typecheck`（`tsc --noEmit` + `pnpm --dir apps/mobile typecheck`）退出码 0。
+- `pnpm test`：630 项测试全部通过 / 0 失败。
+
 ### 2026-10-26 · 图标体系迁移至自有 SVG 图标层 + 全站视觉收敛「Doubao」
 
 **背景**

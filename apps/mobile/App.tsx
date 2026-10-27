@@ -391,6 +391,8 @@ function WorkspaceShell({
   const [threadsOpen, setThreadsOpen] = useState(false);
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
+  // 桌面端主内容区占整页宽度的 61.8%（黄金分割比，下限 760 避免窄桌面过挤）；移动端保持窄列。
+  const contentMax = desktop ? Math.max(760, Math.round(width * 0.618)) : 760;
   const pending =
     (data?.notifications.filter((n) => !n.read).length || 0) +
     workspace.actions.filter((a) => a.status === "awaiting_review").length;
@@ -445,7 +447,7 @@ function WorkspaceShell({
               style={{
                 flex: 1,
                 width: "100%",
-                maxWidth: desktop ? 900 : 760,
+                maxWidth: contentMax,
                 alignSelf: "center",
               }}
             >

@@ -12,20 +12,24 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import {
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   type TextStyle,
+  useWindowDimensions,
   View,
 } from "react-native";
+import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import { z } from "zod";
 import type { ActionProposal, Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { ApprovalCard } from "./approval-card";
+import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { BackgroundUpdates } from "./background-updates";
 import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
@@ -64,6 +68,48 @@ const displayParameters = z.record(z.string(), z.unknown());
 // types omit that value, but react-native-web passes it through.
 const noFocusRing =
   Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : undefined;
+
+// 用户消息气泡（品牌色底、反白文字）上的 Markdown 渲染：标题/加粗/链接跟随 onPrimary 白色系，
+// 行内代码与代码块保留浅紫底做区隔，保证紫底气泡内的可读性。
+const userMarkdownTextStyle: TextStyle = {
+  color: colors.onPrimary,
+  fontSize: 16,
+  lineHeight: 24,
+};
+const userMarkdownStyle: Partial<MarkdownStyles> = {
+  text: userMarkdownTextStyle,
+  paragraph: { marginTop: 0, marginBottom: 4 },
+  list: { marginBottom: 4 },
+  headingContainer: { marginTop: 6, marginBottom: 2 },
+  heading1: { fontSize: 19, lineHeight: 25, color: colors.onPrimary },
+  heading2: { fontSize: 17, lineHeight: 23, color: colors.onPrimary },
+  heading3: { fontSize: 16, lineHeight: 22, color: colors.onPrimary },
+  link: { color: colors.onPrimary, textDecorationLine: "underline" },
+  codeInline: {
+    backgroundColor: colors.tertiary,
+    color: colors.primary,
+    borderRadius: 5,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    fontSize: 13,
+  },
+  codeBlock: { borderRadius: 8, backgroundColor: colors.tertiary, color: colors.text },
+};
+// 与助手消息一致，文本节点显式 selectable，保证长文本可复制。
+const userMarkdownRules: RenderRules = {
+  textgroup: (node, children) => (
+    <Text key={node.key} selectable style={userMarkdownTextStyle}>
+      {children}
+    </Text>
+  ),
+};
+/** 用户消息里的链接统一过安全校验后再打开，拦截外部地址与危险协议。 */
+function openSafeLink(url: string): boolean {
+  if (!isSafeAssistantUrl(url)) return false;
+  void Linking.openURL(url).catch(() => {});
+  return false;
+}
 // ServerToolCard 的 name 是稳定的英文标识符（同时用于判断跳转目标），显示名按此映射翻译。
 const serverToolNameKeys: Record<string, TranslationKey> = {
   Task: "chat.serverToolTask",
@@ -360,6 +406,10 @@ export function ChatScreen({
   active?: boolean;
 }) {
   const { api, workspace: w, refresh, navigate, open } = useWorkspace();
+  const { width: windowWidth } = useWindowDimensions();
+  // 宽屏（>= 900，与 App 外壳的 desktop 判断一致）时文件产物面板停靠为右侧栏；
+  // 窄屏回退为覆盖式弹层，避免把对话列压缩到无法阅读。
+  const wide = windowWidth >= 900;
   const { t } = useTranslation();
   const { data: agentWorkspace, refresh: refreshAgent } = useAgentWorkspace();
   const { enabled: richThreads, mainId, claimPrompt } = useLingWuThread();
@@ -808,712 +858,721 @@ export function ChatScreen({
   }, [agent.isRunning, stream.state.activeRunId, stream.state.gaps, stream.state.phase]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <View
-        accessibilityLiveRegion="polite"
-        style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 }}
-      >
-        <Text>{streamAnnouncement}</Text>
-      </View>
-      <ConversationHeader
-        title={threadName}
-        status={headerStatus}
-        state={headerState}
-        onOpenFiles={() => setFilesOpen((open) => !open)}
-        filesOpen={filesOpen}
-        filesLabel={t("chat.openArtifacts")}
-      />
-      <ScrollView
-        ref={list}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ gap: 13, paddingTop: 15, paddingBottom: 20, flexGrow: 1 }}
-        onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
-          const gap = contentSize.height - contentOffset.y - layoutMeasurement.height;
-          const nearEnd = gap < 120;
-          followLatest.current = nearEnd;
-          setAwayFromLatest(renderedCount > 0 && gap > 400);
-        }}
-        scrollEventThrottle={100}
-        onContentSizeChange={() => {
-          if (active && renderedCount > 0 && followLatest.current)
-            list.current?.scrollToEnd({ animated: false });
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {!!historyError && (
-          <>
-            <ErrorNotice error={historyError} />
-            <Button onPress={() => setHistoryAttempt((attempt) => attempt + 1)}>
-              {t("chat.retryLoadingConversation")}
-            </Button>
-          </>
-        )}
-        {!renderedCount ? (
-          <View
-            style={{
-              flexGrow: 1,
-              flexShrink: 0,
-              justifyContent: "center",
-              alignItems: "center",
-              paddingVertical: 34,
-              gap: 15,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 28,
-                letterSpacing: -1,
-                color: colors.text,
-                textAlign: "center",
-                maxWidth: 350,
-              }}
-            >
-              {t("chat.emptyTitle")}
-            </Text>
-            <Text style={[s.muted, { maxWidth: 320, textAlign: "center", lineHeight: 23 }]}>
-              {t("chat.emptySubtitle")}
-            </Text>
-            <View style={{ width: "100%", maxWidth: 360, marginTop: 14, gap: 8 }}>
-              {[
-                {
-                  text: t("chat.suggestionHackerNews"),
-                  action: () => enqueue(t("chat.suggestionHackerNews")),
-                },
-                {
-                  text: t("chat.suggestionSummarize"),
-                  action: () => enqueue(t("chat.suggestionSummarize")),
-                },
-                {
-                  text: t("chat.suggestionDeepDive"),
-                  action: () => enqueue(t("chat.suggestionDeepDive")),
-                },
-                {
-                  text: t("chat.suggestionBriefing"),
-                  action: () => enqueue(t("chat.suggestionBriefing")),
-                },
-                {
-                  text: t("chat.suggestionPeerCompare"),
-                  action: () => enqueue(t("chat.suggestionPeerCompare")),
-                },
-                {
-                  text: t("chat.suggestionWatchWebsite"),
-                  action: () => {
-                    enqueue(t("chat.suggestionWatchWebsite"));
-                    navigate("goals");
-                  },
-                },
-              ].map((item) => (
-                <Button key={item.text} onPress={item.action}>
-                  {item.text}
-                </Button>
-              ))}
-            </View>
-          </View>
-        ) : (
-          visible.map((message) => {
-            const user = message.role === "user";
-            const userText =
-              user && typeof message.content === "string"
-                ? displayJevUserMessage(
-                    message.content,
-                    messages.slice(0, messages.indexOf(message)),
-                  )
-                : "";
-            const parsedUser = user ? displayUserMessage(userText) : undefined;
-            const text = user ? (parsedUser?.text ?? "") : messageText(message);
-            const attachments = parsedUser?.attachments ?? [];
-            const draft = user ? undefined : stream.state.drafts[message.id];
-            const streaming = !!draft && !draft.done;
-            const toolCalls = "toolCalls" in message ? message.toolCalls || [] : [];
-            const approvals = approvalsByMessage.get(message.id) || [];
-            return (
-              <View
-                key={message.id}
-                style={{
-                  alignSelf: user ? "flex-end" : "flex-start",
-                  maxWidth: user ? 560 : 720,
-                  width: toolCalls.length ? "95%" : undefined,
-                  gap: 8,
-                }}
-              >
-                {attachments.length > 0 && (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      flexWrap: "wrap",
-                      justifyContent: "flex-end",
-                      gap: 6,
-                      maxWidth: "100%",
-                    }}
-                  >
-                    {attachments.map((attachment) => {
-                      const file = w.files.find((candidate) => candidate.id === attachment.id);
-                      return (
-                        <Pressable
-                          key={attachment.id}
-                          accessibilityRole="button"
-                          accessibilityLabel={t("chat.openAttachment", { name: attachment.name })}
-                          disabled={!file}
-                          onPress={() => file && open({ type: "file", file })}
-                          style={({ pressed }) => ({
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 7,
-                            maxWidth: 260,
-                            paddingHorizontal: 10,
-                            paddingVertical: 7,
-                            borderRadius: 10,
-                            borderWidth: 1,
-                            borderColor: colors.line,
-                            backgroundColor: pressed ? colors.overlay1 : colors.canvas,
-                          })}
-                        >
-                          <FileText size={14} strokeWidth={1.8} color={colors.primary} />
-                          <Text
-                            numberOfLines={1}
-                            style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
-                          >
-                            {attachment.name}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
-                {!!text && (
-                  <View
-                    style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 13,
-                      borderRadius: 18,
-                      borderBottomRightRadius: user ? 6 : 18,
-                      borderBottomLeftRadius: user ? 18 : 6,
-                      borderWidth: user ? 0 : 1,
-                      borderColor: colors.line,
-                      backgroundColor: user ? colors.primary : colors.canvas,
-                    }}
-                  >
-                    {user ? (
-                      <Text
-                        selectable
-                        style={[s.text, { fontSize: 16, lineHeight: 24, color: colors.onPrimary }]}
-                      >
-                        {text}
-                      </Text>
-                    ) : (
-                      <AssistantResponse
-                        content={text}
-                        streaming={streaming}
-                        files={w.files}
-                        onOpenFile={(file) => open({ type: "file", file })}
-                      />
-                    )}
-                  </View>
-                )}
-                <JevInteractionContext.Provider
-                  value={{
-                    threadId,
-                    busy:
-                      busy ||
-                      agent.isRunning ||
-                      !loaded ||
-                      !isReady ||
-                      !!outbox.pending.length ||
-                      outbox.paused ||
-                      !!saveError,
-                    latestPanelId,
-                    latestUserText,
-                    send: sendChoice,
-                    retry: (text) => sendChoice(text, true),
-                    canRetry:
-                      loaded &&
-                      isReady &&
-                      !busy &&
-                      !agent.isRunning &&
-                      !outbox.running &&
-                      !outbox.pending.length &&
-                      !saveError,
-                    confirmedSelection: (panelId) => confirmedJevSelection(messages, panelId),
-                  }}
-                >
-                  <BrowserRunContext
-                    value={{
-                      running: busy || agent.isRunning,
-                      active:
-                        (busy || agent.isRunning) && messages.indexOf(message) > latestUserIndex,
-                    }}
-                  >
-                    {toolCalls.map((toolCall) => {
-                      const toolMessage = messages.find(
-                        (candidate): candidate is ToolMessage =>
-                          candidate.role === "tool" && candidate.toolCallId === toolCall.id,
-                      );
-                      const rendered = renderToolCall({ toolCall, toolMessage });
-                      return (
-                        <View key={toolCall.id}>
-                          {rendered ?? (
-                            <ToolStep
-                              tool={toolCall.function.name}
-                              args={parseToolArguments(toolCall.function.arguments)}
-                              result={toolMessage?.content}
-                              status={toolMessage ? "complete" : "executing"}
-                            />
-                          )}
-                        </View>
-                      );
-                    })}
-                  </BrowserRunContext>
-                </JevInteractionContext.Provider>
-                {approvals.map(({ action, task }) => (
-                  <ApprovalCard
-                    key={action.id}
-                    action={action}
-                    task={task}
-                    agentName={agentWorkspace?.identity.name}
-                    files={w.files}
-                    onDecide={decideAction}
-                    onOpenDetails={(item) => open({ type: "review", action: item })}
-                  />
-                ))}
-              </View>
-            );
-          })
-        )}
-        {extraDrafts.map((draft) => (
-          <View
-            key={`live-${draft.id}`}
-            style={{ alignSelf: "flex-start", maxWidth: "95%", width: "95%" }}
-          >
+    <View style={wide && filesOpen ? { flex: 1, minWidth: 0, flexDirection: "row" } : { flex: 1 }}>
+      {/* 主对话列：宽屏 + 产物栏展开时与右侧停靠栏左右分栏，其余情况独占整列。 */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View
+          accessibilityLiveRegion="polite"
+          style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 }}
+        >
+          <Text>{streamAnnouncement}</Text>
+        </View>
+        <ConversationHeader
+          title={threadName}
+          status={headerStatus}
+          state={headerState}
+          onOpenFiles={() => setFilesOpen((open) => !open)}
+          filesOpen={filesOpen}
+          filesLabel={t("chat.openArtifacts")}
+        />
+        <ScrollView
+          ref={list}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ gap: 13, paddingTop: 15, paddingBottom: 20, flexGrow: 1 }}
+          onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+            const gap = contentSize.height - contentOffset.y - layoutMeasurement.height;
+            const nearEnd = gap < 120;
+            followLatest.current = nearEnd;
+            setAwayFromLatest(renderedCount > 0 && gap > 400);
+          }}
+          scrollEventThrottle={100}
+          onContentSizeChange={() => {
+            if (active && renderedCount > 0 && followLatest.current)
+              list.current?.scrollToEnd({ animated: false });
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {!!historyError && (
+            <>
+              <ErrorNotice error={historyError} />
+              <Button onPress={() => setHistoryAttempt((attempt) => attempt + 1)}>
+                {t("chat.retryLoadingConversation")}
+              </Button>
+            </>
+          )}
+          {!renderedCount ? (
             <View
               style={{
-                paddingHorizontal: 16,
-                paddingVertical: 13,
-                borderRadius: 18,
-                borderBottomLeftRadius: 6,
-                borderWidth: 1,
-                borderColor: colors.line,
-                backgroundColor: colors.canvas,
+                flexGrow: 1,
+                flexShrink: 0,
+                justifyContent: "center",
+                alignItems: "center",
+                paddingVertical: 34,
+                gap: 15,
               }}
             >
-              <AssistantResponse
-                content={draft.text}
-                streaming={!draft.done}
-                files={w.files}
-                onOpenFile={(file) => open({ type: "file", file })}
-              />
-            </View>
-          </View>
-        ))}
-        {unplacedApprovals.map(({ action, task }) => (
-          <ApprovalCard
-            key={action.id}
-            action={action}
-            task={task}
-            agentName={agentWorkspace?.identity.name}
-            files={w.files}
-            onDecide={decideAction}
-            onOpenDetails={(item) => open({ type: "review", action: item })}
-          />
-        ))}
-        {unplacedTasks.map((task) => (
-          <QuestionCard
-            key={`question-${task.id}`}
-            task={task}
-            agentName={agentWorkspace?.identity.name}
-          />
-        ))}
-        {!!latestDesktop && (
-          <DesktopToolCard
-            live
-            toolCallId={latestDesktop}
-            result={
-              messages.find(
-                (message) => message.role === "tool" && message.toolCallId === latestDesktop,
-              )?.content
-            }
-            loading={replying}
-          />
-        )}
-        {!richThreads && (
-          <>
-            {(w.files.some((file) => file.parentId) ||
-              w.browsers.some((browser) => browser.status === "active") ||
-              !!agentWorkspace?.artifacts.length) && (
-              <Button
-                small
-                style={{ alignSelf: "flex-start", marginTop: 6 }}
-                onPress={() => setShowResults(!showResults)}
-              >
-                {showResults ? t("chat.hideRecentResults") : t("chat.recentResults")}
-              </Button>
-            )}
-            {showResults && (
-              <>
-                {w.files
-                  .filter((file) => file.parentId)
-                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-                  .slice(0, 1)
-                  .map((file) => (
-                    <FileThreadCard key={file.id} file={file} />
-                  ))}
-                {w.browsers
-                  .filter((browser) => browser.status === "active")
-                  .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-                  .slice(0, 1)
-                  .map((browser) => (
-                    <BrowserThreadCard key={browser.id} browser={browser} />
-                  ))}
-                {[...(agentWorkspace?.artifacts || [])]
-                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-                  .filter(
-                    (artifact, index, items) =>
-                      items.findIndex((item) => item.kind === artifact.kind) === index,
-                  )
-                  .slice(0, 2)
-                  .reverse()
-                  .map((artifact) => (
-                    <ArtifactCard key={artifact.id} artifact={artifact} />
-                  ))}
-              </>
-            )}
-          </>
-        )}
-        {(!richThreads || selection.id === mainId) && <BackgroundUpdates />}
-        {stream.state.phase === "reconnecting" && (
-          <Text accessibilityLiveRegion="polite" style={[s.small, { alignSelf: "flex-start" }]}>
-            {t("chat.reconnectingLiveReply")}
-          </Text>
-        )}
-        {!!integrityWarning && (
-          <Text accessibilityLiveRegion="polite" style={[s.small, { alignSelf: "flex-start" }]}>
-            {integrityWarning}
-          </Text>
-        )}
-        {(busy || agent.isRunning) && !showingStreamText && (
-          <View
-            accessibilityLabel={t("chat.agentWorking")}
-            style={[
-              s.row,
-              {
-                alignSelf: "flex-start",
-                gap: 7,
-                paddingHorizontal: 18,
-                paddingVertical: 16,
-                backgroundColor: colors.canvas,
-                borderWidth: 1,
-                borderColor: colors.line,
-                borderRadius: 18,
-                borderBottomLeftRadius: 6,
-              },
-            ]}
-          >
-            {[0.4, 0.75, 0.5].map((opacity) => (
-              <View
-                key={opacity}
+              <Text
                 style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: colors.muted,
-                  opacity,
+                  fontSize: 28,
+                  letterSpacing: -1,
+                  color: colors.text,
+                  textAlign: "center",
+                  maxWidth: 350,
                 }}
-              />
-            ))}
-          </View>
-        )}
-        <ErrorNotice error={primaryError} />
-        {!!primaryError && (
-          <Button
-            style={{ alignSelf: "flex-start" }}
-            icon={RotateCcw}
-            disabled={error ? busy || agent.isRunning || !loaded || syncing || !isReady : !isReady}
-            onPress={() => {
-              if (!error && liveError) {
-                stream.retry();
-                return;
-              }
-              void run()
-                .then(() => {
-                  if (!queue.getSnapshot().paused) flush();
-                })
-                .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-            }}
-          >
-            {error ? t("chat.retryResponse") : t("chat.retryLiveReply")}
-          </Button>
-        )}
-      </ScrollView>
-      {awayFromLatest && (
-        <Button
-          small
-          icon={ArrowDown}
-          style={{ alignSelf: "center", marginBottom: 10 }}
-          onPress={() => {
-            followLatest.current = true;
-            setAwayFromLatest(false);
-            list.current?.scrollToEnd({ animated: true });
-          }}
-        >
-          {t("chat.latestMessages")}
-        </Button>
-      )}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={keyboardPadding > 0 ? { paddingBottom: keyboardPadding } : undefined}
-      >
-        <ErrorNotice error={saveError} />
-        {!!saveError && (
-          <Button
-            small
-            disabled={busy}
-            onPress={() => {
-              void saveHistory().catch((e) => setSaveError(String(e)));
-            }}
-          >
-            {t("chat.retrySavingConversation")}
-          </Button>
-        )}
-        {!!outbox.pending.length && (
-          <View
-            style={{
-              margin: 12,
-              marginBottom: 6,
-              padding: 12,
-              gap: 8,
-              borderRadius: 14,
-              borderWidth: 1,
-              borderColor: colors.line,
-              backgroundColor: colors.canvas,
-            }}
-          >
-            <Text style={s.small}>
-              {t("chat.outboxStatus", {
-                state: outbox.paused ? t("chat.messagesOnHold") : t("chat.upNext"),
-              })}
-            </Text>
-            {outbox.pending.map((message) => (
-              <View
-                key={message.id}
-                style={[
-                  s.row,
+              >
+                {t("chat.emptyTitle")}
+              </Text>
+              <Text style={[s.muted, { maxWidth: 320, textAlign: "center", lineHeight: 23 }]}>
+                {t("chat.emptySubtitle")}
+              </Text>
+              <View style={{ width: "100%", maxWidth: 360, marginTop: 14, gap: 8 }}>
+                {[
                   {
-                    gap: 8,
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                    borderRadius: 10,
-                    backgroundColor: colors.surface,
+                    text: t("chat.suggestionHackerNews"),
+                    action: () => enqueue(t("chat.suggestionHackerNews")),
                   },
-                ]}
-              >
-                <Text numberOfLines={2} style={[s.muted, { flex: 1 }]}>
-                  {displayJevUserMessage(message.text, messages)}
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t("chat.removeQueuedMessage", {
-                    text: displayJevUserMessage(message.text, messages),
-                  })}
-                  hitSlop={10}
-                  onPress={() => {
-                    queue.remove(message.id);
-                    choiceCompletions.current
-                      .get(message.id)
-                      ?.reject(new Error("Choice removed from queue."));
-                    choiceCompletions.current.delete(message.id);
-                  }}
-                  style={{ padding: 8 }}
-                >
-                  <X size={16} strokeWidth={1.8} color={colors.muted} />
-                </Pressable>
+                  {
+                    text: t("chat.suggestionSummarize"),
+                    action: () => enqueue(t("chat.suggestionSummarize")),
+                  },
+                  {
+                    text: t("chat.suggestionDeepDive"),
+                    action: () => enqueue(t("chat.suggestionDeepDive")),
+                  },
+                  {
+                    text: t("chat.suggestionBriefing"),
+                    action: () => enqueue(t("chat.suggestionBriefing")),
+                  },
+                  {
+                    text: t("chat.suggestionPeerCompare"),
+                    action: () => enqueue(t("chat.suggestionPeerCompare")),
+                  },
+                  {
+                    text: t("chat.suggestionWatchWebsite"),
+                    action: () => {
+                      enqueue(t("chat.suggestionWatchWebsite"));
+                      navigate("goals");
+                    },
+                  },
+                ].map((item) => (
+                  <Button key={item.text} onPress={item.action}>
+                    {item.text}
+                  </Button>
+                ))}
               </View>
-            ))}
-            {outbox.paused && (
-              <Button
-                small
-                disabled={busy || !!saveError}
-                onPress={() => {
-                  queue.resume();
-                  flush();
+            </View>
+          ) : (
+            visible.map((message) => {
+              const user = message.role === "user";
+              const userText =
+                user && typeof message.content === "string"
+                  ? displayJevUserMessage(
+                      message.content,
+                      messages.slice(0, messages.indexOf(message)),
+                    )
+                  : "";
+              const parsedUser = user ? displayUserMessage(userText) : undefined;
+              const text = user ? (parsedUser?.text ?? "") : messageText(message);
+              const attachments = parsedUser?.attachments ?? [];
+              const draft = user ? undefined : stream.state.drafts[message.id];
+              const streaming = !!draft && !draft.done;
+              const toolCalls = "toolCalls" in message ? message.toolCalls || [] : [];
+              const approvals = approvalsByMessage.get(message.id) || [];
+              return (
+                <View
+                  key={message.id}
+                  style={{
+                    alignSelf: user ? "flex-end" : "flex-start",
+                    // 助手回复卡片占据更宽的内容列（原 720 在高分屏下留白过多）。
+                    maxWidth: user ? 560 : 860,
+                    width: toolCalls.length ? "95%" : undefined,
+                    gap: 8,
+                  }}
+                >
+                  {attachments.length > 0 && (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        justifyContent: "flex-end",
+                        gap: 6,
+                        maxWidth: "100%",
+                      }}
+                    >
+                      {attachments.map((attachment) => {
+                        const file = w.files.find((candidate) => candidate.id === attachment.id);
+                        return (
+                          <Pressable
+                            key={attachment.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={t("chat.openAttachment", { name: attachment.name })}
+                            disabled={!file}
+                            onPress={() => file && open({ type: "file", file })}
+                            style={({ pressed }) => ({
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 7,
+                              maxWidth: 260,
+                              paddingHorizontal: 10,
+                              paddingVertical: 7,
+                              borderRadius: 10,
+                              borderWidth: 1,
+                              borderColor: colors.line,
+                              backgroundColor: pressed ? colors.overlay1 : colors.canvas,
+                            })}
+                          >
+                            <FileText size={14} strokeWidth={1.8} color={colors.primary} />
+                            <Text
+                              numberOfLines={1}
+                              style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
+                            >
+                              {attachment.name}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {!!text && (
+                    <View
+                      style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 13,
+                        borderRadius: 18,
+                        borderBottomRightRadius: user ? 6 : 18,
+                        borderBottomLeftRadius: user ? 18 : 6,
+                        borderWidth: user ? 0 : 1,
+                        borderColor: colors.line,
+                        backgroundColor: user ? colors.primary : colors.canvas,
+                      }}
+                    >
+                      {user ? (
+                        <Markdown
+                          markdownit={assistantMarkdown}
+                          style={userMarkdownStyle}
+                          rules={userMarkdownRules}
+                          onLinkPress={openSafeLink}
+                        >
+                          {text}
+                        </Markdown>
+                      ) : (
+                        <AssistantResponse
+                          content={text}
+                          streaming={streaming}
+                          files={w.files}
+                          onOpenFile={(file) => open({ type: "file", file })}
+                        />
+                      )}
+                    </View>
+                  )}
+                  <JevInteractionContext.Provider
+                    value={{
+                      threadId,
+                      busy:
+                        busy ||
+                        agent.isRunning ||
+                        !loaded ||
+                        !isReady ||
+                        !!outbox.pending.length ||
+                        outbox.paused ||
+                        !!saveError,
+                      latestPanelId,
+                      latestUserText,
+                      send: sendChoice,
+                      retry: (text) => sendChoice(text, true),
+                      canRetry:
+                        loaded &&
+                        isReady &&
+                        !busy &&
+                        !agent.isRunning &&
+                        !outbox.running &&
+                        !outbox.pending.length &&
+                        !saveError,
+                      confirmedSelection: (panelId) => confirmedJevSelection(messages, panelId),
+                    }}
+                  >
+                    <BrowserRunContext
+                      value={{
+                        running: busy || agent.isRunning,
+                        active:
+                          (busy || agent.isRunning) && messages.indexOf(message) > latestUserIndex,
+                      }}
+                    >
+                      {toolCalls.map((toolCall) => {
+                        const toolMessage = messages.find(
+                          (candidate): candidate is ToolMessage =>
+                            candidate.role === "tool" && candidate.toolCallId === toolCall.id,
+                        );
+                        const rendered = renderToolCall({ toolCall, toolMessage });
+                        return (
+                          <View key={toolCall.id}>
+                            {rendered ?? (
+                              <ToolStep
+                                tool={toolCall.function.name}
+                                args={parseToolArguments(toolCall.function.arguments)}
+                                result={toolMessage?.content}
+                                status={toolMessage ? "complete" : "executing"}
+                              />
+                            )}
+                          </View>
+                        );
+                      })}
+                    </BrowserRunContext>
+                  </JevInteractionContext.Provider>
+                  {approvals.map(({ action, task }) => (
+                    <ApprovalCard
+                      key={action.id}
+                      action={action}
+                      task={task}
+                      agentName={agentWorkspace?.identity.name}
+                      files={w.files}
+                      onDecide={decideAction}
+                      onOpenDetails={(item) => open({ type: "review", action: item })}
+                    />
+                  ))}
+                </View>
+              );
+            })
+          )}
+          {extraDrafts.map((draft) => (
+            <View
+              key={`live-${draft.id}`}
+              style={{ alignSelf: "flex-start", maxWidth: "95%", width: "95%" }}
+            >
+              <View
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  borderRadius: 18,
+                  borderBottomLeftRadius: 6,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  backgroundColor: colors.canvas,
                 }}
               >
-                {t("chat.sendQueuedMessages")}
-              </Button>
-            )}
-          </View>
-        )}
-        {picking && (
-          <Card style={{ marginBottom: 12, padding: 16 }}>
-            <Text style={s.heading}>{t("chat.addDocument")}</Text>
-            <ScrollView style={{ maxHeight: 230 }} keyboardShouldPersistTaps="handled">
-              {w.files.length ? (
-                w.files.map((f) => (
-                  <CheckRow
-                    key={f.id}
-                    checked={attachments.includes(f.id)}
-                    label={f.name}
-                    onPress={() =>
-                      setAttachments(
-                        attachments.includes(f.id)
-                          ? attachments.filter((id) => id !== f.id)
-                          : [...attachments, f.id],
-                      )
-                    }
-                  />
-                ))
-              ) : (
-                <Text style={s.muted}>{t("chat.importPdfHint")}</Text>
+                <AssistantResponse
+                  content={draft.text}
+                  streaming={!draft.done}
+                  files={w.files}
+                  onOpenFile={(file) => open({ type: "file", file })}
+                />
+              </View>
+            </View>
+          ))}
+          {unplacedApprovals.map(({ action, task }) => (
+            <ApprovalCard
+              key={action.id}
+              action={action}
+              task={task}
+              agentName={agentWorkspace?.identity.name}
+              files={w.files}
+              onDecide={decideAction}
+              onOpenDetails={(item) => open({ type: "review", action: item })}
+            />
+          ))}
+          {unplacedTasks.map((task) => (
+            <QuestionCard
+              key={`question-${task.id}`}
+              task={task}
+              agentName={agentWorkspace?.identity.name}
+            />
+          ))}
+          {!!latestDesktop && (
+            <DesktopToolCard
+              live
+              toolCallId={latestDesktop}
+              result={
+                messages.find(
+                  (message) => message.role === "tool" && message.toolCallId === latestDesktop,
+                )?.content
+              }
+              loading={replying}
+            />
+          )}
+          {!richThreads && (
+            <>
+              {(w.files.some((file) => file.parentId) ||
+                w.browsers.some((browser) => browser.status === "active") ||
+                !!agentWorkspace?.artifacts.length) && (
+                <Button
+                  small
+                  style={{ alignSelf: "flex-start", marginTop: 6 }}
+                  onPress={() => setShowResults(!showResults)}
+                >
+                  {showResults ? t("chat.hideRecentResults") : t("chat.recentResults")}
+                </Button>
               )}
-            </ScrollView>
-            <Button
-              small
-              onPress={() => setPicking(false)}
-              style={{ alignSelf: "flex-end", marginTop: 8 }}
+              {showResults && (
+                <>
+                  {w.files
+                    .filter((file) => file.parentId)
+                    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                    .slice(0, 1)
+                    .map((file) => (
+                      <FileThreadCard key={file.id} file={file} />
+                    ))}
+                  {w.browsers
+                    .filter((browser) => browser.status === "active")
+                    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+                    .slice(0, 1)
+                    .map((browser) => (
+                      <BrowserThreadCard key={browser.id} browser={browser} />
+                    ))}
+                  {[...(agentWorkspace?.artifacts || [])]
+                    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                    .filter(
+                      (artifact, index, items) =>
+                        items.findIndex((item) => item.kind === artifact.kind) === index,
+                    )
+                    .slice(0, 2)
+                    .reverse()
+                    .map((artifact) => (
+                      <ArtifactCard key={artifact.id} artifact={artifact} />
+                    ))}
+                </>
+              )}
+            </>
+          )}
+          {(!richThreads || selection.id === mainId) && <BackgroundUpdates />}
+          {stream.state.phase === "reconnecting" && (
+            <Text accessibilityLiveRegion="polite" style={[s.small, { alignSelf: "flex-start" }]}>
+              {t("chat.reconnectingLiveReply")}
+            </Text>
+          )}
+          {!!integrityWarning && (
+            <Text accessibilityLiveRegion="polite" style={[s.small, { alignSelf: "flex-start" }]}>
+              {integrityWarning}
+            </Text>
+          )}
+          {(busy || agent.isRunning) && !showingStreamText && (
+            <View
+              accessibilityLabel={t("chat.agentWorking")}
+              style={[
+                s.row,
+                {
+                  alignSelf: "flex-start",
+                  gap: 7,
+                  paddingHorizontal: 18,
+                  paddingVertical: 16,
+                  backgroundColor: colors.canvas,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  borderRadius: 18,
+                  borderBottomLeftRadius: 6,
+                },
+              ]}
             >
-              {t("chat.done")}
-            </Button>
-          </Card>
-        )}
-        <View
-          style={{
-            backgroundColor: colors.canvas,
-            borderRadius: 22,
-            borderWidth: 1,
-            borderColor: focused ? colors.primary : colors.line,
-            padding: 8,
-          }}
-        >
-          {attachments.length > 0 && (
-            <View style={[s.row, { gap: 6, flexWrap: "wrap", padding: 9 }]}>
-              {w.files
-                .filter((f) => attachments.includes(f.id))
-                .map((f) => (
-                  <Pressable
-                    key={f.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("chat.removeAttachment", { name: f.name })}
-                    onPress={() => setAttachments((ids) => ids.filter((id) => id !== f.id))}
-                    style={({ pressed }) => [
-                      s.row,
-                      {
-                        gap: 7,
-                        maxWidth: "100%",
-                        backgroundColor: pressed ? colors.overlay1 : colors.canvas,
-                        borderWidth: 1,
-                        borderColor: colors.line,
-                        borderRadius: 10,
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                      },
-                    ]}
-                  >
-                    <FileText size={14} strokeWidth={1.8} color={colors.primary} />
-                    <Text
-                      numberOfLines={1}
-                      style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
-                    >
-                      {f.name}
-                    </Text>
-                    <X size={13} strokeWidth={1.8} color={colors.muted} />
-                  </Pressable>
-                ))}
+              {[0.4, 0.75, 0.5].map((opacity) => (
+                <View
+                  key={opacity}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: colors.muted,
+                    opacity,
+                  }}
+                />
+              ))}
             </View>
           )}
-          <View style={[s.row, { gap: 7, alignItems: "flex-end" }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("chat.attachDocument")}
-              accessibilityState={{ expanded: picking }}
-              onPress={() => setPicking(!picking)}
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 22,
-                backgroundColor: picking || pressed ? colors.overlay1 : "transparent",
-              })}
-            >
-              <Plus size={22} strokeWidth={1.8} color={colors.text} />
-            </Pressable>
-            <TextInput
-              accessibilityLabel={t("chat.messageLingWu")}
-              value={draft}
-              onChangeText={setDraft}
-              onContentSizeChange={(event) =>
-                setInputHeight(Math.max(44, Math.min(140, event.nativeEvent.contentSize.height)))
+          <ErrorNotice error={primaryError} />
+          {!!primaryError && (
+            <Button
+              style={{ alignSelf: "flex-start" }}
+              icon={RotateCcw}
+              disabled={
+                error ? busy || agent.isRunning || !loaded || syncing || !isReady : !isReady
               }
-              placeholder={
-                !isReady
-                  ? t("chat.connecting")
-                  : !loaded
-                    ? historyError
-                      ? t("chat.conversationUnavailable")
-                      : t("chat.loadingConversation")
-                    : t("chat.messagePlaceholder")
-              }
-              placeholderTextColor={colors.faint}
-              selectionColor={colors.primary}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              style={{
-                flex: 1,
-                color: colors.text,
-                height: inputHeight,
-                minHeight: 44,
-                maxHeight: 140,
-                fontSize: 17,
-                lineHeight: 24,
-                paddingHorizontal: 2,
-                paddingTop: 10,
-                paddingBottom: 10,
-                ...noFocusRing,
+              onPress={() => {
+                if (!error && liveError) {
+                  stream.retry();
+                  return;
+                }
+                void run()
+                  .then(() => {
+                    if (!queue.getSnapshot().paused) flush();
+                  })
+                  .catch((e) => setError(e instanceof Error ? e.message : String(e)));
               }}
-              multiline
-              editable
-              onKeyPress={
-                Platform.OS === "web"
-                  ? (event) => {
-                      if (
-                        event.nativeEvent.key === "Enter" &&
-                        !("shiftKey" in event.nativeEvent && event.nativeEvent.shiftKey)
-                      ) {
-                        event.preventDefault();
-                        send();
-                      }
-                    }
-                  : undefined
-              }
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={replying ? t("chat.stopReply") : t("chat.sendMessage")}
-              disabled={!replying && (!draft.trim() || !loaded || !isReady)}
-              onPress={replying ? () => void stop() : send}
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: replying || draft.trim() ? colors.primary : colors.tertiary,
-                alignItems: "center",
-                justifyContent: "center",
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-              })}
             >
-              {replying ? (
-                <Square size={18} fill={colors.onPrimary} strokeWidth={0} />
-              ) : (
-                <ArrowUp
-                  size={25}
-                  strokeWidth={1.8}
-                  color={draft.trim() ? colors.onPrimary : colors.disabled}
-                />
+              {error ? t("chat.retryResponse") : t("chat.retryLiveReply")}
+            </Button>
+          )}
+        </ScrollView>
+        {awayFromLatest && (
+          <Button
+            small
+            icon={ArrowDown}
+            style={{ alignSelf: "center", marginBottom: 10 }}
+            onPress={() => {
+              followLatest.current = true;
+              setAwayFromLatest(false);
+              list.current?.scrollToEnd({ animated: true });
+            }}
+          >
+            {t("chat.latestMessages")}
+          </Button>
+        )}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={keyboardPadding > 0 ? { paddingBottom: keyboardPadding } : undefined}
+        >
+          <ErrorNotice error={saveError} />
+          {!!saveError && (
+            <Button
+              small
+              disabled={busy}
+              onPress={() => {
+                void saveHistory().catch((e) => setSaveError(String(e)));
+              }}
+            >
+              {t("chat.retrySavingConversation")}
+            </Button>
+          )}
+          {!!outbox.pending.length && (
+            <View
+              style={{
+                margin: 12,
+                marginBottom: 6,
+                padding: 12,
+                gap: 8,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: colors.canvas,
+              }}
+            >
+              <Text style={s.small}>
+                {t("chat.outboxStatus", {
+                  state: outbox.paused ? t("chat.messagesOnHold") : t("chat.upNext"),
+                })}
+              </Text>
+              {outbox.pending.map((message) => (
+                <View
+                  key={message.id}
+                  style={[
+                    s.row,
+                    {
+                      gap: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
+                      borderRadius: 10,
+                      backgroundColor: colors.surface,
+                    },
+                  ]}
+                >
+                  <Text numberOfLines={2} style={[s.muted, { flex: 1 }]}>
+                    {displayJevUserMessage(message.text, messages)}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("chat.removeQueuedMessage", {
+                      text: displayJevUserMessage(message.text, messages),
+                    })}
+                    hitSlop={10}
+                    onPress={() => {
+                      queue.remove(message.id);
+                      choiceCompletions.current
+                        .get(message.id)
+                        ?.reject(new Error("Choice removed from queue."));
+                      choiceCompletions.current.delete(message.id);
+                    }}
+                    style={{ padding: 8 }}
+                  >
+                    <X size={16} strokeWidth={1.8} color={colors.muted} />
+                  </Pressable>
+                </View>
+              ))}
+              {outbox.paused && (
+                <Button
+                  small
+                  disabled={busy || !!saveError}
+                  onPress={() => {
+                    queue.resume();
+                    flush();
+                  }}
+                >
+                  {t("chat.sendQueuedMessages")}
+                </Button>
               )}
-            </Pressable>
+            </View>
+          )}
+          {picking && (
+            <Card style={{ marginBottom: 12, padding: 16 }}>
+              <Text style={s.heading}>{t("chat.addDocument")}</Text>
+              <ScrollView style={{ maxHeight: 230 }} keyboardShouldPersistTaps="handled">
+                {w.files.length ? (
+                  w.files.map((f) => (
+                    <CheckRow
+                      key={f.id}
+                      checked={attachments.includes(f.id)}
+                      label={f.name}
+                      onPress={() =>
+                        setAttachments(
+                          attachments.includes(f.id)
+                            ? attachments.filter((id) => id !== f.id)
+                            : [...attachments, f.id],
+                        )
+                      }
+                    />
+                  ))
+                ) : (
+                  <Text style={s.muted}>{t("chat.importPdfHint")}</Text>
+                )}
+              </ScrollView>
+              <Button
+                small
+                onPress={() => setPicking(false)}
+                style={{ alignSelf: "flex-end", marginTop: 8 }}
+              >
+                {t("chat.done")}
+              </Button>
+            </Card>
+          )}
+          <View
+            style={{
+              backgroundColor: colors.canvas,
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: focused ? colors.primary : colors.line,
+              padding: 8,
+            }}
+          >
+            {attachments.length > 0 && (
+              <View style={[s.row, { gap: 6, flexWrap: "wrap", padding: 9 }]}>
+                {w.files
+                  .filter((f) => attachments.includes(f.id))
+                  .map((f) => (
+                    <Pressable
+                      key={f.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("chat.removeAttachment", { name: f.name })}
+                      onPress={() => setAttachments((ids) => ids.filter((id) => id !== f.id))}
+                      style={({ pressed }) => [
+                        s.row,
+                        {
+                          gap: 7,
+                          maxWidth: "100%",
+                          backgroundColor: pressed ? colors.overlay1 : colors.canvas,
+                          borderWidth: 1,
+                          borderColor: colors.line,
+                          borderRadius: 10,
+                          paddingHorizontal: 10,
+                          paddingVertical: 7,
+                        },
+                      ]}
+                    >
+                      <FileText size={14} strokeWidth={1.8} color={colors.primary} />
+                      <Text
+                        numberOfLines={1}
+                        style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
+                      >
+                        {f.name}
+                      </Text>
+                      <X size={13} strokeWidth={1.8} color={colors.muted} />
+                    </Pressable>
+                  ))}
+              </View>
+            )}
+            <View style={[s.row, { gap: 7, alignItems: "flex-end" }]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("chat.attachDocument")}
+                accessibilityState={{ expanded: picking }}
+                onPress={() => setPicking(!picking)}
+                style={({ pressed }) => ({
+                  width: 44,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 22,
+                  backgroundColor: picking || pressed ? colors.overlay1 : "transparent",
+                })}
+              >
+                <Plus size={22} strokeWidth={1.8} color={colors.text} />
+              </Pressable>
+              <TextInput
+                accessibilityLabel={t("chat.messageLingWu")}
+                value={draft}
+                onChangeText={setDraft}
+                onContentSizeChange={(event) =>
+                  setInputHeight(Math.max(44, Math.min(140, event.nativeEvent.contentSize.height)))
+                }
+                placeholder={
+                  !isReady
+                    ? t("chat.connecting")
+                    : !loaded
+                      ? historyError
+                        ? t("chat.conversationUnavailable")
+                        : t("chat.loadingConversation")
+                      : t("chat.messagePlaceholder")
+                }
+                placeholderTextColor={colors.faint}
+                selectionColor={colors.primary}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                style={{
+                  flex: 1,
+                  color: colors.text,
+                  height: inputHeight,
+                  minHeight: 44,
+                  maxHeight: 140,
+                  fontSize: 17,
+                  lineHeight: 24,
+                  paddingHorizontal: 2,
+                  paddingTop: 10,
+                  paddingBottom: 10,
+                  ...noFocusRing,
+                }}
+                multiline
+                editable
+                onKeyPress={
+                  Platform.OS === "web"
+                    ? (event) => {
+                        if (
+                          event.nativeEvent.key === "Enter" &&
+                          !("shiftKey" in event.nativeEvent && event.nativeEvent.shiftKey)
+                        ) {
+                          event.preventDefault();
+                          send();
+                        }
+                      }
+                    : undefined
+                }
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={replying ? t("chat.stopReply") : t("chat.sendMessage")}
+                disabled={!replying && (!draft.trim() || !loaded || !isReady)}
+                onPress={replying ? () => void stop() : send}
+                style={({ pressed }) => ({
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: replying || draft.trim() ? colors.primary : colors.tertiary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                })}
+              >
+                {replying ? (
+                  <Square size={18} fill={colors.onPrimary} strokeWidth={0} />
+                ) : (
+                  <ArrowUp
+                    size={25}
+                    strokeWidth={1.8}
+                    color={draft.trim() ? colors.onPrimary : colors.disabled}
+                  />
+                )}
+              </Pressable>
+            </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
       {filesOpen && (
         <ThreadArtifactsPanel
+          mode={wide ? "docked" : "overlay"}
           threadId={threadId}
           files={w.files}
           tasks={agentWorkspace?.tasks || []}
@@ -1527,12 +1586,14 @@ export function ChatScreen({
   );
 }
 /**
- * 对话页右上角「文件产物」按钮展开的覆盖式右边栏。
+ * 对话页右上角「文件产物」按钮展开的右边栏。
+ * 宽屏下 `docked` 停靠在主对话列右侧，窄屏下 `overlay` 覆盖式弹出。
  * 只展示当前对话（threadId）发起任务所关联的产物与文件，不混入其他对话的内容。
  * 过滤逻辑：按 threadId 找到本级对话创建的任务 → 产物按 art.taskId 匹配任务；文件按任务 artifactIds 匹配。
- * 点击面板外的遮罩区域或面板右上角的关闭按钮即可收起；列表项点击后在右侧打开对应文件的详情。
+ * overlay 模式下点击面板外的遮罩区域或面板右上角的关闭按钮即可收起；列表项点击后在右侧打开对应文件的详情。
  */
 function ThreadArtifactsPanel({
+  mode,
   threadId,
   files,
   tasks,
@@ -1541,6 +1602,7 @@ function ThreadArtifactsPanel({
   onOpen,
   onOpenArtifact,
 }: {
+  mode: "docked" | "overlay";
   threadId: string;
   files: Artifact[];
   tasks: AgentTask[];
@@ -1558,6 +1620,7 @@ function ThreadArtifactsPanel({
   );
   return (
     <ArtifactsPanel
+      mode={mode}
       files={[...threadFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
       artifacts={[...threadArtifacts].sort((a, b) => b.createdAt.localeCompare(a.createdAt))}
       onClose={onClose}
@@ -1567,12 +1630,14 @@ function ThreadArtifactsPanel({
   );
 }
 function ArtifactsPanel({
+  mode = "overlay",
   files,
   artifacts,
   onClose,
   onOpen,
   onOpenArtifact,
 }: {
+  mode?: "docked" | "overlay";
   files: Artifact[];
   artifacts: AgentArtifact[];
   onClose: () => void;
@@ -1601,40 +1666,53 @@ function ArtifactsPanel({
   };
   return (
     <>
-      {/* 遮罩：点击面板外任意区域收起右边栏（与 Sheet 的点击背板关闭保持一致）。 */}
-      <Pressable
-        accessibilityLabel={t("chat.closeArtifacts")}
-        accessibilityRole="button"
-        onPress={onClose}
-        style={{
-          position: "absolute",
-          zIndex: 8,
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: colors.modalShade,
-        }}
-      />
+      {/* 遮罩（仅 overlay）：点击面板外任意区域收起右边栏（与 Sheet 的点击背板关闭保持一致）。 */}
+      {mode === "overlay" && (
+        <Pressable
+          accessibilityLabel={t("chat.closeArtifacts")}
+          accessibilityRole="button"
+          onPress={onClose}
+          style={{
+            position: "absolute",
+            zIndex: 8,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: colors.modalShade,
+          }}
+        />
+      )}
       <View
-        accessibilityViewIsModal
-        style={{
-          position: "absolute",
-          zIndex: 9,
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 320,
-          maxWidth: "85%",
-          backgroundColor: colors.canvas,
-          borderLeftWidth: 1,
-          borderLeftColor: colors.line,
-          shadowColor: "#000",
-          shadowOffset: { width: -4, height: 0 },
-          shadowOpacity: 0.08,
-          shadowRadius: 14,
-          elevation: 10,
-        }}
+        accessibilityViewIsModal={mode === "overlay"}
+        style={
+          mode === "docked"
+            ? {
+                // 停靠模式：作为主对话列的同行兄弟，占右侧固定宽度，不遮罩、不浮层。
+                width: 340,
+                maxWidth: "42%",
+                backgroundColor: colors.canvas,
+                borderLeftWidth: 1,
+                borderLeftColor: colors.line,
+              }
+            : {
+                position: "absolute",
+                zIndex: 9,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: 320,
+                maxWidth: "85%",
+                backgroundColor: colors.canvas,
+                borderLeftWidth: 1,
+                borderLeftColor: colors.line,
+                shadowColor: "#000",
+                shadowOffset: { width: -4, height: 0 },
+                shadowOpacity: 0.08,
+                shadowRadius: 14,
+                elevation: 10,
+              }
+        }
       >
         <View
           style={[

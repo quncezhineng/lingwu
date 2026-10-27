@@ -1218,6 +1218,13 @@ export class AgentService {
       );
     }
     const text = observation.text.replace(/\s+/g, " ").trim();
+    // 证据摘要保留原始换行结构（折叠空白但不折叠整行），
+    // 让来源卡片中的 Markdown 块级语法（标题/列表/引用）能正常渲染。
+    const excerpt = observation.text
+      .replace(/[ \t]+/g, " ")
+      .replace(/ +\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
     const currentHash = hash(text);
     const previousHash =
       typeof task.state.lastHash === "string" ? task.state.lastHash : monitor.lastHash;
@@ -1318,7 +1325,7 @@ export class AgentService {
           kind: "web",
           title: observation.title,
           url: observation.url,
-          excerpt: text.slice(0, 600),
+          excerpt: excerpt.slice(0, 600),
         },
       ],
       plan: task.plan.map((s) => ({ ...s, status: "succeeded" })),

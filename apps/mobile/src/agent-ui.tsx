@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, Linking, Modal, Pressable, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  type TextStyle,
+  View,
+} from "react-native";
+import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import type { Artifact, BrowserSession } from "../../../packages/domain/src";
 import type {
   AgentArtifact,
@@ -12,6 +23,7 @@ import type {
   RunEvent,
 } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
+import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { fileKind } from "./file-kind";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
@@ -80,6 +92,68 @@ function errorText(e: unknown) {
 function activeTask(task: AgentTask) {
   return !["succeeded", "failed", "cancelled"].includes(task.status);
 }
+
+// 来源摘要的 Markdown 渲染：卡片本身空间很小，正文沿用 s.small 规格（11/17），
+// 标题逐级缩小并去掉默认下边框，段落与列表边距压缩，避免小卡片里出现大片留白。
+const evidenceMarkdownTextStyle: TextStyle = { color: colors.muted, fontSize: 11, lineHeight: 17 };
+const evidenceMarkdownStyle: Partial<MarkdownStyles> = {
+  text: evidenceMarkdownTextStyle,
+  paragraph: { marginTop: 0, marginBottom: 2 },
+  list: { marginBottom: 2 },
+  listUnorderedItem: { marginTop: 1 },
+  listOrderedItem: { marginTop: 1 },
+  listUnorderedItemIcon: { marginLeft: 0, marginRight: 4, lineHeight: 17 },
+  listOrderedItemIcon: { marginLeft: 0, marginRight: 4, lineHeight: 17 },
+  listUnorderedItemText: { fontSize: 11, lineHeight: 17 },
+  listOrderedItemText: { fontSize: 11, lineHeight: 17 },
+  headingContainer: { marginTop: 3, marginBottom: 1 },
+  heading1: { fontSize: 12.5, lineHeight: 17, color: colors.text },
+  heading2: { fontSize: 12, lineHeight: 17, color: colors.text },
+  heading3: { fontSize: 11.5, lineHeight: 17, color: colors.text },
+  heading1Container: { paddingBottom: 0, borderBottomWidth: 0 },
+  heading2Container: { paddingBottom: 0, borderBottomWidth: 0 },
+  link: { color: colors.primary, textDecorationLine: "underline" },
+  codeInline: {
+    backgroundColor: colors.tertiary,
+    color: colors.primary,
+    borderRadius: 3,
+    paddingHorizontal: 3,
+    paddingVertical: 0,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    fontSize: 10.5,
+  },
+  codeBlock: {
+    borderRadius: 6,
+    backgroundColor: colors.tertiary,
+    color: colors.text,
+    fontSize: 10.5,
+    lineHeight: 15,
+    padding: 8,
+  },
+  pre: { marginBottom: 2 },
+  blockquote: {
+    borderLeftWidth: 2,
+    borderLeftColor: colors.line,
+    paddingHorizontal: 6,
+    marginBottom: 2,
+  },
+  hr: { backgroundColor: colors.line, height: 1, marginTop: 4, marginBottom: 4 },
+};
+// 文本节点保持 selectable，来源摘要仍可整段复制。
+const evidenceMarkdownRules: RenderRules = {
+  textgroup: (node, children) => (
+    <Text key={node.key} selectable style={evidenceMarkdownTextStyle}>
+      {children}
+    </Text>
+  ),
+};
+/** 来源摘要中的链接统一过安全校验后再打开，拦截危险协议与非 HTTP(S) 地址。 */
+function openEvidenceLink(url: string): boolean {
+  if (!isSafeAssistantUrl(url)) return false;
+  void Linking.openURL(url).catch(() => {});
+  return false;
+}
+
 export function AgentStatus() {
   const { t } = useTranslation();
   const { data, error, refresh } = useAgentWorkspace();
@@ -259,9 +333,14 @@ export function EvidenceList({ items }: { items: Evidence[] }) {
           style={{ borderLeftWidth: 2, borderLeftColor: colors.primary, paddingLeft: 12, gap: 4 }}
         >
           <Text style={[s.small, { color: colors.text, fontWeight: "600" }]}>{item.title}</Text>
-          <Text selectable style={s.small}>
+          <Markdown
+            markdownit={assistantMarkdown}
+            style={evidenceMarkdownStyle}
+            rules={evidenceMarkdownRules}
+            onLinkPress={openEvidenceLink}
+          >
             {item.excerpt}
-          </Text>
+          </Markdown>
           {item.url && /^https?:\/\//i.test(item.url) && (
             <Button
               small
@@ -1732,7 +1811,12 @@ export function NotificationsSheet() {
         {data?.notifications.map((item) => (
           <Card
             key={item.id}
-            style={{ gap: 8, borderColor: item.read ? colors.line : colors.lineStrong }}
+            style={{
+              gap: 8,
+              // 未读通知用品牌浅紫色底提示，已读回到白底。
+              backgroundColor: item.read ? colors.canvas : colors.sky,
+              borderColor: item.read ? colors.line : colors.lineStrong,
+            }}
           >
             <View style={s.between}>
               <Text style={s.heading}>{item.title}</Text>

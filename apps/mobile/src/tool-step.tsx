@@ -342,7 +342,8 @@ export function ToolStep({
 const styles = StyleSheet.create({
   wrap: {
     width: "100%",
-    maxWidth: 640,
+    // 与对话回复卡片同宽，避免工具卡片比正文窄一截。
+    maxWidth: 860,
     alignSelf: "flex-start",
   },
   header: {
