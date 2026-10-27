@@ -11,6 +11,7 @@ import {
   emailDraftSchema,
   proposalSchema,
 } from "../../../packages/domain/src/index.ts";
+import type { MarketDataService } from "../../../packages/integrations/src/market-data.ts";
 import { ActionService } from "./actions.ts";
 import { agentConfigured, makeRuntime } from "./agent.ts";
 import { createAuth } from "./auth.ts";
@@ -23,6 +24,7 @@ import { agentRoutes } from "./engine/routes.ts";
 import { AgentService } from "./engine/service.ts";
 import { ConversationStream } from "./engine/stream.ts";
 import { conversationStreamRoutes } from "./engine/stream-routes.ts";
+import { symbolRoutes, watchlistRoutes } from "./engine/watchlist-routes.ts";
 import { AppError } from "./errors.ts";
 import { Files } from "./files.ts";
 import { GoogleAuth } from "./google-auth.ts";
@@ -36,7 +38,7 @@ import { WorkspaceService } from "./workspace.ts";
 export async function createApp(
   db: Store,
   config: Config,
-  options: { docker?: DockerRunner } = {},
+  options: { docker?: DockerRunner; market?: MarketDataService } = {},
 ) {
   assertApiDeploymentConfig(config);
   const auth = await createAuth(db, config),
@@ -57,7 +59,16 @@ export async function createApp(
   });
   const browser = new BrowserService(db, config, auth, files);
   const computer = new ComputerService(db, config, options.docker);
-  const agent = new AgentService(db, config, workspace, files, actions, browser, computer);
+  const agent = new AgentService(
+    db,
+    config,
+    workspace,
+    files,
+    actions,
+    browser,
+    computer,
+    options.market,
+  );
   const intelligence = new CopilotKitIntelligence({ apiKey: config.intelligenceApiKey });
   const conversationStream = new ConversationStream(db);
   const runtime = makeRuntime(config, agent, auth, intelligence, conversationStream);
@@ -355,6 +366,8 @@ export async function createApp(
     return c.json({ model: config.model });
   });
   app.route("/api/agent", agentRoutes(agent));
+  app.route("/api/watchlists", watchlistRoutes(agent));
+  app.route("/api/symbols", symbolRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));
   app.route("/api/computer", computerRoutes(computer, files));
   app.get("/api/calendars", async (c) => c.json(await workspace.calendars(c.get("owner"))));

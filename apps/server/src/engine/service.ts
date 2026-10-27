@@ -23,6 +23,7 @@ import type {
   Mail,
   ProposalInput,
 } from "../../../../packages/domain/src/index.ts";
+import { MarketDataService } from "../../../../packages/integrations/src/market-data.ts";
 import type { ActionService } from "../actions.ts";
 import type { BrowserService } from "../browser.ts";
 import { ComputerService } from "../computer.ts";
@@ -43,6 +44,7 @@ import {
   pageLines,
   withoutRelativeTimes,
 } from "./page-diff.ts";
+import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
 
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -53,6 +55,8 @@ const terminal = new Set(["succeeded", "failed", "cancelled"]);
 export class AgentService {
   readonly worker: TaskWorker;
   readonly search: SearchService;
+  readonly market: MarketDataService;
+  readonly watchlists: WatchlistsService;
   private maintenance?: ReturnType<typeof setInterval>;
   private refreshing = false;
   constructor(
@@ -63,8 +67,11 @@ export class AgentService {
     readonly actions: ActionService,
     readonly browser: BrowserService,
     readonly computer: ComputerService = new ComputerService(db, config),
+    market: MarketDataService = new MarketDataService(),
   ) {
     this.search = new SearchService(db);
+    this.market = market;
+    this.watchlists = new WatchlistsService(db, market);
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
       settled: (owner, task) => this.publishOutcome(owner, task),
     });
