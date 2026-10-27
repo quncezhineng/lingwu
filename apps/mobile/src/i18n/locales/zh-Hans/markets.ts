@@ -24,6 +24,7 @@ const markets = {
   "markets.watchlistDeleteDetail": "「{name}」将被移除，列表中的标的本身不会被删除。",
   "markets.watchlistDeleteCancel": "取消",
   "markets.watchlistDeleteConfirm": "删除列表",
+  "markets.watchlistDeleteError": "删除失败，请重试。",
   "markets.watchlistSearchPlaceholder": "搜索股票代码或名称",
   "markets.watchlistSearchEmpty": "没有匹配的标的",
   "markets.watchlistSearchHint": "输入代码或公司名称即可添加标的。",

@@ -31,9 +31,7 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Sparkles,
   Target,
-  Trash2,
   X,
 } from "./icons";
 import {
@@ -44,7 +42,6 @@ import {
   loadWatchlists,
   type MarketKind,
   refreshWatchlists,
-  removeSymbol,
   type SymbolAlert,
   type SymbolMeta,
   searchSymbols,
@@ -54,6 +51,13 @@ import {
   type WatchlistSymbol,
 } from "./market";
 import {
+  currencySymbol,
+  defaultCurrency,
+  directionOf,
+  formatPercent,
+  formatPrice,
+} from "./market-format";
+import {
   Button,
   Card,
   colors,
@@ -61,6 +65,7 @@ import {
   Empty,
   ErrorNotice,
   IconButton,
+  marketDirectionColor,
   Sheet,
   s,
 } from "./ui";
@@ -80,47 +85,6 @@ const MARKET_LABEL = {
   HK: "markets.marketHK",
   ETF: "markets.marketETF",
 } as const satisfies Record<MarketKind, TranslationKey>;
-
-function defaultCurrency(market: MarketKind) {
-  if (market === "CN") return "CNY";
-  if (market === "HK") return "HKD";
-  return "USD";
-}
-
-function currencySymbol(currency: string) {
-  if (currency === "CNY") return "¥";
-  if (currency === "HKD") return "HK$";
-  return "$";
-}
-
-function formatPrice(value: number, currency: string) {
-  const text = new Intl.NumberFormat(activeLocaleTag(), {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-  return `${currencySymbol(currency)}${text}`;
-}
-
-function formatPercent(value: number) {
-  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
-}
-
-type Direction = "up" | "down" | "flat";
-
-function directionOf(value: number): Direction {
-  if (value > 0.005) return "up";
-  if (value < -0.005) return "down";
-  return "flat";
-}
-
-/** 正文/数字使用的深色变体（AA 对比度）。 */
-function directionTextColor(direction: Direction) {
-  return direction === "up"
-    ? colors.marketUpText
-    : direction === "down"
-      ? colors.marketDownText
-      : colors.marketFlat;
-}
 
 /** 骨架屏的呼吸动画；尊重「减少动态效果」偏好。 */
 function useShimmer() {
@@ -188,10 +152,10 @@ function AlertBadge({ alert }: { alert: SymbolAlert }) {
       case "change_threshold": {
         const dir = directionOf(alert.threshold ?? 0);
         return {
-          color: directionTextColor(dir),
+          color: marketDirectionColor(dir),
           background: dir === "down" ? colors.marketDownSurface : colors.marketUpSurface,
           icon: (
-            <Text style={{ fontSize: 9, color: directionTextColor(dir) }}>
+            <Text style={{ fontSize: 9, color: marketDirectionColor(dir) }}>
               {dir === "down" ? "▼" : dir === "up" ? "▲" : "—"}
             </Text>
           ),
@@ -263,7 +227,7 @@ function SymbolCard({
   const currency = quote?.currency ?? defaultCurrency(symbol.market);
   const dayDirection = directionOf(quote?.changePercent ?? 0);
   const weekDirection = directionOf(quote?.weekChangePercent ?? 0);
-  const dayColor = directionTextColor(dayDirection);
+  const dayColor = marketDirectionColor(dayDirection);
   const arrow = dayDirection === "up" ? "▲" : dayDirection === "down" ? "▼" : "—";
   const alert = alerts[0];
   const priceText = quote ? formatPrice(quote.price, currency) : "—";
@@ -302,7 +266,7 @@ function SymbolCard({
           </View>
           <View style={[s.between, { gap: 8 }]}>
             {quote?.weekChangePercent !== undefined ? (
-              <Text style={[s.metric, s.small, { color: directionTextColor(weekDirection) }]}>
+              <Text style={[s.metric, s.small, { color: marketDirectionColor(weekDirection) }]}>
                 {t("markets.weekChange", { value: formatPercent(quote.weekChangePercent) })}
               </Text>
             ) : (
@@ -337,7 +301,7 @@ function SymbolCard({
             </Text>
             {quote?.weekChangePercent !== undefined && (
               <Text
-                style={[s.metric, { fontSize: 11, color: directionTextColor(weekDirection) }]}
+                style={[s.metric, { fontSize: 11, color: marketDirectionColor(weekDirection) }]}
                 numberOfLines={1}
               >
                 {t("markets.weekChange", { value: formatPercent(quote.weekChangePercent) })}
@@ -571,13 +535,13 @@ function SegmentedTabs({
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             onPress={() => onChange(filter.id)}
-            hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+            hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
             style={({ pressed }) => [
               s.row,
               {
                 gap: 5,
                 paddingHorizontal: 12,
-                minHeight: 32,
+                minHeight: 36,
                 borderRadius: 999,
                 borderWidth: 1,
                 borderColor: selected ? colors.primary : colors.line,
@@ -803,7 +767,7 @@ function WatchlistSheet({
 }
 
 export function WatchlistScreen() {
-  const { api, ask } = useWorkspace();
+  const { api, notify, open } = useWorkspace();
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const state = useWatchlistState();
@@ -813,7 +777,6 @@ export function WatchlistScreen() {
   const [sheet, setSheet] = useState<"create" | "edit" | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [detailCode, setDetailCode] = useState<string | null>(null);
   const shimmer = useShimmer();
 
   useEffect(() => {
@@ -855,8 +818,6 @@ export function WatchlistScreen() {
       ? symbols
       : symbols.filter((item) => item.symbol.market === marketFilter);
   }, [list, marketFilter]);
-
-  const detail = list?.symbols.find((item) => item.symbol.code === detailCode);
 
   if (state.status === "loading" && !state.lists.length) {
     return (
@@ -909,13 +870,13 @@ export function WatchlistScreen() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected }}
                 onPress={() => selectWatchlist(api, item.id)}
-                hitSlop={{ top: 5, bottom: 5, left: 2, right: 2 }}
+                hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                 style={({ pressed }) => [
                   s.row,
                   {
                     gap: 6,
                     paddingHorizontal: 12,
-                    minHeight: 34,
+                    minHeight: 36,
                     borderRadius: 999,
                     borderWidth: 1,
                     borderColor: selected ? colors.primary : colors.line,
@@ -940,7 +901,14 @@ export function WatchlistScreen() {
             );
           })}
         </View>
-        <Button small primary icon={Plus} onPress={() => setSheet("create")}>
+        <Button
+          small
+          primary
+          icon={Plus}
+          hitSlop={4}
+          style={{ minHeight: 36 }}
+          onPress={() => setSheet("create")}
+        >
           {t("markets.watchlistNew")}
         </Button>
         <IconButton
@@ -987,7 +955,14 @@ export function WatchlistScreen() {
                 flexGrow: columns === 1 ? 0 : 1,
                 minWidth: columns === 3 ? 230 : 240,
               }}
-              onPress={() => setDetailCode(item.symbol.code)}
+              onPress={() =>
+                open({
+                  type: "symbol",
+                  symbol: item.symbol,
+                  quote: item.quote,
+                  watchlist: { id: list?.id ?? "", name: list?.name ?? "" },
+                })
+              }
             />
           ))}
         </View>
@@ -1055,76 +1030,16 @@ export function WatchlistScreen() {
           confirmLabel={t("markets.watchlistDeleteConfirm")}
           onCancel={() => setConfirmDelete(false)}
           onConfirm={() => {
-            deleteWatchlist(api, list.id);
-            setConfirmDelete(false);
+            void (async () => {
+              try {
+                await deleteWatchlist(api, list.id);
+                setConfirmDelete(false);
+              } catch {
+                notify(t("markets.watchlistDeleteError"));
+              }
+            })();
           }}
         />
-      )}
-      {detail && (
-        <Sheet
-          title={`${detail.symbol.code} · ${detail.symbol.name}`}
-          onClose={() => setDetailCode(null)}
-        >
-          <View style={{ gap: 4 }}>
-            <Text style={{ fontSize: 30, fontWeight: "600", color: colors.text }}>
-              {detail.quote
-                ? formatPrice(
-                    detail.quote.price,
-                    detail.quote.currency ?? defaultCurrency(detail.symbol.market),
-                  )
-                : "—"}
-            </Text>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: directionTextColor(directionOf(detail.quote?.changePercent ?? 0)),
-              }}
-            >
-              {detail.quote?.changePercent === undefined
-                ? "—"
-                : formatPercent(detail.quote.changePercent)}
-              {detail.quote?.weekChangePercent === undefined
-                ? ""
-                : ` · ${t("markets.weekChange", {
-                    value: formatPercent(detail.quote.weekChangePercent),
-                  })}`}
-            </Text>
-          </View>
-          <View style={{ gap: 8, marginTop: 16 }}>
-            {detail.alerts.length ? (
-              detail.alerts.map((alert) => (
-                <AlertBadge
-                  key={`${alert.kind}:${alert.headline ?? ""}:${alert.level ?? ""}:${alert.threshold ?? ""}`}
-                  alert={alert}
-                />
-              ))
-            ) : (
-              <Text style={s.muted}>{t("markets.briefingNoMove")}</Text>
-            )}
-          </View>
-          <View style={{ gap: 10, marginTop: 22 }}>
-            <Button
-              primary
-              icon={Sparkles}
-              onPress={() => {
-                setDetailCode(null);
-                ask(t("markets.symbolDetailPrompt", { code: detail.symbol.code }));
-              }}
-            >
-              {t("markets.symbolDetailAsk")}
-            </Button>
-            <Button
-              icon={Trash2}
-              onPress={() => {
-                if (list) removeSymbol(api, list.id, detail.symbol.code);
-                setDetailCode(null);
-              }}
-            >
-              {t("markets.watchlistRemove")}
-            </Button>
-          </View>
-        </Sheet>
       )}
     </View>
   );

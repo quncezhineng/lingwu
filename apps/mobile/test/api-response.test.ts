@@ -45,10 +45,11 @@ test("a caller fallback covers error bodies without a message", async () => {
   );
 });
 
-test("successful responses without a readable body fail clearly", async () => {
-  await assert.rejects(
-    readApiPayload(new Response(null, { status: 204 })),
-    /unreadable response \(204\)/,
-  );
+test("204 / 空 body 是合法成功响应，返回 undefined", async () => {
+  assert.equal(await readApiPayload(new Response(null, { status: 204 })), undefined);
+  assert.equal(await readApiPayload(new Response("", { status: 200 })), undefined);
+});
+
+test("200 但内容不是 JSON 时仍明确报错", async () => {
   await assert.rejects(readApiPayload(new Response("OK", { status: 200 })), /unreadable response/);
 });

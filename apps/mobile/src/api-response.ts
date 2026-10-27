@@ -21,6 +21,8 @@ export async function readApiPayload<T>(response: Response, fallback?: string): 
     failure.status = response.status;
     throw failure;
   }
+  // 204 / 空 body 是合法的成功响应（如 DELETE）：按「无内容」返回，而不是当成解析失败。
+  if (response.status === 204 || text.trim().length === 0) return undefined as T;
   if (payload === undefined)
     throw new Error(`The server returned an unreadable response (${response.status}).`);
   return payload as T;

@@ -197,6 +197,7 @@ export function Button({
   small,
   danger,
   style,
+  hitSlop,
 }: {
   children: ReactNode;
   onPress: () => void;
@@ -209,6 +210,8 @@ export function Button({
   small?: boolean;
   danger?: boolean;
   style?: ViewStyle;
+  /** 扩大触控热区（视觉尺寸不变）；小尺寸按钮用于达到 44px 触控目标。 */
+  hitSlop?: number;
 }) {
   const color = danger ? colors.danger : primary ? colors.onPrimary : colors.text;
 
@@ -217,6 +220,7 @@ export function Button({
       accessibilityRole="button"
       disabled={disabled || busy}
       accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
+      hitSlop={hitSlop}
       onPress={onPress}
       style={({ pressed }) => [
         s.button,
@@ -573,6 +577,15 @@ export function Mascot({ size = 42, variant }: { size?: number; variant?: string
     </View>
   );
 }
+/** 行情正文色：涨红/跌绿/平灰的 AA 对比度变体（观察列表、标的详情共用）。 */
+export function marketDirectionColor(direction: "up" | "down" | "flat") {
+  return direction === "up"
+    ? colors.marketUpText
+    : direction === "down"
+      ? colors.marketDownText
+      : colors.marketFlat;
+}
+
 /**
  * 合规声明：所有行情/简报/研报类界面都应展示「不构成投资建议」。
  * 统一放在 ui 层，避免各页面各写一份导致遗漏或文案不一致。
