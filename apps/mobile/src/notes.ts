@@ -412,6 +412,13 @@ export function loadNotes(api: LingWuApi, force = false): Promise<void> {
   return request;
 }
 
+/** 最新检验记录：先按 week，再按 checked_at 倒序，避免旧周压过新周。 */
+export function newestCheckEntry(entries: NoteCheckEntry[]): NoteCheckEntry | undefined {
+  return [...entries].sort(
+    (a, b) => b.week.localeCompare(a.week) || b.checkedAt.localeCompare(a.checkedAt),
+  )[0];
+}
+
 export function loadLatestCheck(api: LingWuApi): Promise<void> {
   if (checkRequest) return checkRequest;
   setState({ checkLoading: true });
@@ -419,8 +426,28 @@ export function loadLatestCheck(api: LingWuApi): Promise<void> {
     try {
       const payload = await api.request<unknown>("/api/notes/thesis-check/latest");
       const record = isRecord(payload) ? payload : {};
-      const check = record.check === null ? undefined : parseThesisCheck(record.check);
+      let check = record.check === null ? undefined : parseThesisCheck(record.check);
       const nextRun = str(record.next_run) ?? str(record.nextRun);
+      // 服务端 latestCheck 若未排序会返回旧周；用最近更新的论点笔记核对检验历史。
+      if (check && state.source === "api") {
+        const candidates = state.notes
+          .filter((note) => note.type === "THESIS")
+          .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
+          .slice(0, 5);
+        if (candidates.length) {
+          const lists = await Promise.all(
+            candidates.map((note) =>
+              api
+                .request<unknown>(`/api/notes/${encodeURIComponent(note.id)}/checks?limit=5`)
+                .then(parseNoteChecks)
+                .catch(() => []),
+            ),
+          );
+          const newest = newestCheckEntry(lists.flat());
+          if (newest && newest.checkedAt > check.checkedAt)
+            check = { ...check, week: newest.week || check.week, checkedAt: newest.checkedAt };
+        }
+      }
       setState({ check, nextRun, checkLoading: false });
     } catch {
       const record = mockCheck(state.notes);

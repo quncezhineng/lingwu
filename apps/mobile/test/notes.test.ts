@@ -10,6 +10,7 @@ import {
   groupNotesByDate,
   type InvestmentNote,
   loadNotes,
+  newestCheckEntry,
   notesSnapshot,
   parseNote,
   parseNoteChecks,
@@ -111,6 +112,7 @@ test("检验历史：按时间倒序，failed 保留原因而非结论", () => {
   assert.equal(checks[0]?.error, "model timeout");
   assert.equal(checks[1]?.status, "ok");
   assert.equal(parseNoteChecks({ checks: [{ outcome: "weird" }] }).length, 0);
+  assert.equal(newestCheckEntry(checks)?.week, "2026-W44");
 });
 
 test("日期分组：今天/昨天/本周/更早", () => {
