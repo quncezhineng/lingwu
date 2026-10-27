@@ -217,6 +217,8 @@ export async function generateMarketBriefing(
     market_data: marketData,
     symbol_updates: symbolUpdates,
     events: [],
+    events_status: "not_implemented",
+    events_note: "今日事件依赖日历/公告数据源，P0 暂未接入；events 为空不代表今日无事件。",
     generated_at: now.toISOString(),
   };
   await deps.db.put(owner, BRIEFING_KIND, briefing);

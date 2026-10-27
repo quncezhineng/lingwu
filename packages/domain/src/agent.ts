@@ -202,6 +202,9 @@ export const marketBriefingSchema = z.object({
   market_data: z.record(z.string(), z.any()),
   symbol_updates: z.record(z.string(), z.any()),
   events: z.array(z.any()),
+  /** P0 does not yet ingest calendar/announcement events; clients must not treat [] as "no events today". */
+  events_status: z.enum(["not_implemented", "available"]).default("not_implemented"),
+  events_note: z.string().optional(),
   generated_at: z.string().datetime(),
 });
 export type MarketBriefing = z.infer<typeof marketBriefingSchema>;
