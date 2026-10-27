@@ -36,6 +36,7 @@ import { resolveTaskNotifications } from "../notifications.ts";
 import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
 import { analyzeSpending } from "./finance.ts";
+import { generateMarketBriefing } from "./market-briefing.ts";
 import { executeModelTask } from "./model.ts";
 import {
   countPageDiff,
@@ -234,7 +235,14 @@ export class AgentService {
           ? ["Check the source", "Compare with the last observation", "Report a meaningful change"]
           : input.kind === "finance"
             ? ["Validate transactions", "Calculate the summary", "Save your tracker"]
-            : ["Understand the outcome", "Plan the work", "Use connected tools", "Return a result"];
+            : input.kind === "market_briefing"
+              ? ["Collect overnight market data", "Scan your watchlists", "Write the briefing"]
+              : [
+                  "Understand the outcome",
+                  "Plan the work",
+                  "Use connected tools",
+                  "Return a result",
+                ];
     const task: AgentTask = {
       id,
       title: input.title ?? input.prompt.slice(0, 90),
@@ -889,6 +897,29 @@ export class AgentService {
           },
         };
       }
+    }
+    if (task.kind === "market_briefing") {
+      await context.event("step", "Collecting overnight market data and watchlist moves");
+      const briefing = await generateMarketBriefing(owner, {
+        db: this.db,
+        market: this.market,
+      });
+      const artifact = await this.artifact(
+        owner,
+        task,
+        "market_briefing",
+        `Daily market briefing · ${briefing.date}`,
+        briefing.summary.join(" · "),
+        {
+          date: briefing.date,
+          summary: briefing.summary,
+          content: briefing.content,
+          market_data: briefing.market_data,
+          symbol_updates: briefing.symbol_updates,
+        },
+      );
+      task = await context.checkpoint({ artifactIds: [artifact.id] });
+      return this.finish(task, context, briefing.summary.join("\n"));
     }
     if (task.kind === "finance") {
       await context.event("step", "Analyzing the imported transactions");
