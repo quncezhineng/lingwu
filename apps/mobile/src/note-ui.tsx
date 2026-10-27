@@ -167,10 +167,11 @@ export function noteCheckLine(note: InvestmentNote, t: TranslationFn) {
   const date = new Date(check.checkedAt).toLocaleDateString();
   if (check.outcome === "pending_confirmation")
     return `${t("notes.lastChecked", { time: date, source: t("notes.checkAuto") })} · ${t("notes.checkPendingDetail")}`;
-  if (check.outcome === "inconclusive")
-    return `${t("notes.lastChecked", { time: date, source: t("notes.checkAuto") })} · ${t("notes.checkInconclusive")}`;
+  // 人工确认优先：EXPIRED 等手动状态的 outcome 可能是 inconclusive，不能显示成「证据不足」。
   if (check.source === "manual")
     return `${t("notes.lastChecked", { time: date, source: t("notes.checkManual") })}`;
+  if (check.outcome === "inconclusive")
+    return `${t("notes.lastChecked", { time: date, source: t("notes.checkAuto") })} · ${t("notes.checkInconclusive")}`;
   return `${t("notes.lastChecked", { time: date, source: t("notes.checkAuto") })} · ${t(
     check.outcome === "valid" ? "notes.suggestValid" : "notes.suggestInvalid",
   )}`;
