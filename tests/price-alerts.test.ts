@@ -165,20 +165,35 @@ test("triggered alerts notify once and deduplicate for 24h", async () => {
     triggered: boolean;
     notified: boolean;
     notification_id?: string;
+    notification_key?: string;
     quote?: { price: number };
   }>(`/price-alerts/${alert.id}/check`, { method: "POST", body: "{}" });
   assert.equal(first.triggered, true);
   assert.equal(first.notified, true);
   assert.ok(first.notification_id);
+  assert.ok(first.notification_key?.startsWith("price-alert:"));
+  assert.notEqual(first.notification_id, first.notification_key);
   assert.equal(first.quote?.price, 190);
 
-  const second = await call<{ triggered: boolean; notified: boolean; reason?: string }>(
-    `/price-alerts/${alert.id}/check`,
-    { method: "POST", body: "{}" },
-  );
+  // notification_id is the real primary key, so the read endpoint must accept it.
+  const read = await call<{ read: boolean }>(`/agent/notifications/${first.notification_id}/read`, {
+    method: "POST",
+    body: "{}",
+  });
+  assert.equal(read.read, true);
+
+  const second = await call<{
+    triggered: boolean;
+    notified: boolean;
+    notification_id?: string;
+    notification_key?: string;
+    reason?: string;
+  }>(`/price-alerts/${alert.id}/check`, { method: "POST", body: "{}" });
   assert.equal(second.triggered, true);
   assert.equal(second.notified, false);
   assert.equal(second.reason, "deduplicated");
+  assert.equal(second.notification_id, undefined);
+  assert.equal(second.notification_key, first.notification_key);
 
   const notifications = await call<{ title: string; body: string }[]>("/agent/notifications");
   const matches = notifications.filter((item) => item.body.includes("AAPL"));

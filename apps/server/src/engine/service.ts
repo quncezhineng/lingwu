@@ -795,11 +795,17 @@ export class AgentService {
   }
   private alertNotifier(owner: string): AlertNotifier {
     return async (title, body, key) => {
-      await this.notify(owner, title, body, undefined, key);
-      return { id: hash(key), title, body };
+      const notification = await this.notify(owner, title, body, undefined, key);
+      return { id: notification.id, title, body };
     };
   }
-  async notify(owner: string, title: string, body: string, taskId?: string, key?: string) {
+  async notify(
+    owner: string,
+    title: string,
+    body: string,
+    taskId?: string,
+    key?: string,
+  ): Promise<AgentNotification> {
     const value: AgentNotification = {
       id: key ? hash(key) : randomUUID(),
       taskId,
@@ -809,6 +815,7 @@ export class AgentService {
       read: false,
     };
     await this.db.insertIfAbsent(owner, "notifications", value);
+    return (await this.db.get<AgentNotification>(owner, "notifications", value.id)) ?? value;
   }
   mailEvidence(mail: Mail): Evidence {
     return { id: mail.id, kind: "mail", title: mail.subject, excerpt: mail.body.slice(0, 400) };

@@ -66,7 +66,10 @@ export interface AlertCheckResult {
   /** Whether a notification was actually created (false when deduplicated or disabled). */
   notified: boolean;
   reason?: "disabled" | "deduplicated" | "quote_unavailable" | "not_triggered";
+  /** Real notification primary key, usable with POST /api/agent/notifications/:id/read. */
   notification_id?: string;
+  /** Dedupe key used for this alert's daily notification bucket. */
+  notification_key?: string;
   notification?: { id: string; title: string; body: string };
 }
 
@@ -204,16 +207,18 @@ export class PriceAlertsService {
     let notified = false;
     let deduplicated = false;
     let notification: { id: string; title: string; body: string } | undefined;
+    let notificationKey: string | undefined;
 
     if (triggered && notify) {
       const lastNotified = alert.last_notified_at ? Date.parse(alert.last_notified_at) : 0;
       deduplicated = !options.force && now.getTime() - lastNotified < NOTIFICATION_DEDUPE_MS;
+      const bucket = Math.floor(now.getTime() / NOTIFICATION_DEDUPE_MS);
+      notificationKey = `price-alert:${alert.id}:${bucket}`;
       if (!deduplicated) {
         const label = thresholdLabel(alert);
         const title = `${alert.symbol_code} 价格提醒`;
         const body = `${alert.symbol_code} 当前 ${quote.price}（${label}），日内 ${quote.changePercent.toFixed(2)}%。`;
-        const bucket = Math.floor(now.getTime() / NOTIFICATION_DEDUPE_MS);
-        notification = await notify(title, body, `price-alert:${alert.id}:${bucket}`);
+        notification = await notify(title, body, notificationKey);
         notified = true;
       }
     }
@@ -239,6 +244,7 @@ export class PriceAlertsService {
           ? {}
           : { reason: "not_triggered" as const }),
       ...(notification ? { notification, notification_id: notification.id } : {}),
+      ...(notificationKey ? { notification_key: notificationKey } : {}),
     };
   }
 

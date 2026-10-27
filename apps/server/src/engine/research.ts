@@ -247,6 +247,9 @@ export async function generateResearchReport(
   await progress("estimate_valuation", "Estimating a valuation range");
   const valuation = estimateValuation(quote);
 
+  const risks = buildRisks(quote, newsNote, peerNote);
+  if (!profile.name) risks.push("公司资料未完整解析，标题为代码兜底。");
+
   const report: ResearchReport = {
     id: randomUUID(),
     user_id: owner,
@@ -258,7 +261,7 @@ export async function generateResearchReport(
       news,
       peer_comparison: peers,
       valuation,
-      risks: buildRisks(quote, newsNote, peerNote),
+      risks,
     },
     generated_at: now.toISOString(),
   };
