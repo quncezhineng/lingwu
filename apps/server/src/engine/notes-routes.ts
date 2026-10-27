@@ -36,6 +36,12 @@ export function noteRoutes(service: AgentService): Hono<Env> {
     });
     return c.json({ notes: await service.notes.list(c.get("owner"), query) });
   });
+  app.get("/:id/checks", async (c) => {
+    const limit = z.coerce.number().int().min(1).max(100).default(20).parse(c.req.query("limit"));
+    return c.json({
+      checks: await service.notes.listChecks(c.get("owner"), c.req.param("id"), limit),
+    });
+  });
   app.post("/", async (c) => {
     const input = createNoteSchema.parse(await c.req.json());
     return c.json(await service.notes.create(c.get("owner"), input), 201);

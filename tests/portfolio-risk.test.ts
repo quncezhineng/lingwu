@@ -53,6 +53,9 @@ test("weightedReturns blends holdings by weight", () => {
   assert.ok(Math.abs((blended[1]?.ret ?? 0) + 0.04) < 1e-12);
 });
 
+const compoundReturn = (values: number[]) =>
+  (values.reduce((product, value) => product * (1 + value), 1) - 1) * 100;
+
 test("beta is 2 when portfolio returns are twice the benchmark", () => {
   const metrics = computeRiskMetrics({
     currency: "USD",
@@ -60,6 +63,8 @@ test("beta is 2 when portfolio returns are twice the benchmark", () => {
     portfolioReturns: doubled,
     benchmarkReturns: benchmark,
     portfolioCloses: equityCurve(doubled),
+    portfolioStartDate: "2025-12-31",
+    benchmarkStartDate: "2025-12-31",
     riskFreeRate: 0.02,
   });
   assert.equal(metrics.observations, 260);
@@ -143,6 +148,7 @@ test("downsampleSeries keeps the last point", () => {
   }));
   const sampled = downsampleSeries(points, 120);
   assert.ok(sampled.length <= 121);
+  assert.equal(sampled[0]?.date, points[0]?.date);
   assert.equal(sampled.at(-1)?.date, points.at(-1)?.date);
 });
 

@@ -405,6 +405,7 @@ test("summary aggregates per currency without FX conversion", async () => {
       observations: number;
       beta?: number;
       max_drawdown?: number;
+      portfolio_return?: number;
       benchmark_return?: number;
       excess_return?: number;
       series?: { date: string; portfolio: number; benchmark: number }[];
@@ -451,8 +452,15 @@ test("summary aggregates per currency without FX conversion", async () => {
   assert.ok((usdRisk?.observations ?? 0) >= 120);
   assert.ok((usdRisk?.max_drawdown ?? 0) > 0);
   assert.ok(usdRisk?.series && usdRisk.series.length > 1);
-  assert.equal(usdRisk?.series?.[0]?.portfolio, 1);
+  assert.deepEqual(usdRisk?.series?.[0], {
+    date: "2025-10-01",
+    portfolio: 1,
+    benchmark: 1,
+  });
   assert.equal(typeof usdRisk?.benchmark_return, "number");
+  // Holdings and the benchmark share the same stub history, so returns coincide.
+  assert.ok(Math.abs((usdRisk?.portfolio_return ?? 0) - (usdRisk?.benchmark_return ?? 1)) < 1e-6);
+  assert.ok(Math.abs(usdRisk?.excess_return ?? 1) < 1e-6);
   const cnyRisk = summary.risk.find((entry) => entry.currency === "CNY");
   assert.equal(cnyRisk?.benchmark, "000300.SS");
 });

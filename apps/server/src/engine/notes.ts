@@ -19,10 +19,13 @@ const symbolSchema = z
 const noteTypeSchema = z.enum(["BUY_REASON", "SELL_REASON", "RESEARCH", "THESIS"]);
 const statusSchema = z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]);
 
+const titleSchema = z.string().trim().max(80);
+
 export const createNoteSchema = z
   .object({
     symbol_code: symbolSchema,
     type: noteTypeSchema,
+    title: titleSchema.optional(),
     content: z.string().trim().min(1).max(MAX_CONTENT),
     status: statusSchema.optional(),
   })
@@ -35,12 +38,15 @@ export const createNoteSchema = z
 
 export const updateNoteSchema = z
   .object({
+    title: titleSchema.optional(),
     content: z.string().trim().min(1).max(MAX_CONTENT).optional(),
     status: statusSchema.optional(),
   })
-  .refine((value) => value.content !== undefined || value.status !== undefined, {
-    message: "Provide content or status to update",
-  });
+  .refine(
+    (value) =>
+      value.title !== undefined || value.content !== undefined || value.status !== undefined,
+    { message: "Provide title, content or status to update" },
+  );
 
 export type CreateNoteInput = z.infer<typeof createNoteSchema>;
 export type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
@@ -53,6 +59,9 @@ export interface ThesisCheckItem {
   outcome: NoteCheck["outcome"];
   source: NoteCheck["source"];
   note?: string;
+  /** "ok" for evaluated checks; "failed" when the check itself errored. */
+  check_status?: "ok" | "failed";
+  error?: string;
 }
 
 export interface ThesisCheckRecord {
@@ -133,6 +142,7 @@ export class NotesService {
       user_id: owner,
       symbol_code: normalizeYahooSymbol(input.symbol_code),
       type: input.type,
+      ...(input.title ? { title: input.title } : {}),
       content: input.content,
       ...(input.type === "THESIS"
         ? {
@@ -171,6 +181,11 @@ export class NotesService {
     return this.db.put(owner, NOTE_KIND, {
       ...note,
       content,
+      ...(input.title !== undefined
+        ? input.title
+          ? { title: input.title }
+          : { title: undefined }
+        : {}),
       ...(input.status ? { status: input.status } : {}),
       ...(manualCheck ? { check: manualCheck } : {}),
       updated_at: at,
@@ -189,6 +204,46 @@ export class NotesService {
   async latestCheck(owner: string): Promise<ThesisCheckRecord | null> {
     const records = await this.db.list<ThesisCheckRecord>(owner, CHECK_KIND);
     return records[0] ?? null;
+  }
+
+  /** Per-note check history, newest first, including failed checks. */
+  async listChecks(
+    owner: string,
+    noteId: string,
+    limit = 20,
+  ): Promise<
+    {
+      week: string;
+      checked_at: string;
+      outcome: NoteCheck["outcome"];
+      source: NoteCheck["source"];
+      status: "ok" | "failed";
+      error?: string;
+      note?: string;
+    }[]
+  > {
+    await this.require(owner, noteId);
+    const records = await this.db.list<ThesisCheckRecord>(owner, CHECK_KIND);
+    const entries = records
+      .flatMap((record) =>
+        record.items
+          .filter((item) => item.note_id === noteId)
+          .map((item) => ({
+            week: record.week,
+            checked_at: record.checked_at,
+            outcome: item.outcome,
+            source: item.source,
+            status: item.check_status ?? "ok",
+            ...(item.error ? { error: item.error } : {}),
+            ...(item.note ? { note: item.note } : {}),
+          })),
+      )
+      .sort((a, b) =>
+        b.checked_at === a.checked_at
+          ? b.week.localeCompare(a.week)
+          : b.checked_at.localeCompare(a.checked_at),
+      );
+    return entries.slice(0, limit);
   }
 
   /**
@@ -224,6 +279,7 @@ export class NotesService {
           ...(note.status ? { status: note.status, previous_status: note.status } : {}),
           outcome: "pending_confirmation",
           source: "automated",
+          check_status: "ok",
           note: "用户已手动确认，自动化周检未覆盖；有更新待确认。",
         });
         // Preserve the manual check so future automated runs keep treating it as user-confirmed.
@@ -252,6 +308,7 @@ export class NotesService {
         ...(note.status ? { status: note.status } : {}),
         outcome: check.outcome,
         source: check.source,
+        check_status: "ok",
         note: check.note,
       });
     }

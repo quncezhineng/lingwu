@@ -210,3 +210,99 @@ test("deletes a note and returns 404 afterwards", async () => {
   assert.equal(deleted.status, 204);
   await call(`/notes/${note.id}`, { method: "PUT", body: JSON.stringify({ content: "x" }) }, 404);
 });
+
+test("note titles are optional, echoed back and capped at 80 characters", async () => {
+  const note = await post<InvestmentNote>("/notes", {
+    symbol_code: "AAPL",
+    type: "BUY_REASON",
+    title: "买入理由：服务业务",
+    content: "服务业务增长稳定",
+  });
+  assert.equal(note.title, "买入理由：服务业务");
+
+  await call(
+    "/notes",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        symbol_code: "AAPL",
+        type: "BUY_REASON",
+        title: "x".repeat(81),
+        content: "y",
+      }),
+    },
+    422,
+  );
+
+  const updated = await call<InvestmentNote>(`/notes/${note.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ title: "更新后的标题" }),
+  });
+  assert.equal(updated.title, "更新后的标题");
+});
+
+test("per-note check history is newest first and exposes failed checks", async () => {
+  const notes = new NotesService(db);
+  const note = await notes.create("local-user", {
+    symbol_code: "AAPL",
+    type: "THESIS",
+    content: "论点内容足够长可以验证",
+  });
+  await db.put("local-user", "thesis_checks", {
+    id: "chk-ok",
+    week: "2026-W44",
+    checked_at: "2026-10-28T03:00:00.000Z",
+    items: [
+      {
+        note_id: note.id,
+        symbol_code: "AAPL",
+        outcome: "pending_confirmation",
+        source: "automated",
+        check_status: "ok",
+      },
+    ],
+    pending: 1,
+    manual_updates: 0,
+    note: "待确认",
+  });
+  await db.put("local-user", "thesis_checks", {
+    id: "chk-failed",
+    week: "2026-W45",
+    checked_at: "2026-11-04T03:00:00.000Z",
+    items: [
+      {
+        note_id: note.id,
+        symbol_code: "AAPL",
+        outcome: "pending_confirmation",
+        source: "automated",
+        check_status: "failed",
+        error: "model timeout",
+      },
+    ],
+    pending: 1,
+    manual_updates: 0,
+    note: "检验失败",
+  });
+
+  const history = await call<{
+    checks: {
+      week: string;
+      checked_at: string;
+      outcome: string;
+      source: string;
+      status: string;
+      error?: string;
+    }[];
+  }>(`/notes/${note.id}/checks`);
+
+  assert.equal(history.checks.length, 2);
+  assert.equal(history.checks[0]?.status, "failed");
+  assert.equal(history.checks[0]?.error, "model timeout");
+  assert.equal(history.checks[1]?.status, "ok");
+  assert.equal(history.checks[1]?.week, "2026-W44");
+
+  const limited = await call<{ checks: unknown[] }>(`/notes/${note.id}/checks?limit=1`);
+  assert.equal(limited.checks.length, 1);
+  await call(`/notes/${note.id}/checks?limit=0`, {}, 422);
+  await call("/notes/00000000-0000-0000-0000-000000000000/checks", {}, 404);
+});
