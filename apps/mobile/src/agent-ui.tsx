@@ -1766,6 +1766,12 @@ export function AppsScreen() {
   const [query, setQuery] = useState("");
   const shortcuts = [
     {
+      section: "watchlist" as const,
+      title: t("app.titleWatchlist"),
+      detail: t("agent.shortcutWatchlistDetail"),
+      icon: Target,
+    },
+    {
       section: "mail" as const,
       title: t("app.titleMail"),
       detail: t("agent.shortcutMailDetail"),

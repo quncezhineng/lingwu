@@ -5,6 +5,7 @@ const ui = {
   "ui.closeDetails": "Close details",
   "ui.capybaraLabel": "LingWu capybara",
   "ui.replySaved": "Reply saved in your local Sent mail.",
+  "ui.disclaimer": "Information only — not investment advice.",
 } satisfies Dictionary;
 
 export default ui;

@@ -39,10 +39,11 @@ import { LanguageSwitcher } from "./src/i18n/LanguageSwitcher";
 import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
 import { Bell, Check, Menu, X } from "./src/icons";
-import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
+import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen, TodayScreen } from "./src/screens";
 import { ACCOUNT_NAV, ChatsColumn, Rail, SECTION_NAV } from "./src/shell";
 import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
 import { Button, Card, colors, ErrorNotice, Field, IconButton, Mascot, s } from "./src/ui";
+import { WatchlistScreen } from "./src/watchlist";
 import { type Detail, useWorkspace, WorkspaceContext } from "./src/workspace";
 
 /** 登录会话在本地持久化的键，刷新网页后据此恢复登录状态。 */
@@ -52,6 +53,8 @@ const SESSION_KEY = "lingwu.session";
 const nav = [...SECTION_NAV, ACCOUNT_NAV];
 const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: TranslationKey }>> =
   {
+    today: { titleKey: "app.titleToday", subtitleKey: "app.subtitleToday" },
+    watchlist: { titleKey: "app.titleWatchlist", subtitleKey: "app.subtitleWatchlist" },
     activity: { titleKey: "app.titleActivity", subtitleKey: "app.subtitleActivity" },
     ideas: { titleKey: "app.titleIdeas", subtitleKey: "app.subtitleIdeas" },
     goals: { titleKey: "app.titleGoals", subtitleKey: "app.subtitleGoals" },
@@ -266,7 +269,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   const { t } = useTranslation();
   const api = useMemo(() => new LingWuApi(token), [token]);
   const [workspace, setWorkspace] = useState<Workspace>();
-  const [section, setSection] = useState<Section>("chat");
+  const [section, setSection] = useState<Section>("today");
   const [detail, setDetail] = useState<Detail>();
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
@@ -298,8 +301,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
     return () => clearTimeout(timer);
   }, [toast]);
   const navigate = useCallback(
-    (next: Section) =>
-      setSection(next === "today" ? "chat" : next === "connections" ? "apps" : next),
+    (next: Section) => setSection(next === "connections" ? "apps" : next),
     [],
   );
   const open = useCallback((next: Detail) => setDetail(next), []);
@@ -409,22 +411,26 @@ function WorkspaceShell({
       : t("app.statusIdle");
   const title = titles[section] || titles.apps;
   const Screen =
-    section === "mail"
-      ? MailScreen
-      : section === "calendar"
-        ? CalendarScreen
-        : section === "browser"
-          ? BrowserScreen
-          : section === "files"
-            ? FilesScreen
-            : section === "activity"
-              ? AgentActivityScreen
-              : section === "ideas"
-                ? IdeasScreen
-                : section === "goals"
-                  ? GoalsScreen
-                  : AppsScreen;
-  const utility = ["mail", "calendar", "browser", "files"].includes(section);
+    section === "today"
+      ? TodayScreen
+      : section === "watchlist"
+        ? WatchlistScreen
+        : section === "mail"
+          ? MailScreen
+          : section === "calendar"
+            ? CalendarScreen
+            : section === "browser"
+              ? BrowserScreen
+              : section === "files"
+                ? FilesScreen
+                : section === "activity"
+                  ? AgentActivityScreen
+                  : section === "ideas"
+                    ? IdeasScreen
+                    : section === "goals"
+                      ? GoalsScreen
+                      : AppsScreen;
+  const utility = ["mail", "calendar", "browser", "files", "watchlist"].includes(section);
   return (
     <>
       <WorkspaceTools />

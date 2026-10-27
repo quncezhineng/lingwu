@@ -12,6 +12,7 @@ export type Section =
   | "connections"
   | "ideas"
   | "goals"
+  | "watchlist"
   | "apps"
   | "account";
 export interface Mail {
