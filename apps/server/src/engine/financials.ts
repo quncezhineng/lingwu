@@ -7,14 +7,19 @@ import { AppError } from "../errors.ts";
 
 const REPORT_KIND = "financial_reports";
 
+const symbolField = z
+  .string()
+  .trim()
+  .max(24)
+  .regex(/^[A-Za-z0-9^=.-]*$/, "Invalid symbol")
+  .optional();
+
 export const parseFinancialsSchema = z
-  .object({
-    symbol_code: z
-      .string()
-      .trim()
-      .max(24)
-      .regex(/^[A-Za-z0-9^=.-]*$/, "Invalid symbol")
-      .optional(),
+  .strictObject({
+    /** Canonical field. */
+    symbol_code: symbolField,
+    /** Accepted alias for symbol_code. */
+    symbol: symbolField,
     text: z.string().min(1).max(2_000_000).optional(),
     pdf_base64: z.string().min(1).max(8_000_000).optional(),
     source_file: z.string().trim().max(300).optional(),
@@ -22,7 +27,18 @@ export const parseFinancialsSchema = z
   })
   .refine((value) => value.text !== undefined || value.pdf_base64 !== undefined, {
     message: "Provide extracted text or a PDF",
-  });
+  })
+  .refine(
+    (value) =>
+      value.symbol === undefined ||
+      value.symbol_code === undefined ||
+      value.symbol.trim().toUpperCase() === value.symbol_code.trim().toUpperCase(),
+    { message: "symbol and symbol_code disagree" },
+  )
+  .transform(({ symbol, ...rest }) => ({
+    ...rest,
+    ...(rest.symbol_code ? {} : symbol ? { symbol_code: symbol } : {}),
+  }));
 
 export type ParseFinancialsInput = z.infer<typeof parseFinancialsSchema>;
 
