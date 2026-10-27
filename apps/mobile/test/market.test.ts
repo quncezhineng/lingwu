@@ -197,6 +197,40 @@ test("简报解析：B3 契约（market_data.indexes + symbol_updates 记录）"
   assert.equal(parsed?.symbolUpdates[2]?.alert, undefined);
 });
 
+test("简报解析：data_status=partial、unavailable、events_status 标记", () => {
+  const parsed = parseBriefing({
+    id: "b-p",
+    date: "2026-10-27",
+    summary: ["一", "二", "三"],
+    events: [],
+    events_status: "not_implemented",
+    data_status: "partial",
+    unavailable: ["600519.SS"],
+  });
+  assert.equal(parsed?.dataStatus, "partial");
+  assert.deepEqual(parsed?.unavailable, ["600519.SS"]);
+  assert.equal(parsed?.eventsStatus, "not_implemented");
+});
+
+test("简报解析：仅凭 unavailable 推导 partial，无标识时保持 undefined", () => {
+  const partial = parseBriefing({
+    date: "2026-10-27",
+    summary: ["一", "二", "三"],
+    unavailable: ["AAPL"],
+  });
+  assert.equal(partial?.dataStatus, "partial");
+  const complete = parseBriefing({
+    date: "2026-10-27",
+    summary: ["一", "二", "三"],
+    data_status: "complete",
+  });
+  assert.equal(complete?.dataStatus, "complete");
+  assert.deepEqual(complete?.unavailable, []);
+  const unknown = parseBriefing({ date: "2026-10-27", summary: ["一", "二", "三"] });
+  assert.equal(unknown?.dataStatus, undefined);
+  assert.equal(unknown?.eventsStatus, undefined);
+});
+
 test("简报解析：缺少 summary 时视为无效，触发 mock 兜底", () => {
   assert.equal(parseBriefing({ id: "b-3", date: "2026-10-27", summary: [] }), undefined);
   assert.equal(parseBriefing("nope"), undefined);

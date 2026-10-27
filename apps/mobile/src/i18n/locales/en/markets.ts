@@ -78,6 +78,12 @@ const markets = {
   "markets.briefingGenerating": "Generating your briefing…",
   "markets.briefingError": "Couldn’t generate today’s briefing.",
   "markets.briefingRetry": "Retry",
+  "markets.briefingPartial": "Some data is unavailable",
+  "markets.briefingPartialHint":
+    "Some quotes could not be loaded, so this briefing may be incomplete.",
+  "markets.briefingRegenerate": "Regenerate",
+  "markets.briefingEventsPending":
+    "Event tracking isn’t connected yet — an empty list doesn’t mean there are no events today.",
   "markets.briefingNoEvents": "No scheduled events today.",
   "markets.briefingNoUpdates": "No watchlist moves yet.",
   "markets.briefingStaleHint": "Today’s briefing is still being prepared — showing yesterday’s.",

@@ -95,6 +95,12 @@ export interface MarketBriefing {
   marketData: IndexQuote[];
   symbolUpdates: BriefingSymbolUpdate[];
   events: BriefingEvent[];
+  /** 后端标注事件是否已接入；not_implemented 时 events=[] 不代表今日无事件。 */
+  eventsStatus?: "not_implemented" | "available";
+  eventsNote?: string;
+  /** 后端数据完整性标识；partial 时展示「部分数据不可用」并允许强制重建。 */
+  dataStatus?: "complete" | "partial";
+  unavailable?: string[];
   generatedAt: string;
 }
 
@@ -783,10 +789,16 @@ export function loadBriefing(api: LingWuApi, locale: string, force = false): Pro
 }
 
 /** POST /api/briefings/generate：生成当天简报（已存在则直接返回，force 才重建）。 */
-export async function generateBriefing(api: LingWuApi, locale: string): Promise<void> {
+export async function generateBriefing(
+  api: LingWuApi,
+  locale: string,
+  options?: { force?: boolean },
+): Promise<void> {
   setBriefingState({ status: "generating", error: undefined });
   try {
-    const payload = await api.request<unknown>("/api/briefings/generate", { force: false });
+    const payload = await api.request<unknown>("/api/briefings/generate", {
+      force: !!options?.force,
+    });
     const parsed = parseBriefing(payload);
     if (!parsed) throw new Error("Unexpected briefing payload");
     parsed.isToday = payload && isRecord(payload) ? true : parsed.isToday;
@@ -1006,6 +1018,17 @@ export function parseBriefing(payload: unknown): MarketBriefing | undefined {
       : undefined;
   const symbolUpdates = record.symbolUpdates ?? record.symbol_updates;
   const date = str(record.date) ?? todayISO();
+  const unavailable = Array.isArray(record.unavailable)
+    ? record.unavailable.filter((item): item is string => typeof item === "string")
+    : [];
+  const dataStatusRaw = str(record.data_status) ?? str(record.dataStatus);
+  const dataStatus =
+    dataStatusRaw === "partial" || dataStatusRaw === "complete"
+      ? dataStatusRaw
+      : unavailable.length
+        ? "partial"
+        : undefined;
+  const eventsStatusRaw = str(record.events_status) ?? str(record.eventsStatus);
   return {
     id: str(record.id) ?? `briefing-${date}`,
     date,
@@ -1020,6 +1043,13 @@ export function parseBriefing(payload: unknown): MarketBriefing | undefined {
             : [],
         )
       : [],
+    eventsStatus:
+      eventsStatusRaw === "not_implemented" || eventsStatusRaw === "available"
+        ? eventsStatusRaw
+        : undefined,
+    eventsNote: str(record.events_note) ?? str(record.eventsNote),
+    dataStatus,
+    unavailable,
     generatedAt: str(record.generated_at) ?? str(record.generatedAt) ?? new Date().toISOString(),
   };
 }

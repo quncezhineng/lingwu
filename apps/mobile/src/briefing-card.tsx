@@ -10,6 +10,7 @@ import { ActivityIndicator, LayoutAnimation, Pressable, Text, View } from "react
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
   Activity,
+  AlertTriangle,
   ChevronDown,
   FileText,
   type IconComponent,
@@ -368,6 +369,41 @@ export function MarketBriefingCard() {
               {t("markets.briefingStaleHint")}
             </Text>
           )}
+          {briefing.dataStatus === "partial" && (
+            <View
+              style={[
+                s.row,
+                {
+                  flexWrap: "wrap",
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: colors.alertVolumeSurface,
+                  marginBottom: 12,
+                },
+              ]}
+            >
+              <AlertTriangle size={15} strokeWidth={1.8} color={colors.alertVolumeText} />
+              <View style={{ flex: 1, minWidth: 160, gap: 2 }}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.alertVolumeText }}>
+                  {t("markets.briefingPartial")}
+                </Text>
+                <Text style={{ fontSize: 11, lineHeight: 16, color: colors.alertVolumeText }}>
+                  {t("markets.briefingPartialHint")}
+                  {briefing.unavailable?.length
+                    ? ` · ${briefing.unavailable.slice(0, 5).join(", ")}`
+                    : ""}
+                </Text>
+              </View>
+              <Button
+                small
+                icon={RefreshCw}
+                onPress={() => void generateBriefing(api, locale, { force: true })}
+              >
+                {t("markets.briefingRegenerate")}
+              </Button>
+            </View>
+          )}
           <View style={{ gap: 8 }}>
             {briefing.summary.map((point, index) => (
               <View key={point} style={[s.row, { alignItems: "flex-start", gap: 8 }]}>
@@ -396,6 +432,8 @@ export function MarketBriefingCard() {
               <SectionLabel>{t("markets.briefingEvents")}</SectionLabel>
               {briefing.events.length ? (
                 <EventsSection rows={briefing.events} />
+              ) : briefing.eventsStatus === "not_implemented" ? (
+                <Text style={s.muted}>{t("markets.briefingEventsPending")}</Text>
               ) : (
                 <Text style={s.muted}>{t("markets.briefingNoEvents")}</Text>
               )}
