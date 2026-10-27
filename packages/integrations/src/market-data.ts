@@ -3,6 +3,8 @@ import { execFile } from "node:child_process";
 /** Markets supported by the P0 investment research features. */
 export type Market = "US" | "CN" | "HK";
 
+export type MarketState = "pre" | "regular" | "post" | "closed" | "unknown";
+
 export interface Quote {
   symbol: string;
   name?: string;
@@ -22,6 +24,8 @@ export interface Quote {
   source: "yahoo" | "akshare" | "cache";
   /** True when the data came from a stale cache after an upstream failure. */
   stale?: boolean;
+  /** Session state from the upstream; "unknown" when it cannot be determined. */
+  marketState?: MarketState;
 }
 
 export interface SymbolMatch {
@@ -65,6 +69,7 @@ export interface BatchQuoteItem {
   asOf?: string;
   stale?: boolean;
   source?: string;
+  marketState?: MarketState;
   error?: MarketDataErrorKind | "provider_error";
 }
 
@@ -179,6 +184,39 @@ function numberOrUndefined(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+/**
+ * Normalize Yahoo's marketState. When the upstream value is missing, derive it from
+ * the regular trading period; never guess beyond that (returns "unknown").
+ */
+export function normalizeMarketState(
+  raw?: string,
+  period?: { start?: number; end?: number },
+  nowMs: number = Date.now(),
+): MarketState {
+  const value = raw?.trim().toUpperCase();
+  switch (value) {
+    case "PRE":
+    case "PREPRE":
+      return "pre";
+    case "REGULAR":
+      return "regular";
+    case "POST":
+    case "POSTPOST":
+      return "post";
+    case "CLOSED":
+      return "closed";
+    default:
+      break;
+  }
+  if (typeof period?.start === "number" && typeof period?.end === "number") {
+    const nowSeconds = Math.floor(nowMs / 1000);
+    if (nowSeconds < period.start) return "pre";
+    if (nowSeconds <= period.end) return "regular";
+    return "post";
+  }
+  return "unknown";
+}
+
 interface YahooChartMeta {
   currency?: string;
   symbol?: string;
@@ -193,6 +231,8 @@ interface YahooChartMeta {
   fiftyTwoWeekHigh?: number;
   fiftyTwoWeekLow?: number;
   regularMarketTime?: number;
+  marketState?: string;
+  currentTradingPeriod?: { regular?: { start?: number; end?: number } };
 }
 
 function yahooQuoteFromMeta(meta: YahooChartMeta, symbol: string): Quote {
@@ -219,6 +259,7 @@ function yahooQuoteFromMeta(meta: YahooChartMeta, symbol: string): Quote {
     fiftyTwoWeekLow: numberOrUndefined(meta.fiftyTwoWeekLow),
     asOf: new Date((meta.regularMarketTime ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
     source: "yahoo",
+    marketState: normalizeMarketState(meta.marketState, meta.currentTradingPeriod?.regular),
   };
 }
 
@@ -732,6 +773,7 @@ export class MarketDataService {
           asOf: quote.asOf,
           stale: quote.stale ?? false,
           source: quote.source,
+          ...(quote.marketState ? { marketState: quote.marketState } : {}),
         };
       }
       const error =

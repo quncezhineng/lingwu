@@ -16,6 +16,7 @@ const quote: BatchQuoteItem = {
   asOf: "2026-10-27T08:00:00.000Z",
   stale: false,
   source: "yahoo",
+  marketState: "closed",
 };
 
 test("single-symbol quote results expose both quotes[] and quote", () => {
@@ -42,4 +43,5 @@ test("quote payload keeps card fields including asOf, volume and stale", () => {
   assert.equal(payload?.stale, true);
   assert.equal(payload?.change, 10);
   assert.equal(payload?.changePercent, 5.56);
+  assert.equal(payload?.marketState, "closed");
 });
