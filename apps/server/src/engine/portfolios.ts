@@ -61,6 +61,22 @@ export const addHoldingSchema = z.object({
   buy_date: z.string().date().optional(),
 });
 
+/** Frontend may send raw CSV + this mapping (canonical field → header name). */
+export const csvMappingSchema = z
+  .object({
+    symbol: z.string().trim().min(1).max(64).optional(),
+    quantity: z.string().trim().min(1).max(64).optional(),
+    cost_price: z.string().trim().min(1).max(64).optional(),
+    buy_date: z.string().trim().min(1).max(64).optional(),
+    name: z.string().trim().min(1).max(64).optional(),
+    sector: z.string().trim().min(1).max(64).optional(),
+    market: z.string().trim().min(1).max(64).optional(),
+    currency: z.string().trim().min(1).max(64).optional(),
+  })
+  .strict();
+
+export type CsvMapping = z.infer<typeof csvMappingSchema>;
+
 export const updateHoldingSchema = z
   .object({
     quantity: z.number().finite().positive().optional(),
@@ -221,7 +237,7 @@ export function splitCsvLine(line: string): string[] {
 }
 
 /** Parse and validate a holdings CSV. Errors are reported per line; valid rows still import. */
-export function parseHoldingsCsv(text: string): CsvPreview {
+export function parseHoldingsCsv(text: string, mapping?: CsvMapping): CsvPreview {
   const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
   const numbered = lines
     .map((content, index) => ({ line: index + 1, content: content.trim() }))
@@ -231,14 +247,30 @@ export function parseHoldingsCsv(text: string): CsvPreview {
     throw new AppError(`CSV supports at most ${MAX_CSV_ROWS} holdings rows`, 422);
 
   const header = splitCsvLine(numbered[0]?.content ?? "").map((item) => item.toLowerCase());
-  const column = (name: string) => header.indexOf(name);
+  const rawColumn = (name: string) => header.indexOf(name.toLowerCase());
+  /** Resolve a canonical field to a header index, honouring an explicit mapping. */
+  const column = (field: keyof CsvMapping, aliases: string[] = []): number => {
+    const mapped = mapping?.[field];
+    if (mapped) {
+      const index = rawColumn(mapped);
+      if (index < 0) throw new AppError(`mapping header not found for ${field}: ${mapped}`, 422);
+      return index;
+    }
+    for (const candidate of [field, ...aliases]) {
+      const index = rawColumn(candidate);
+      if (index >= 0) return index;
+    }
+    return -1;
+  };
   const symbolIndex = column("symbol");
   const quantityIndex = column("quantity");
-  // `cost_price` is the contract column; keep `avg_cost` as a tolerated alias.
-  const costIndex = column("cost_price") >= 0 ? column("cost_price") : column("avg_cost");
+  const costIndex = column("cost_price", ["avg_cost"]);
   const buyDateIndex = column("buy_date");
   if (symbolIndex < 0 || quantityIndex < 0 || costIndex < 0 || buyDateIndex < 0)
-    throw new AppError("CSV header must include symbol, quantity, cost_price and buy_date", 422);
+    throw new AppError(
+      "CSV header must include symbol, quantity, cost_price and buy_date (or provide mapping)",
+      422,
+    );
 
   const nameIndex = column("name");
   const sectorIndex = column("sector");
@@ -458,15 +490,21 @@ export class PortfoliosService {
     await this.db.remove(owner, HOLDING_KIND, holdingId);
   }
 
-  previewCsv(text: string): CsvPreview {
-    return parseHoldingsCsv(text);
+  previewCsv(text: string, mapping?: CsvMapping): CsvPreview {
+    return parseHoldingsCsv(text, mapping);
   }
 
   async importCsv(
     owner: string,
-    input: { csv: string; portfolio_id?: string; name?: string; base_currency?: string },
+    input: {
+      csv: string;
+      mapping?: CsvMapping;
+      portfolio_id?: string;
+      name?: string;
+      base_currency?: string;
+    },
   ): Promise<CsvImportResult> {
-    const preview = parseHoldingsCsv(input.csv);
+    const preview = parseHoldingsCsv(input.csv, input.mapping);
     const contentHash = createHash("sha256").update(input.csv, "utf8").digest("hex");
     const portfolio = input.portfolio_id
       ? await this.requirePortfolio(owner, input.portfolio_id)

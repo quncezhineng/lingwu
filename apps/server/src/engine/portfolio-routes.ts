@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   addHoldingSchema,
   createPortfolioSchema,
+  csvMappingSchema,
   updateHoldingSchema,
   updatePortfolioSchema,
 } from "./portfolios.ts";
@@ -16,6 +17,8 @@ const csvSchema = z
   .max(1024 * 1024);
 const importSchema = z.object({
   csv: csvSchema,
+  /** Canonical field → header name in the uploaded CSV. */
+  mapping: csvMappingSchema.optional(),
   portfolio_id: z.string().uuid().optional(),
   name: z.string().trim().min(1).max(100).optional(),
   base_currency: z.enum(["CNY", "USD", "HKD"]).optional(),
@@ -32,8 +35,10 @@ export function portfolioRoutes(service: AgentService): Hono<Env> {
 
   // Register static import paths before `/:id` so they are not captured as ids.
   app.post("/import/preview", async (c) => {
-    const { csv } = z.object({ csv: csvSchema }).parse(await c.req.json());
-    return c.json(service.portfolios.previewCsv(csv));
+    const { csv, mapping } = z
+      .object({ csv: csvSchema, mapping: csvMappingSchema.optional() })
+      .parse(await c.req.json());
+    return c.json(service.portfolios.previewCsv(csv, mapping));
   });
   app.post("/import", async (c) => {
     const input = importSchema.parse(await c.req.json());

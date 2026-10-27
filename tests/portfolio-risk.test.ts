@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   computeRiskMetrics,
+  downsampleSeries,
   equityCurve,
   maxDrawdown,
   sampleCovariance,
@@ -65,6 +66,20 @@ test("beta is 2 when portfolio returns are twice the benchmark", () => {
   assert.equal(metrics.beta, 2);
   assert.ok(metrics.sharpe !== undefined);
   assert.ok((metrics.max_drawdown ?? 0) >= 0);
+
+  // Normalized NAV: starts at 1.0, downsampled to ≤120 points, benchmark return in percent.
+  assert.ok(metrics.series);
+  assert.equal(metrics.series?.[0]?.portfolio, 1);
+  assert.equal(metrics.series?.[0]?.benchmark, 1);
+  assert.ok((metrics.series?.length ?? 0) <= 120);
+  const last = metrics.series?.at(-1);
+  assert.ok((last?.portfolio ?? 0) > 1);
+  assert.ok(Math.abs((metrics.benchmark_return ?? 0) - ((last?.benchmark ?? 1) - 1) * 100) < 1e-6);
+  assert.ok(
+    Math.abs(
+      (metrics.excess_return ?? 0) - ((last?.portfolio ?? 1) - (last?.benchmark ?? 1)) * 100,
+    ) < 1e-6,
+  );
 });
 
 test("sharpe uses the 2% risk-free rate and 252 annualization", () => {
@@ -118,6 +133,17 @@ test("short histories return explicit unavailable reasons", () => {
     "max_drawdown:insufficient_history",
     "sharpe:insufficient_history",
   ]);
+});
+
+test("downsampleSeries keeps the last point", () => {
+  const points = Array.from({ length: 300 }, (_, i) => ({
+    date: `2026-${String(Math.floor(i / 28) + 1).padStart(2, "0")}-${String((i % 28) + 1).padStart(2, "0")}`,
+    portfolio: 1 + i / 1000,
+    benchmark: 1 + i / 2000,
+  }));
+  const sampled = downsampleSeries(points, 120);
+  assert.ok(sampled.length <= 121);
+  assert.equal(sampled.at(-1)?.date, points.at(-1)?.date);
 });
 
 test("max drawdown is available with 60 bars even when beta is not", () => {
