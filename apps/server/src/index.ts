@@ -4,6 +4,7 @@ import { readConfig } from "./config.ts";
 import { createStore } from "./db.ts";
 import { backgroundFailure } from "./log.ts";
 import { getMarketDataHealth } from "./market-data-health.ts";
+import { getPdfHealth } from "./pdf-health.ts";
 
 const config = readConfig();
 const db = await createStore({
@@ -16,6 +17,11 @@ if (config.taskWorkerEnabled) agent.start();
 // Startup self-check: log whether python3 + akshare is usable so a deployment that
 // silently falls back to Yahoo for A-shares is visible in logs, not only /api/health.
 void getMarketDataHealth()
+  .refresh(true)
+  .catch((error) => backgroundFailure("startup self-check", error));
+// Financial-report PDF uploads need poppler's pdftotext; probe at boot so the
+// phase=pdf-self-check log and /api/health are populated before the first check.
+void getPdfHealth()
   .refresh(true)
   .catch((error) => backgroundFailure("startup self-check", error));
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, () =>
