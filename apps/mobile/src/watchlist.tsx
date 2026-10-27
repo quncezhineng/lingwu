@@ -940,7 +940,7 @@ export function WatchlistScreen() {
         />
       </View>
 
-      {state.source === "mock" && (
+      {state.status === "ready" && state.source === "mock" && (
         <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>
           <View style={[s.chip, { backgroundColor: colors.surface }]}>
             <Text style={s.chipText}>{t("markets.watchlistSample")}</Text>

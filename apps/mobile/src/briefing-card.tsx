@@ -297,7 +297,7 @@ export function MarketBriefingCard() {
               <Text style={s.chipText}>{t("markets.briefingYesterday")}</Text>
             </View>
           )}
-          {state.source === "mock" && (
+          {state.status === "ready" && state.source === "mock" && (
             <View style={[s.chip, { backgroundColor: colors.surface }]}>
               <Text style={s.chipText}>{t("markets.watchlistSample")}</Text>
             </View>

@@ -715,7 +715,7 @@ interface BriefingState {
   error?: string;
 }
 
-let briefingState: BriefingState = { status: "loading", source: "mock" };
+let briefingState: BriefingState = { status: "loading", source: "api" };
 const briefingListeners = new Set<() => void>();
 let briefingLocale = "";
 let briefingLoadedAt = 0;
