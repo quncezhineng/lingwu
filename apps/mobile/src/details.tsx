@@ -45,6 +45,7 @@ import {
   X,
 } from "./icons";
 import PdfReader from "./PdfReader";
+import { SymbolDetailSheet } from "./symbol-detail";
 import {
   Button,
   Card,
@@ -84,6 +85,10 @@ export function Details({ detail }: { detail: Detail }) {
     return <EventEditor event={detail.event} draft={detail.draft} neighbors={detail.neighbors} />;
   if (detail.type === "file") return <FileDetail file={detail.file} />;
   if (detail.type === "artifact") return <ArtifactDetail artifact={detail.artifact} />;
+  if (detail.type === "symbol")
+    return (
+      <SymbolDetailSheet symbol={detail.symbol} quote={detail.quote} watchlist={detail.watchlist} />
+    );
   if (detail.type === "review") return <ReviewDetail initial={detail.action} />;
   if (detail.type === "browser") return <BrowserDetail initial={detail.browser} />;
   return (
