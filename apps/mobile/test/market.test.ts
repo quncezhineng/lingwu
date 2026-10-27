@@ -158,6 +158,45 @@ test("简报解析：camelCase 与 snake_case 字段均可识别", () => {
   assert.equal(snake?.events.length, 0);
 });
 
+test("简报解析：B3 契约（market_data.indexes + symbol_updates 记录）", () => {
+  const parsed = parseBriefing({
+    id: "b-9",
+    date: "2026-10-27",
+    summary: ["一", "二", "三"],
+    content: "# 简报",
+    market_data: {
+      indexes: [
+        {
+          symbol: "^GSPC",
+          name: "S&P 500",
+          market: "US",
+          price: 5842.15,
+          previousClose: 5796.93,
+          change: 45.22,
+          changePercent: 0.78,
+          asOf: "2026-10-27T00:00:00.000Z",
+          stale: false,
+        },
+      ],
+    },
+    symbol_updates: {
+      AAPL: { name: "Apple Inc.", price: 343.91, changePercent: 2.34 },
+      "600519.SH": { price: 1356.97, changePercent: -1.2 },
+      TSLA: { price: 391.62, changePercent: 1.2 },
+    },
+    events: [],
+    generated_at: "2026-10-27T00:00:00.000Z",
+  });
+  assert.deepEqual(parsed?.marketData, [{ name: "S&P 500", value: 5842.15, changePercent: 0.78 }]);
+  assert.deepEqual(
+    parsed?.symbolUpdates.map((item) => item.code),
+    ["AAPL", "600519.SS", "TSLA"],
+  );
+  assert.equal(parsed?.symbolUpdates[0]?.alert, "change_threshold");
+  assert.equal(parsed?.symbolUpdates[1]?.alert, undefined);
+  assert.equal(parsed?.symbolUpdates[2]?.alert, undefined);
+});
+
 test("简报解析：缺少 summary 时视为无效，触发 mock 兜底", () => {
   assert.equal(parseBriefing({ id: "b-3", date: "2026-10-27", summary: [] }), undefined);
   assert.equal(parseBriefing("nope"), undefined);

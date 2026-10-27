@@ -147,7 +147,11 @@ function WatchlistSection({ rows }: { rows: BriefingSymbolUpdate[] }) {
               },
             ]}
           >
-            {row.alert === "volume_spike" ? (
+            {row.alert === "change_threshold" ? (
+              <Text style={{ fontSize: 9, width: 8, color }}>
+                {row.changePercent >= 0 ? "▲" : "▼"}
+              </Text>
+            ) : row.alert === "volume_spike" ? (
               <Activity size={13} strokeWidth={2} color={colors.alertVolume} />
             ) : row.alert === "price_break" ? (
               <View
@@ -272,7 +276,7 @@ export function MarketBriefingCard() {
   }, [api, locale]);
 
   const briefing = state.briefing;
-  const stale = !!briefing && briefing.date < todayISO();
+  const stale = !!briefing && (briefing.isToday === false || briefing.date < todayISO());
   const title = t(stale ? "markets.briefingYesterdayTitle" : "markets.briefingTitle");
 
   const toggle = () => {
@@ -291,6 +295,11 @@ export function MarketBriefingCard() {
           {stale && (
             <View style={[s.chip, { backgroundColor: colors.surface }]}>
               <Text style={s.chipText}>{t("markets.briefingYesterday")}</Text>
+            </View>
+          )}
+          {state.source === "mock" && (
+            <View style={[s.chip, { backgroundColor: colors.surface }]}>
+              <Text style={s.chipText}>{t("markets.watchlistSample")}</Text>
             </View>
           )}
         </View>
@@ -346,7 +355,7 @@ export function MarketBriefingCard() {
               <Text style={[s.muted, { textAlign: "center" }]}>
                 {t("markets.briefingEmptyDetail")}
               </Text>
-              <Button icon={RefreshCw} onPress={() => void generateBriefing(locale)}>
+              <Button icon={RefreshCw} onPress={() => void generateBriefing(api, locale)}>
                 {t("markets.briefingGenerate")}
               </Button>
             </View>

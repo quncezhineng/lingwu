@@ -89,6 +89,8 @@ export interface MarketBriefing {
   id: string;
   /** 生成日期 YYYY-MM-DD；早于今天时 UI 标记「昨日」。 */
   date: string;
+  /** 服务端判断是否为当天简报（避免客户端时区与 UTC 日期不一致）。 */
+  isToday?: boolean;
   summary: string[];
   marketData: IndexQuote[];
   symbolUpdates: BriefingSymbolUpdate[];
@@ -328,6 +330,7 @@ function mockBriefing(locale: string): MarketBriefing {
   return {
     id: `briefing-${todayISO()}`,
     date: todayISO(),
+    isToday: true,
     summary: zh
       ? [
           "美股三大指数集体收涨，纳指涨 1.20% 创历史新高，科技股领涨。",
@@ -733,7 +736,10 @@ export function useBriefingState() {
   return useSyncExternalStore(subscribeBriefing, () => briefingState);
 }
 
-/** GET /api/briefings/today；接口未就绪（B3 进行中）时回落 mock。 */
+/**
+ * GET /api/briefings/latest → `{ briefing, is_today, today }`。
+ * briefing 为 null 时是「尚未生成」的空态；请求失败（网络/服务异常）才回落 mock。
+ */
 export function loadBriefing(api: LingWuApi, locale: string, force = false): Promise<void> {
   if (!force && briefingState.status === "ready" && briefingLocale === locale) {
     if (Date.now() - briefingLoadedAt < BRIEFING_TTL) return Promise.resolve();
@@ -741,11 +747,23 @@ export function loadBriefing(api: LingWuApi, locale: string, force = false): Pro
   if (briefingRequest) return briefingRequest;
   const request = (async () => {
     try {
-      const payload = await api.request<unknown>("/api/briefings/today");
-      const parsed = parseBriefing(payload);
-      if (!parsed) throw new Error("Unexpected briefing payload");
+      const payload = await api.request<unknown>("/api/briefings/latest");
+      const envelope = isRecord(payload) ? payload : undefined;
+      const raw = envelope && "briefing" in envelope ? envelope.briefing : payload;
       briefingLocale = locale;
       briefingLoadedAt = Date.now();
+      if (raw === null || raw === undefined) {
+        setBriefingState({
+          status: "ready",
+          briefing: undefined,
+          source: "api",
+          error: undefined,
+        });
+        return;
+      }
+      const parsed = parseBriefing(raw);
+      if (!parsed) throw new Error("Unexpected briefing payload");
+      if (envelope && typeof envelope.is_today === "boolean") parsed.isToday = envelope.is_today;
       setBriefingState({ status: "ready", briefing: parsed, source: "api", error: undefined });
     } catch (error) {
       briefingLocale = locale;
@@ -764,13 +782,23 @@ export function loadBriefing(api: LingWuApi, locale: string, force = false): Pro
   return request;
 }
 
-/** 「立即生成今日简报」：mock 模式下模拟生成；真实接口就绪后替换为触发 market_briefing 任务。 */
-export async function generateBriefing(locale: string): Promise<void> {
+/** POST /api/briefings/generate：生成当天简报（已存在则直接返回，force 才重建）。 */
+export async function generateBriefing(api: LingWuApi, locale: string): Promise<void> {
   setBriefingState({ status: "generating", error: undefined });
-  await new Promise((resolve) => setTimeout(resolve, 900));
-  briefingLocale = locale;
-  briefingLoadedAt = Date.now();
-  setBriefingState({ status: "ready", briefing: mockBriefing(locale), source: "mock" });
+  try {
+    const payload = await api.request<unknown>("/api/briefings/generate", { force: false });
+    const parsed = parseBriefing(payload);
+    if (!parsed) throw new Error("Unexpected briefing payload");
+    parsed.isToday = payload && isRecord(payload) ? true : parsed.isToday;
+    briefingLocale = locale;
+    briefingLoadedAt = Date.now();
+    setBriefingState({ status: "ready", briefing: parsed, source: "api", error: undefined });
+  } catch (error) {
+    setBriefingState({
+      status: "ready",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -911,51 +939,80 @@ export function mergeSummary(list: Watchlist, summary: Summary): Watchlist {
   };
 }
 
+function parseIndexRows(value: unknown): IndexQuote[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    const value = num(entry.value) ?? num(entry.price);
+    const name = str(entry.name) ?? str(entry.symbol);
+    if (value === undefined || !name) return [];
+    return [{ name, value, changePercent: num(entry.changePercent) ?? 0 }];
+  });
+}
+
+function parseUpdateRows(value: unknown): BriefingSymbolUpdate[] {
+  const rows: BriefingSymbolUpdate[] = [];
+  if (Array.isArray(value)) {
+    // 兼容旧形态 / mock：数组元素自带 code。
+    for (const entry of value) {
+      if (!isRecord(entry) || typeof entry.price !== "number") continue;
+      const code = str(entry.code);
+      if (!code) continue;
+      const changePercent = num(entry.changePercent) ?? 0;
+      rows.push({
+        code: normalizeCode(code),
+        name: str(entry.name) ?? code,
+        price: entry.price,
+        changePercent,
+        alert:
+          entry.alert === "price_break" ||
+          entry.alert === "change_threshold" ||
+          entry.alert === "volume_spike" ||
+          entry.alert === "news"
+            ? entry.alert
+            : undefined,
+      });
+    }
+    return rows;
+  }
+  // B3 契约：Record<code, quote>；|涨跌幅| ≥ 2% 视为异动。
+  if (isRecord(value)) {
+    for (const [code, entry] of Object.entries(value)) {
+      if (!isRecord(entry) || typeof entry.price !== "number") continue;
+      const changePercent = num(entry.changePercent) ?? 0;
+      rows.push({
+        code: normalizeCode(code),
+        name: str(entry.name) ?? code,
+        price: entry.price,
+        changePercent,
+        alert: Math.abs(changePercent) >= 2 ? "change_threshold" : undefined,
+      });
+    }
+  }
+  return rows.sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
+}
+
 export function parseBriefing(payload: unknown): MarketBriefing | undefined {
   if (!isRecord(payload)) return undefined;
   const record = isRecord(payload.briefing) ? payload.briefing : payload;
   const summary = record.summary;
   if (!Array.isArray(summary) || !summary.length) return undefined;
   const marketData = record.marketData ?? record.market_data;
+  // B3 契约：market_data = { indexes: [...] }；旧形态/mock 直接是数组。
+  const indexes = Array.isArray(marketData)
+    ? marketData
+    : isRecord(marketData)
+      ? marketData.indexes
+      : undefined;
   const symbolUpdates = record.symbolUpdates ?? record.symbol_updates;
+  const date = str(record.date) ?? todayISO();
   return {
-    id: str(record.id) ?? `briefing-${todayISO()}`,
-    date: str(record.date) ?? todayISO(),
+    id: str(record.id) ?? `briefing-${date}`,
+    date,
+    isToday: date === todayISO(),
     summary: summary.filter((line): line is string => typeof line === "string"),
-    marketData: Array.isArray(marketData)
-      ? marketData.flatMap((entry) =>
-          isRecord(entry) && typeof entry.name === "string" && typeof entry.value === "number"
-            ? [
-                {
-                  name: entry.name,
-                  value: entry.value,
-                  changePercent: num(entry.changePercent) ?? 0,
-                },
-              ]
-            : [],
-        )
-      : [],
-    symbolUpdates: Array.isArray(symbolUpdates)
-      ? symbolUpdates.flatMap((entry) =>
-          isRecord(entry) && typeof entry.code === "string" && typeof entry.price === "number"
-            ? [
-                {
-                  code: entry.code,
-                  name: str(entry.name) ?? entry.code,
-                  price: entry.price,
-                  changePercent: num(entry.changePercent) ?? 0,
-                  alert:
-                    entry.alert === "price_break" ||
-                    entry.alert === "change_threshold" ||
-                    entry.alert === "volume_spike" ||
-                    entry.alert === "news"
-                      ? entry.alert
-                      : undefined,
-                },
-              ]
-            : [],
-        )
-      : [],
+    marketData: parseIndexRows(indexes),
+    symbolUpdates: parseUpdateRows(symbolUpdates),
     events: Array.isArray(record.events)
       ? record.events.flatMap((entry) =>
           isRecord(entry) && typeof entry.title === "string"
