@@ -43,6 +43,7 @@ import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen, TodayScreen } f
 import { ACCOUNT_NAV, ChatsColumn, Rail, SECTION_NAV } from "./src/shell";
 import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
 import { Button, Card, colors, ErrorNotice, Field, IconButton, Mascot, s } from "./src/ui";
+import { PortfolioScreen } from "./src/portfolio-screen";
 import { WatchlistScreen } from "./src/watchlist";
 import { type Detail, useWorkspace, WorkspaceContext } from "./src/workspace";
 
@@ -55,6 +56,7 @@ const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: T
   {
     today: { titleKey: "app.titleToday", subtitleKey: "app.subtitleToday" },
     watchlist: { titleKey: "app.titleWatchlist", subtitleKey: "app.subtitleWatchlist" },
+    portfolio: { titleKey: "app.titlePortfolio", subtitleKey: "app.subtitlePortfolio" },
     activity: { titleKey: "app.titleActivity", subtitleKey: "app.subtitleActivity" },
     ideas: { titleKey: "app.titleIdeas", subtitleKey: "app.subtitleIdeas" },
     goals: { titleKey: "app.titleGoals", subtitleKey: "app.subtitleGoals" },
@@ -417,6 +419,8 @@ function WorkspaceShell({
       ? TodayScreen
       : section === "watchlist"
         ? WatchlistScreen
+        : section === "portfolio"
+          ? PortfolioScreen
         : section === "mail"
           ? MailScreen
           : section === "calendar"
@@ -432,7 +436,7 @@ function WorkspaceShell({
                     : section === "goals"
                       ? GoalsScreen
                       : AppsScreen;
-  const utility = ["mail", "calendar", "browser", "files", "watchlist"].includes(section);
+  const utility = ["mail", "calendar", "browser", "files", "watchlist", "portfolio"].includes(section);
   return (
     <>
       <WorkspaceTools />

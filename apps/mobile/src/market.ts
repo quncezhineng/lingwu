@@ -120,8 +120,8 @@ const CATALOG: SymbolMeta[] = [
   { code: "300750.SZ", name: "宁德时代", market: "CN" },
   { code: "601318.SS", name: "中国平安", market: "CN" },
   { code: "000858.SZ", name: "五粮液", market: "CN" },
-  { code: "00700.HK", name: "腾讯控股", market: "HK" },
-  { code: "09988.HK", name: "阿里巴巴-W", market: "HK" },
+  { code: "0700.HK", name: "腾讯控股", market: "HK" },
+  { code: "9988.HK", name: "阿里巴巴-W", market: "HK" },
   { code: "SPY", name: "SPDR S&P 500 ETF", market: "ETF" },
   { code: "QQQ", name: "Invesco QQQ Trust", market: "ETF" },
   { code: "510300.SS", name: "沪深300ETF", market: "ETF" },
@@ -191,14 +191,14 @@ const SEED_QUOTES: Record<string, Quote> = {
     weekChangePercent: -3.31,
     volumeRatio: 1.3,
   },
-  "00700.HK": {
+  "0700.HK": {
     price: 412.6,
     change: 6.4,
     changePercent: 1.58,
     weekChangePercent: 3.42,
     volumeRatio: 1.5,
   },
-  "09988.HK": {
+  "9988.HK": {
     price: 98.55,
     change: -1.15,
     changePercent: -1.15,
@@ -235,15 +235,22 @@ const SEED_ALERTS: Record<string, SymbolAlert[]> = {
     { kind: "change_threshold", threshold: 5.24 },
     { kind: "news", headline: "宁德时代发布新一代神行电池，机构上调全年出货预期" },
   ],
-  "00700.HK": [{ kind: "news", headline: "腾讯第三季度广告收入超预期" }],
+  "0700.HK": [{ kind: "news", headline: "腾讯第三季度广告收入超预期" }],
 };
 
 /** 后端把 `.SH` 规范化成 `.SS`，这里同步做一次，避免 mock/live 代码不一致。 */
+/**
+ * 与后端一致的代码归一化：
+ * - `.SH` → `.SS`；
+ * - 港股去前导零到 4 位（`00700.HK` → `0700.HK`，`09988.HK` → `9988.HK`）。
+ */
 export function normalizeCode(code: string): string {
   const trimmed = code.trim();
-  return /\.SH$/i.test(trimmed)
+  const upper = /\.SH$/i.test(trimmed)
     ? `${trimmed.slice(0, -3).toUpperCase()}.SS`
     : trimmed.toUpperCase();
+  const hk = upper.match(/^0*(\d{1,5})\.HK$/);
+  return hk ? `${hk[1]?.padStart(4, "0")}.HK` : upper;
 }
 
 export function catalogEntry(code: string): SymbolMeta | undefined {

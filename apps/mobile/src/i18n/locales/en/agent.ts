@@ -249,6 +249,7 @@ const agent = {
   "agent.searchApps": "Search apps",
   "agent.searchConnectors": "Search connectors",
   "agent.onYourComputer": "On your computer",
+  "agent.shortcutPortfolioDetail": "Holdings, P/L and allocation",
   "agent.shortcutWatchlistDetail": "Quotes, alerts and daily moves",
   "agent.shortcutMailDetail": "Read messages and prepare replies",
   "agent.shortcutCalendarDetail": "Events and reviewed invitations",

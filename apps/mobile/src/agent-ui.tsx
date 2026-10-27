@@ -1856,6 +1856,12 @@ export function AppsScreen() {
       icon: Target,
     },
     {
+      section: "portfolio" as const,
+      title: t("app.titlePortfolio"),
+      detail: t("agent.shortcutPortfolioDetail"),
+      icon: CircleDollarSign,
+    },
+    {
       section: "mail" as const,
       title: t("app.titleMail"),
       detail: t("agent.shortcutMailDetail"),
