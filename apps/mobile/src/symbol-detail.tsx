@@ -21,11 +21,12 @@ import {
   View,
 } from "react-native";
 import type { AgentTask, RunEvent } from "../../../packages/domain/src/agent";
+import { FinancialsSection } from "./financials-card";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { FileText, MessageCircle, Plus, RefreshCw, Sparkles, Trash2 } from "./icons";
 import { type Quote, removeSymbol, type SymbolMeta } from "./market";
-import { defaultCurrency, directionOf, formatPercent, formatPrice } from "./market-format";
+import { directionOf, formatPercent } from "./market-format";
 import { SymbolNotesSection } from "./note-ui";
 import { setNotesIntent } from "./notes";
 import {
@@ -37,6 +38,8 @@ import {
   type ThresholdType,
   updatePriceAlert,
 } from "./price-alerts";
+import { QuoteCard } from "./quote-card";
+import { availabilityFromQuote, useQuotes } from "./quotes";
 import {
   fetchLatestReport,
   fetchResearchTask,
@@ -49,7 +52,6 @@ import {
 import {
   Button,
   Card,
-  Chip,
   colors,
   DisclaimerNote,
   ErrorNotice,
@@ -66,7 +68,7 @@ const ALERT_TYPES: ReadonlyArray<{ id: ThresholdType; labelKey: TranslationKey }
   { id: "CHANGE_PCT", labelKey: "research.changePct" },
 ];
 
-const MARKET_CHIP: Record<SymbolMeta["market"], TranslationKey> = {
+const _MARKET_CHIP: Record<SymbolMeta["market"], TranslationKey> = {
   US: "markets.marketUS",
   CN: "markets.marketCN",
   HK: "markets.marketHK",
@@ -573,8 +575,14 @@ export function SymbolDetailSheet({
   const [researchError, setResearchError] = useState("");
   const [starting, setStarting] = useState(false);
 
-  const currency = quote?.currency ?? defaultCurrency(symbol.market);
-  const dayDirection = directionOf(quote?.changePercent ?? 0);
+  const { quotes, retry } = useQuotes(api, [symbol.code], { refreshMs: 60_000 });
+  const fetched = quotes[symbol.code];
+  const availability =
+    fetched?.status === "ready"
+      ? fetched
+      : quote
+        ? availabilityFromQuote(quote)
+        : (fetched ?? { status: "loading" as const });
 
   async function loadAlerts(target = symbol.code) {
     setAlertsError("");
@@ -813,40 +821,15 @@ export function SymbolDetailSheet({
 
   return (
     <Sheet title={`${symbol.code} · ${symbol.name}`} onClose={close} fullscreen>
-      {/* 行情概览 */}
-      <Card style={{ gap: 4, marginBottom: 14 }}>
-        <View style={[s.between, { gap: 10 }]}>
-          <View style={[s.row, { gap: 8, flex: 1, minWidth: 0 }]}>
-            <Text style={s.heading} numberOfLines={1}>
-              {symbol.code}
-            </Text>
-            <Chip>{t(MARKET_CHIP[symbol.market])}</Chip>
-          </View>
-          <Text style={{ fontSize: 26, fontWeight: "600", color: colors.text }}>
-            {quote ? formatPrice(quote.price, currency) : "—"}
-          </Text>
-        </View>
-        <View style={[s.row, { gap: 12 }]}>
-          <Text
-            style={[
-              s.metric,
-              { fontSize: 14, fontWeight: "600", color: marketDirectionColor(dayDirection) },
-            ]}
-          >
-            {quote?.changePercent === undefined ? "—" : formatPercent(quote.changePercent)}
-          </Text>
-          {quote?.weekChangePercent !== undefined && (
-            <Text
-              style={[
-                s.metric,
-                { fontSize: 12, color: marketDirectionColor(directionOf(quote.weekChangePercent)) },
-              ]}
-            >
-              {t("research.weekChange", { value: formatPercent(quote.weekChangePercent) })}
-            </Text>
-          )}
-        </View>
-      </Card>
+      {/* 行情概览（统一 QuoteCard，standard） */}
+      <View style={{ marginBottom: 14 }}>
+        <QuoteCard
+          symbol={{ code: symbol.code, name: symbol.name, market: symbol.market }}
+          availability={availability}
+          size="standard"
+          onRetry={retry}
+        />
+      </View>
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 6 }}>
         <Button primary icon={Sparkles} busy={starting} onPress={() => void runResearch()}>
@@ -1044,6 +1027,8 @@ export function SymbolDetailSheet({
           navigate("notes");
         }}
       />
+      {/* 财报解析（固定「对比上一期、未接一致预期」横幅） */}
+      <FinancialsSection api={api} symbolCode={symbol.code} />
 
       {/* 近期新闻（来自最新研报） */}
       <SectionLabel>{t("research.newsSection")}</SectionLabel>

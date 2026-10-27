@@ -54,6 +54,7 @@ import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
 import { MemoryRecallCard } from "./memory-recall-card";
 import { QuestionCard, taskHasQuestion } from "./question-card";
+import { QuoteToolCard } from "./quote-tool-card";
 import { ReminderToolCard } from "./reminder-tool-card";
 import { SearchToolCard } from "./search-tool-card";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
@@ -214,6 +215,16 @@ export function WorkspaceTools() {
     render: ({ args, result, status }) => (
       <ToolStep tool="present_choices" args={args} result={result} status={status} defaultOpen>
         <JevToolCard result={result} loading={status !== "complete"} />
+      </ToolStep>
+    ),
+  });
+  useRenderTool({
+    name: "get_quote",
+    description: "Show delayed market quotes returned by the agent",
+    parameters: displayParameters,
+    render: ({ args, result, status }) => (
+      <ToolStep tool="get_quote" args={args} result={result} status={status} defaultOpen>
+        <QuoteToolCard result={result} loading={status !== "complete"} />
       </ToolStep>
     ),
   });

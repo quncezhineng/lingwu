@@ -5,9 +5,11 @@ import chat from "./chat";
 import common from "./common";
 import computer from "./computer";
 import details from "./details";
+import financials from "./financials";
 import markets from "./markets";
 import notes from "./notes";
 import portfolio from "./portfolio";
+import quotes from "./quotes";
 import research from "./research";
 import screens from "./screens";
 import status from "./status";
@@ -33,6 +35,8 @@ export const zhHans = {
   ...research,
   ...portfolio,
   ...notes,
+  ...quotes,
+  ...financials,
   ...computer,
   ...threads,
   ...tools,

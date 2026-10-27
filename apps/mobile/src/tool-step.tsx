@@ -18,6 +18,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  CircleDollarSign,
   Globe2,
   type IconComponent,
   ListChecks,
@@ -51,6 +52,7 @@ const toolIcons: Record<string, IconComponent> = {
   recall_memory: Brain,
   recall: Brain,
   read_calendar: CalendarDays,
+  get_quote: CircleDollarSign,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -196,6 +198,17 @@ function toolTitle(tool: string, args: ToolArguments, result: unknown, t: Transl
     }
     case "read_calendar":
       return t("tools.toolStepCalendar");
+    case "get_quote": {
+      const symbols = Array.isArray(args.symbols)
+        ? args.symbols
+            .filter((value): value is string => typeof value === "string" && !!value.trim())
+            .slice(0, 3)
+            .join("、")
+        : "";
+      return symbols
+        ? t("tools.toolStepQuoteFor", { symbols: clip(symbols, 48) })
+        : t("tools.toolStepQuote");
+    }
     default:
       return t("tools.toolStepUnknown", {
         tool: tool.replace(/[_-]+/g, " ").replace(/^./, (letter) => letter.toUpperCase()),
