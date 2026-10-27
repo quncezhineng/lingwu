@@ -33,7 +33,13 @@ export interface SymbolMatch {
   sector?: string;
 }
 
-export type MarketDataErrorKind = "network" | "http" | "parse" | "not_found" | "unsupported";
+export type MarketDataErrorKind =
+  | "network"
+  | "timeout"
+  | "http"
+  | "parse"
+  | "not_found"
+  | "unsupported";
 
 export class MarketDataError extends Error {
   constructor(
@@ -65,7 +71,36 @@ export interface MarketDataLogContext {
 }
 
 const YAHOO_BASE = "https://query1.finance.yahoo.com";
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 5_000;
+/** Deadline for one symbol across the whole provider chain (Yahoo + AKShare). */
+export const DEFAULT_QUOTE_TIMEOUT_MS = 5_000;
+export const DEFAULT_AKSHARE_TIMEOUT_MS = 5_000;
+
+/**
+ * Reject a promise once `ms` elapses, even when the underlying work ignores its abort signal.
+ * Prevents a hanging provider from blocking a whole summary request.
+ */
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message = `Timed out after ${ms}ms`,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new MarketDataError("timeout", message));
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 /** Indexes shown in the daily market briefing. */
 export const BRIEFING_INDEXES: { symbol: string; name: string; market: Market }[] = [
@@ -293,10 +328,22 @@ const defaultPythonRunner: PythonRunner = (script, timeoutMs) =>
     execFile(
       process.env.AKSHARE_PYTHON ?? "python3",
       ["-c", script],
-      { timeout: timeoutMs, maxBuffer: 1024 * 1024, env: process.env },
+      {
+        timeout: timeoutMs,
+        killSignal: "SIGKILL",
+        maxBuffer: 1024 * 1024,
+        env: process.env,
+      },
       (error, stdout) => {
         if (error) {
-          reject(new MarketDataError("network", "AKShare helper failed to run"));
+          const code = (error as NodeJS.ErrnoException).code;
+          const timedOut = code === "ETIMEDOUT" || (error as { killed?: boolean }).killed;
+          reject(
+            new MarketDataError(
+              timedOut ? "timeout" : "network",
+              timedOut ? "AKShare helper timed out" : "AKShare helper failed to run",
+            ),
+          );
           return;
         }
         resolve(stdout);
@@ -312,7 +359,9 @@ export class AkshareProvider implements MarketDataProvider {
 
   constructor(options: AkshareProviderOptions = {}) {
     this.pythonRunner = options.pythonRunner ?? defaultPythonRunner;
-    this.timeoutMs = options.timeoutMs ?? 20_000;
+    this.timeoutMs =
+      options.timeoutMs ??
+      Number(process.env.MARKET_DATA_AKSHARE_TIMEOUT_MS ?? DEFAULT_AKSHARE_TIMEOUT_MS);
   }
 
   supports(market: Market): boolean {
@@ -387,8 +436,19 @@ export interface MarketDataServiceOptions {
   cacheTtlMs?: number;
   staleTtlMs?: number;
   maxCacheEntries?: number;
+  /** Deadline for one symbol across the whole provider chain. */
+  quoteTimeoutMs?: number;
+  /** Set false to skip the AKShare fallback entirely. */
+  akshareEnabled?: boolean;
+  /** Set false to skip returning an expired cache when providers fail. */
+  staleFallbackEnabled?: boolean;
   now?: () => number;
   onError?: (context: MarketDataLogContext, error: unknown) => void;
+}
+
+function envNumber(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function defaultErrorLogger(context: MarketDataLogContext, error: unknown) {
@@ -402,6 +462,7 @@ function defaultErrorLogger(context: MarketDataLogContext, error: unknown) {
 /**
  * Cached facade over market data providers.
  * Order: fresh cache → Yahoo → AKShare (A-shares only) → stale cache → error.
+ * Every symbol is bounded by `quoteTimeoutMs`, so a hanging provider cannot stall a summary.
  */
 export class MarketDataService {
   private readonly yahoo: MarketDataProvider;
@@ -409,16 +470,30 @@ export class MarketDataService {
   private readonly cacheTtlMs: number;
   private readonly staleTtlMs: number;
   private readonly maxCacheEntries: number;
+  private readonly quoteTimeoutMs: number;
+  private readonly staleFallbackEnabled: boolean;
   private readonly now: () => number;
   private readonly onError: (context: MarketDataLogContext, error: unknown) => void;
   private readonly cache = new Map<string, CacheEntry>();
 
   constructor(options: MarketDataServiceOptions = {}) {
     this.yahoo = options.yahoo ?? new YahooFinanceProvider({ fetch: options.fetch });
-    this.akshare = options.akshare === undefined ? new AkshareProvider() : options.akshare;
-    this.cacheTtlMs = options.cacheTtlMs ?? 60_000;
-    this.staleTtlMs = options.staleTtlMs ?? 300_000;
-    this.maxCacheEntries = options.maxCacheEntries ?? 10_000;
+    const akshareEnabled =
+      options.akshareEnabled ?? process.env.MARKET_DATA_AKSHARE_ENABLED !== "false";
+    this.akshare =
+      options.akshare === null
+        ? null
+        : akshareEnabled
+          ? (options.akshare ?? new AkshareProvider())
+          : null;
+    this.cacheTtlMs = options.cacheTtlMs ?? envNumber("MARKET_DATA_CACHE_TTL_MS", 60_000);
+    this.staleTtlMs = options.staleTtlMs ?? envNumber("MARKET_DATA_STALE_CACHE_TTL_MS", 300_000);
+    this.maxCacheEntries =
+      options.maxCacheEntries ?? envNumber("MARKET_DATA_CACHE_MAX_SIZE", 10_000);
+    this.quoteTimeoutMs =
+      options.quoteTimeoutMs ?? envNumber("MARKET_DATA_QUOTE_TIMEOUT_MS", DEFAULT_QUOTE_TIMEOUT_MS);
+    this.staleFallbackEnabled =
+      options.staleFallbackEnabled ?? process.env.MARKET_DATA_STALE_CACHE_ENABLED !== "false";
     this.now = options.now ?? Date.now;
     this.onError = options.onError ?? defaultErrorLogger;
   }
@@ -467,36 +542,54 @@ export class MarketDataService {
       if (fresh) return fresh;
     }
 
-    let lastError: unknown;
-    try {
-      const quote = await this.yahoo.getQuote(symbol);
-      this.store(key, quote);
-      return quote;
-    } catch (error) {
-      lastError = error;
-      this.report({ phase: "getQuote", provider: "yahoo", kind: "provider_error", symbol }, error);
-    }
-
-    const market = resolveMarket(symbol);
-    if (market === "CN" && this.akshare?.supports(market)) {
+    // Bound the whole provider chain so one hanging source cannot stall callers.
+    const work = (async () => {
+      let lastError: unknown;
       try {
-        const quote = await this.akshare.getQuote(symbol);
-        this.store(key, quote);
-        return quote;
+        return await this.yahoo.getQuote(symbol);
       } catch (error) {
         lastError = error;
         this.report(
-          { phase: "getQuote", provider: "akshare", kind: "provider_error", symbol },
+          { phase: "getQuote", provider: "yahoo", kind: "provider_error", symbol },
           error,
         );
       }
-    }
+      const market = resolveMarket(symbol);
+      if (market === "CN" && this.akshare?.supports(market)) {
+        try {
+          return await this.akshare.getQuote(symbol);
+        } catch (error) {
+          lastError = error;
+          this.report(
+            { phase: "getQuote", provider: "akshare", kind: "provider_error", symbol },
+            error,
+          );
+        }
+      }
+      throw lastError instanceof MarketDataError
+        ? lastError
+        : new MarketDataError("network", `Unable to load a quote for ${symbol}`);
+    })();
 
-    const stale = this.readStale(key);
-    if (stale) return { ...stale, source: "cache", stale: true };
-    throw lastError instanceof MarketDataError
-      ? lastError
-      : new MarketDataError("network", `Unable to load a quote for ${symbol}`);
+    try {
+      const quote = await withTimeout(
+        work,
+        this.quoteTimeoutMs,
+        `Timed out loading a quote for ${symbol}`,
+      );
+      this.store(key, quote);
+      return quote;
+    } catch (error) {
+      if (error instanceof MarketDataError && error.kind === "timeout")
+        this.report({ phase: "getQuote", provider: "chain", kind: "timeout", symbol }, error);
+      if (this.staleFallbackEnabled) {
+        const stale = this.readStale(key);
+        if (stale) return { ...stale, source: "cache", stale: true };
+      }
+      throw error instanceof MarketDataError
+        ? error
+        : new MarketDataError("network", `Unable to load a quote for ${symbol}`);
+    }
   }
 
   async getQuotes(symbols: string[]): Promise<Quote[]> {

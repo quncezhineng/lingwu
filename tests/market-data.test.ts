@@ -276,3 +276,82 @@ test("index data keeps the indexes that succeed", async () => {
   assert.equal(indexes.length, BRIEFING_INDEXES.length - 1);
   assert.ok(indexes.every((index) => typeof index.name === "string" && index.name.length > 0));
 });
+
+test("getQuote rejects a hanging provider within the configured deadline", async () => {
+  const hanging: MarketDataProvider = {
+    id: "yahoo",
+    supports: () => true,
+    getQuote: () => new Promise(() => {}),
+    searchSymbols: async () => [],
+    getIndexData: async () => [],
+  };
+  const service = new MarketDataService({
+    yahoo: hanging,
+    akshare: null,
+    quoteTimeoutMs: 25,
+    onError: () => undefined,
+  });
+  const started = Date.now();
+  await assert.rejects(
+    () => service.getQuote("AAPL"),
+    (error: unknown) => error instanceof MarketDataError && error.kind === "timeout",
+  );
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("a timed-out quote still falls back to the stale cache", async () => {
+  let now = 0;
+  let hang = false;
+  const provider: MarketDataProvider = {
+    id: "yahoo",
+    supports: () => true,
+    getQuote: (symbol) =>
+      hang ? new Promise(() => {}) : Promise.resolve({ ...quoteOf(120, 100), symbol }),
+    searchSymbols: async () => [],
+    getIndexData: async () => [],
+  };
+  const service = new MarketDataService({
+    yahoo: provider,
+    akshare: null,
+    quoteTimeoutMs: 25,
+    now: () => now,
+    onError: () => undefined,
+  });
+  await service.getQuote("AAPL");
+  now = 90_000;
+  hang = true;
+  const stale = await service.getQuote("AAPL");
+  assert.equal(stale.price, 120);
+  assert.equal(stale.stale, true);
+});
+
+test("akshareEnabled=false skips the A-share fallback", async () => {
+  const yahoo: MarketDataProvider = {
+    id: "yahoo",
+    supports: () => true,
+    getQuote: async () => {
+      throw new MarketDataError("not_found", "missing");
+    },
+    searchSymbols: async () => [],
+    getIndexData: async () => [],
+  };
+  const akshare: MarketDataProvider = {
+    id: "akshare",
+    supports: () => true,
+    getQuote: async () => {
+      throw new Error("akshare should not be called");
+    },
+    searchSymbols: async () => [],
+    getIndexData: async () => [],
+  };
+  const service = new MarketDataService({
+    yahoo,
+    akshare,
+    akshareEnabled: false,
+    onError: () => undefined,
+  });
+  await assert.rejects(
+    () => service.getQuote("600519.SS"),
+    (error: unknown) => error instanceof MarketDataError && error.kind === "not_found",
+  );
+});

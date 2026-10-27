@@ -33,6 +33,7 @@ const provider: MarketDataProvider = {
   id: "yahoo",
   supports: () => true,
   getQuote: async (symbol) => {
+    if (symbol === "HANG") return new Promise(() => {});
     const entry = quotes[symbol];
     if (!entry || entry.fail) throw new MarketDataError("not_found", `no quote ${symbol}`);
     const change = entry.price - entry.previousClose;
@@ -54,7 +55,12 @@ const provider: MarketDataProvider = {
 };
 
 const market = () =>
-  new MarketDataService({ yahoo: provider, akshare: null, onError: () => undefined });
+  new MarketDataService({
+    yahoo: provider,
+    akshare: null,
+    quoteTimeoutMs: 40,
+    onError: () => undefined,
+  });
 
 const headers = () => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" });
 const request = (path: string, init: RequestInit = {}) =>
@@ -212,4 +218,17 @@ test("symbol search returns provider matches", async () => {
 
 test("symbol search rejects a missing query", async () => {
   assert.equal((await request("/symbols/search")).status, 422);
+});
+
+test("summary returns bounded partial results when a quote hangs", async () => {
+  const created = await createWatchlist("超时", ["AAPL", "HANG"]);
+  const started = Date.now();
+  const summary = await read<{
+    quotes: { symbol: string; error?: string }[];
+    unavailable: string[];
+  }>(`/watchlists/${created.id}/summary`);
+  assert.ok(Date.now() - started < 2000);
+  assert.deepEqual(summary.unavailable, ["HANG"]);
+  assert.equal(summary.quotes.find((quote) => quote.symbol === "AAPL")?.error, undefined);
+  assert.equal(summary.quotes.find((quote) => quote.symbol === "HANG")?.error, "timeout");
 });

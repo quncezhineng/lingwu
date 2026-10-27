@@ -168,12 +168,16 @@ test("generate persists today's briefing with indexes and watchlist updates", as
     content: string;
     market_data: { indexes: unknown[] };
     symbol_updates: Record<string, { price: number }>;
+    events_status: string;
+    events_note?: string;
   }>("/briefings/generate", { method: "POST", body: JSON.stringify({}) });
 
   assert.equal(briefing.date, today());
   assert.ok(briefing.summary.length >= 3 && briefing.summary.length <= 5);
   assert.equal(briefing.market_data.indexes.length, BRIEFING_INDEXES.length);
   assert.equal(briefing.symbol_updates.AAPL?.price, 190);
+  assert.equal(briefing.events_status, "not_implemented");
+  assert.match(briefing.events_note ?? "", /P0 暂未接入/);
   assert.match(briefing.content, /每日市场简报/);
 
   const todayBriefing = await call<{ id: string }>("/briefings/today");
