@@ -242,3 +242,64 @@ export const priceAlertSchema = z.object({
   created_at: z.string().datetime(),
 });
 export type PriceAlert = z.infer<typeof priceAlertSchema>;
+
+// ─── P1 组合、持仓、笔记 ───
+
+export const CURRENCY_CODES = ["CNY", "USD", "HKD"] as const;
+
+/** 投资组合。base_currency 只用于展示口径；P1 不做汇率折算。 */
+export const portfolioSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string(),
+  name: z.string().min(1).max(100),
+  base_currency: z.enum(CURRENCY_CODES).default("CNY"),
+  /** 基准：CSI300 / SPX 等，缺省按 base_currency 推导。 */
+  benchmark: z.string().max(32).optional(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type Portfolio = z.infer<typeof portfolioSchema>;
+
+/** 持仓。quantity/avg_cost 均为原币数值。 */
+export const holdingSchema = z.object({
+  id: z.string().uuid(),
+  portfolio_id: z.string().uuid(),
+  symbol_code: z.string(),
+  name: z.string().max(200).optional(),
+  market: z.enum(["US", "CN", "HK"]),
+  sector: z.string().max(100).optional(),
+  currency: z.enum(CURRENCY_CODES),
+  quantity: z.number().finite().positive(),
+  avg_cost: z.number().finite().nonnegative(),
+  /** 建仓日期 YYYY-MM-DD。手工录入可省略（默认当天），CSV 导入必填。 */
+  buy_date: z.string().date().optional(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type Holding = z.infer<typeof holdingSchema>;
+
+/** 论点检验结果。source=manual 表示用户确认，自动周检不得覆盖。 */
+export const noteCheckSchema = z.object({
+  outcome: z.enum(["valid", "invalid", "inconclusive", "pending_confirmation"]),
+  source: z.enum(["automated", "manual"]),
+  checked_at: z.string().datetime(),
+  note: z.string().max(500).optional(),
+});
+export type NoteCheck = z.infer<typeof noteCheckSchema>;
+
+/** 投资笔记 / 论点 */
+export const investmentNoteSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string(),
+  symbol_code: z.string(),
+  type: z.enum(["BUY_REASON", "SELL_REASON", "RESEARCH", "THESIS"]),
+  content: z.string().min(1).max(20000),
+  /** 论点状态；仅 THESIS 类型使用。 */
+  status: z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]).optional(),
+  /** 最近一次检验；无模型时 outcome=pending_confirmation，绝不伪造结论。 */
+  check: noteCheckSchema.optional(),
+  last_checked_at: z.string().datetime().optional(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type InvestmentNote = z.infer<typeof investmentNoteSchema>;
