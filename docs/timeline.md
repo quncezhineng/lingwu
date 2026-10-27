@@ -5,6 +5,29 @@
 
 ## 变更记录
 
+### 2026-10-27 · render.yaml 补齐每日简报定时调度环境变量（O2）
+
+**背景**
+
+O2 功能（`7430e33`，每日简报定时调度与行情源自检）在 `.env.example` 新增 `BRIEFING_SCHEDULE_ENABLED` / `BRIEFING_SCHEDULE_UTC_HOUR` / `MARKET_DATA_HEALTH_TTL_MS`，但 `render.yaml` 未同步。生产环境不显式开启开关时，每日简报永远不会自动生成，只剩手动 `POST /api/briefings/generate`。
+
+**实现**
+
+- [render.yaml](../render.yaml)：`lingwu-api` 服务同步部署环境变量共两批——
+  - O2 每日简报：`BRIEFING_SCHEDULE_ENABLED=true`（生产必开；默认关闭）、`BRIEFING_SCHEDULE_UTC_HOUR=0`（UTC 00:00 = 北京 08:00 执行）、`MARKET_DATA_HEALTH_TTL_MS=300000`（akshare 自检缓存）。
+  - P1/F3 财报与行情：`PDFTOTEXT_BIN=pdftotext`（财报 PDF 解析依赖 PATH 中的 poppler 二进制，缺失时 PDF 上传返回 422、文本粘贴可用）、`PDF_HEALTH_TTL_MS=300000` 与 `PDF_HEALTH_TIMEOUT_MS=3000`（`/api/health` 的 pdf 自检）、`RISK_FREE_RATE=0.02`（Sharpe 无风险利率）、`MARKET_DATA_HISTORY_TIMEOUT_MS=10000` 与 `MARKET_DATA_HISTORY_CACHE_TTL_MS=1800000`（日线行情 10s 截止 / 30min 缓存）。
+- 单进程部署（API 内嵌 worker、PGlite）即可生效，无需拆独立 worker。
+
+**验证**
+
+- `ruby -ryaml` 解析通过：`services=lingwu-api,lingwu-browser,lingwu-web`，`lingwu-api` 环境变量共 36 个，结构合法。
+- 释放到 Render 后需重新部署 `lingwu-api` 使新环境变量生效；次日 UTC 00:00 观察日志 `phase=briefing-schedule outcome=enqueued`。
+
+**注意**
+
+- A 股实时数据依赖部署环境预装 `python3 + akshare`（可配置 `AKSHARE_PYTHON` 指向 venv 解释器）；未安装时 `/api/health` 返回 `market_data.akshare.status=unavailable`，A 股自动回退 Yahoo（约 15 分钟延迟），不影响服务启动。
+- 财报 PDF 解析依赖 `pdftotext`（poppler-utils）；环境中未安装时 `POST /api/financials/parse` 对 PDF 请求返回 422，`/api/health` 的 `pdf.status=unavailable`，文本粘贴仍可用。
+
 ### 2026-10-27 · 未读通知卡片添加浅紫色背景提示
 
 **背景**

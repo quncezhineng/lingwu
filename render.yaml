@@ -28,6 +28,41 @@ services:
         value: /var/data/lingwu
       - key: TASK_WORKER_ENABLED
         value: "true"
+      # Daily market briefing scheduler (O2): the embedded task worker creates one
+      # durable `market_briefing` task per owner with a watchlist per UTC date
+      # (catch-up after downtime, at most 3 attempts/day). Must stay true for
+      # automatic daily briefings; false keeps only manual generation.
+      - key: BRIEFING_SCHEDULE_ENABLED
+        value: "true"
+      # UTC hour of the daily run (default 0). 0 = UTC 00:00 = Beijing 08:00,
+      # right before the A-share open and after the US close (~20:00 ET).
+      - key: BRIEFING_SCHEDULE_UTC_HOUR
+        value: "0"
+      # AKShare self-check cache surfaced by GET /api/health as
+      # market_data.akshare.status. Keep long enough to avoid spawning python3
+      # on every health poll; python3 + akshare must be preinstalled for live
+      # A-share data, otherwise A-shares fall back to Yahoo (15-min delay).
+      - key: MARKET_DATA_HEALTH_TTL_MS
+        value: "300000"
+      # P1 financial report parsing: POST /api/financials/parse extracts PDF text
+      # via pdftotext (poppler-utils). The binary name is looked up on PATH; install
+      # poppler-utils in this environment for PDF uploads, otherwise they return 422
+      # while pasted text keeps working. Probe state is surfaced by /api/health pdf.status.
+      - key: PDFTOTEXT_BIN
+        value: pdftotext
+      - key: PDF_HEALTH_TTL_MS
+        value: "300000"
+      - key: PDF_HEALTH_TIMEOUT_MS
+        value: "3000"
+      # P1 risk metrics: annual risk-free rate used for the Sharpe ratio (default 2%).
+      - key: RISK_FREE_RATE
+        value: "0.02"
+      # Daily-history quotes (charts / indicator inputs): 10s per-symbol deadline,
+      # 30min cache TTL. Tune only when provider latency or freshness matters.
+      - key: MARKET_DATA_HISTORY_TIMEOUT_MS
+        value: "10000"
+      - key: MARKET_DATA_HISTORY_CACHE_TTL_MS
+        value: "1800000"
       - key: PUBLIC_API_URL
         fromService:
           name: lingwu-api
