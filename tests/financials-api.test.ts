@@ -186,3 +186,34 @@ test("an unparsable text fails explicitly instead of inventing values", async ()
 test("rejects a request without text or PDF", async () => {
   await call("/financials/parse", { method: "POST", body: JSON.stringify({}) }, 422);
 });
+
+test("accepts 'symbol' as an alias for symbol_code and rejects unknown fields", async () => {
+  const viaAlias = await call<{ symbol_code: string }>(
+    "/financials/parse",
+    {
+      method: "POST",
+      body: JSON.stringify({ symbol: "tsla", text: completeText }),
+    },
+    201,
+  );
+  assert.equal(viaAlias.symbol_code, "TSLA");
+
+  // Unknown fields are rejected so reports never land without an owner symbol.
+  await call(
+    "/financials/parse",
+    {
+      method: "POST",
+      body: JSON.stringify({ text: completeText, ticker: "AAPL" }),
+    },
+    422,
+  );
+  // Conflicting aliases are ambiguous and rejected too.
+  await call(
+    "/financials/parse",
+    {
+      method: "POST",
+      body: JSON.stringify({ symbol: "AAPL", symbol_code: "MSFT", text: completeText }),
+    },
+    422,
+  );
+});
