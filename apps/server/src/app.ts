@@ -21,6 +21,7 @@ import { computerRoutes } from "./computer-routes.ts";
 import { assertApiDeploymentConfig, type Config } from "./config.ts";
 import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
+import { researchRoutes } from "./engine/research-routes.ts";
 import { agentRoutes } from "./engine/routes.ts";
 import { AgentService } from "./engine/service.ts";
 import { ConversationStream } from "./engine/stream.ts";
@@ -32,6 +33,7 @@ import { GoogleAuth } from "./google-auth.ts";
 import { applyModel, isOfferedModel, modelChoices } from "./models.ts";
 import { resolveTaskNotifications } from "./notifications.ts";
 import { createRateLimitStore, rateLimit } from "./rate-limit.ts";
+import type { SearchService } from "./search.ts";
 import { createSupabaseAuth } from "./supabase-auth.ts";
 import { createSupabaseData } from "./supabase-data.ts";
 import { WorkspaceService } from "./workspace.ts";
@@ -39,7 +41,11 @@ import { WorkspaceService } from "./workspace.ts";
 export async function createApp(
   db: Store,
   config: Config,
-  options: { docker?: DockerRunner; market?: MarketDataService } = {},
+  options: {
+    docker?: DockerRunner;
+    market?: MarketDataService;
+    search?: SearchService;
+  } = {},
 ) {
   assertApiDeploymentConfig(config);
   const auth = await createAuth(db, config),
@@ -69,6 +75,7 @@ export async function createApp(
     browser,
     computer,
     options.market,
+    options.search,
   );
   const intelligence = new CopilotKitIntelligence({ apiKey: config.intelligenceApiKey });
   const conversationStream = new ConversationStream(db);
@@ -370,6 +377,7 @@ export async function createApp(
   app.route("/api/watchlists", watchlistRoutes(agent));
   app.route("/api/symbols", symbolRoutes(agent));
   app.route("/api/briefings", briefingRoutes(agent));
+  app.route("/api/research", researchRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));
   app.route("/api/computer", computerRoutes(computer, files));
   app.get("/api/calendars", async (c) => c.json(await workspace.calendars(c.get("owner"))));

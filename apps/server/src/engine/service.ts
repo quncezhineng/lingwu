@@ -45,6 +45,7 @@ import {
   pageLines,
   withoutRelativeTimes,
 } from "./page-diff.ts";
+import { generateResearchReport, researchSymbolSchema } from "./research.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
 
@@ -69,8 +70,9 @@ export class AgentService {
     readonly browser: BrowserService,
     readonly computer: ComputerService = new ComputerService(db, config),
     market: MarketDataService = new MarketDataService(),
+    search?: SearchService,
   ) {
-    this.search = new SearchService(db);
+    this.search = search ?? new SearchService(db);
     this.market = market;
     this.watchlists = new WatchlistsService(db, market);
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
@@ -237,12 +239,19 @@ export class AgentService {
             ? ["Validate transactions", "Calculate the summary", "Save your tracker"]
             : input.kind === "market_briefing"
               ? ["Collect overnight market data", "Scan your watchlists", "Write the briefing"]
-              : [
-                  "Understand the outcome",
-                  "Plan the work",
-                  "Use connected tools",
-                  "Return a result",
-                ];
+              : input.kind === "research"
+                ? [
+                    "Load market data",
+                    "Gather news and peer quotes",
+                    "Estimate a valuation range",
+                    "Write the report",
+                  ]
+                : [
+                    "Understand the outcome",
+                    "Plan the work",
+                    "Use connected tools",
+                    "Return a result",
+                  ];
     const task: AgentTask = {
       id,
       title: input.title ?? input.prompt.slice(0, 90),
@@ -897,6 +906,25 @@ export class AgentService {
           },
         };
       }
+    }
+    if (task.kind === "research") {
+      const symbol = researchSymbolSchema.parse(String(task.input.symbol ?? ""));
+      const report = await generateResearchReport(
+        owner,
+        symbol,
+        { db: this.db, market: this.market, search: this.search },
+        (step, detail) => context.event("step", step, detail),
+      );
+      const artifact = await this.artifact(
+        owner,
+        task,
+        "research_report",
+        report.title,
+        `${report.symbol_code} · ${report.sections.news.length} news · ${report.sections.peer_comparison.length} peers`,
+        report as unknown as Record<string, unknown>,
+      );
+      task = await context.checkpoint({ artifactIds: [artifact.id] });
+      return this.finish(task, context, `${report.title}\n\n${report.sections.company_overview}`);
     }
     if (task.kind === "market_briefing") {
       await context.event("step", "Collecting overnight market data and watchlist moves");
