@@ -2,6 +2,8 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.ts";
 import { readConfig } from "./config.ts";
 import { createStore } from "./db.ts";
+import { backgroundFailure } from "./log.ts";
+import { getMarketDataHealth } from "./market-data-health.ts";
 
 const config = readConfig();
 const db = await createStore({
@@ -11,6 +13,11 @@ const db = await createStore({
 await db.recoverInterruptedActions();
 const { app, agent, conversationStream } = await createApp(db, config);
 if (config.taskWorkerEnabled) agent.start();
+// Startup self-check: log whether python3 + akshare is usable so a deployment that
+// silently falls back to Yahoo for A-shares is visible in logs, not only /api/health.
+void getMarketDataHealth()
+  .refresh(true)
+  .catch((error) => backgroundFailure("startup self-check", error));
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, () =>
   console.log(`LingWu ${config.mode} API ready at ${config.publicUrl}`),
 );

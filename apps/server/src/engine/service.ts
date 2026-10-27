@@ -35,6 +35,7 @@ import { backgroundFailure } from "../log.ts";
 import { resolveTaskNotifications } from "../notifications.ts";
 import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
+import { createBriefingScheduler } from "./briefing-scheduler.ts";
 import { analyzeSpending } from "./finance.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { executeModelTask } from "./model.ts";
@@ -61,6 +62,7 @@ export class AgentService {
   readonly market: MarketDataService;
   readonly watchlists: WatchlistsService;
   readonly priceAlerts: PriceAlertsService;
+  private readonly briefings: ReturnType<typeof createBriefingScheduler>;
   private maintenance?: ReturnType<typeof setInterval>;
   private refreshing = false;
   constructor(
@@ -80,6 +82,23 @@ export class AgentService {
     this.priceAlerts = new PriceAlertsService(db, market);
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
       settled: (owner, task) => this.publishOutcome(owner, task),
+    });
+    // Daily briefing: enqueue one durable task per owner per UTC date. Opt-in via
+    // BRIEFING_SCHEDULE_ENABLED so tests and manual demo runs never spawn tasks.
+    this.briefings = createBriefingScheduler({
+      db,
+      enqueue: (owner, date, attempt) =>
+        this.createTask(
+          owner,
+          {
+            kind: "market_briefing",
+            title: `每日市场简报 · ${date}`,
+            prompt:
+              "Generate the daily market briefing from overnight indexes and the user's watchlists.",
+            input: { date, scheduled_for: `${date}T00:00:00.000Z`, trigger: "schedule", attempt },
+          },
+          `market-briefing:${owner}:${date}:${attempt}`,
+        ),
     });
   }
   start() {
@@ -114,6 +133,10 @@ export class AgentService {
           .check(owner, value.id, this.alertNotifier(owner))
           .catch((error) => backgroundFailure("price alert check", error));
       }
+      // Daily briefing: durable task creation, idempotent per owner and UTC date.
+      await this.briefings
+        .runOnce()
+        .catch((error) => backgroundFailure("briefing schedule", error));
       for (const { owner, value } of await this.db.scan<Idea>("ideas"))
         if (
           value.status === "accepted" &&
