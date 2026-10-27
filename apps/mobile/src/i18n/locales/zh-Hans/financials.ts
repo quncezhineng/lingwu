@@ -16,6 +16,7 @@ const financials = {
   "financials.operatingCashFlow": "经营现金流",
   "financials.unavailable": "未取到字段",
   "financials.comparisonNone": "未找到上一期数据，仅展示本期。",
+  "financials.bannerPartial": "部分指标缺少上期/本期数据，缺失项以 — 显示。",
   "financials.statusComplete": "完整",
   "financials.statusPartial": "部分字段缺失",
   "financials.statusFailed": "解析失败",

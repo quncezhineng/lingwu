@@ -36,6 +36,31 @@ test("批量报价解析：逐项 ready / unavailable 与错误映射", () => {
   assert.equal(parsed.HANG?.status === "unavailable" ? parsed.HANG.reason : "", "timeout");
 });
 
+test("market_state：只接受明确时段，unknown/缺省保持 undefined", () => {
+  const parsed = parseBatchQuotes({
+    quotes: [
+      { symbol: "AAPL", price: 1, market_state: "regular" },
+      { symbol: "MSFT", price: 2, market_state: "PRE" },
+      { symbol: "TSLA", price: 3, marketState: "closed" },
+      { symbol: "NVDA", price: 4, market_state: "unknown" },
+      { symbol: "AMD", price: 5 },
+    ],
+  });
+  assert.equal(parsed.AAPL?.status === "ready" ? parsed.AAPL.quote.marketState : "", "regular");
+  assert.equal(parsed.MSFT?.status === "ready" ? parsed.MSFT.quote.marketState : "", "pre");
+  assert.equal(parsed.TSLA?.status === "ready" ? parsed.TSLA.quote.marketState : "", "closed");
+  assert.equal(parsed.NVDA?.status === "ready" ? parsed.NVDA.quote.marketState : "x", undefined);
+  assert.equal(parsed.AMD?.status === "ready" ? parsed.AMD.quote.marketState : "x", undefined);
+
+  const tool = parseToolQuotes({
+    quote: { symbol: "AAPL", price: 1, market_state: "post" },
+  });
+  assert.equal(
+    tool[0]?.availability.status === "ready" ? tool[0].availability.quote.marketState : "",
+    "post",
+  );
+});
+
 test("对话内联行情：单标的优先 quote，多标的取 quotes 并保留错误", () => {
   const single = parseToolQuotes({
     quote: {

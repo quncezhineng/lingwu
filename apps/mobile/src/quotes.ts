@@ -28,7 +28,7 @@ export interface QuoteView {
   currency?: string;
   asOf?: string;
   stale?: boolean;
-  marketState?: "open" | "closed" | "pre" | "post";
+  marketState?: "pre" | "regular" | "post" | "closed";
 }
 
 export type QuoteAvailability =
@@ -58,6 +58,24 @@ function str(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+/** 只接受后端明确给出的交易时段；unknown/缺省保持 undefined，不按本地时间推断。 */
+function marketStateOf(value: unknown): QuoteView["marketState"] {
+  if (typeof value !== "string") return undefined;
+  switch (value.toLowerCase()) {
+    case "pre":
+      return "pre";
+    case "regular":
+    case "open":
+      return "regular";
+    case "post":
+      return "post";
+    case "closed":
+      return "closed";
+    default:
+      return undefined;
+  }
+}
+
 export function parseBatchQuotes(payload: unknown): Record<string, QuoteAvailability> {
   const result: Record<string, QuoteAvailability> = {};
   const items = isRecord(payload) && Array.isArray(payload.quotes) ? payload.quotes : [];
@@ -85,13 +103,7 @@ export function parseBatchQuotes(payload: unknown): Record<string, QuoteAvailabi
         currency: str(item.currency),
         asOf: str(item.asOf) ?? str(item.as_of),
         stale: item.stale === true,
-        marketState:
-          item.marketState === "closed" ||
-          item.marketState === "open" ||
-          item.marketState === "pre" ||
-          item.marketState === "post"
-            ? item.marketState
-            : undefined,
+        marketState: marketStateOf(item.market_state ?? item.marketState),
       },
     };
   }
@@ -194,6 +206,7 @@ export function parseToolQuotes(payload: unknown): InlineQuoteView[] {
             currency,
             asOf: str(item.asOf) ?? str(item.as_of),
             stale: item.stale === true,
+            marketState: marketStateOf(item.market_state ?? item.marketState),
           },
         },
       },

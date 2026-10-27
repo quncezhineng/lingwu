@@ -222,8 +222,8 @@ function SymbolCard({
   const { symbol, quote, alerts, unavailable } = item;
   const alert = alerts[0];
   const summary = availabilityFromQuote(quote, unavailable);
-  // 批量报价提供 asOf/volume/stale；失败时回落到 summary 报价。
-  const merged = availability?.status === "ready" ? availability : summary;
+  // 批量报价优先：加载/逐项错误都保留其状态，只有还没拿到 availability 时才回落 summary。
+  const merged = availability ?? summary;
   return (
     <QuoteCard
       symbol={{ code: symbol.code, name: symbol.name, market: symbol.market }}

@@ -241,6 +241,16 @@ export function QuoteCard({
         ? t("quotes.delayedMinutes", { count: delayMinutes })
         : t("quotes.delayed");
     const volume = showVolume ? formatVolume(quote.volume, locale) : undefined;
+    const marketLabel =
+      quote.marketState === "pre"
+        ? t("quotes.preMarket")
+        : quote.marketState === "regular"
+          ? t("quotes.regularMarket")
+          : quote.marketState === "post"
+            ? t("quotes.postMarket")
+            : quote.marketState === "closed"
+              ? t("quotes.closed")
+              : undefined;
     const delayedChip = quote.stale ? (
       <View
         style={{
@@ -254,7 +264,7 @@ export function QuoteCard({
           {delayLabel}
         </Text>
       </View>
-    ) : quote.marketState === "closed" ? (
+    ) : marketLabel ? (
       <View
         style={{
           paddingHorizontal: 6,
@@ -263,9 +273,7 @@ export function QuoteCard({
           backgroundColor: colors.surface,
         }}
       >
-        <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>
-          {t("quotes.closed")}
-        </Text>
+        <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>{marketLabel}</Text>
       </View>
     ) : null;
     const timeText = time ? t("quotes.updatedAt", { time: time.label }) : undefined;

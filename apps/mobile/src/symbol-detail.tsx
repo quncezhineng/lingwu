@@ -26,7 +26,7 @@ import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { FileText, MessageCircle, Plus, RefreshCw, Sparkles, Trash2 } from "./icons";
 import { type Quote, removeSymbol, type SymbolMeta } from "./market";
-import { defaultCurrency, directionOf, formatPercent, formatPrice } from "./market-format";
+import { directionOf, formatPercent } from "./market-format";
 import { SymbolNotesSection } from "./note-ui";
 import { setNotesIntent } from "./notes";
 import {

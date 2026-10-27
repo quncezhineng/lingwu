@@ -1,7 +1,12 @@
 /** P1-F3 财报解析数据层单测。 */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isPdfUnsupported, parseFinancialReport } from "../src/financials.ts";
+import {
+  financialsState,
+  isPdfUnsupported,
+  missingMetricKeys,
+  parseFinancialReport,
+} from "../src/financials.ts";
 
 const PAYLOAD = {
   id: "fr-1",
@@ -32,6 +37,47 @@ test("财报解析：5 指标、单位、同比/百分点与缺失字段", () =>
   assert.deepEqual(report?.unavailable, ["operating_cash_flow"]);
   assert.equal(report?.comparisonSource, "same_pdf");
   assert.equal(report?.expectations, "not_available");
+});
+
+test("财报横幅三态：全缺失/部分缺失/完整", () => {
+  const report = parseFinancialReport(PAYLOAD);
+  assert.ok(report);
+  assert.equal(financialsState(report), "partial");
+  assert.deepEqual(missingMetricKeys(report), ["operating_cash_flow"]);
+
+  const none = parseFinancialReport({
+    ...PAYLOAD,
+    metrics: Object.fromEntries(
+      Object.entries(PAYLOAD.metrics).map(([key, metric]) => [key, { ...metric, previous: null }]),
+    ),
+  });
+  assert.equal(financialsState(none), "none");
+
+  const complete = parseFinancialReport({
+    ...PAYLOAD,
+    metrics: {
+      ...PAYLOAD.metrics,
+      operating_cash_flow: { current: 110000, previous: 100000, unit: "USD", yoy: 10 },
+    },
+    unavailable: [],
+  });
+  assert.equal(financialsState(complete), "complete");
+  assert.ok(complete);
+  assert.deepEqual(missingMetricKeys(complete), []);
+});
+
+test("缺失字段按指标 key 去重，忽略原始后缀", () => {
+  const report = parseFinancialReport({
+    ...PAYLOAD,
+    metrics: {
+      ...PAYLOAD.metrics,
+      operating_cash_flow: { current: 1, previous: 1, unit: "USD", yoy: 0 },
+      eps: { current: 6.08, previous: 6.13, unit: "per_share", yoy: -0.82 },
+    },
+    unavailable: ["eps:current", "eps:previous", "revenue:previous", "unknown:current"],
+  });
+  assert.ok(report);
+  assert.deepEqual(missingMetricKeys(report).sort(), ["eps", "revenue"]);
 });
 
 test("财报解析：report:null 与无效 payload", () => {

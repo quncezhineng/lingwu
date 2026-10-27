@@ -17,6 +17,8 @@ const financials = {
   "financials.operatingCashFlow": "Operating cash flow",
   "financials.unavailable": "Unavailable fields",
   "financials.comparisonNone": "No previous period found — showing the current period only.",
+  "financials.bannerPartial":
+    "Some metrics lack current/previous data; missing values are shown as —.",
   "financials.statusComplete": "Complete",
   "financials.statusPartial": "Partial",
   "financials.statusFailed": "Parse failed",

@@ -8,18 +8,28 @@
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Platform, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import type { LingWuApi } from "./api";
 import {
   type FinancialMetric,
   type FinancialReport,
   fetchLatestFinancials,
+  financialsState,
   isPdfUnsupported,
   METRIC_KEYS,
   type MetricKey,
+  missingMetricKeys,
   parseFinancials,
 } from "./financials";
-import { type TranslationFn, useTranslation } from "./i18n";
+import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { FileText, RefreshCw, Upload } from "./icons";
 import { Button, Card, Chip, colors, DisclaimerNote, ErrorNotice, s } from "./ui";
@@ -55,18 +65,20 @@ function formatMetric(value: number | null, unit: FinancialMetric["unit"]) {
   }).format(value)}`;
 }
 
-function formatDelta(metric: FinancialMetric, t: TranslationFn) {
+function formatDelta(metric: FinancialMetric) {
   if (metric.changePp !== undefined && metric.changePp !== null) {
     const sign = metric.changePp > 0 ? "+" : "";
     return `${sign}${metric.changePp.toFixed(1)}pp`;
   }
-  if (metric.yoy === null) return t("financials.yoy");
+  if (metric.yoy === null) return "—";
   const sign = metric.yoy > 0 ? "+" : "";
   return `${sign}${metric.yoy.toFixed(1)}%`;
 }
 
 export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolCode: string }) {
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
+  const narrow = width < 480;
   const [report, setReport] = useState<FinancialReport>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -142,7 +154,17 @@ export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolC
   }
 
   const rows = report ? METRIC_KEYS.map((key) => ({ key, metric: report.metrics[key] })) : [];
-  const missing = rows.filter((row) => row.metric.current === null).map((row) => row.key);
+  const state = financialsState(report);
+  const banner = !report
+    ? t("financials.banner")
+    : state === "none"
+      ? t("financials.comparisonNone")
+      : state === "partial"
+        ? t("financials.bannerPartial")
+        : t("financials.banner");
+  const missingLabels = report
+    ? [...new Set(missingMetricKeys(report).map((key) => t(METRIC_LABEL[key])))]
+    : [];
 
   return (
     <View style={{ marginTop: 18, gap: 8 }}>
@@ -165,7 +187,7 @@ export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolC
       <View
         style={[s.row, { gap: 6, padding: 10, borderRadius: 10, backgroundColor: colors.surface }]}
       >
-        <Text style={{ flex: 1, fontSize: 11, color: colors.muted }}>{t("financials.banner")}</Text>
+        <Text style={{ flex: 1, fontSize: 11, color: colors.muted }}>{banner}</Text>
       </View>
 
       {loading ? (
@@ -177,11 +199,6 @@ export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolC
         <Card style={{ padding: 12, gap: 8 }}>
           <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
             <Chip>{t(STATUS_LABEL[report.parseStatus])}</Chip>
-            {report.comparisonSource === "none" && (
-              <Text style={[s.small, { color: colors.alertVolumeText }]}>
-                {t("financials.comparisonNone")}
-              </Text>
-            )}
             <View style={{ flex: 1 }} />
             <Text style={[s.small, { color: colors.faint }]}>
               {t("financials.parsedAt", {
@@ -190,86 +207,145 @@ export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolC
             </Text>
           </View>
 
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: colors.line,
-              borderRadius: 10,
-              overflow: "hidden",
-            }}
-          >
+          {narrow ? (
             <View
-              style={[
-                s.row,
-                { minHeight: 34, paddingHorizontal: 10, backgroundColor: colors.surface },
-              ]}
+              style={{
+                borderWidth: 1,
+                borderColor: colors.line,
+                borderRadius: 10,
+                overflow: "hidden",
+              }}
             >
-              <Text style={[s.small, { flex: 1.4 }]}>{t("financials.metricColumn")}</Text>
-              <Text style={[s.small, { flex: 1, textAlign: "right" }]}>
-                {t("financials.current")}
-              </Text>
-              <Text style={[s.small, { flex: 1, textAlign: "right" }]}>
-                {t("financials.previous")}
-              </Text>
-              <Text style={[s.small, { flex: 1, textAlign: "right" }]}>{t("financials.yoy")}</Text>
-            </View>
-            {rows.map((row, index) => (
-              <View
-                key={row.key}
-                style={[
-                  s.row,
-                  {
-                    minHeight: 40,
+              {rows.map((row, index) => (
+                <View
+                  key={row.key}
+                  style={{
+                    minHeight: 54,
                     paddingHorizontal: 10,
+                    paddingVertical: 8,
+                    justifyContent: "center",
+                    gap: 2,
                     borderTopWidth: index ? 1 : 0,
                     borderTopColor: colors.line,
-                  },
+                  }}
+                >
+                  <View style={[s.between, { gap: 10 }]}>
+                    <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]} numberOfLines={1}>
+                      {t(METRIC_LABEL[row.key])}
+                    </Text>
+                    <Text
+                      style={[
+                        s.metric,
+                        s.text,
+                        {
+                          fontSize: 13,
+                          color: row.metric.current === null ? colors.faint : colors.text,
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {formatMetric(row.metric.current, row.metric.unit)}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      s.small,
+                      { color: row.metric.previous === null ? colors.faint : colors.muted },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {t("financials.previous")} {formatMetric(row.metric.previous, row.metric.unit)}
+                    {" · "}
+                    {t("financials.yoy")} {formatDelta(row.metric)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: colors.line,
+                borderRadius: 10,
+                overflow: "hidden",
+              }}
+            >
+              <View
+                style={[
+                  s.row,
+                  { minHeight: 34, paddingHorizontal: 10, backgroundColor: colors.surface },
                 ]}
               >
-                <Text style={[s.text, { flex: 1.4, fontSize: 12 }]} numberOfLines={1}>
-                  {t(METRIC_LABEL[row.key])}
+                <Text style={[s.small, { flex: 1.4 }]}>{t("financials.metricColumn")}</Text>
+                <Text style={[s.small, { flex: 1, textAlign: "right" }]}>
+                  {t("financials.current")}
                 </Text>
-                <Text
-                  style={[
-                    s.metric,
-                    s.small,
-                    {
-                      flex: 1,
-                      textAlign: "right",
-                      color: row.metric.current === null ? colors.faint : colors.text,
-                    },
-                  ]}
-                >
-                  {formatMetric(row.metric.current, row.metric.unit)}
+                <Text style={[s.small, { flex: 1, textAlign: "right" }]}>
+                  {t("financials.previous")}
                 </Text>
-                <Text
-                  style={[
-                    s.metric,
-                    s.small,
-                    {
-                      flex: 1,
-                      textAlign: "right",
-                      color: row.metric.previous === null ? colors.faint : colors.muted,
-                    },
-                  ]}
-                >
-                  {formatMetric(row.metric.previous, row.metric.unit)}
-                </Text>
-                <Text
-                  style={[s.metric, s.small, { flex: 1, textAlign: "right", color: colors.muted }]}
-                >
-                  {formatDelta(row.metric, t)}
+                <Text style={[s.small, { flex: 1, textAlign: "right" }]}>
+                  {t("financials.yoy")}
                 </Text>
               </View>
-            ))}
-          </View>
+              {rows.map((row, index) => (
+                <View
+                  key={row.key}
+                  style={[
+                    s.row,
+                    {
+                      minHeight: 40,
+                      paddingHorizontal: 10,
+                      borderTopWidth: index ? 1 : 0,
+                      borderTopColor: colors.line,
+                    },
+                  ]}
+                >
+                  <Text style={[s.text, { flex: 1.4, fontSize: 12 }]} numberOfLines={1}>
+                    {t(METRIC_LABEL[row.key])}
+                  </Text>
+                  <Text
+                    style={[
+                      s.metric,
+                      s.small,
+                      {
+                        flex: 1,
+                        textAlign: "right",
+                        color: row.metric.current === null ? colors.faint : colors.text,
+                      },
+                    ]}
+                  >
+                    {formatMetric(row.metric.current, row.metric.unit)}
+                  </Text>
+                  <Text
+                    style={[
+                      s.metric,
+                      s.small,
+                      {
+                        flex: 1,
+                        textAlign: "right",
+                        color: row.metric.previous === null ? colors.faint : colors.muted,
+                      },
+                    ]}
+                  >
+                    {formatMetric(row.metric.previous, row.metric.unit)}
+                  </Text>
+                  <Text
+                    style={[
+                      s.metric,
+                      s.small,
+                      { flex: 1, textAlign: "right", color: colors.muted },
+                    ]}
+                  >
+                    {formatDelta(row.metric)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
-          {(report.unavailable.length > 0 || missing.length > 0) && (
+          {missingLabels.length > 0 && (
             <Text style={[s.small, { color: colors.alertVolumeText }]}>
-              {t("financials.unavailable")}:{" "}
-              {[
-                ...new Set([...report.unavailable, ...missing.map((key) => t(METRIC_LABEL[key]))]),
-              ].join(", ")}
+              {t("financials.unavailable")}: {missingLabels.join("、")}
             </Text>
           )}
 

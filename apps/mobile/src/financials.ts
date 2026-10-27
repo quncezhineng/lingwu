@@ -119,6 +119,32 @@ export async function fetchLatestFinancials(
   return parseFinancialReport(payload);
 }
 
+/** 横幅三态：上一期全缺失 / 部分缺失 / 完整。 */
+export function financialsState(
+  report: FinancialReport | undefined,
+): "none" | "partial" | "complete" {
+  if (!report) return "complete";
+  const metrics = METRIC_KEYS.map((key) => report.metrics[key]);
+  if (metrics.every((metric) => metric.previous === null)) return "none";
+  return metrics.some((metric) => metric.current === null || metric.previous === null)
+    ? "partial"
+    : "complete";
+}
+
+/** 缺失指标：按 metric key 去重，忽略 `field:current` 之类原始后缀。 */
+export function missingMetricKeys(report: FinancialReport): MetricKey[] {
+  const keys = new Set<MetricKey>();
+  for (const key of METRIC_KEYS) {
+    const metric = report.metrics[key];
+    if (metric.current === null || metric.previous === null) keys.add(key);
+  }
+  for (const entry of report.unavailable) {
+    const key = entry.split(":")[0]?.trim();
+    if (key && (METRIC_KEYS as string[]).includes(key)) keys.add(key as MetricKey);
+  }
+  return [...keys];
+}
+
 export interface ParseFinancialsInput {
   symbolCode: string;
   text?: string;
