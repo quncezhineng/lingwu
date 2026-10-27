@@ -205,6 +205,9 @@ export const marketBriefingSchema = z.object({
   /** P0 does not yet ingest calendar/announcement events; clients must not treat [] as "no events today". */
   events_status: z.enum(["not_implemented", "available"]).default("not_implemented"),
   events_note: z.string().optional(),
+  /** "partial" means at least one index or watchlist symbol was unavailable when the briefing was generated. */
+  data_status: z.enum(["complete", "partial"]).default("complete"),
+  unavailable: z.array(z.string()).default([]),
   generated_at: z.string().datetime(),
 });
 export type MarketBriefing = z.infer<typeof marketBriefingSchema>;

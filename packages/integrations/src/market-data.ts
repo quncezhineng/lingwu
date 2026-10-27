@@ -438,6 +438,8 @@ export interface MarketDataServiceOptions {
   maxCacheEntries?: number;
   /** Deadline for one symbol across the whole provider chain. */
   quoteTimeoutMs?: number;
+  /** Deadline for one symbol search (product threshold: 5s). */
+  searchTimeoutMs?: number;
   /** Set false to skip the AKShare fallback entirely. */
   akshareEnabled?: boolean;
   /** Set false to skip returning an expired cache when providers fail. */
@@ -471,6 +473,7 @@ export class MarketDataService {
   private readonly staleTtlMs: number;
   private readonly maxCacheEntries: number;
   private readonly quoteTimeoutMs: number;
+  private readonly searchTimeoutMs: number;
   private readonly staleFallbackEnabled: boolean;
   private readonly now: () => number;
   private readonly onError: (context: MarketDataLogContext, error: unknown) => void;
@@ -492,6 +495,8 @@ export class MarketDataService {
       options.maxCacheEntries ?? envNumber("MARKET_DATA_CACHE_MAX_SIZE", 10_000);
     this.quoteTimeoutMs =
       options.quoteTimeoutMs ?? envNumber("MARKET_DATA_QUOTE_TIMEOUT_MS", DEFAULT_QUOTE_TIMEOUT_MS);
+    this.searchTimeoutMs =
+      options.searchTimeoutMs ?? envNumber("MARKET_DATA_SEARCH_TIMEOUT_MS", REQUEST_TIMEOUT_MS);
     this.staleFallbackEnabled =
       options.staleFallbackEnabled ?? process.env.MARKET_DATA_STALE_CACHE_ENABLED !== "false";
     this.now = options.now ?? Date.now;
@@ -600,7 +605,12 @@ export class MarketDataService {
   async searchSymbols(query: string, limit = 10): Promise<SymbolMatch[]> {
     if (!query.trim()) return [];
     try {
-      return await this.yahoo.searchSymbols(query, limit);
+      const matches = await withTimeout(
+        this.yahoo.searchSymbols(query, limit),
+        this.searchTimeoutMs,
+        "Timed out searching symbols",
+      );
+      return matches;
     } catch (error) {
       this.report({ phase: "searchSymbols", provider: "yahoo", kind: "provider_error" }, error);
       throw error instanceof MarketDataError
