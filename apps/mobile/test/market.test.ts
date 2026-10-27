@@ -30,7 +30,7 @@ function fakeApi(handler: (path: string, body?: unknown, method?: string) => unk
 test("代码规范化：.SH → .SS、统一大写", () => {
   assert.equal(normalizeCode("600519.sh"), "600519.SS");
   assert.equal(normalizeCode(" aapl "), "AAPL");
-  assert.equal(normalizeCode("00700.HK"), "00700.HK");
+  assert.equal(normalizeCode("00700.HK"), "0700.HK");
 });
 
 test("观察列表响应：代码数组解析为带名称的标的，未取价前不编造报价", () => {

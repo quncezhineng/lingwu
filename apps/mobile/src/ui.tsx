@@ -245,10 +245,13 @@ export function IconButton({
   icon: Icon,
   label,
   onPress,
+  size = 38,
 }: {
   icon: IconComponent;
   label: string;
   onPress: () => void;
+  /** Touch target; pass 44 for dense table rows that need a larger hit area. */
+  size?: number;
 }) {
   return (
     <Pressable
@@ -257,8 +260,8 @@ export function IconButton({
       onPress={onPress}
       style={({ pressed }) => [
         {
-          width: 38,
-          height: 38,
+          width: size,
+          height: size,
           alignItems: "center",
           justifyContent: "center",
           borderRadius: 10,
@@ -266,7 +269,7 @@ export function IconButton({
         },
       ]}
     >
-      <Icon size={18} strokeWidth={1.8} color={colors.muted} />
+      <Icon size={size >= 44 ? 20 : 18} strokeWidth={1.8} color={colors.muted} />
     </Pressable>
   );
 }

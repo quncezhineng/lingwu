@@ -766,7 +766,7 @@ function WatchlistSheet({
 }
 
 export function WatchlistScreen() {
-  const { api, notify, open } = useWorkspace();
+  const { api, navigate, notify, open } = useWorkspace();
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const state = useWatchlistState();
@@ -899,6 +899,14 @@ export function WatchlistScreen() {
             );
           })}
         </View>
+        <Button
+          small
+          icon={CircleDollarSign}
+          style={{ minHeight: 44 }}
+          onPress={() => navigate("portfolio")}
+        >
+          {t("app.titlePortfolio")}
+        </Button>
         <Button
           small
           primary

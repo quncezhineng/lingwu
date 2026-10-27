@@ -6,6 +6,7 @@ import common from "./common";
 import computer from "./computer";
 import details from "./details";
 import markets from "./markets";
+import portfolio from "./portfolio";
 import research from "./research";
 import screens from "./screens";
 import status from "./status";
@@ -29,6 +30,7 @@ export const zhHans = {
   ...details,
   ...markets,
   ...research,
+  ...portfolio,
   ...computer,
   ...threads,
   ...tools,
