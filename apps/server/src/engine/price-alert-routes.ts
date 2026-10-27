@@ -30,8 +30,9 @@ export function priceAlertRoutes(service: AgentService): Hono<Env> {
       owner,
       c.req.param("id"),
       async (title, body, key) => {
-        await service.notify(owner, title, body, undefined, key);
-        return { id: key, title, body };
+        // Return the stored notification so clients receive the real primary key.
+        const notification = await service.notify(owner, title, body, undefined, key);
+        return { id: notification.id, title, body };
       },
     );
     return c.json(result);

@@ -234,3 +234,11 @@ test("unknown symbol returns a null report", async () => {
   const result = await call<{ report: ResearchReport | null }>("/research/ZZZZ");
   assert.equal(result.report, null);
 });
+
+test("flags unresolved company data when the profile lookup returns nothing", async () => {
+  await call("/research", { method: "POST", body: JSON.stringify({ symbol: "MSFT" }) }, 201);
+  await server.agent.worker.tick();
+  const { report } = await call<{ report: ResearchReport }>("/research/MSFT");
+  assert.equal(report.title, "MSFT 深度研究");
+  assert.ok(report.sections.risks.some((risk) => risk.includes("公司资料未完整解析")));
+});
