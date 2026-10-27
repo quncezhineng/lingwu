@@ -6,10 +6,12 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  type StyleProp,
   StyleSheet,
   Text,
   TextInput,
   type TextInputProps,
+  type TextStyle,
   useWindowDimensions,
   View,
   type ViewStyle,
@@ -569,6 +571,18 @@ export function Mascot({ size = 42, variant }: { size?: number; variant?: string
         accessible={false}
       />
     </View>
+  );
+}
+/**
+ * 合规声明：所有行情/简报/研报类界面都应展示「不构成投资建议」。
+ * 统一放在 ui 层，避免各页面各写一份导致遗漏或文案不一致。
+ */
+export function DisclaimerNote({ style }: { style?: StyleProp<TextStyle> }) {
+  const { t } = useTranslation();
+  return (
+    <Text style={[s.small, { color: colors.faint, marginTop: 12 }, style]}>
+      {t("ui.disclaimer")}
+    </Text>
   );
 }
 export function dateLabel(value: string, options?: Intl.DateTimeFormatOptions) {

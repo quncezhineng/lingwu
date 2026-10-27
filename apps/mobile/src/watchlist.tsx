@@ -53,7 +53,17 @@ import {
   useWatchlistState,
   type WatchlistSymbol,
 } from "./market";
-import { Button, Card, colors, Empty, ErrorNotice, IconButton, Sheet, s } from "./ui";
+import {
+  Button,
+  Card,
+  colors,
+  DisclaimerNote,
+  Empty,
+  ErrorNotice,
+  IconButton,
+  Sheet,
+  s,
+} from "./ui";
 import { useWorkspace } from "./workspace";
 
 const MARKET_FILTERS: ReadonlyArray<{ id: MarketKind | "all"; labelKey: TranslationKey }> = [
@@ -1004,6 +1014,7 @@ export function WatchlistScreen() {
           })}
         </Text>
       </View>
+      <DisclaimerNote style={{ marginTop: 0, textAlign: "right" }} />
 
       {sheet === "create" && (
         <WatchlistSheet

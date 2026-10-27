@@ -28,7 +28,7 @@ import {
   todayISO,
   useBriefingState,
 } from "./market";
-import { Button, Card, colors, ErrorNotice, s } from "./ui";
+import { Button, Card, colors, DisclaimerNote, ErrorNotice, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
 function formatPercent(value: number) {
@@ -414,6 +414,7 @@ export function MarketBriefingCard() {
               onPress={() => (expanded ? navigate("watchlist") : toggle())}
             />
           </View>
+          <DisclaimerNote />
         </View>
       )}
     </Card>

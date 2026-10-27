@@ -5,6 +5,7 @@ const ui = {
   "ui.closeDetails": "关闭详情",
   "ui.capybaraLabel": "灵悟水豚",
   "ui.replySaved": "回复已保存到本地「已发送」。",
+  "ui.disclaimer": "以上内容为信息整理，不构成投资建议。",
 } satisfies Dictionary;
 
 export default ui;
