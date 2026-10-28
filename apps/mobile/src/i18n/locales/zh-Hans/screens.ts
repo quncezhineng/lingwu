@@ -90,8 +90,13 @@ const screens = {
     "在上方打开一个会话，把浏览记录汇聚在一起。配置好浏览器工作进程后，即可显示实时预览。",
 
   // Files 文件
-  "screens.filesSubtitle": "研报与公告，留一点整理的空间。",
+  "screens.filesSubtitle": "研报、公告、领悟卡与笔记，都在这一页。",
   "screens.filesImport": "导入 PDF 或 HTML",
+  "screens.libraryFiles": "文件资料",
+  "screens.libraryInsights": "领悟卡",
+  "screens.libraryNotes": "我的笔记",
+  "screens.libraryInsightsEmptyTitle": "还没有沉淀下来的领悟卡",
+  "screens.libraryInsightsEmptyDetail": "完成的研报、对比与市场简报会自动归档到这里。",
   "screens.filesDocumentBadge": "文档",
   "screens.filesResearchHeading": "研究产物",
   "screens.filesDocumentsHeading": "文件",

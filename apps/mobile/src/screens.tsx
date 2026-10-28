@@ -18,14 +18,13 @@ import type {
   CalendarEvent,
   EmailDraft,
 } from "../../../packages/domain/src";
-import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
 import { API_URL } from "./api";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
 import { fileKind } from "./file-kind";
-import { buildFileLibrary, markdownExcerpt } from "./file-library";
+import { buildFileLibrary } from "./file-library";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel } from "./i18n/translate";
 import {
@@ -36,7 +35,6 @@ import {
   CheckCheck,
   ChevronLeft,
   ChevronRight,
-  CircleDollarSign,
   Clock3,
   Cpu,
   FileText,
@@ -50,6 +48,10 @@ import {
   Sparkles,
   Upload,
 } from "./icons";
+import { InsightCard } from "./insight-card";
+import { NotesScreen } from "./notes-screen";
+import { PageHeader } from "./page-header";
+import { breakpoints, layout, space } from "./theme";
 import {
   Button,
   Card,
@@ -1032,13 +1034,36 @@ export function BrowserScreen() {
     </View>
   );
 }
-export function FilesScreen() {
-  const { workspace: w, api, refresh, open, navigate } = useWorkspace();
+type LibrarySection = "files" | "insights" | "notes";
+
+export function FilesScreen({ initialSection = "files" }: { initialSection?: LibrarySection }) {
+  const { workspace: w, api, refresh, open } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
+  const [section, setSection] = useState<LibrarySection>(initialSection);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // 收藏态占位：P2-6 契约接入前只在本次会话内生效，不写后端。
+  const [saved, setSaved] = useState<Set<string>>(() => new Set());
   const library = buildFileLibrary(w.files, agent?.artifacts || []);
+  // 内容区宽度：桌面扣侧栏与页面 padding，决定资料卡栅格列数（避免单卡右侧大片留白）。
+  const contentWidth =
+    width >= breakpoints.desktop
+      ? width - layout.sidebar - space.page * 2
+      : width - space.pageMobile * 2;
+  const columns = contentWidth >= 1080 ? 3 : contentWidth >= 700 ? 2 : 1;
+  const cardWidth = columns === 1 ? "100%" : columns === 2 ? "48.5%" : "31.8%";
+
+  useEffect(() => {
+    setSection(initialSection);
+  }, [initialSection]);
+
+  const sections: ReadonlyArray<{ id: LibrarySection; label: string }> = [
+    { id: "files", label: t("screens.libraryFiles") },
+    { id: "insights", label: t("screens.libraryInsights") },
+    { id: "notes", label: t("screens.libraryNotes") },
+  ];
   async function upload() {
     setError("");
     setBusy(true);
@@ -1080,47 +1105,82 @@ export function FilesScreen() {
   }
   return (
     <View style={{ gap: 20 }}>
-      <View style={s.between}>
-        <Text style={[s.muted, { flex: 1, marginRight: 15 }]}>{t("screens.filesSubtitle")}</Text>
-        <Button primary icon={Upload} busy={busy} onPress={() => void upload()}>
-          {t("screens.filesImport")}
-        </Button>
+      {/* N4：副标题一行，导入动作收进页头右侧 */}
+      <PageHeader
+        title={t("app.titleFiles")}
+        description={t("screens.filesSubtitle")}
+        compact={width < breakpoints.desktop}
+        actions={
+          section === "files" ? (
+            <Button primary icon={Upload} busy={busy} onPress={() => void upload()}>
+              {t("screens.filesImport")}
+            </Button>
+          ) : undefined
+        }
+        style={{ marginBottom: 0 }}
+      />
+      {/* D3：单页三分区，旧「资料/笔记」两页入口都落到这里 */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignSelf: "flex-start",
+          padding: 4,
+          gap: 4,
+          borderRadius: 14,
+          backgroundColor: colors.surface,
+        }}
+      >
+        {sections.map((item) => {
+          const active = item.id === section;
+          return (
+            <Pressable
+              key={item.id}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              onPress={() => setSection(item.id)}
+              style={{
+                minHeight: 34,
+                paddingHorizontal: 14,
+                borderRadius: 9,
+                justifyContent: "center",
+                backgroundColor: active ? colors.paper : "transparent",
+                borderWidth: 1,
+                borderColor: active ? colors.line : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: active ? "600" : "500",
+                  color: active ? colors.text : colors.muted,
+                }}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
       <ErrorNotice error={error || agentError} />
-      <Card style={{ paddingVertical: 2 }}>
-        <LinkRow
-          icon={FileText}
-          title={t("app.titleNotes")}
-          detail={t("agent.shortcutNotesDetail")}
-          onPress={() => navigate("notes")}
-        />
-      </Card>
-      {library.artifacts.length > 0 && (
-        <View style={{ gap: 2 }}>
-          <SectionHeading title={t("screens.filesResearchHeading")} />
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 18 }}>
-            {library.artifacts.map((artifact) => (
-              <ResearchArtifactCard key={artifact.id} artifact={artifact} />
-            ))}
-          </View>
-        </View>
-      )}
-      {library.files.length > 0 && (
-        <View style={{ gap: 2 }}>
-          <SectionHeading title={t("screens.filesDocumentsHeading")} />
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 18 }}>
+
+      {section === "files" &&
+        (library.files.length ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, alignItems: "stretch" }}>
             {library.files.map((f) => {
               const kind = fileKind(f);
               return (
                 <Pressable
                   key={f.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={f.name}
                   onPress={() => open({ type: "file", file: f })}
-                  style={{ flexGrow: 1, flexBasis: 250, maxWidth: 430 }}
+                  style={{ width: library.files.length === 1 ? "100%" : cardWidth }}
                 >
-                  <Card style={{ padding: 0, overflow: "hidden" }}>
+                  <Card style={{ padding: 0, overflow: "hidden", width: "100%" }}>
+                    {/* L2：封面 175→120，移动端首屏至少露出两张卡 */}
                     <View
                       style={{
-                        height: 175,
+                        height: 120,
                         backgroundColor: colors.tertiary,
                         justifyContent: "center",
                         alignItems: "center",
@@ -1128,45 +1188,44 @@ export function FilesScreen() {
                     >
                       <View
                         style={{
-                          width: 93,
-                          height: 121,
+                          width: 64,
+                          height: 84,
                           borderRadius: 5,
                           backgroundColor: colors.paper,
-                          padding: 14,
+                          padding: 9,
                           transform: [{ rotate: "-4deg" }],
                           borderWidth: 1,
                           borderColor: colors.line,
                         }}
                       >
-                        <View style={[s.row, { gap: 5, marginBottom: 15 }]}>
-                          <FileText size={13} color={colors.primary} />
+                        <View style={[s.row, { gap: 3, marginBottom: 8 }]}>
+                          <FileText size={10} color={colors.primary} />
                           <Text style={{ fontSize: 10, color: colors.primaryStrong }}>
                             {t("screens.filesDocumentBadge")}
                           </Text>
                         </View>
-                        {[100, 75, 90, 95, 60].map((width, i) => (
+                        {[100, 75, 90, 95, 60].map((barWidth, i) => (
                           <View
-                            key={width}
+                            key={barWidth}
                             style={{
-                              height: 3,
+                              height: 2,
                               backgroundColor: i === 0 ? colors.primary : colors.tertiary,
-                              width: `${width}%`,
-                              marginBottom: 7,
+                              width: `${barWidth}%`,
+                              marginBottom: 5,
                               borderRadius: 4,
                             }}
                           />
                         ))}
                       </View>
-                      <View style={{ position: "absolute", bottom: 12, right: 14 }}>
+                      <View style={{ position: "absolute", bottom: 10, right: 12 }}>
                         <Chip>{kind === "html" ? "HTML" : "PDF"}</Chip>
                       </View>
                     </View>
-                    {/* 卡片正文收紧到紧凑密度：内边距 14、间距 6 */}
                     <View style={{ padding: 14, gap: 6 }}>
                       <Text numberOfLines={1} style={[s.heading, { fontSize: 14 }]}>
                         {f.name}
                       </Text>
-                      <Text style={s.small}>
+                      <Text numberOfLines={1} style={s.small}>
                         {kind === "html"
                           ? t("screens.filesWebPage")
                           : `${f.pageCount} ${t(f.pageCount === 1 ? "screens.filesPage" : "screens.filesPages")}`}{" "}
@@ -1182,107 +1241,58 @@ export function FilesScreen() {
               );
             })}
           </View>
-        </View>
-      )}
-      {!library.artifacts.length && !library.files.length && (
-        <Card>
-          <Empty
-            icon={FileText}
-            title={t("screens.filesEmptyTitle")}
-            detail={t("screens.filesEmptyDetail")}
-          />
-        </Card>
-      )}
-    </View>
-  );
-}
-function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
-  const { open } = useWorkspace();
-  const { t } = useTranslation();
-  const Icon = artifact.kind === "finance" ? CircleDollarSign : FileText;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t("screens.filesOpenResearchArtifact", { name: artifact.title })}
-      onPress={() => open({ type: "artifact", artifact })}
-      style={{ flexGrow: 1, flexBasis: 250, maxWidth: 430 }}
-    >
-      <Card style={{ padding: 0, overflow: "hidden" }}>
-        {/* 封面用中性面 tertiary，品牌浅底只留给小面积状态 Chip */}
-        <View
-          style={{
-            height: 175,
-            backgroundColor: colors.tertiary,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <View
-            style={{
-              width: 103,
-              height: 127,
-              borderRadius: 7,
-              backgroundColor: colors.paper,
-              padding: 15,
-              transform: [{ rotate: "2deg" }],
-              borderWidth: 1,
-              borderColor: colors.line,
-              gap: 9,
-            }}
-          >
-            <View style={[s.row, { gap: 7 }]}>
+        ) : (
+          <Card>
+            <Empty
+              icon={FileText}
+              title={t("screens.filesEmptyTitle")}
+              detail={t("screens.filesEmptyDetail")}
+            >
+              <Button primary icon={Upload} busy={busy} onPress={() => void upload()}>
+                {t("screens.filesImport")}
+              </Button>
+            </Empty>
+          </Card>
+        ))}
+
+      {section === "insights" &&
+        (library.artifacts.length ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, alignItems: "stretch" }}>
+            {library.artifacts.map((artifact) => (
               <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 7,
-                  backgroundColor: colors.surface,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
+                key={artifact.id}
+                style={{ width: library.artifacts.length === 1 ? "100%" : cardWidth }}
               >
-                <Sparkles size={13} color={colors.primary} />
+                <InsightCard
+                  eyebrow={`${t("screens.libraryInsights")} · ${statusLabel(artifact.kind)}`}
+                  title={artifact.summary || artifact.title}
+                  meta={`${artifact.title} · ${dateLabel(artifact.createdAt)}`}
+                  saved={saved.has(artifact.id)}
+                  onToggleSave={() =>
+                    setSaved((current) => {
+                      const next = new Set(current);
+                      if (next.has(artifact.id)) next.delete(artifact.id);
+                      else next.add(artifact.id);
+                      return next;
+                    })
+                  }
+                  onPress={() => open({ type: "artifact", artifact })}
+                />
               </View>
-              <Text style={{ flex: 1, fontSize: 10, color: colors.primaryStrong }}>
-                {t("screens.filesResearchBadge")}
-              </Text>
-            </View>
-            {[92, 76, 98, 66].map((width, index) => (
-              <View
-                key={width}
-                style={{
-                  height: 4,
-                  borderRadius: 4,
-                  width: `${width}%`,
-                  backgroundColor: index === 0 ? colors.primary : colors.tertiary,
-                }}
-              />
             ))}
           </View>
-          <View style={{ position: "absolute", bottom: 12, right: 14 }}>
-            <Chip tint={colors.paper}>{statusLabel(artifact.kind)}</Chip>
-          </View>
-        </View>
-        {/* 卡片正文收紧到紧凑密度：内边距 14、间距 6 */}
-        <View style={{ padding: 14, gap: 6 }}>
-          <View style={[s.row, { gap: 8 }]}>
-            <Icon size={15} color={colors.primary} />
-            <Text numberOfLines={1} style={[s.heading, { flex: 1, fontSize: 14 }]}>
-              {artifact.title}
-            </Text>
-          </View>
-          <Text numberOfLines={2} style={[s.small, { minHeight: 34 }]}>
-            {artifact.summary
-              ? markdownExcerpt(artifact.summary)
-              : t("screens.filesGeneratedByAgent")}
-          </Text>
-          <View style={[s.between, { marginTop: 9 }]}>
-            <Chip>{t("screens.filesGeneratedByAgent")}</Chip>
-            <Text style={s.small}>{dateLabel(artifact.createdAt)}</Text>
-          </View>
-        </View>
-      </Card>
-    </Pressable>
+        ) : (
+          <Card>
+            <Empty
+              icon={Sparkles}
+              title={t("screens.libraryInsightsEmptyTitle")}
+              detail={t("screens.libraryInsightsEmptyDetail")}
+            />
+          </Card>
+        ))}
+
+      {section === "notes" && <NotesScreen />}
+    </View>
   );
 }
 export function ActivityScreen() {

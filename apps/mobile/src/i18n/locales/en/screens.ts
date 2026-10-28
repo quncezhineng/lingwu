@@ -93,6 +93,12 @@ const screens = {
   // Files 文件
   "screens.filesSubtitle": "Reports and filings, with room to organize.",
   "screens.filesImport": "Import PDF or HTML",
+  "screens.libraryFiles": "Documents",
+  "screens.libraryInsights": "Insights",
+  "screens.libraryNotes": "My notes",
+  "screens.libraryInsightsEmptyTitle": "No saved insights yet",
+  "screens.libraryInsightsEmptyDetail":
+    "Finished reports, comparisons and briefings are filed here automatically.",
   "screens.filesDocumentBadge": "DOCUMENT",
   "screens.filesResearchHeading": "Research outputs",
   "screens.filesDocumentsHeading": "Files",

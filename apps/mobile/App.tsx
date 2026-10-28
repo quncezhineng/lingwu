@@ -34,7 +34,6 @@ import { LanguageSwitcher } from "./src/i18n/LanguageSwitcher";
 import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
 import { Bell, Check, Menu, Search, X } from "./src/icons";
-import { NotesScreen } from "./src/notes-screen";
 import { PageHeader } from "./src/page-header";
 import { PortfolioScreen } from "./src/portfolio-screen";
 import { PreferencesScreen } from "./src/preferences-screen";
@@ -438,25 +437,21 @@ function WorkspaceShell({
         ? WatchlistScreen
         : section === "portfolio"
           ? PortfolioScreen
-          : section === "notes"
-            ? NotesScreen
-            : section === "mail"
-              ? MailScreen
-              : section === "calendar"
-                ? CalendarScreen
-                : section === "browser"
-                  ? BrowserScreen
-                  : section === "files"
-                    ? FilesScreen
-                    : section === "activity"
-                      ? AgentActivityScreen
-                      : section === "ideas"
-                        ? IdeasScreen
-                        : section === "goals"
-                          ? GoalsScreen
-                          : section === "preferences"
-                            ? PreferencesScreen
-                            : CapabilityHubScreen;
+          : section === "mail"
+            ? MailScreen
+            : section === "calendar"
+              ? CalendarScreen
+              : section === "browser"
+                ? BrowserScreen
+                : section === "activity"
+                  ? AgentActivityScreen
+                  : section === "ideas"
+                    ? IdeasScreen
+                    : section === "goals"
+                      ? GoalsScreen
+                      : section === "preferences"
+                        ? PreferencesScreen
+                        : CapabilityHubScreen;
   return (
     <>
       <WorkspaceTools />
@@ -631,13 +626,13 @@ function WorkspaceShell({
                     }}
                     keyboardShouldPersistTaps="handled"
                   >
-                    {section !== "today" && (
+                    {section !== "today" && section !== "files" && section !== "notes" && (
                       <PageHeader
                         title={title ? t(title.titleKey) : ""}
                         description={title ? t(title.subtitleKey) : undefined}
                         compact={!desktop}
                         actions={
-                          section === "portfolio" || section === "notes" ? (
+                          section === "portfolio" ? (
                             <Button
                               small
                               onPress={() =>
@@ -655,7 +650,13 @@ function WorkspaceShell({
                       />
                     )}
                     <ErrorNotice error={error} />
-                    {section === "account" ? <AccountScreen onSignOut={onSignOut} /> : <Screen />}
+                    {section === "account" ? (
+                      <AccountScreen onSignOut={onSignOut} />
+                    ) : section === "files" || section === "notes" ? (
+                      <FilesScreen initialSection={section === "notes" ? "notes" : "files"} />
+                    ) : (
+                      <Screen />
+                    )}
                   </ScrollView>
                 )}
                 <View
