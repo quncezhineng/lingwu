@@ -24,7 +24,7 @@ const notes = {
   "notes.groupThisWeek": "本周",
   "notes.groupEarlier": "更早",
   "notes.emptyTitle": "还没有笔记",
-  "notes.emptyDetail": "记录你的买入理由、研究心得，或创建一条可跟踪的论点。",
+  "notes.emptyDetail": "记录买入理由与研究心得，创建可跟踪的论点。",
   "notes.emptyCreate": "写第一条笔记",
   "notes.noResultsTitle": "没有符合条件的笔记",
   "notes.noResultsDetail": "试试清除筛选或换个关键词。",

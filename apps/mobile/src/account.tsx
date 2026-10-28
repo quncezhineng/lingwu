@@ -7,7 +7,10 @@ import { useTranslation } from "./i18n";
 import {
   Archive,
   ArrowLeft,
+  Bell,
   CalendarClock,
+  FileText,
+  Heart,
   type IconComponent,
   IdCard,
   LogOut,
@@ -16,6 +19,7 @@ import {
   Monitor,
   RotateCcw,
   Search,
+  Shapes,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -251,7 +255,7 @@ function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
  */
 export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
   const { t } = useTranslation();
-  const { api } = useWorkspace();
+  const { api, navigate } = useWorkspace();
   const { enabled: richThreads } = useLingWuThread();
   const [view, setView] = useState<"overview" | "archived">("overview");
   const [profile, setProfile] = useState<AccountProfile>();
@@ -346,6 +350,36 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
             value={
               expiresAt ? `${dateLabel(expiresAt)} ${timeLabel(expiresAt)}` : t("app.profileUnset")
             }
+          />
+        </Card>
+      </View>
+      {/* I3：移动端二次入口——资料 / 偏好 / 应用与资源 / 盯盘 */}
+      <View style={{ gap: 10 }}>
+        <Text style={s.heading}>{t("app.moreHeading")}</Text>
+        <Card style={{ paddingVertical: 4 }}>
+          <LinkRow
+            icon={FileText}
+            title={t("app.titleFiles")}
+            detail={t("app.destFilesDetail")}
+            onPress={() => navigate("files")}
+          />
+          <LinkRow
+            icon={Heart}
+            title={t("app.titlePreferences")}
+            detail={t("app.destPreferencesDetail")}
+            onPress={() => navigate("preferences")}
+          />
+          <LinkRow
+            icon={Shapes}
+            title={t("app.titleApps")}
+            detail={t("app.destAppsDetail")}
+            onPress={() => navigate("apps")}
+          />
+          <LinkRow
+            icon={Bell}
+            title={t("app.titleGoals")}
+            detail={t("app.destGoalsDetail")}
+            onPress={() => navigate("goals")}
           />
         </Card>
       </View>

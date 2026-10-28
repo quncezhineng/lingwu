@@ -11,6 +11,7 @@ import {
   type TextStyle,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from "react-native";
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import type { Artifact, BrowserSession } from "../../../packages/domain/src";
@@ -344,17 +345,35 @@ export function AgentActivityScreen() {
     <View style={{ gap: 20 }}>
       <AgentStatus />
       {/* 唯一一套筛选：五个状态 Tab + 计数；窄屏横向滚动，不折成两行 */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingBottom: 2 }}
-      >
-        {TASK_FILTERS.map(({ id, labelKey }) => (
-          <Button key={id} small primary={filter === id} onPress={() => setFilter(id)}>
-            {`${t(labelKey)} · ${counts[id]}`}
-          </Button>
-        ))}
-      </ScrollView>
+      <View style={{ position: "relative" }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingRight: 24, paddingBottom: 2 }}
+        >
+          {TASK_FILTERS.map(({ id, labelKey }) => (
+            <Button key={id} small primary={filter === id} onPress={() => setFilter(id)}>
+              {`${t(labelKey)} · ${counts[id]}`}
+            </Button>
+          ))}
+        </ScrollView>
+        {/* H4：右缘 24px 渐隐，提示还有未展示的 Tab（仅 Web，RN 原生无 gradient 样式） */}
+        {Platform.OS === "web" && (
+          <View
+            pointerEvents="none"
+            style={
+              {
+                position: "absolute",
+                right: 0,
+                top: 0,
+                bottom: 2,
+                width: 24,
+                backgroundImage: `linear-gradient(to right, rgba(248,248,248,0), ${colors.canvas})`,
+              } as unknown as ViewStyle
+            }
+          />
+        )}
+      </View>
       {tasks.map((task) => (
         <TaskCard key={task.id} task={task} />
       ))}
