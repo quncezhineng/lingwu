@@ -94,6 +94,7 @@ export function QuoteCard({
   size,
   onPress,
   footer,
+  metaAction,
   onRetry,
   showVolume = true,
   narrow,
@@ -104,6 +105,8 @@ export function QuoteCard({
   size: "compact" | "standard";
   onPress?: () => void;
   footer?: ReactNode;
+  /** meta 行右侧的动作（如「⋯」更多操作），避免单独再占一行。 */
+  metaAction?: ReactNode;
   onRetry?: () => void;
   showVolume?: boolean;
   /** 强制两行布局（网格卡片等窄容器）。 */
@@ -345,6 +348,7 @@ export function QuoteCard({
         )}
         <View style={{ flex: 1 }} />
         {delayedChip}
+        {metaAction}
       </View>
     );
 

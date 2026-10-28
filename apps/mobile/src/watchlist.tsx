@@ -244,37 +244,35 @@ function SymbolCard({
       onRetry={onRetry}
       onPress={onPress}
       style={style}
+      metaAction={
+        onMore ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("markets.symbolMore", { name: symbol.name })}
+            hitSlop={10}
+            onPress={(event) => {
+              event.stopPropagation();
+              onMore();
+            }}
+            style={({ pressed }) => ({
+              width: 28,
+              height: 24,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 7,
+              backgroundColor: pressed ? colors.overlay1 : "transparent",
+            })}
+          >
+            <MoreHorizontal size={15} color={colors.faint} />
+          </Pressable>
+        ) : undefined
+      }
       footer={
-        <View style={[s.between, { gap: 8, minHeight: 24 }]}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            {alert ? (
-              <AlertBadge alert={alert} />
-            ) : unavailable && !quote ? (
-              <Text style={s.small}>{t("markets.quoteUnavailable")}</Text>
-            ) : null}
-          </View>
-          {!!onMore && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("markets.symbolMore", { name: symbol.name })}
-              hitSlop={10}
-              onPress={(event) => {
-                event.stopPropagation();
-                onMore();
-              }}
-              style={({ pressed }) => ({
-                width: 28,
-                height: 24,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 7,
-                backgroundColor: pressed ? colors.overlay1 : "transparent",
-              })}
-            >
-              <MoreHorizontal size={15} color={colors.faint} />
-            </Pressable>
-          )}
-        </View>
+        alert ? (
+          <AlertBadge alert={alert} />
+        ) : unavailable && !quote ? (
+          <Text style={s.small}>{t("markets.quoteUnavailable")}</Text>
+        ) : undefined
       }
     />
   );

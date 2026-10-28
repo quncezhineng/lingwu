@@ -211,9 +211,26 @@ function renderFinance(artifact: AgentArtifact): string {
     <section class="block"><h2>${escapeHtml(tr("agent.viewTransactions"))}</h2>${renderValue(transactions)}</section>`;
 }
 
-/** 通用产物渲染：按顶层字段逐一渲染数据块。 */
+/**
+ * 洞察三段在详情浮层顶部已有独立展示（依据 / 还不能判断什么 / 何时回看），
+ * 产物 HTML 里再画一遍会重复，这里统一排除这些数据键（含别名）。
+ */
+const INSIGHT_SECTION_KEYS = new Set([
+  "basis",
+  "evidence",
+  "evidenceSummary",
+  "limits",
+  "caveats",
+  "unknowns",
+  "revisit",
+  "reviewAt",
+  "revisitAt",
+]);
+
+/** 通用产物渲染：按顶层字段逐一渲染数据块（跳过洞察三段键）。 */
 function renderGeneric(artifact: AgentArtifact): string {
   return Object.entries(artifact.data)
+    .filter(([key]) => !INSIGHT_SECTION_KEYS.has(key))
     .map(
       ([key, value]) =>
         `<section class="block"><h2>${label(key)}</h2>${

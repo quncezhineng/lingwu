@@ -7,7 +7,7 @@ const agent = {
   "agent.reconnectAgent": "Reconnect agent",
   "agent.workerOffline": "Worker is offline. Saved work will continue when it reconnects.",
   "agent.openTaskLabel": "Open task: {title}",
-  "agent.planStepsProgress": " · {done}/{total} steps",
+  "agent.planStepsProgress": "{done}/{total} steps",
   "agent.reviewRequested": "Review requested",
   "agent.inputNeeded": "Your input is needed",
   "agent.filterAll": "All",

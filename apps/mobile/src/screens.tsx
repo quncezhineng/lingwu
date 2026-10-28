@@ -1305,101 +1305,97 @@ export function ActivityScreen() {
       b.createdAt.localeCompare(a.createdAt),
   );
   return (
-    <View style={{ gap: 20 }}>
-      {actions.length > 0 && (
-        <Card>
-          <SectionHeading title={t("screens.activityActionsHeading")} />
-          {actions.map((a) => (
-            <Pressable
-              key={a.id}
-              onPress={() => open({ type: "review", action: a })}
-              // 列表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
-              style={({ pressed }) => [
-                s.row,
-                {
-                  gap: 14,
-                  paddingVertical: 12,
-                  borderTopWidth: 1,
-                  borderTopColor: colors.line,
-                  borderRadius: 10,
-                },
-                pressed && { backgroundColor: colors.overlay1 },
-              ]}
-            >
-              <View
-                style={[
-                  s.iconBox,
-                  {
-                    // 图标底座用中性面；品牌浅底只留给下面的小面积状态 Chip
-                    backgroundColor: a.status === "awaiting_review" ? colors.surface : colors.green,
-                  },
-                ]}
-              >
-                {a.status === "awaiting_review" ? (
-                  <ShieldCheck size={18} color={colors.primary} />
-                ) : (
-                  <CheckCheck size={18} color={colors.text} />
-                )}
-              </View>
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={s.text}>{runtimeLabel(a.title)}</Text>
-                <Text style={s.small}>{relativeDate(a.createdAt)}</Text>
-              </View>
-              <Chip
-                tint={
-                  a.status === "failed"
-                    ? colors.errorSoft
-                    : a.status === "awaiting_review"
-                      ? colors.sky
-                      : colors.paper
-                }
-              >
-                {statusLabel(a.status)}
-              </Chip>
-              <ChevronRight size={16} color={colors.muted} />
-            </Pressable>
-          ))}
-        </Card>
-      )}
-      <Card>
-        <SectionHeading title={t("screens.activityTimelineHeading")} />
-        {w.activity.length ? (
-          w.activity.map((a, i) => (
+    <Card style={{ gap: 0 }}>
+      {/* 审批与时间线是同一条回执的两个维度，合并为一张卡、1px 分隔 */}
+      <SectionHeading title={t("screens.activityActionsHeading")} style={{ marginBottom: 6 }} />
+      {actions.length ? (
+        actions.map((a) => (
+          <Pressable
+            key={a.id}
+            onPress={() => open({ type: "review", action: a })}
+            // 列表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+            style={({ pressed }) => [
+              s.row,
+              {
+                gap: 14,
+                paddingVertical: 12,
+                borderTopWidth: 1,
+                borderTopColor: colors.line,
+                borderRadius: 10,
+              },
+              pressed && { backgroundColor: colors.overlay1 },
+            ]}
+          >
             <View
-              key={a.id}
               style={[
-                s.row,
+                s.iconBox,
                 {
-                  alignItems: "flex-start",
-                  gap: 14,
-                  paddingVertical: 12,
-                  borderTopWidth: i ? 1 : 0,
-                  borderTopColor: colors.line,
+                  // 图标底座用中性面；品牌浅底只留给下面的小面积状态 Chip
+                  backgroundColor: a.status === "awaiting_review" ? colors.surface : colors.green,
                 },
               ]}
             >
-              <View style={[s.iconBox, { height: 34, width: 34, backgroundColor: colors.paper }]}>
-                <Clock3 size={16} color={colors.muted} />
-              </View>
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={s.text}>{runtimeLabel(a.title)}</Text>
-                <Text style={s.muted}>{resultSummary(a.detail)}</Text>
-                <Text style={s.small}>
-                  {dateLabel(a.date)} · {timeLabel(a.date)}
-                </Text>
-              </View>
-              <Chip>{statusLabel(a.status)}</Chip>
+              {a.status === "awaiting_review" ? (
+                <ShieldCheck size={18} color={colors.primary} />
+              ) : (
+                <CheckCheck size={18} color={colors.text} />
+              )}
             </View>
-          ))
-        ) : (
-          <Empty
-            icon={Clock3}
-            title={t("screens.activityEmptyTitle")}
-            detail={t("screens.activityEmptyDetail")}
-          />
-        )}
-      </Card>
-    </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={s.text}>{runtimeLabel(a.title)}</Text>
+              <Text style={s.small}>{relativeDate(a.createdAt)}</Text>
+            </View>
+            <Chip
+              tint={
+                a.status === "failed"
+                  ? colors.errorSoft
+                  : a.status === "awaiting_review"
+                    ? colors.sky
+                    : colors.paper
+              }
+            >
+              {statusLabel(a.status)}
+            </Chip>
+            <ChevronRight size={16} color={colors.muted} />
+          </Pressable>
+        ))
+      ) : (
+        <Text style={s.small}>{t("screens.activityCaughtUpTitle")}</Text>
+      )}
+      <View style={{ height: 1, backgroundColor: colors.line, marginVertical: 14 }} />
+      <SectionHeading title={t("screens.activityTimelineHeading")} style={{ marginBottom: 6 }} />
+      {w.activity.length ? (
+        w.activity.map((a, i) => (
+          <View
+            key={a.id}
+            style={[
+              s.row,
+              {
+                alignItems: "flex-start",
+                gap: 14,
+                paddingVertical: 12,
+                borderTopWidth: i ? 1 : 0,
+                borderTopColor: colors.line,
+              },
+            ]}
+          >
+            <View style={[s.iconBox, { height: 34, width: 34, backgroundColor: colors.paper }]}>
+              <Clock3 size={16} color={colors.muted} />
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={s.text}>{runtimeLabel(a.title)}</Text>
+              <Text style={s.muted}>{resultSummary(a.detail)}</Text>
+              <Text style={s.small}>
+                {dateLabel(a.date)} · {timeLabel(a.date)}
+              </Text>
+            </View>
+            <Chip>{statusLabel(a.status)}</Chip>
+          </View>
+        ))
+      ) : (
+        <Text style={s.small}>{t("screens.activityEmptyDetail")}</Text>
+      )}
+    </Card>
   );
 }
 export function ConnectionsScreen({ query = "" }: { query?: string }) {

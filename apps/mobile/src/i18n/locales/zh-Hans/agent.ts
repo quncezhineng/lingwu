@@ -7,7 +7,7 @@ const agent = {
   "agent.reconnectAgent": "重新连接智能体",
   "agent.workerOffline": "工作进程已离线。重新连接后，已保存的工作会继续进行。",
   "agent.openTaskLabel": "打开任务：{title}",
-  "agent.planStepsProgress": " · {done}/{total} 步",
+  "agent.planStepsProgress": "{done}/{total} 步",
   "agent.reviewRequested": "已请求复核",
   "agent.inputNeeded": "需要你补充信息",
   "agent.filterAll": "全部",

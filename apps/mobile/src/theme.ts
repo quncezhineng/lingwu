@@ -86,14 +86,14 @@ export const colors = {
 /**
  * 状态语义（StatusBadge）。
  *
- * 四态统一中性底 `#EFEFEF`，仅文字色区分：running 蓝、其余灰阶；
- * done / paused 取自 Demo 但压深到达标（Demo done #878787 对浅灰仅 3.12:1）。
+ * 四态统一中性底 `#EFEFEF`：只有 running 用蓝、waiting 用行动色（唯一需要用户动手的状态），
+ * done / paused 压到 #666666（对 #EFEFEF 4.99:1，达 AA）。
  */
 export const statusColors = {
   surface: "#EFEFEF",
   running: "#4369A2", // 4.83:1
-  waiting: "#6F6F6F", // 4.36:1
-  done: "#6F6F6F",
+  waiting: "#8C520E", // 行动色：等待审批/补充输入是唯一需要人工介入的状态
+  done: "#666666", // 4.99:1
   paused: "#666666",
   /** 计划步骤「已完成」图标的低饱和蓝灰（Demo .plan-step.done）。 */
   stepDone: "#8499B8",

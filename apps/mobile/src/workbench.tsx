@@ -377,7 +377,8 @@ function TaskRow({ task }: { task: AgentTask }) {
                 width: `${Math.max(3, Math.round(progress * 100))}%`,
                 height: 2,
                 borderRadius: radius.full,
-                backgroundColor: toneColor,
+                // 等待态不需要抢注意力：用中性描边色，避免深色条比「进行中」更重
+                backgroundColor: tone === "waiting" ? colors.lineStrong : toneColor,
               }}
             />
           </View>

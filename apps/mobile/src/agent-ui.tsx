@@ -6,8 +6,10 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   type TextStyle,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
@@ -52,6 +54,7 @@ import {
 import { PlanCard } from "./plan-card";
 import { ActivityScreen } from "./screens";
 import { StatusBadge, taskStatusTone } from "./status-badge";
+import { breakpoints } from "./theme";
 import {
   Button,
   Card,
@@ -182,6 +185,8 @@ export function TaskCard({
 }) {
   const { t } = useTranslation();
   const { open } = useWorkspace();
+  const { width } = useWindowDimensions();
+  const narrow = width < breakpoints.mobile;
   const done = task.plan.filter((step) => step.status === "succeeded").length;
   const next = task.plan.find((step) => ["running", "waiting"].includes(step.status));
   const waiting = ["waiting_input", "waiting_approval"].includes(task.status);
@@ -221,15 +226,33 @@ export function TaskCard({
           >
             <ListChecks size={18} color={colors.primary} />
           </View>
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={s.heading}>{task.title}</Text>
-            <Text style={[s.small, s.metric]}>
-              {task.plan.length
-                ? t("agent.planStepsProgress", { done, total: task.plan.length })
-                : (task.question ?? task.error ?? "")}
+          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+            <Text numberOfLines={narrow ? 2 : 1} style={s.heading}>
+              {task.title}
             </Text>
+            <View style={[s.between, { gap: 8 }]}>
+              <Text numberOfLines={1} style={[s.small, s.metric, { flex: 1 }]}>
+                {task.plan.length
+                  ? t("agent.planStepsProgress", { done, total: task.plan.length })
+                  : (task.question ?? task.error ?? "")}
+              </Text>
+              {/* 移动端把徽标放进 meta 行，避免把标题挤成孤字 */}
+              {narrow && (
+                <StatusBadge
+                  tone={taskStatusTone(task.status)}
+                  label={statusLabel(task.status)}
+                  style={{ flexShrink: 0 }}
+                />
+              )}
+            </View>
           </View>
-          <StatusBadge tone={taskStatusTone(task.status)} label={statusLabel(task.status)} />
+          {!narrow && (
+            <StatusBadge
+              tone={taskStatusTone(task.status)}
+              label={statusLabel(task.status)}
+              style={{ flexShrink: 0 }}
+            />
+          )}
           <ChevronRight size={17} color={colors.muted} />
         </View>
         {!!task.plan.length && (
@@ -317,14 +340,18 @@ export function AgentActivityScreen() {
   return (
     <View style={{ gap: 20 }}>
       <AgentStatus />
-      {/* 唯一一套筛选：五个状态 Tab + 计数，下方只保留一份任务列表 */}
-      <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+      {/* 唯一一套筛选：五个状态 Tab + 计数；窄屏横向滚动，不折成两行 */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8, paddingBottom: 2 }}
+      >
         {TASK_FILTERS.map(({ id, labelKey }) => (
           <Button key={id} small primary={filter === id} onPress={() => setFilter(id)}>
             {`${t(labelKey)} · ${counts[id]}`}
           </Button>
         ))}
-      </View>
+      </ScrollView>
       {tasks.map((task) => (
         <TaskCard key={task.id} task={task} />
       ))}
