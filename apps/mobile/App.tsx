@@ -38,21 +38,24 @@ import { I18nProvider, localizeAgentName, useTranslation } from "./src/i18n";
 import { LanguageSwitcher } from "./src/i18n/LanguageSwitcher";
 import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
-import { Bell, Check, Menu, X } from "./src/icons";
-import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen, TodayScreen } from "./src/screens";
-import { ACCOUNT_NAV, ChatsColumn, Rail, SECTION_NAV } from "./src/shell";
-import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
-import { Button, Card, colors, ErrorNotice, Field, IconButton, Mascot, s } from "./src/ui";
+import { Bell, Check, Menu, Search, X } from "./src/icons";
 import { NotesScreen } from "./src/notes-screen";
 import { PortfolioScreen } from "./src/portfolio-screen";
+import { PreferencesScreen } from "./src/preferences-screen";
+import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
+import { GlobalSearchSheet } from "./src/search-sheet";
+import { ACCOUNT_NAV, BrandMark, ChatsColumn, MOBILE_NAV, Rail } from "./src/shell";
+import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
+import { Button, Card, colors, ErrorNotice, Field, fonts, IconButton, Mascot, s } from "./src/ui";
 import { WatchlistScreen } from "./src/watchlist";
+import { WorkbenchScreen } from "./src/workbench";
 import { type Detail, useWorkspace, WorkspaceContext } from "./src/workspace";
 
 /** 登录会话在本地持久化的键，刷新网页后据此恢复登录状态。 */
 const SESSION_KEY = "lingwu.session";
 
-// 底部标签栏的顺序与宽屏图标栏一致：五个主页面在前，「我的」在最后。
-const nav = [...SECTION_NAV, ACCOUNT_NAV];
+// 移动端底部保留四个主入口，「我的」固定在最后。
+const nav = [...MOBILE_NAV, ACCOUNT_NAV];
 const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: TranslationKey }>> =
   {
     today: { titleKey: "app.titleToday", subtitleKey: "app.subtitleToday" },
@@ -62,6 +65,7 @@ const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: T
     activity: { titleKey: "app.titleActivity", subtitleKey: "app.subtitleActivity" },
     ideas: { titleKey: "app.titleIdeas", subtitleKey: "app.subtitleIdeas" },
     goals: { titleKey: "app.titleGoals", subtitleKey: "app.subtitleGoals" },
+    preferences: { titleKey: "app.titlePreferences", subtitleKey: "app.subtitlePreferences" },
     apps: { titleKey: "app.titleApps", subtitleKey: "app.subtitleApps" },
     account: { titleKey: "app.titleAccount", subtitleKey: "app.subtitleAccount" },
     connections: { titleKey: "app.titleConnections", subtitleKey: "app.subtitleConnections" },
@@ -393,10 +397,11 @@ function WorkspaceShell({
     enabled: richThreads,
   } = useLingWuThread();
   const [threadsOpen, setThreadsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
-  // 桌面端主内容区占整页宽度的 61.8%（黄金分割比，下限 760 避免窄桌面过挤）；移动端保持窄列。
-  const contentMax = desktop ? Math.max(760, Math.round(width * 0.618)) : 760;
+  // 工作台采用宽幅编辑画布，右侧信息轨由页面内部负责。
+  const contentMax = desktop ? 1340 : 760;
   const pending =
     (data?.notifications.filter((n) => !n.read).length || 0) +
     workspace.actions.filter((a) => a.status === "awaiting_review").length;
@@ -418,45 +423,37 @@ function WorkspaceShell({
   const title = titles[section] || titles.apps;
   const Screen =
     section === "today"
-      ? TodayScreen
+      ? WorkbenchScreen
       : section === "watchlist"
         ? WatchlistScreen
         : section === "portfolio"
           ? PortfolioScreen
           : section === "notes"
             ? NotesScreen
-        : section === "mail"
-          ? MailScreen
-          : section === "calendar"
-            ? CalendarScreen
-            : section === "browser"
-              ? BrowserScreen
-              : section === "files"
-                ? FilesScreen
-                : section === "activity"
-                  ? AgentActivityScreen
-                  : section === "ideas"
-                    ? IdeasScreen
-                    : section === "goals"
-                      ? GoalsScreen
-                      : AppsScreen;
-  const utility = [
-    "mail",
-    "calendar",
-    "browser",
-    "files",
-    "watchlist",
-    "portfolio",
-    "notes",
-  ].includes(section);
+            : section === "mail"
+              ? MailScreen
+              : section === "calendar"
+                ? CalendarScreen
+                : section === "browser"
+                  ? BrowserScreen
+                  : section === "files"
+                    ? FilesScreen
+                    : section === "activity"
+                      ? AgentActivityScreen
+                      : section === "ideas"
+                        ? IdeasScreen
+                        : section === "goals"
+                          ? GoalsScreen
+                          : section === "preferences"
+                            ? PreferencesScreen
+                            : AppsScreen;
   return (
     <>
       <WorkspaceTools />
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.canvas }} edges={["top", "bottom"]}>
-        {/* 宽屏（>= 900）是「图标栏 + 对话列表栏 + 主内容区」，窄屏是单列加底部标签栏；
-            两套外壳下面是同一个主内容区，页面组件不做第二份实现。 */}
+        {/* 宽屏是「文本侧栏 + 工作区」，窄屏是单列加底部标签栏。 */}
         <View style={{ flex: 1, flexDirection: desktop ? "row" : "column" }}>
-          {desktop && <Rail name={agentName} pending={pending} />}
+          {desktop && <Rail name={agentName} />}
           {desktop && section === "chat" && <ChatsColumn />}
           <View style={{ flex: 1, minWidth: 0 }}>
             <View
@@ -470,60 +467,57 @@ function WorkspaceShell({
               {!desktop && (
                 <View
                   style={{
-                    height: 122,
-                    paddingTop: 2,
-                    marginHorizontal: 20,
+                    height: 82,
+                    paddingTop: 8,
+                    marginHorizontal: 18,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.line,
                   }}
                 >
-                  <View style={{ position: "absolute", left: 0, top: 16 }}>
+                  <View style={{ position: "absolute", left: 0, top: 8 }}>
                     <IconButton
                       icon={Menu}
                       label={t("app.openConversations")}
                       onPress={() => setThreadsOpen(true)}
                     />
                   </View>
-                  <View pointerEvents="box-none" style={{ alignItems: "center", gap: 1 }}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t("agent.personalityMemory")}
-                      onPress={() => open({ type: "personality" })}
-                      style={({ pressed }) => ({
-                        alignItems: "center",
-                        maxWidth: "70%",
-                        opacity: pressed ? 0.65 : 1,
-                      })}
-                    >
-                      <Mascot size={49} variant={data?.identity.avatar} />
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: 58,
+                      gap: 2,
+                    }}
+                  >
+                    <View style={[s.row, { gap: 7, justifyContent: "center" }]}>
+                      <BrandMark size={22} />
                       <Text
                         style={{
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: "600",
                           color: colors.text,
-                          letterSpacing: -0.4,
+                          letterSpacing: -0.3,
+                          fontFamily: fonts.serif,
                         }}
                       >
-                        {agentName}
+                        {t("common.agentName")}
                       </Text>
-                      <Text
-                        numberOfLines={1}
-                        style={{ fontSize: 11, color: colors.muted, marginBottom: 6 }}
-                      >
-                        {status}
-                      </Text>
-                    </Pressable>
-                    {section === "chat" && <ComputerEntry />}
+                    </View>
+                    <Text numberOfLines={1} style={{ fontSize: 10.5, color: colors.muted }}>
+                      {status}
+                    </Text>
                   </View>
                   <View
                     style={{
                       position: "absolute",
                       right: 0,
-                      top: 16,
+                      top: 8,
                       flexDirection: "row",
                       alignItems: "center",
-                      gap: 8,
+                      gap: 4,
                     }}
                   >
-                    <LanguageSwitcher />
                     <View>
                       <IconButton
                         icon={Bell}
@@ -536,15 +530,81 @@ function WorkspaceShell({
                           style={{
                             width: 6,
                             height: 6,
-                            borderRadius: 4,
+                            borderRadius: 3,
                             position: "absolute",
-                            top: 7,
+                            top: 8,
                             right: 9,
                             backgroundColor: colors.primary,
                           }}
                         />
                       )}
                     </View>
+                    <LanguageSwitcher compact />
+                  </View>
+                  {section === "chat" && (
+                    <View style={{ position: "absolute", right: 78, top: 12 }}>
+                      <ComputerEntry />
+                    </View>
+                  )}
+                </View>
+              )}
+              {desktop && (
+                <View
+                  style={{
+                    height: 64,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingHorizontal: 42,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.line,
+                    backgroundColor: colors.canvas,
+                  }}
+                >
+                  <View style={[s.row, { gap: 10, flex: 1 }]}>
+                    <Text style={{ fontSize: 12, color: colors.faint }}>
+                      {t("app.personalInvestmentSpace")}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.lineStrong }}>/</Text>
+                    <Text style={{ fontSize: 12, color: colors.muted }}>
+                      {section === "chat"
+                        ? t("app.newAnalysis")
+                        : section === "portfolio"
+                          ? `${t("app.navPreferences")} / ${t("app.titlePortfolio")}`
+                          : section === "notes"
+                            ? `${t("app.navFiles")} / ${t("app.titleNotes")}`
+                            : title
+                              ? t(title.titleKey)
+                              : t("app.navApps")}
+                    </Text>
+                  </View>
+                  <View style={[s.row, { gap: 8 }]}>
+                    <IconButton
+                      icon={Search}
+                      label={t("search.title")}
+                      onPress={() => setSearchOpen(true)}
+                    />
+                    <View>
+                      <IconButton
+                        icon={Bell}
+                        label={t("app.notificationsLabel", { count: pending })}
+                        onPress={() => open({ type: "notifications" })}
+                      />
+                      {pending > 0 && (
+                        <View
+                          pointerEvents="none"
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            position: "absolute",
+                            top: 8,
+                            right: 9,
+                            backgroundColor: colors.primary,
+                          }}
+                        />
+                      )}
+                    </View>
+                    <LanguageSwitcher compact />
                   </View>
                 </View>
               )}
@@ -554,23 +614,48 @@ function WorkspaceShell({
                     key={section}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{
-                      paddingHorizontal: desktop ? 28 : 22,
-                      paddingBottom: 28,
+                      paddingHorizontal: desktop ? 42 : 22,
+                      paddingTop: desktop ? 20 : 16,
+                      paddingBottom: desktop ? 48 : 30,
                     }}
                     keyboardShouldPersistTaps="handled"
                   >
-                    {utility && (
-                      <Button
-                        small
-                        style={{ alignSelf: "flex-start", marginBottom: 18 }}
-                        onPress={() => navigate("apps")}
+                    {section !== "today" && (
+                      <View
+                        style={[s.between, { alignItems: "flex-start", gap: 16, marginBottom: 24 }]}
                       >
-                        {t("app.backToApps")}
-                      </Button>
+                        <View style={{ flex: 1, gap: 6 }}>
+                          <Text
+                            style={[
+                              s.title,
+                              {
+                                fontSize: desktop ? 30 : 26,
+                                lineHeight: desktop ? 40 : 35,
+                              },
+                            ]}
+                          >
+                            {title && t(title.titleKey)}
+                          </Text>
+                          {title && (
+                            <Text style={[s.muted, { maxWidth: 720 }]}>{t(title.subtitleKey)}</Text>
+                          )}
+                        </View>
+                        {(section === "portfolio" || section === "notes") && (
+                          <Button
+                            small
+                            onPress={() =>
+                              navigate(section === "portfolio" ? "preferences" : "files")
+                            }
+                          >
+                            {t(
+                              section === "portfolio"
+                                ? "preferences.backToPreferences"
+                                : "app.backToFiles",
+                            )}
+                          </Button>
+                        )}
+                      </View>
                     )}
-                    <Text style={[s.title, { fontSize: 25, marginBottom: 22 }]}>
-                      {title && t(title.titleKey)}
-                    </Text>
                     <ErrorNotice error={error} />
                     {section === "account" ? <AccountScreen onSignOut={onSignOut} /> : <Screen />}
                   </ScrollView>
@@ -579,7 +664,7 @@ function WorkspaceShell({
                   style={{
                     display: section === "chat" ? "flex" : "none",
                     flex: 1,
-                    paddingHorizontal: desktop ? 28 : 17,
+                    paddingHorizontal: desktop ? 42 : 17,
                   }}
                 >
                   <AgentStatus />
@@ -624,22 +709,23 @@ function WorkspaceShell({
                     style={{
                       flexDirection: "row",
                       width: "100%",
-                      // 六个页签（含「我的」），容器放宽以保证点击区域。
+                      // 五个主入口，标签文字帮助移动端快速定位。
                       maxWidth: 430,
                       padding: 5,
-                      backgroundColor: "#FFF",
-                      borderRadius: 40,
+                      backgroundColor: colors.paper,
+                      borderRadius: 18,
                       shadowColor: "#000",
                       shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.07,
-                      shadowRadius: 18,
+                      shadowOpacity: 0.06,
+                      shadowRadius: 14,
                       elevation: 3,
                       borderWidth: 1,
                       borderColor: colors.line,
                     }}
                   >
                     {nav.map((item) => {
-                      const active = section === item.id || (item.id === "apps" && utility);
+                      const active =
+                        section === item.id || (item.id === "activity" && section === "ideas");
                       return (
                         <Pressable
                           key={item.id}
@@ -649,18 +735,29 @@ function WorkspaceShell({
                           onPress={() => navigate(item.id)}
                           style={{
                             flex: 1,
-                            height: 47,
+                            height: 50,
                             alignItems: "center",
                             justifyContent: "center",
-                            backgroundColor: active ? colors.surface : "transparent",
-                            borderRadius: 28,
+                            gap: 3,
+                            backgroundColor: active ? colors.sky : "transparent",
+                            borderRadius: 13,
                           }}
                         >
                           <item.icon
-                            size={23}
-                            strokeWidth={active ? 2 : 1.8}
+                            size={19}
+                            strokeWidth={active ? 2 : 1.7}
                             color={active ? colors.primary : colors.muted}
                           />
+                          <Text
+                            numberOfLines={1}
+                            style={{
+                              fontSize: 9.5,
+                              fontWeight: active ? "600" : "500",
+                              color: active ? colors.primaryStrong : colors.muted,
+                            }}
+                          >
+                            {t(item.labelKey)}
+                          </Text>
                         </Pressable>
                       );
                     })}
@@ -700,6 +797,7 @@ function WorkspaceShell({
           </View>
         )}
         {threadsOpen && <ThreadsSheet onClose={() => setThreadsOpen(false)} />}
+        {searchOpen && <GlobalSearchSheet onClose={() => setSearchOpen(false)} />}
         {detail && (
           <Details
             key={

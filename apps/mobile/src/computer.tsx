@@ -92,7 +92,7 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
             width: "100%",
             aspectRatio: 1.6,
             borderRadius: 11,
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
           }}
           resizeMode="contain"
           onError={() => setFailed(true)}
@@ -102,7 +102,7 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
           style={{
             padding: 24,
             borderRadius: 12,
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
             alignItems: "center",
             gap: 10,
           }}
@@ -199,7 +199,7 @@ export function ComputerSheet() {
                 borderRadius: 14,
                 borderWidth: 1,
                 borderColor: colors.line,
-                backgroundColor: colors.canvas,
+                backgroundColor: colors.paper,
               },
             ]}
           >

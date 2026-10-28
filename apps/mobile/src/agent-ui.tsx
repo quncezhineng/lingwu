@@ -7,7 +7,9 @@ import {
   Platform,
   Pressable,
   Text,
+  TextInput,
   type TextStyle,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
@@ -31,21 +33,26 @@ import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
 import {
   ArrowRight,
   Bell,
+  Brain,
   CalendarDays,
   Check,
   ChevronRight,
   CircleDollarSign,
   FileText,
-  Globe2,
   Heart,
+  type IconComponent,
   Lightbulb,
+  Link2,
   ListChecks,
   Mail,
   Pause,
   Play,
   Plus,
   RefreshCw,
+  Search,
   Send,
+  Shapes,
+  Sparkles,
   Square,
   Target,
   Users,
@@ -61,6 +68,7 @@ import {
   Empty,
   ErrorNotice,
   Field,
+  fonts,
   LinkRow,
   Mascot,
   resultSummary,
@@ -203,7 +211,7 @@ export function TaskCard({
           padding: compact ? 14 : 16,
           gap: 12,
           borderRadius: 14,
-          backgroundColor: colors.canvas,
+          backgroundColor: colors.paper,
         }}
       >
         <View style={[s.row, { gap: 10 }]}>
@@ -1813,8 +1821,8 @@ export function NotificationsSheet() {
             key={item.id}
             style={{
               gap: 8,
-              // 未读通知用品牌浅紫色底提示，已读回到白底。
-              backgroundColor: item.read ? colors.canvas : colors.sky,
+              // 未读通知用品牌浅蓝色底提示，已读回到白底。
+              backgroundColor: item.read ? colors.paper : colors.sky,
               borderColor: item.read ? colors.line : colors.lineStrong,
             }}
           >
@@ -1844,82 +1852,475 @@ export function NotificationsSheet() {
     </Sheet>
   );
 }
+type AppsCategory = "all" | "plugins" | "skills" | "connectors";
+type CapabilityCategory = Exclude<AppsCategory, "all">;
+type CapabilityItem = {
+  id: string;
+  category: CapabilityCategory;
+  title: string;
+  detail: string;
+  icon: IconComponent;
+  onPress: () => void;
+};
+
+function CapabilityCard({ item, twoColumns }: { item: CapabilityItem; twoColumns: boolean }) {
+  const { t } = useTranslation();
+  const plugin = item.category === "plugins";
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title} · ${item.detail}`}
+      onPress={item.onPress}
+      style={({ pressed }) => ({
+        flexBasis: twoColumns ? "47%" : "100%",
+        flexGrow: 1,
+        minWidth: 0,
+        padding: 17,
+        gap: 11,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: pressed ? colors.lineStrong : colors.line,
+        backgroundColor: pressed ? colors.surface : colors.paper,
+      })}
+    >
+      <View style={[s.between, { alignItems: "flex-start" }]}>
+        <View
+          style={[
+            s.iconBox,
+            {
+              width: 38,
+              height: 38,
+              borderRadius: 11,
+              backgroundColor: plugin ? colors.sky : colors.orange,
+            },
+          ]}
+        >
+          <item.icon
+            size={19}
+            strokeWidth={1.8}
+            color={plugin ? colors.primary : colors.alertVolumeText}
+          />
+        </View>
+        <Chip tint={plugin ? colors.sky : colors.orange}>{t("agent.capabilityEnabled")}</Chip>
+      </View>
+      <View style={{ gap: 4, flex: 1 }}>
+        <Text style={[s.heading, { fontSize: 15 }]}>{item.title}</Text>
+        <Text style={[s.small, { lineHeight: 19 }]}>{item.detail}</Text>
+      </View>
+      <View style={[s.row, { gap: 5 }]}>
+        <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+          {t("agent.capabilityOpen")}
+        </Text>
+        <ArrowRight size={13} strokeWidth={1.8} color={colors.primary} />
+      </View>
+    </Pressable>
+  );
+}
+
+function CapabilitySection({
+  title,
+  detail,
+  icon: Icon,
+  items,
+  twoColumns,
+}: {
+  title: string;
+  detail: string;
+  icon: IconComponent;
+  items: CapabilityItem[];
+  twoColumns: boolean;
+}) {
+  return (
+    <View style={{ gap: 13 }}>
+      <View style={[s.row, { gap: 10 }]}>
+        <View
+          style={[
+            s.iconBox,
+            { width: 34, height: 34, borderRadius: 9, backgroundColor: colors.surface },
+          ]}
+        >
+          <Icon size={17} strokeWidth={1.8} color={colors.text} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={s.heading}>{title}</Text>
+          <Text style={s.small}>{detail}</Text>
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+        {items.map((item) => (
+          <CapabilityCard key={item.id} item={item} twoColumns={twoColumns} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function AppsScreen() {
   const { t } = useTranslation();
-  const { navigate, open } = useWorkspace();
+  const { width } = useWindowDimensions();
+  const { navigate, ask } = useWorkspace();
   const [query, setQuery] = useState("");
-  const shortcuts = [
+  const [category, setCategory] = useState<AppsCategory>("all");
+  const twoColumns = width >= 900;
+
+  const plugins: CapabilityItem[] = [
     {
-      section: "watchlist" as const,
-      title: t("app.titleWatchlist"),
-      detail: t("agent.shortcutWatchlistDetail"),
+      id: "deep-research",
+      category: "plugins",
+      title: t("agent.pluginDeepResearch"),
+      detail: t("agent.pluginDeepResearchDetail"),
+      icon: Sparkles,
+      onPress: () => ask(t("agent.pluginDeepResearchPrompt")),
+    },
+    {
+      id: "daily-review",
+      category: "plugins",
+      title: t("agent.pluginDailyReview"),
+      detail: t("agent.pluginDailyReviewDetail"),
+      icon: ListChecks,
+      onPress: () => navigate("today"),
+    },
+    {
+      id: "portfolio-review",
+      category: "plugins",
+      title: t("agent.pluginPortfolioReview"),
+      detail: t("agent.pluginPortfolioReviewDetail"),
       icon: Target,
+      onPress: () => navigate("portfolio"),
     },
+  ];
+  const skills: CapabilityItem[] = [
     {
-      section: "portfolio" as const,
-      title: t("app.titlePortfolio"),
-      detail: t("agent.shortcutPortfolioDetail"),
-      icon: CircleDollarSign,
-    },
-    {
-      section: "notes" as const,
-      title: t("app.titleNotes"),
-      detail: t("agent.shortcutNotesDetail"),
+      id: "earnings",
+      category: "skills",
+      title: t("agent.skillEarnings"),
+      detail: t("agent.skillEarningsDetail"),
       icon: FileText,
+      onPress: () => ask(t("agent.skillEarningsPrompt")),
     },
     {
-      section: "mail" as const,
+      id: "report",
+      category: "skills",
+      title: t("agent.skillReport"),
+      detail: t("agent.skillReportDetail"),
+      icon: Brain,
+      onPress: () => ask(t("agent.skillReportPrompt")),
+    },
+    {
+      id: "notes",
+      category: "skills",
+      title: t("agent.skillNotes"),
+      detail: t("agent.skillNotesDetail"),
+      icon: FileText,
+      onPress: () => navigate("notes"),
+    },
+    {
+      id: "monitoring",
+      category: "skills",
+      title: t("agent.skillMonitoring"),
+      detail: t("agent.skillMonitoringDetail"),
+      icon: Bell,
+      onPress: () => navigate("goals"),
+    },
+  ];
+  const workspaceApps = [
+    {
+      id: "mail",
       title: t("app.titleMail"),
       detail: t("agent.shortcutMailDetail"),
       icon: Mail,
+      onPress: () => navigate("mail"),
     },
     {
-      section: "calendar" as const,
+      id: "calendar",
       title: t("app.titleCalendar"),
       detail: t("agent.shortcutCalendarDetail"),
       icon: CalendarDays,
-    },
-    {
-      section: "browser" as const,
-      title: t("threads.agentComputer"),
-      detail: t("agent.shortcutBrowserDetail"),
-      icon: Globe2,
-    },
-    {
-      section: "files" as const,
-      title: t("app.titleFiles"),
-      detail: t("agent.shortcutFilesDetail"),
-      icon: FileText,
+      onPress: () => navigate("calendar"),
     },
   ];
+
+  const q = query.trim().toLowerCase();
+  const categoryLabel = (value: CapabilityCategory) =>
+    t(value === "plugins" ? "agent.pluginsHeading" : "agent.skillsHeading");
+  const matchesCategory = (value: CapabilityCategory) => category === "all" || category === value;
+  const matchesQuery = (item: CapabilityItem) =>
+    !q || `${item.title} ${item.detail} ${categoryLabel(item.category)}`.toLowerCase().includes(q);
+  const visiblePlugins = plugins.filter((item) => matchesCategory("plugins") && matchesQuery(item));
+  const visibleSkills = skills.filter((item) => matchesCategory("skills") && matchesQuery(item));
+  const visibleWorkspaceApps = workspaceApps.filter(
+    (item) =>
+      (category === "all" || category === "connectors") &&
+      (!q ||
+        `${item.title} ${item.detail} ${t("agent.workspaceAppsHeading")}`
+          .toLowerCase()
+          .includes(q)),
+  );
+  const connectorMatches =
+    !q ||
+    [
+      t("agent.connectorsHeading"),
+      t("screens.connectionsModelLabel"),
+      "Gmail",
+      "Google Calendar",
+      t("threads.agentComputer"),
+      "OpenBot",
+    ].some((label) => label.toLowerCase().includes(q));
+  const showConnectors = (category === "all" || category === "connectors") && connectorMatches;
+  const showEmpty =
+    !visiblePlugins.length &&
+    !visibleSkills.length &&
+    !visibleWorkspaceApps.length &&
+    !showConnectors &&
+    (!!q || category !== "all");
+
+  const filters: { id: AppsCategory; label: string; icon: IconComponent; count: number }[] = [
+    {
+      id: "all",
+      label: t("agent.appsFilterAll"),
+      icon: Shapes,
+      count: plugins.length + skills.length + 5,
+    },
+    {
+      id: "plugins",
+      label: t("agent.appsFilterPlugins"),
+      icon: Sparkles,
+      count: plugins.length,
+    },
+    {
+      id: "skills",
+      label: t("agent.appsFilterSkills"),
+      icon: Brain,
+      count: skills.length,
+    },
+    {
+      id: "connectors",
+      label: t("agent.appsFilterConnectors"),
+      icon: Link2,
+      count: 5,
+    },
+  ];
+
   return (
     <View style={{ gap: 22 }}>
       <AgentStatus />
-      <Field
-        label={t("agent.searchApps")}
-        value={query}
-        onChangeText={setQuery}
-        placeholder={t("agent.searchConnectors")}
-      />
-      <ConnectionsScreen query={query} />
-      <Text style={s.heading}>{t("agent.onYourComputer")}</Text>
-      <Card style={{ paddingVertical: 6 }}>
-        {shortcuts
-          .filter((item) =>
-            `${item.title} ${item.detail}`.toLowerCase().includes(query.toLowerCase()),
-          )
-          .map((item) => (
-            <LinkRow
-              key={item.section}
-              icon={item.icon}
-              title={item.title}
-              detail={item.detail}
-              onPress={() =>
-                item.section === "browser" ? open({ type: "computer" }) : navigate(item.section)
-              }
-            />
+      <Card style={{ padding: 0, overflow: "hidden", borderColor: colors.lineStrong }}>
+        <View style={{ padding: 21, gap: 7 }}>
+          <Text style={[s.label, { color: colors.primary }]}>{t("agent.appsHeroEyebrow")}</Text>
+          <Text style={[s.title, { fontSize: 23, lineHeight: 32 }]}>
+            {t("agent.appsHeroTitle")}
+          </Text>
+          <Text style={[s.muted, { maxWidth: 720 }]}>{t("agent.appsHeroDetail")}</Text>
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            borderTopWidth: 1,
+            borderTopColor: colors.line,
+            backgroundColor: colors.surface,
+          }}
+        >
+          {[
+            [plugins.length, t("agent.appsFilterPlugins")],
+            [skills.length, t("agent.appsFilterSkills")],
+            [5, t("agent.appsFilterConnectors")],
+          ].map(([count, label], index, all) => (
+            <View
+              key={String(label)}
+              style={{
+                flex: 1,
+                paddingHorizontal: 18,
+                paddingVertical: 13,
+                gap: 1,
+                borderRightWidth: index < all.length - 1 ? 1 : 0,
+                borderRightColor: colors.line,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 19,
+                  lineHeight: 24,
+                  color: colors.text,
+                  fontFamily: fonts.number,
+                }}
+              >
+                {String(count).padStart(2, "0")}
+              </Text>
+              <Text style={s.small}>{label}</Text>
+            </View>
           ))}
+        </View>
       </Card>
+
+      <View
+        style={[
+          s.row,
+          {
+            gap: 9,
+            minHeight: 44,
+            paddingHorizontal: 13,
+            borderRadius: 11,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: colors.paper,
+          },
+        ]}
+      >
+        <Search size={16} strokeWidth={1.8} color={colors.faint} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t("agent.searchCapabilities")}
+          placeholderTextColor={colors.faint}
+          accessibilityLabel={t("agent.searchApps")}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            paddingVertical: 0,
+            color: colors.text,
+            fontSize: 14,
+            fontFamily: fonts.sans,
+          }}
+        />
+        {!!query && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("common.close")}
+            onPress={() => setQuery("")}
+            hitSlop={8}
+          >
+            <X size={15} strokeWidth={1.8} color={colors.muted} />
+          </Pressable>
+        )}
+      </View>
+
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {filters.map((filter) => {
+          const active = category === filter.id;
+          return (
+            <Pressable
+              key={filter.id}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              onPress={() => setCategory(filter.id)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 7,
+                minHeight: 36,
+                paddingHorizontal: 12,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: active ? colors.primary : colors.line,
+                backgroundColor: active ? colors.sky : pressed ? colors.surface : colors.paper,
+              })}
+            >
+              <filter.icon
+                size={15}
+                strokeWidth={1.8}
+                color={active ? colors.primary : colors.muted}
+              />
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: "600",
+                  color: active ? colors.primary : colors.text,
+                }}
+              >
+                {filter.label}
+              </Text>
+              <View
+                style={{
+                  minWidth: 20,
+                  paddingHorizontal: 5,
+                  paddingVertical: 1,
+                  borderRadius: 6,
+                  alignItems: "center",
+                  backgroundColor: active ? colors.paper : colors.surface,
+                }}
+              >
+                <Text style={{ fontSize: 10, color: active ? colors.primary : colors.muted }}>
+                  {filter.count}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {!!visiblePlugins.length && (
+        <CapabilitySection
+          title={t("agent.pluginsHeading")}
+          detail={t("agent.pluginsDetail")}
+          icon={Sparkles}
+          items={visiblePlugins}
+          twoColumns={twoColumns}
+        />
+      )}
+      {!!visibleSkills.length && (
+        <CapabilitySection
+          title={t("agent.skillsHeading")}
+          detail={t("agent.skillsDetail")}
+          icon={Brain}
+          items={visibleSkills}
+          twoColumns={twoColumns}
+        />
+      )}
+      {!!visibleWorkspaceApps.length && (
+        <View style={{ gap: 13 }}>
+          <View style={[s.row, { gap: 10 }]}>
+            <View
+              style={[
+                s.iconBox,
+                { width: 34, height: 34, borderRadius: 9, backgroundColor: colors.surface },
+              ]}
+            >
+              <Shapes size={17} strokeWidth={1.8} color={colors.text} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={s.heading}>{t("agent.workspaceAppsHeading")}</Text>
+              <Text style={s.small}>{t("agent.workspaceAppsDetail")}</Text>
+            </View>
+          </View>
+          <Card style={{ paddingVertical: 6 }}>
+            {visibleWorkspaceApps.map((item) => (
+              <LinkRow
+                key={item.id}
+                icon={item.icon}
+                title={item.title}
+                detail={item.detail}
+                onPress={item.onPress}
+              />
+            ))}
+          </Card>
+        </View>
+      )}
+      {showConnectors && (
+        <View style={{ gap: 13 }}>
+          <View style={[s.row, { gap: 10 }]}>
+            <View
+              style={[
+                s.iconBox,
+                { width: 34, height: 34, borderRadius: 9, backgroundColor: colors.surface },
+              ]}
+            >
+              <Link2 size={17} strokeWidth={1.8} color={colors.text} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={s.heading}>{t("agent.connectorsHeading")}</Text>
+              <Text style={s.small}>{t("agent.connectorsDetail")}</Text>
+            </View>
+          </View>
+          <ConnectionsScreen query={query} />
+        </View>
+      )}
+      {showEmpty && (
+        <Empty
+          icon={Shapes}
+          title={t("agent.appsNoMatchTitle")}
+          detail={t("agent.appsNoMatchDetail")}
+        />
+      )}
     </View>
   );
 }
@@ -1994,7 +2395,7 @@ export function AgentPersonalitySheet() {
                     borderRadius: 999,
                     borderWidth: 1,
                     borderColor: avatar === item ? colors.primary : colors.line,
-                    backgroundColor: avatar === item ? colors.surface : colors.canvas,
+                    backgroundColor: avatar === item ? colors.surface : colors.paper,
                   }}
                 >
                   <Mascot size={62} variant={item} />
@@ -2075,7 +2476,7 @@ export function AgentPersonalitySheet() {
                 borderRadius: 14,
                 borderWidth: 1,
                 borderColor: colors.line,
-                backgroundColor: colors.canvas,
+                backgroundColor: colors.paper,
               }}
             >
               <View

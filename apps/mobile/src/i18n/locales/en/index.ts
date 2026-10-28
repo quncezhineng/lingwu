@@ -12,6 +12,7 @@ import portfolio from "./portfolio";
 import quotes from "./quotes";
 import research from "./research";
 import screens from "./screens";
+import search from "./search";
 import status from "./status";
 import threads from "./threads";
 import tools from "./tools";
@@ -32,6 +33,7 @@ export const en = {
   ...details,
   ...markets,
   ...research,
+  ...search,
   ...portfolio,
   ...notes,
   ...quotes,

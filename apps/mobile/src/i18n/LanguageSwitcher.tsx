@@ -84,7 +84,7 @@ export function LanguageSwitcher({
                 borderRadius: 19,
                 borderWidth: 1,
                 borderColor: colors.line,
-                backgroundColor: pressed ? colors.overlay2 : colors.canvas,
+                backgroundColor: pressed ? colors.overlay2 : colors.paper,
               }
         }
       >
@@ -127,7 +127,7 @@ export function LanguageSwitcher({
                 left: anchor.left,
                 bottom: anchor.bottom,
                 minWidth: 144,
-                backgroundColor: colors.canvas,
+                backgroundColor: colors.paper,
                 borderRadius: 12,
                 borderWidth: 1,
                 borderColor: colors.line,
@@ -169,7 +169,7 @@ export function LanguageSwitcher({
                       gap: 10,
                       paddingHorizontal: 14,
                       paddingVertical: 11,
-                      backgroundColor: pressed ? colors.canvas : "transparent",
+                      backgroundColor: pressed ? colors.paper : "transparent",
                     })}
                   >
                     <View style={{ flex: 1, gap: 2 }}>

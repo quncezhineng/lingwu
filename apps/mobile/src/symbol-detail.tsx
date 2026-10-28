@@ -163,7 +163,7 @@ function AlertRow({
           disabled={busy}
           onValueChange={onToggle}
           trackColor={{ false: colors.lineStrong, true: colors.primary }}
-          thumbColor={colors.canvas}
+          thumbColor={colors.paper}
           accessibilityLabel={t("research.enabled")}
         />
       </View>
@@ -952,7 +952,7 @@ export function SymbolDetailSheet({
                     borderRadius: 999,
                     borderWidth: 1,
                     borderColor: selected ? colors.primary : colors.line,
-                    backgroundColor: selected ? colors.sky : colors.canvas,
+                    backgroundColor: selected ? colors.sky : colors.paper,
                   }}
                 >
                   <Text
@@ -1004,7 +1004,7 @@ export function SymbolDetailSheet({
               value={form.enabled}
               onValueChange={(enabled) => setForm({ ...form, enabled })}
               trackColor={{ false: colors.lineStrong, true: colors.primary }}
-              thumbColor={colors.canvas}
+              thumbColor={colors.paper}
               accessibilityLabel={t("research.enabled")}
             />
           </View>

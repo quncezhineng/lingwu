@@ -248,14 +248,61 @@ const agent = {
     "Results, meaningful changes and requests for your input will appear here.",
   "agent.searchApps": "Search apps",
   "agent.searchConnectors": "Search connectors",
+  "agent.searchCapabilities": "Search plugins, skills or connectors",
+  "agent.appsHeroEyebrow": "Capability center",
+  "agent.appsHeroTitle": "Make LingWu work the way you research.",
+  "agent.appsHeroDetail":
+    "Plugins orchestrate workflows, skills add specialist actions, and connectors bring external data into chat.",
+  "agent.appsFilterAll": "All",
+  "agent.appsFilterPlugins": "Plugins",
+  "agent.appsFilterSkills": "Skills",
+  "agent.appsFilterConnectors": "Connectors",
+  "agent.appsNoMatchTitle": "No matching apps",
+  "agent.appsNoMatchDetail": "Try another search or switch to a different capability type.",
+  "agent.pluginsHeading": "Plugins",
+  "agent.pluginsDetail":
+    "Package recurring research workflows into repeatable, one-click entry points.",
+  "agent.skillsHeading": "Skills",
+  "agent.skillsDetail": "Enable reusable specialist actions for research and investment work.",
+  "agent.connectorsHeading": "Connectors",
+  "agent.connectorsDetail": "Bring models, mail, calendars and browsing into your workspace.",
+  "agent.workspaceAppsHeading": "Workspace apps",
+  "agent.workspaceAppsDetail":
+    "Open organized mail and calendar views directly without reconnecting.",
+  "agent.capabilityEnabled": "Enabled",
+  "agent.capabilityOpen": "Open",
+  "agent.pluginDeepResearch": "Deep research",
+  "agent.pluginDeepResearchDetail":
+    "Run traceable multi-step research from question framing and source review to synthesis.",
+  "agent.pluginDeepResearchPrompt":
+    "Start a deep research task: frame the question, review reliable sources, verify key data, and finish with a source-backed conclusion that separates assumptions and open questions.",
+  "agent.pluginDailyReview": "Daily review",
+  "agent.pluginDailyReviewDetail":
+    "Summarize watchlist moves, task progress and decisions that need you.",
+  "agent.pluginPortfolioReview": "Portfolio review",
+  "agent.pluginPortfolioReviewDetail":
+    "Review concentration, profit and loss changes, and allocation risk.",
+  "agent.skillEarnings": "Earnings breakdown",
+  "agent.skillEarningsDetail":
+    "Extract key metrics, year-over-year changes and anomalies worth investigating.",
+  "agent.skillEarningsPrompt":
+    "Break down the latest earnings report: extract revenue, profit, cash flow and key operating metrics, explain year-over-year changes, and flag anomalies that need more verification.",
+  "agent.skillReport": "Research report",
+  "agent.skillReportDetail":
+    "Turn evidence and conclusions into a structured, source-backed report.",
+  "agent.skillReportPrompt":
+    "Turn the current research into a structured report with the core conclusion, key evidence, valuation or risk assumptions, counterevidence and open questions, while preserving sources.",
+  "agent.skillNotes": "Investment notes",
+  "agent.skillNotesDetail":
+    "Capture buy and sell rationale, research insights and theses to verify.",
+  "agent.skillMonitoring": "Conditional monitoring",
+  "agent.skillMonitoringDetail":
+    "Get notified when a price, page or key piece of information changes.",
   "agent.onYourComputer": "On your computer",
   "agent.shortcutPortfolioDetail": "Holdings, P/L and allocation",
   "agent.shortcutNotesDetail": "Buy/sell reasons, research notes and thesis tracking",
-  "agent.shortcutWatchlistDetail": "Quotes, alerts and daily moves",
   "agent.shortcutMailDetail": "Read messages and prepare replies",
   "agent.shortcutCalendarDetail": "Events and reviewed invitations",
-  "agent.shortcutBrowserDetail": "Persistent browser sessions",
-  "agent.shortcutFilesDetail": "PDFs, forms and filled copies",
   "agent.personalityMemory": "Personality & memory",
   "agent.yourAgent": "Your agent",
   "agent.avatarLabel": "{name} avatar",

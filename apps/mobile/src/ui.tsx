@@ -4,6 +4,7 @@ import {
   Image,
   type ImageSourcePropType,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   type StyleProp,
@@ -21,63 +22,81 @@ import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
 import { ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
 /**
- * 设计令牌（LingWu × Doubao 设计系统）。
+ * 灵悟设计令牌。
  *
- * 视觉结构对齐 Doubao 的「紧凑型 AI Dashboard」：
- * - 边框优先、弱阴影：卡片用 1px 描边区分层级，而不是靠灰面或投影。
- * - 单一中性面阶梯：canvas(页面) → surface(次级面) → tertiary(输入/深一档填充)。
- * - 单一圆角体系：面板 14、控件 10、按钮与 Chip 走胶囊形。
- * - 操作层级清晰：主操作实心品牌色，次级操作中性面，危险操作语义红。
- *
- * 品牌色覆盖：设计库默认主色为蓝色 `--primary: #0065fd`，LingWu 继续保留
- * 紫色品牌 #4B3FE3 与白色主题，设计库的边框、密度、圆角与操作层级照常沿用。
+ * 视觉方向来自 v7 Demo 的工作台：暖灰画布、白色纸面、细描边、克制的蓝色
+ * 强调和衬线标题。行情涨跌仍遵循中国市场惯例（红涨绿跌），但品牌操作色
+ * 不再使用紫色。
  */
 export const colors = {
-  canvas: "#FFFFFF", // --background / --card：页面与卡片底色
-  surface: "#EFF1F4", // --muted / --secondary：次级面（搜索框、次级按钮）
-  tertiary: "#E7EAEF", // --input：深一档的次级填充（代码块、分段控件）
-  text: "#0E1115", // --foreground：主文字
-  muted: "#404040", // --text-secondary：次级文字
-  faint: "#737373", // --text-tertiary：占位符/三级文字
-  disabled: "#A1A1A1", // --text-disabled
-  line: "#E7EAEF", // --border / --input：统一描边
-  lineStrong: "#D5DBE3", // 派生描边：需要更清晰分隔时使用
-  overlay1: "rgba(115,115,115,0.08)", // --bg-overlay-l1：按下/悬停底色
-  overlay2: "rgba(115,115,115,0.12)", // --bg-overlay-l2（悬停/选中）
-  overlay3: "rgba(115,115,115,0.16)", // --bg-overlay-l3（按下）
-  // 品牌（--bg-brand 系）。`primary` 为实心填充（配 onPrimary 前景），
-  // 也是图标、链接与强调文字的统一色；`sky` 只用于小面积状态 Chip。
-  primary: "#4B3FE3",
+  canvas: "#F8F8F8", // 页面画布
+  paper: "#FFFFFF", // 卡片、输入框与浮层纸面
+  surface: "#F4F4F4",
+  tertiary: "#EEEEEE",
+  text: "#303030",
+  muted: "#696969",
+  faint: "#8A8A8A",
+  disabled: "#B0B0B0",
+  line: "#E6E6E6",
+  lineStrong: "#D6D6D6",
+  overlay1: "rgba(48,48,48,0.045)",
+  overlay2: "rgba(48,48,48,0.075)",
+  overlay3: "rgba(48,48,48,0.11)",
+  primary: "#3A83F7",
   onPrimary: "#FFFFFF",
-  sky: "#E5EAFF", // --accent：品牌浅底（状态 Chip 等小面积使用）
-  green: "rgba(64,176,139,0.12)", // status-success-surface-l1
-  success: "#15A877", // status-success-default
-  orange: "rgba(226,121,0,0.12)", // status-warning-surface-l1
-  danger: "#E8463A", // status-error-default
-  errorSoft: "rgba(232,70,58,0.12)", // status-error-surface-l1
-  modalShade: "rgba(23,23,23,0.4)", // 模态遮罩（弹窗/菜单背景）
+  primaryStrong: "#245FC4",
+  primaryAction: "#2F6FD8",
+  sky: "#EDF3FF",
+  green: "rgba(33,125,98,0.10)",
+  success: "#217D62",
+  orange: "rgba(211,126,35,0.11)",
+  danger: "#C4384B",
+  errorSoft: "rgba(196,56,75,0.09)",
+  modalShade: "rgba(24,24,24,0.32)",
   // 行情语义色：遵循中国市场惯例（涨红跌绿），与 danger/success 同色值但语义独立，
   // 避免行情涨跌被误读为「错误 / 成功」状态。
-  marketUp: "#E8463A", // 涨（红）：圆点/图形
-  marketDown: "#15A877", // 跌（绿）：圆点/图形
-  marketFlat: "#737373", // 平（灰）
-  marketUpSurface: "rgba(232,70,58,0.12)", // 涨底色
-  marketDownSurface: "rgba(64,176,139,0.12)", // 跌底色
+  marketUp: "#C4384B",
+  marketDown: "#217D62",
+  marketFlat: "#767676",
+  marketUpSurface: "rgba(196,56,75,0.08)",
+  marketDownSurface: "rgba(33,125,98,0.08)",
   // 文本专用深色变体：上两者直接作为正文色时对白底只有 ~3.9:1 / ~3.0:1，
   // 这里压深到 ≥4.5:1（WCAG AA 正文），图形与浅底仍用上面的原始色。
-  marketUpText: "#D0342A",
-  marketDownText: "#0E7A55",
-  alertVolume: "#E27900", // 成交量异动（橙）：图标/圆点
-  alertVolumeText: "#994F00", // 成交量异动正文（对 surface 底 ≥4.5:1）
-  alertVolumeSurface: "rgba(226,121,0,0.12)", // 成交量异动底色
+  marketUpText: "#B42F43",
+  marketDownText: "#176A52",
+  alertVolume: "#C47B24",
+  alertVolumeText: "#8C520E",
+  alertVolumeSurface: "rgba(196,123,36,0.10)",
 };
+
+/** Web 端优先使用中文系统字体；原生端保持在平台字体回退内。 */
+export const fonts = {
+  sans: Platform.select({
+    web: '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
+    ios: "PingFang SC",
+    android: "sans-serif",
+    default: "sans-serif",
+  }),
+  serif: Platform.select({
+    web: '"Noto Serif SC", "Songti SC", STSong, Georgia, serif',
+    ios: "Songti SC",
+    android: "serif",
+    default: "serif",
+  }),
+  number: Platform.select({
+    web: 'Georgia, "Times New Roman", serif',
+    ios: "Georgia",
+    android: "serif",
+    default: "serif",
+  }),
+} as const;
 
 /**
  * 第三方服务品牌色。
  *
  * 仅用于 Connections 列表里的服务识别（Gmail / Google 日历 / 浏览器 / OpenBot），
  * 让用户一眼认出对接的是哪个外部服务；它们不参与品牌主操作，
- * 避免「紫色 = LingWu 自身操作」这一语义被稀释。
+ * 避免外部服务色与 LingWu 的蓝色操作层级混淆。
  * `surface` 是配套的浅色底座，用于图标背板。
  */
 export const serviceBrands = {
@@ -89,22 +108,35 @@ export const serviceBrands = {
 export const s = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center" },
   between: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  text: { color: colors.text, fontSize: 15, lineHeight: 23 },
-  muted: { color: colors.muted, fontSize: 14, lineHeight: 21 },
-  small: { color: colors.muted, fontSize: 11, lineHeight: 17 },
+  text: { color: colors.text, fontSize: 15, lineHeight: 23, fontFamily: fonts.sans },
+  muted: { color: colors.muted, fontSize: 14, lineHeight: 21, fontFamily: fonts.sans },
+  small: { color: colors.muted, fontSize: 11, lineHeight: 17, fontFamily: fonts.sans },
   label: {
     color: colors.muted,
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 1.4,
     textTransform: "uppercase",
+    fontFamily: fonts.sans,
   },
-  title: { color: colors.text, fontSize: 23, fontWeight: "600", letterSpacing: -0.7 },
-  heading: { color: colors.text, fontSize: 16, fontWeight: "600", letterSpacing: -0.25 },
-  /** App Card：白底 + 1px 描边 + 14px 圆角 + 16px 内边距，靠边框而不是阴影分层。 */
+  title: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "600",
+    letterSpacing: -0.7,
+    fontFamily: fonts.serif,
+  },
+  heading: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+    letterSpacing: -0.25,
+    fontFamily: fonts.sans,
+  },
+  /** 白纸卡片：轻描边、10px 圆角，避免过多浮层与阴影。 */
   card: {
-    backgroundColor: colors.canvas,
-    borderRadius: 14,
+    backgroundColor: colors.paper,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.line,
     padding: 16,
@@ -113,16 +145,17 @@ export const s = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 10,
+    borderRadius: 9,
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: colors.text,
     fontSize: 16,
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.paper,
     minHeight: 44,
+    fontFamily: fonts.sans,
   },
   field: { gap: 7, marginBottom: 16 },
-  /** 按钮：胶囊形 + 1px 描边，默认高度 38（small 32），与设计库 .btn 一致。 */
+  /** 按钮：轻圆角 + 1px 描边，默认高度 38（small 32）。 */
   button: {
     flexDirection: "row",
     alignItems: "center",
@@ -131,29 +164,34 @@ export const s = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 38,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: 9,
     borderWidth: 1,
     borderColor: "transparent",
   },
-  primary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  primary: { backgroundColor: colors.primaryAction, borderColor: colors.primaryAction },
   secondary: { backgroundColor: colors.surface, borderColor: colors.line },
   dangerSurface: { backgroundColor: colors.errorSoft, borderColor: colors.errorSoft },
-  buttonText: { fontSize: 14, fontWeight: "600" },
+  buttonText: { fontSize: 14, fontWeight: "600", fontFamily: fonts.sans },
   chip: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 7,
     alignSelf: "flex-start",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
   },
-  chipText: { fontSize: 10, fontWeight: "600", color: colors.muted },
+  chipText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: colors.muted,
+    fontFamily: fonts.sans,
+  },
   /** 图标底座：44×44 / 13px 圆角（设计库 App Card 的 .ic 规格）。 */
   iconBox: {
     width: 44,
     height: 44,
-    borderRadius: 13,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.surface,
@@ -174,8 +212,8 @@ export const s = StyleSheet.create({
   },
   /** 弹窗面板：白底 + 1px 描边 + 14px 圆角，最大宽度对齐设计库 .panel 的 760。 */
   sheet: {
-    backgroundColor: colors.canvas,
-    borderRadius: 14,
+    backgroundColor: colors.paper,
+    borderRadius: 12,
     width: "100%",
     maxWidth: 760,
     maxHeight: "94%",
@@ -184,7 +222,7 @@ export const s = StyleSheet.create({
     borderColor: colors.line,
   },
   /** 数据/度量数字：等宽字体 + tabular 数字，对齐 TraeWork 数值展示规范。 */
-  metric: { fontVariant: ["tabular-nums"] as const },
+  metric: { fontVariant: ["tabular-nums"] as const, fontFamily: fonts.number },
 });
 export function Button({
   children,
@@ -451,7 +489,7 @@ export function CheckRow({
           borderRadius: 5,
           borderWidth: 1,
           borderColor: checked ? colors.primary : colors.lineStrong,
-          backgroundColor: checked ? colors.primary : colors.canvas,
+          backgroundColor: checked ? colors.primary : colors.paper,
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -551,7 +589,7 @@ export function Mascot({ size = 42, variant }: { size?: number; variant?: string
     );
   }
   // 兜底涂装：默认（无 variant）或旧版 sky/sand/lilac 仍渲染水豚。
-  // sand/lilac 是历史头像遗留值，保持原样以兼容已存数据；默认底色跟随品牌浅紫。
+  // sand/lilac 是历史头像遗留值，保持原样以兼容已存数据；默认底色跟随品牌浅蓝。
   const palette =
     {
       sky: colors.sky,
@@ -572,7 +610,7 @@ export function Mascot({ size = 42, variant }: { size?: number; variant?: string
         }}
       />
       <Image
-        source={require("../assets/logo.png")}
+        source={require("../assets/capybara.png")}
         resizeMode="contain"
         style={{ width: size, height: size }}
         accessible={false}

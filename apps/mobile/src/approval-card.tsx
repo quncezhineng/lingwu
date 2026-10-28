@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     width: "100%",
     overflow: "hidden",
     borderRadius: 14,
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.paper,
     borderWidth: 1,
     borderColor: colors.line,
   },

@@ -78,7 +78,7 @@ function ChipButton({
         borderRadius: 999,
         borderWidth: 1,
         borderColor: selected ? colors.primary : colors.line,
-        backgroundColor: selected ? colors.sky : colors.canvas,
+        backgroundColor: selected ? colors.sky : colors.paper,
         opacity: disabled ? 0.4 : 1,
       }}
     >
@@ -440,7 +440,7 @@ export function NotesScreen() {
                 alignItems: "center",
                 justifyContent: "center",
                 borderRadius: 999,
-                backgroundColor: active ? colors.canvas : "transparent",
+                backgroundColor: active ? colors.paper : "transparent",
                 borderWidth: active ? 1 : 0,
                 borderColor: colors.line,
               }}

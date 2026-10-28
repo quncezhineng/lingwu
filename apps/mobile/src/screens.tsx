@@ -93,7 +93,7 @@ export function TodayScreen() {
       <View
         style={[
           {
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: 14,
@@ -172,7 +172,7 @@ export function TodayScreen() {
                   paddingHorizontal: 12,
                   paddingVertical: 8,
                   gap: 7,
-                  backgroundColor: colors.canvas,
+                  backgroundColor: colors.paper,
                   borderWidth: 1,
                   borderColor: colors.line,
                   borderRadius: 999,
@@ -193,7 +193,7 @@ export function TodayScreen() {
                   paddingHorizontal: 12,
                   paddingVertical: 8,
                   gap: 8,
-                  backgroundColor: colors.canvas,
+                  backgroundColor: colors.paper,
                   borderWidth: 1,
                   borderColor: colors.line,
                   borderRadius: 999,
@@ -825,7 +825,7 @@ export function CalendarScreen() {
                   borderRadius: 10,
                   borderWidth: 1,
                   borderColor: selected ? colors.line : "transparent",
-                  backgroundColor: selected ? colors.canvas : "transparent",
+                  backgroundColor: selected ? colors.paper : "transparent",
                 }}
               >
                 <Text style={s.small}>
@@ -1000,7 +1000,7 @@ export function BrowserScreen() {
                     {b.url}
                   </Text>
                 </View>
-                <Chip tint={b.status === "active" ? colors.green : colors.canvas}>
+                <Chip tint={b.status === "active" ? colors.green : colors.paper}>
                   {statusLabel(b.status)}
                 </Chip>
                 <ArrowUpRight size={17} strokeWidth={1.8} color={colors.muted} />
@@ -1013,7 +1013,7 @@ export function BrowserScreen() {
                     height: 180,
                     width: "100%",
                     borderRadius: 10,
-                    backgroundColor: colors.canvas,
+                    backgroundColor: colors.paper,
                   }}
                 />
               )}
@@ -1031,7 +1031,7 @@ export function BrowserScreen() {
   );
 }
 export function FilesScreen() {
-  const { workspace: w, api, refresh, open } = useWorkspace();
+  const { workspace: w, api, refresh, open, navigate } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
@@ -1085,6 +1085,14 @@ export function FilesScreen() {
         </Button>
       </View>
       <ErrorNotice error={error || agentError} />
+      <Card style={{ paddingVertical: 2 }}>
+        <LinkRow
+          icon={FileText}
+          title={t("app.titleNotes")}
+          detail={t("agent.shortcutNotesDetail")}
+          onPress={() => navigate("notes")}
+        />
+      </Card>
       {library.artifacts.length > 0 && (
         <View style={{ gap: 2 }}>
           <SectionHeading title={t("screens.filesResearchHeading")} />
@@ -1121,7 +1129,7 @@ export function FilesScreen() {
                           width: 93,
                           height: 121,
                           borderRadius: 5,
-                          backgroundColor: colors.canvas,
+                          backgroundColor: colors.paper,
                           padding: 14,
                           transform: [{ rotate: "-4deg" }],
                           borderWidth: 1,
@@ -1212,7 +1220,7 @@ function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
               width: 103,
               height: 127,
               borderRadius: 8,
-              backgroundColor: colors.canvas,
+              backgroundColor: colors.paper,
               padding: 15,
               transform: [{ rotate: "2deg" }],
               borderWidth: 1,
@@ -1250,7 +1258,7 @@ function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
             ))}
           </View>
           <View style={{ position: "absolute", bottom: 12, right: 14 }}>
-            <Chip tint={colors.canvas}>{statusLabel(artifact.kind)}</Chip>
+            <Chip tint={colors.paper}>{statusLabel(artifact.kind)}</Chip>
           </View>
         </View>
         {/* 卡片正文收紧到紧凑密度：内边距 14、间距 6 */}
@@ -1336,7 +1344,7 @@ export function ActivityScreen() {
                     ? colors.errorSoft
                     : a.status === "awaiting_review"
                       ? colors.sky
-                      : colors.canvas
+                      : colors.paper
                 }
               >
                 {statusLabel(a.status)}
@@ -1364,9 +1372,7 @@ export function ActivityScreen() {
                   },
                 ]}
               >
-                <View
-                  style={[s.iconBox, { height: 34, width: 34, backgroundColor: colors.canvas }]}
-                >
+                <View style={[s.iconBox, { height: 34, width: 34, backgroundColor: colors.paper }]}>
                   <Clock3 size={16} strokeWidth={1.8} color={colors.muted} />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
@@ -1522,7 +1528,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                 borderRadius: 14,
                 borderWidth: 1,
                 borderColor: colors.line,
-                backgroundColor: colors.canvas,
+                backgroundColor: colors.paper,
                 overflow: "hidden",
               }}
             >

@@ -41,6 +41,9 @@ const status = {
   "status.status": "Status",
   "status.comparison": "Comparison",
   "status.report": "Report",
+  "status.market_briefing": "Market briefing",
+  "status.research_report": "Research report",
+  "status.research": "Research",
   // 目标 / 监控状态
   "status.active": "Active",
   "status.completed": "Completed",

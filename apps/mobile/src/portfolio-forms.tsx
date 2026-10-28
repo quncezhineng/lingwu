@@ -67,7 +67,7 @@ export function PortfolioCreateSheet({
                     borderRadius: 999,
                     borderWidth: 1,
                     borderColor: selected ? colors.primary : colors.line,
-                    backgroundColor: selected ? colors.sky : colors.canvas,
+                    backgroundColor: selected ? colors.sky : colors.paper,
                   }}
                 >
                   <Text
@@ -374,7 +374,7 @@ export function HoldingFormSheet({
                   borderRadius: 999,
                   borderWidth: 1,
                   borderColor: selected ? colors.primary : colors.line,
-                  backgroundColor: selected ? colors.sky : colors.canvas,
+                  backgroundColor: selected ? colors.sky : colors.paper,
                 }}
               >
                 <Text

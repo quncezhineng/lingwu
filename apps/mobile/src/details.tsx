@@ -27,19 +27,23 @@ import HtmlPreview from "./HtmlPreview";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
 import {
+  Bot,
   CalendarDays,
   Check,
+  CircleUserRound,
   Clock3,
   Download,
   Edit3,
   ExternalLink,
   FileText,
   Globe2,
+  Heart,
   Mail as MailIcon,
   Reply,
   RotateCw,
   Save,
   Send,
+  Shapes,
   ShieldCheck,
   Trash2,
   X,
@@ -79,6 +83,7 @@ export function Details({ detail }: { detail: Detail }) {
     );
   if (detail.type === "notifications") return <NotificationsSheet />;
   if (detail.type === "personality") return <AgentPersonalitySheet />;
+  if (detail.type === "settings") return <SettingsSheet />;
   if (detail.type === "mail") return <MailDetail mail={detail.mail} />;
   if (detail.type === "email") return <EmailEditor draft={detail.draft} />;
   if (detail.type === "event")
@@ -115,6 +120,64 @@ export function Details({ detail }: { detail: Detail }) {
           }}
         />
       ))}
+    </Sheet>
+  );
+}
+function SettingsSheet() {
+  const { t } = useTranslation();
+  const { close, open, navigate } = useWorkspace();
+  return (
+    <Sheet
+      title={t("details.settingsTitle")}
+      subtitle={t("details.settingsSubtitle")}
+      onClose={close}
+    >
+      <View style={{ gap: 20 }}>
+        <View style={{ gap: 8 }}>
+          <Text style={s.label}>{t("details.settingsAgentHeading")}</Text>
+          <Card style={{ paddingVertical: 6 }}>
+            <LinkRow
+              icon={Bot}
+              title={t("agent.personalityMemory")}
+              detail={t("details.settingsPersonalityDetail")}
+              onPress={() => open({ type: "personality" })}
+            />
+          </Card>
+        </View>
+        <View style={{ gap: 8 }}>
+          <Text style={s.label}>{t("details.settingsWorkspaceHeading")}</Text>
+          <Card style={{ paddingVertical: 6 }}>
+            <LinkRow
+              icon={Heart}
+              title={t("app.navPreferences")}
+              detail={t("details.settingsPreferencesDetail")}
+              onPress={() => {
+                navigate("preferences");
+                close();
+              }}
+            />
+            <LinkRow
+              icon={Shapes}
+              title={t("app.navApps")}
+              detail={t("details.settingsAppsDetail")}
+              onPress={() => {
+                navigate("apps");
+                close();
+              }}
+            />
+            <LinkRow
+              icon={CircleUserRound}
+              title={t("details.settingsAccountTitle")}
+              detail={t("details.settingsAccountDetail")}
+              onPress={() => {
+                navigate("account");
+                close();
+              }}
+            />
+          </Card>
+        </View>
+        <Text style={s.small}>{t("details.settingsPrivacy")}</Text>
+      </View>
     </Sheet>
   );
 }
@@ -1103,7 +1166,7 @@ function BrowserDetail({ initial }: { initial: BrowserSession }) {
       ) : browser.status === "active" && browser.previewUrl ? (
         <Image
           source={{ uri: api.url(browser.previewUrl) }}
-          style={{ width: "100%", height: 450, backgroundColor: colors.canvas }}
+          style={{ width: "100%", height: 450, backgroundColor: colors.paper }}
           resizeMode="contain"
         />
       ) : (

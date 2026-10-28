@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.paper,
   },
   header: { flexDirection: "row", alignItems: "center", gap: 6 },
   headerText: { color: colors.muted, fontSize: 12, lineHeight: 18, fontWeight: "600" },

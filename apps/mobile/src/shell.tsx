@@ -1,17 +1,14 @@
 /**
- * 宽屏外壳：左侧图标栏 + 对话列表栏。
+ * 应用外壳。
  *
- * 布局（窗口宽度 >= 900 时启用，见 App.tsx 的 `desktop` 判断）：
- *
- *   [ 图标栏 76 ] [ 对话列表 248，仅「对话」页 ] [ 主内容区 ]
- *
- * 图标栏顶部是智能体头像与状态，中间是五个主页面，底部是通知、语言与「我的」；
- * 对话列表栏把会话分成「主要聊天」与「旁聊」两组，底部可以直接新建旁聊。
- * 窄屏仍沿用底部标签栏，两套外壳共用同一份状态与页面组件，不存在第二套实现。
+ * 桌面端是 232px 文本侧栏 + 主工作区，信息架构对齐 v7 Demo：
+ * 工作台、对话、自选、分析任务、灵感、资料、盯盘、投资偏好和应用。
+ * 进入对话时额外显示会话列表栏，保留完整的历史会话管理与切换能力。
  */
 import { useThreads } from "@copilotkit/react-native/headless";
 import { useEffect, useState } from "react";
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -20,64 +17,81 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import Svg, { Circle, Ellipse } from "react-native-svg";
 import type { Section } from "../../../packages/domain/src";
 import { useAgentWorkspace } from "./agent-workspace";
+import type { AccountProfile } from "./api";
 import { useTranslation } from "./i18n";
-import { LanguageSwitcher } from "./i18n/LanguageSwitcher";
 import type { TranslationKey } from "./i18n/locales/en";
+import { statusLabel } from "./i18n/translate";
 import {
   Archive,
   Bell,
   Check,
   CircleUserRound,
+  FileText,
+  Heart,
   type IconComponent,
   Lightbulb,
+  ListChecks,
   MessageCircle,
   MoreHorizontal,
-  PanelsTopLeft,
   Pencil,
   Plus,
   Search,
+  Settings2,
   Shapes,
   Sparkles,
-  SquareCheck,
+  Target,
   Trash2,
   X,
 } from "./icons";
 import { relativeDate } from "./relative-date";
 import { useLingWuThread } from "./threads";
-import { Button, colors, ErrorNotice, Mascot, s } from "./ui";
+import { Button, colors, ErrorNotice, fonts, Mascot, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
-/** 图标栏中的导航项：都对应一个页面，点击切换到对应 section。 */
+/** 侧栏中的导航项：都对应一个页面，点击切换到对应 section。 */
 export type NavItem = { id: Section; labelKey: TranslationKey; icon: IconComponent };
 
-/** 图标栏中间的主页面（底部的「我的」单独列出，见 ACCOUNT_NAV）。 */
+/** 桌面侧栏的主要页面。 */
 export const SECTION_NAV: NavItem[] = [
   { id: "today", labelKey: "app.navToday", icon: Sparkles },
   { id: "chat", labelKey: "app.navChat", icon: MessageCircle },
-  { id: "activity", labelKey: "app.navActivity", icon: PanelsTopLeft },
+  { id: "watchlist", labelKey: "app.navWatchlist", icon: Target },
+  { id: "activity", labelKey: "app.navActivity", icon: ListChecks },
   { id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb },
-  { id: "goals", labelKey: "app.navGoals", icon: SquareCheck },
+  { id: "files", labelKey: "app.navFiles", icon: FileText },
+  { id: "goals", labelKey: "app.navGoals", icon: Bell },
+  { id: "preferences", labelKey: "app.navPreferences", icon: Heart },
   { id: "apps", labelKey: "app.navApps", icon: Shapes },
 ];
 
-/** 图标栏底部的「我的」页面项。 */
+/** 移动端底部导航：与 Demo 一样只保留五条主路径。 */
+export const MOBILE_NAV: NavItem[] = [
+  { id: "today", labelKey: "app.navToday", icon: Sparkles },
+  { id: "watchlist", labelKey: "app.navWatchlistShort", icon: Target },
+  { id: "activity", labelKey: "app.navActivity", icon: ListChecks },
+  { id: "goals", labelKey: "app.navGoalsShort", icon: Bell },
+];
+
+/** 侧栏底部的「我的」页面项。 */
 export const ACCOUNT_NAV: NavItem = {
   id: "account",
   labelKey: "app.navAccount",
   icon: CircleUserRound,
 };
 
-export const RAIL_WIDTH = 76;
+export const SIDEBAR_WIDTH = 232;
+/** 兼容仍在引用的旧常量名。 */
+export const RAIL_WIDTH = SIDEBAR_WIDTH;
 export const CHATS_WIDTH = 248;
 
 function errorText(e: unknown) {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** 图标栏里的一项：图标在上、文字在下，选中时用白色面 + 品牌色图标（对齐设计库侧栏激活态）。 */
-function RailItem({
+function SidebarNavItem({
   icon: Icon,
   label,
   active,
@@ -97,29 +111,31 @@ function RailItem({
       accessibilityState={{ selected: active }}
       onPress={onPress}
       style={({ pressed }) => ({
-        position: "relative",
-        width: 60,
+        width: "100%",
+        minHeight: 42,
+        flexDirection: "row",
         alignItems: "center",
-        gap: 3,
-        paddingVertical: 6,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: active ? colors.line : "transparent",
-        backgroundColor: active ? colors.canvas : pressed ? colors.overlay1 : "transparent",
+        gap: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        borderRadius: 7,
+        backgroundColor: active ? colors.sky : pressed ? colors.overlay1 : "transparent",
       })}
     >
       <Icon
-        size={20}
-        strokeWidth={active ? 2 : 1.8}
+        size={18}
+        strokeWidth={active ? 2 : 1.7}
         color={active ? colors.primary : colors.muted}
       />
       <Text
         numberOfLines={1}
         style={{
-          fontSize: 10.5,
-          lineHeight: 13,
-          fontWeight: "500",
-          color: active ? colors.text : colors.muted,
+          flex: 1,
+          fontSize: 14,
+          lineHeight: 20,
+          fontWeight: active ? "600" : "500",
+          color: active ? colors.primaryStrong : colors.text,
+          fontFamily: fonts.sans,
         }}
       >
         {label}
@@ -127,16 +143,13 @@ function RailItem({
       {!!badge && badge > 0 && (
         <View
           style={{
-            position: "absolute",
-            top: 2,
-            right: 6,
-            minWidth: 17,
-            height: 17,
-            borderRadius: 9,
-            paddingHorizontal: 4,
+            minWidth: 20,
+            height: 20,
+            borderRadius: 10,
+            paddingHorizontal: 5,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: colors.danger,
+            backgroundColor: colors.primaryAction,
           }}
         >
           <Text style={{ fontSize: 10, fontWeight: "700", color: colors.onPrimary }}>{badge}</Text>
@@ -146,94 +159,299 @@ function RailItem({
   );
 }
 
+/** 四瓣花品牌符号，与 Web favicon 使用同一套几何形状。 */
+export function BrandMark({ size = 28 }: { size?: number }) {
+  return (
+    <Svg
+      accessibilityElementsHidden
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      style={{ flexShrink: 0 }}
+    >
+      <Ellipse cx="26" cy="23" rx="9" ry="14" fill={colors.primary} transform="rotate(-42 26 23)" />
+      <Ellipse cx="41" cy="26" rx="14" ry="9" fill={colors.primary} transform="rotate(-42 41 26)" />
+      <Ellipse cx="38" cy="41" rx="9" ry="14" fill={colors.primary} transform="rotate(-42 38 41)" />
+      <Ellipse cx="23" cy="38" rx="14" ry="9" fill={colors.primary} transform="rotate(-42 23 38)" />
+      <Circle cx="32" cy="32" r="5" fill={colors.sky} />
+    </Svg>
+  );
+}
+
+function SidebarAccountAvatar({ avatarUrl, name }: { avatarUrl?: string; name: string }) {
+  const initial = name.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <View
+      style={{
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        backgroundColor: colors.sky,
+      }}
+    >
+      {avatarUrl ? (
+        <Image
+          source={{ uri: avatarUrl }}
+          resizeMode="cover"
+          accessible={false}
+          style={{ width: 24, height: 24 }}
+        />
+      ) : (
+        <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>{initial}</Text>
+      )}
+    </View>
+  );
+}
+
 /**
- * 左侧图标栏。头像与名字来自工作区身份，状态行与窄屏顶部一致；
- * 底部依次是通知、语言与「我的」入口（宽屏没有顶部栏，语言按钮收纳在这里）。
+ * 桌面文本侧栏。导航上方是品牌与新建分析，导航下方是真实任务形成的
+ * “最近的分析”，底部保留助手状态、通知、语言和账户入口。
  */
-export function Rail({ name, pending }: { name: string; pending: number }) {
-  const { section, navigate, open } = useWorkspace();
+export function Rail({ name }: { name: string }) {
+  const { section, navigate, open, api, workspace } = useWorkspace();
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
+  const [accountAvatarUrl, setAccountAvatarUrl] = useState<string>();
+
+  useEffect(() => {
+    let active = true;
+    void api
+      .request<AccountProfile>("/api/auth/me")
+      .then((profile) => {
+        if (active) setAccountAvatarUrl(profile.avatarUrl ?? undefined);
+      })
+      .catch(() => {
+        // The account page owns the visible error state; the sidebar keeps its fallback.
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
+
+  const recent = [...(data?.tasks ?? [])]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 3);
+  const activeCount = (data?.tasks ?? []).filter(
+    (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
+  ).length;
 
   return (
     <View
       style={{
-        width: RAIL_WIDTH,
+        width: SIDEBAR_WIDTH,
         flexShrink: 0,
         zIndex: 20,
-        alignItems: "center",
         borderRightWidth: 1,
         borderRightColor: colors.line,
-        backgroundColor: colors.canvas,
+        backgroundColor: colors.surface,
+        paddingHorizontal: 20,
+        paddingTop: 22,
+        paddingBottom: 18,
       }}
     >
+      <View style={[s.row, { gap: 10, paddingHorizontal: 2 }]}>
+        <BrandMark size={27} />
+        <View style={[s.row, { gap: 8, alignItems: "baseline" }]}>
+          <Text
+            style={{
+              fontSize: 21,
+              lineHeight: 27,
+              fontWeight: "600",
+              color: colors.text,
+              fontFamily: fonts.serif,
+            }}
+          >
+            {t("common.agentName")}
+          </Text>
+          <Text
+            style={{
+              fontSize: 12,
+              color: colors.muted,
+              fontStyle: "italic",
+              fontFamily: fonts.number,
+            }}
+          >
+            lingwu
+          </Text>
+        </View>
+      </View>
+
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={t("agent.personalityMemory")}
-        onPress={() => open({ type: "personality" })}
+        accessibilityLabel={t("app.newAnalysis")}
+        onPress={() => navigate("chat")}
         style={({ pressed }) => ({
+          marginTop: 26,
+          minHeight: 43,
+          flexDirection: "row",
           alignItems: "center",
-          gap: 4,
-          paddingTop: 14,
-          opacity: pressed ? 0.7 : 1,
+          gap: 9,
+          paddingHorizontal: 13,
+          borderRadius: 9,
+          borderWidth: 1,
+          borderColor: colors.lineStrong,
+          backgroundColor: pressed ? colors.overlay1 : colors.paper,
         })}
       >
-        <Mascot size={44} variant={data?.identity.avatar} />
-        <Text
-          numberOfLines={1}
-          style={{
-            maxWidth: 68,
-            fontSize: 11,
-            fontWeight: "600",
-            color: colors.text,
-            letterSpacing: -0.2,
-          }}
-        >
-          {name}
+        <Plus size={16} strokeWidth={1.9} color={colors.text} />
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: "600", color: colors.text }}>
+          {t("app.newAnalysis")}
         </Text>
+        <Text style={{ fontSize: 11, color: colors.faint }}>⌘ J</Text>
       </Pressable>
 
       <ScrollView
-        style={{ width: "100%", flex: 1, marginTop: 12 }}
-        contentContainerStyle={{ alignItems: "center", gap: 2, paddingHorizontal: 8 }}
+        style={{ flex: 1, marginHorizontal: -8, marginTop: 14 }}
+        contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12 }}
         showsVerticalScrollIndicator={false}
       >
-        {SECTION_NAV.map((item) => (
-          <RailItem
-            key={item.id}
-            icon={item.icon}
-            label={t(item.labelKey)}
-            active={section === item.id}
-            onPress={() => navigate(item.id)}
-          />
-        ))}
+        <View style={{ gap: 2 }}>
+          {SECTION_NAV.map((item) => (
+            <SidebarNavItem
+              key={item.id}
+              icon={item.icon}
+              label={t(item.labelKey)}
+              active={
+                section === item.id ||
+                (item.id === "preferences" && section === "portfolio") ||
+                (item.id === "files" && section === "notes")
+              }
+              badge={item.id === "activity" && activeCount ? activeCount : undefined}
+              onPress={() => navigate(item.id)}
+            />
+          ))}
+        </View>
+
+        <View style={{ height: 1, backgroundColor: colors.line, margin: 12, marginTop: 18 }} />
+        <View style={[s.between, { paddingHorizontal: 10, marginBottom: 8 }]}>
+          <Text style={[s.label, { fontSize: 10, letterSpacing: 0.8 }]}>
+            {t("app.recentAnalyses")}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("app.newAnalysis")}
+            onPress={() => navigate("chat")}
+            hitSlop={8}
+          >
+            <Plus size={14} strokeWidth={1.8} color={colors.faint} />
+          </Pressable>
+        </View>
+        {recent.length ? (
+          recent.map((task) => (
+            <Pressable
+              key={task.id}
+              accessibilityRole="button"
+              accessibilityLabel={task.title}
+              onPress={() => open({ type: "task", taskId: task.id })}
+              style={({ pressed }) => ({
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                borderRadius: 7,
+                backgroundColor: pressed ? colors.overlay1 : "transparent",
+                gap: 3,
+              })}
+            >
+              <Text numberOfLines={1} style={{ fontSize: 12.5, color: colors.text }}>
+                {task.title}
+              </Text>
+              <Text style={{ fontSize: 10.5, color: colors.faint }}>
+                {statusLabel(task.status)}
+              </Text>
+            </Pressable>
+          ))
+        ) : (
+          <Text style={[s.small, { paddingHorizontal: 10, lineHeight: 18 }]}>
+            {t("app.noRecentAnalyses")}
+          </Text>
+        )}
       </ScrollView>
 
       <View
         style={{
           width: "100%",
-          alignItems: "center",
-          gap: 2,
-          paddingHorizontal: 8,
-          paddingBottom: 14,
-          paddingTop: 6,
+          gap: 10,
+          paddingTop: 12,
+          borderTopWidth: 1,
+          borderTopColor: colors.line,
         }}
       >
-        {/* 通知与语言从「更多」菜单移出，直接放在「我的」上方，减少一级菜单。 */}
-        <RailItem
-          icon={Bell}
-          label={t("app.menuNotifications")}
-          active={false}
-          badge={pending}
-          onPress={() => open({ type: "notifications" })}
-        />
-        <LanguageSwitcher vertical />
-        <RailItem
-          icon={ACCOUNT_NAV.icon}
-          label={t(ACCOUNT_NAV.labelKey)}
-          active={section === ACCOUNT_NAV.id}
-          onPress={() => navigate(ACCOUNT_NAV.id)}
-        />
+        <View style={[s.row, { gap: 10, paddingHorizontal: 4 }]}>
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: colors.primary,
+            }}
+          >
+            <Mascot size={27} variant={data?.identity.avatar} />
+          </View>
+          <View style={{ flex: 1, gap: 1 }}>
+            <Text style={{ fontSize: 12.5, fontWeight: "600", color: colors.text }}>
+              {t("app.agentWatching", { name })}
+            </Text>
+            <Text style={{ fontSize: 10.5, color: colors.muted }}>
+              {t("app.activeAnalyses", { count: activeCount })}
+            </Text>
+          </View>
+        </View>
+        <View style={[s.row, { gap: 6, paddingHorizontal: 2, paddingBottom: 4 }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t(ACCOUNT_NAV.labelKey)}
+            accessibilityState={{ selected: section === ACCOUNT_NAV.id }}
+            onPress={() => navigate(ACCOUNT_NAV.id)}
+            style={({ pressed }) => ({
+              flex: 1,
+              minWidth: 0,
+              minHeight: 38,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 9,
+              paddingHorizontal: 10,
+              borderRadius: 9,
+              backgroundColor:
+                section === ACCOUNT_NAV.id ? colors.sky : pressed ? colors.overlay1 : "transparent",
+            })}
+          >
+            <SidebarAccountAvatar avatarUrl={accountAvatarUrl} name={workspace.profile.name} />
+            <View style={{ flex: 1 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: "600",
+                  color: section === ACCOUNT_NAV.id ? colors.primaryStrong : colors.text,
+                }}
+              >
+                {t(ACCOUNT_NAV.labelKey)}
+              </Text>
+              <Text numberOfLines={1} style={{ fontSize: 10.5, color: colors.muted }}>
+                {t("app.personalSpace")}
+              </Text>
+            </View>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("app.settingsLabel")}
+            onPress={() => open({ type: "settings" })}
+            style={({ pressed }) => ({
+              width: 38,
+              height: 38,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9,
+              backgroundColor: pressed ? colors.overlay1 : "transparent",
+            })}
+          >
+            <Settings2 size={17} strokeWidth={1.7} color={colors.muted} />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -309,7 +527,7 @@ function ThreadActionsMenu({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.paper,
     padding: 6,
     shadowColor: "#000",
     shadowOpacity: 0.08,
@@ -377,7 +595,7 @@ function ThreadActionsMenu({
   );
 }
 
-/** 对话列表里的一行：名字一行、说明一行，选中时用品牌浅紫底。 */
+/** 对话列表里的一行：名字一行、说明一行，选中时用品牌浅蓝底。 */
 function ThreadRow({
   title,
   detail,
@@ -421,7 +639,7 @@ function ThreadRow({
           borderRadius: 10,
           borderWidth: 1,
           borderColor: active ? colors.line : "transparent",
-          backgroundColor: active ? colors.canvas : pressed ? colors.overlay1 : "transparent",
+          backgroundColor: active ? colors.paper : pressed ? colors.overlay1 : "transparent",
         })}
       >
         {editing ? (
@@ -643,7 +861,7 @@ export function ChatsColumn() {
               borderRadius: 10,
               borderWidth: 1,
               borderColor: colors.line,
-              backgroundColor: colors.canvas,
+              backgroundColor: colors.paper,
             },
           ]}
         >
@@ -776,7 +994,7 @@ export function ChatsColumn() {
             borderRadius: 10,
             borderWidth: 1,
             borderColor: colors.line,
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
             fontSize: 13,
             color: colors.text,
           }}

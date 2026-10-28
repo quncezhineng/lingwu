@@ -38,6 +38,9 @@ const status = {
   "status.status": "状态",
   "status.comparison": "对比",
   "status.report": "报告",
+  "status.market_briefing": "市场简报",
+  "status.research_report": "研究报告",
+  "status.research": "研究",
   // 目标 / 监控状态
   "status.active": "进行中",
   "status.completed": "已完成",

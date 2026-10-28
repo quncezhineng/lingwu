@@ -285,7 +285,7 @@ function SymbolSearch({
             borderRadius: 10,
             paddingHorizontal: 12,
             minHeight: 44,
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
           },
         ]}
       >
@@ -332,7 +332,7 @@ function SymbolSearch({
             left: 0,
             right: 0,
             maxHeight: 280,
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: 10,
@@ -550,7 +550,7 @@ function ListMenu({
             top: 96,
             right: 20,
             minWidth: 168,
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: 10,
@@ -800,7 +800,7 @@ export function WatchlistScreen() {
                     borderRadius: 999,
                     borderWidth: 1,
                     borderColor: selected ? colors.primary : colors.line,
-                    backgroundColor: selected ? colors.sky : colors.canvas,
+                    backgroundColor: selected ? colors.sky : colors.paper,
                     opacity: pressed ? 0.75 : 1,
                   },
                 ]}

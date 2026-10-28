@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   outputScroll: {
     maxHeight: 260,
     borderRadius: 12,
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.paper,
   },
   outputContent: {
     padding: 10,

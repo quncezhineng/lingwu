@@ -30,7 +30,7 @@ export default function HtmlPreview({
           width: "100%",
           border: 0,
           borderRadius: 12,
-          background: colors.canvas,
+          background: colors.paper,
         }}
       />
     </View>

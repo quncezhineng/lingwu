@@ -216,7 +216,7 @@ function ColumnPicker({
                 paddingHorizontal: 16,
                 borderTopWidth: 1,
                 borderTopColor: colors.line,
-                backgroundColor: selected === index ? colors.sky : colors.canvas,
+                backgroundColor: selected === index ? colors.sky : colors.paper,
               }}
             >
               <Text style={s.text}>{header || `#${index + 1}`}</Text>
@@ -726,7 +726,7 @@ export function ImportWizard({
                       alignItems: "center",
                       borderTopWidth: 1,
                       borderTopColor: colors.line,
-                      backgroundColor: isError ? colors.errorSoft : colors.canvas,
+                      backgroundColor: isError ? colors.errorSoft : colors.paper,
                     }}
                   >
                     {isWarning && (

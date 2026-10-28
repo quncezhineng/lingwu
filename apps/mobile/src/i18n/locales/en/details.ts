@@ -5,6 +5,18 @@ const details = {
   // Workspace sheet.
   "details.workspaceSubtitle": "Your personal inverstment research agent.",
   "details.connections": "Connections",
+  "details.settingsTitle": "Settings",
+  "details.settingsSubtitle":
+    "Manage how LingWu works, your investment preferences and external connections.",
+  "details.settingsAgentHeading": "Agent",
+  "details.settingsWorkspaceHeading": "Workspace",
+  "details.settingsPersonalityDetail": "Name, avatar, tone and long-term memory.",
+  "details.settingsPreferencesDetail": "Investment goals, risk preferences and research habits.",
+  "details.settingsAppsDetail": "Plugins, skills and connectors.",
+  "details.settingsAccountTitle": "Account & data",
+  "details.settingsAccountDetail": "Profile, sign-in method and archived conversations.",
+  "details.settingsPrivacy":
+    "These settings affect only this workspace and can be changed anytime.",
 
   // Mail thread.
   "details.messageInConversation": "{count} message in this conversation",

@@ -71,7 +71,7 @@ const noFocusRing =
   Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : undefined;
 
 // 用户消息气泡（品牌色底、反白文字）上的 Markdown 渲染：标题/加粗/链接跟随 onPrimary 白色系，
-// 行内代码与代码块保留浅紫底做区隔，保证紫底气泡内的可读性。
+// 行内代码与代码块保留浅蓝底做区隔，保证品牌底色气泡内的可读性。
 const userMarkdownTextStyle: TextStyle = {
   color: colors.onPrimary,
   fontSize: 16,
@@ -1029,7 +1029,7 @@ export function ChatScreen({
                               borderRadius: 10,
                               borderWidth: 1,
                               borderColor: colors.line,
-                              backgroundColor: pressed ? colors.overlay1 : colors.canvas,
+                              backgroundColor: pressed ? colors.overlay1 : colors.paper,
                             })}
                           >
                             <FileText size={14} strokeWidth={1.8} color={colors.primary} />
@@ -1054,7 +1054,7 @@ export function ChatScreen({
                         borderBottomLeftRadius: user ? 18 : 6,
                         borderWidth: user ? 0 : 1,
                         borderColor: colors.line,
-                        backgroundColor: user ? colors.primary : colors.canvas,
+                        backgroundColor: user ? colors.primary : colors.paper,
                       }}
                     >
                       {user ? (
@@ -1158,7 +1158,7 @@ export function ChatScreen({
                   borderBottomLeftRadius: 6,
                   borderWidth: 1,
                   borderColor: colors.line,
-                  backgroundColor: colors.canvas,
+                  backgroundColor: colors.paper,
                 }}
               >
                 <AssistantResponse
@@ -1265,7 +1265,7 @@ export function ChatScreen({
                   gap: 7,
                   paddingHorizontal: 18,
                   paddingVertical: 16,
-                  backgroundColor: colors.canvas,
+                  backgroundColor: colors.paper,
                   borderWidth: 1,
                   borderColor: colors.line,
                   borderRadius: 18,
@@ -1351,7 +1351,7 @@ export function ChatScreen({
                 borderRadius: 14,
                 borderWidth: 1,
                 borderColor: colors.line,
-                backgroundColor: colors.canvas,
+                backgroundColor: colors.paper,
               }}
             >
               <Text style={s.small}>
@@ -1443,7 +1443,7 @@ export function ChatScreen({
           )}
           <View
             style={{
-              backgroundColor: colors.canvas,
+              backgroundColor: colors.paper,
               borderRadius: 22,
               borderWidth: 1,
               borderColor: focused ? colors.primary : colors.line,
@@ -1465,7 +1465,7 @@ export function ChatScreen({
                         {
                           gap: 7,
                           maxWidth: "100%",
-                          backgroundColor: pressed ? colors.overlay1 : colors.canvas,
+                          backgroundColor: pressed ? colors.overlay1 : colors.paper,
                           borderWidth: 1,
                           borderColor: colors.line,
                           borderRadius: 10,
@@ -1665,7 +1665,7 @@ function ArtifactsPanel({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: pressed ? colors.lineStrong : "transparent",
-    backgroundColor: pressed ? colors.canvas : "transparent",
+    backgroundColor: pressed ? colors.paper : "transparent",
   });
   const listSectionLabel: TextStyle = {
     fontSize: 12,
@@ -1702,7 +1702,7 @@ function ArtifactsPanel({
                 // 停靠模式：作为主对话列的同行兄弟，占右侧固定宽度，不遮罩、不浮层。
                 width: 340,
                 maxWidth: "42%",
-                backgroundColor: colors.canvas,
+                backgroundColor: colors.paper,
                 borderLeftWidth: 1,
                 borderLeftColor: colors.line,
               }
@@ -1714,7 +1714,7 @@ function ArtifactsPanel({
                 bottom: 0,
                 width: 320,
                 maxWidth: "85%",
-                backgroundColor: colors.canvas,
+                backgroundColor: colors.paper,
                 borderLeftWidth: 1,
                 borderLeftColor: colors.line,
                 shadowColor: "#000",

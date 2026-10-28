@@ -5,6 +5,16 @@ const details = {
   // 工作区面板。
   "details.workspaceSubtitle": "给每件事都留一点空间。",
   "details.connections": "连接",
+  "details.settingsTitle": "设置",
+  "details.settingsSubtitle": "管理灵悟的工作方式、投资偏好与外部连接。",
+  "details.settingsAgentHeading": "智能体",
+  "details.settingsWorkspaceHeading": "工作区",
+  "details.settingsPersonalityDetail": "名称、头像、语气与长期记忆。",
+  "details.settingsPreferencesDetail": "投资目标、风险偏好与研究习惯。",
+  "details.settingsAppsDetail": "插件、技能与连接器。",
+  "details.settingsAccountTitle": "账号与数据",
+  "details.settingsAccountDetail": "个人信息、登录方式与已归档对话。",
+  "details.settingsPrivacy": "这些设置只影响当前工作区，并可随时修改。",
 
   // 邮件会话。
   "details.messageInConversation": "这段对话中有 {count} 条消息",

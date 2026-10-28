@@ -173,7 +173,7 @@ export function QuoteCard({
                 borderWidth: 1,
                 borderColor: colors.line,
                 borderRadius: 10,
-                backgroundColor: colors.canvas,
+                backgroundColor: colors.paper,
               },
               style,
             ]}
@@ -290,7 +290,7 @@ export function QuoteCard({
               borderWidth: 1,
               borderColor: colors.line,
               borderRadius: 10,
-              backgroundColor: colors.canvas,
+              backgroundColor: colors.paper,
             },
             style,
           ]}

@@ -26,7 +26,7 @@ export default function HtmlPreview({
         javaScriptEnabled={interactive}
         domStorageEnabled={interactive}
         onError={(event) => setError(event.nativeEvent.description)}
-        style={{ flex: 1, borderRadius: 12, backgroundColor: colors.canvas }}
+        style={{ flex: 1, borderRadius: 12, backgroundColor: colors.paper }}
       />
     </View>
   );

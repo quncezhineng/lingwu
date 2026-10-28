@@ -143,7 +143,7 @@ function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
             borderColor: colors.line,
             borderRadius: 14,
             overflow: "hidden",
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
           }}
         >
           {visibleThreads.map((thread, index) => (

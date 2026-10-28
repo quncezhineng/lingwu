@@ -138,7 +138,7 @@ export function BrowserToolCard({
             width: "100%",
             aspectRatio: 1.7,
             borderRadius: 12,
-            backgroundColor: colors.canvas,
+            backgroundColor: colors.paper,
           }}
           resizeMode="contain"
           onError={() => setPreviewFailed(true)}

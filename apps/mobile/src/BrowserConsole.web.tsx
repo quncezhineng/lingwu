@@ -22,7 +22,7 @@ export default function BrowserConsole({
         width: "100%",
         border: 0,
         borderRadius: 12,
-        background: colors.canvas,
+        background: colors.paper,
       }}
     />
   );

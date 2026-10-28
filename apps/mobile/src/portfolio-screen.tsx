@@ -140,7 +140,7 @@ function SegmentedChips<T extends string>({
               borderRadius: 999,
               borderWidth: 1,
               borderColor: active ? colors.primary : colors.line,
-              backgroundColor: active ? colors.sky : colors.canvas,
+              backgroundColor: active ? colors.sky : colors.paper,
             }}
           >
             <Text
@@ -505,7 +505,7 @@ function AllocationSection({
                       ? OTHER_COLOR
                       : ALLOCATION_COLORS[index % ALLOCATION_COLORS.length],
                   borderRightWidth: index < slices.length - 1 ? 2 : 0,
-                  borderRightColor: colors.canvas,
+                  borderRightColor: colors.paper,
                 }}
               />
             ))}
