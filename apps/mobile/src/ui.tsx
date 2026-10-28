@@ -21,6 +21,7 @@ import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
 import { ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
 import { colors, fonts, radius, space, statusColors, typography } from "./theme";
+import { useReducedMotion } from "./use-reduced-motion";
 
 /**
  * 设计令牌统一由 `theme.ts` 提供，这里 re-export 以兼容既有 `from "./ui"` 引用。
@@ -319,9 +320,15 @@ export function Sheet({
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const reducedMotion = useReducedMotion();
   const compact = width < 600;
   return (
-    <Modal transparent animationType={compact ? "slide" : "fade"} visible onRequestClose={onClose}>
+    <Modal
+      transparent
+      animationType={reducedMotion ? "none" : compact ? "slide" : "fade"}
+      visible
+      onRequestClose={onClose}
+    >
       {/* 背板：点击深色区域关闭弹窗（dismissOnBackdrop 可关闭此行为） */}
       <Pressable
         onPress={dismissOnBackdrop ? onClose : undefined}

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Animated, Pressable, type StyleProp, View, type ViewStyle } from "react-native";
 import { colors, radius } from "./theme";
+import { useReducedMotion } from "./use-reduced-motion";
 
 const TRACK_WIDTH = 32;
 const TRACK_HEIGHT = 19;
@@ -30,14 +31,20 @@ export function Toggle({
   style?: StyleProp<ViewStyle>;
 }) {
   const progress = useRef(new Animated.Value(value ? 1 : 0)).current;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) {
+      // 减少动态效果：直接跳到目标位置，不做滑动。
+      progress.setValue(value ? 1 : 0);
+      return;
+    }
     Animated.timing(progress, {
       toValue: value ? 1 : 0,
       duration: 140,
       useNativeDriver: true,
     }).start();
-  }, [value, progress]);
+  }, [value, progress, reducedMotion]);
 
   return (
     <Pressable

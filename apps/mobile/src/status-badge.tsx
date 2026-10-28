@@ -56,6 +56,7 @@ export function StatusBadge({
   const palette = statusToneColors[tone];
   return (
     <View
+      accessibilityLiveRegion="polite"
       style={[
         {
           alignSelf: "flex-start",
