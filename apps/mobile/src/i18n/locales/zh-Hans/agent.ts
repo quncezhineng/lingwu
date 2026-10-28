@@ -235,7 +235,7 @@ const agent = {
   "agent.searchApps": "搜索应用",
   "agent.searchConnectors": "搜索连接器",
   "agent.searchCapabilities": "搜索插件、技能或连接器",
-  "agent.hubMarketplace": "能力市场",
+  "agent.hubMarketplace": "应用与资源",
   "agent.hubMine": "我的能力",
   "agent.hubPluginsDetail": "探索与安装研究流程",
   "agent.hubSkillsDetail": "启用专业研究动作",

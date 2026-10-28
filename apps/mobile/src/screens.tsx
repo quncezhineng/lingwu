@@ -51,6 +51,7 @@ import {
 import { InsightCard } from "./insight-card";
 import { NotesScreen } from "./notes-screen";
 import { PageHeader } from "./page-header";
+import { StatusBadge, type StatusTone } from "./status-badge";
 import { breakpoints, layout, space } from "./theme";
 import {
   Button,
@@ -1422,9 +1423,14 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
   const [selected, setSelected] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // 连接四态：未连接 / 授权中 / 已连接 / 失败（按分组记录进行中与失败）
+  const [pendingId, setPendingId] = useState<"google" | "model">();
+  const [failedId, setFailedId] = useState<"google" | "model">();
   async function connect(capability: "read" | "write") {
     setBusy(true);
     setError("");
+    setPendingId("google");
+    setFailedId(undefined);
     try {
       const result = await api.request<{ url: string | null; connected?: boolean }>(
         "/api/google/connect",
@@ -1438,34 +1444,44 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
         notify(t("screens.connectionsNotifyLocalReady"));
       }
     } catch (e) {
+      setFailedId("google");
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      setPendingId(undefined);
       setBusy(false);
     }
   }
   async function disconnect() {
     setBusy(true);
     setError("");
+    setPendingId("google");
+    setFailedId(undefined);
     try {
       await api.request("/api/google/disconnect", {});
       await refresh();
       notify(t("screens.connectionsNotifyDisconnected"));
     } catch (e) {
+      setFailedId("google");
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      setPendingId(undefined);
       setBusy(false);
     }
   }
   async function switchModel(model: string) {
     setBusy(true);
     setError("");
+    setPendingId("model");
+    setFailedId(undefined);
     try {
       await api.request("/api/model", { model });
       await refresh();
       notify(t("screens.connectionsModelSwitched", { model: shortModel(model) }));
     } catch (e) {
+      setFailedId("model");
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      setPendingId(undefined);
       setBusy(false);
     }
   }
@@ -1542,68 +1558,83 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                 overflow: "hidden",
               }}
             >
-              {group.map((row, index) => (
-                <Pressable
-                  key={row.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("screens.connectionsManage", { name: row.name })}
-                  onPress={() =>
-                    row.group === "browser" ? open({ type: "computer" }) : setSelected(row.group)
-                  }
-                  // 数据表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
-                  style={({ pressed }) => [
-                    s.row,
-                    {
-                      gap: 12,
-                      minHeight: 56,
-                      borderBottomWidth: index < group.length - 1 ? 1 : 0,
-                      borderBottomColor: colors.line,
-                      borderRadius: 10,
-                    },
-                    pressed && { backgroundColor: colors.overlay1 },
-                  ]}
-                >
-                  <View
-                    style={{
-                      width: 29,
-                      height: 29,
-                      borderRadius: 7,
-                      backgroundColor: row.brand
-                        ? serviceBrands[row.brand].surface
-                        : colors.surface,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+              {group.map((row, index) => {
+                const key = row.group === "google" || row.group === "model" ? row.group : undefined;
+                const state =
+                  key && pendingId === key
+                    ? "connecting"
+                    : key && failedId === key
+                      ? "failed"
+                      : row.connected
+                        ? "connected"
+                        : "idle";
+                const badge =
+                  state === "connecting"
+                    ? {
+                        tone: "running" as StatusTone,
+                        label: t("screens.connectionsStateConnecting"),
+                      }
+                    : state === "failed"
+                      ? {
+                          tone: "failed" as StatusTone,
+                          label: t("screens.connectionsStateFailed"),
+                        }
+                      : state === "connected"
+                        ? {
+                            tone: "done" as StatusTone,
+                            label: t("screens.connectionsStateConnected"),
+                          }
+                        : {
+                            tone: "paused" as StatusTone,
+                            label: t("screens.connectionsStateIdle"),
+                          };
+                return (
+                  <Pressable
+                    key={row.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("screens.connectionsManage", { name: row.name })}
+                    onPress={() =>
+                      row.group === "browser" ? open({ type: "computer" }) : setSelected(row.group)
+                    }
+                    // 数据表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+                    style={({ pressed }) => [
+                      s.row,
+                      {
+                        gap: 12,
+                        minHeight: 56,
+                        borderBottomWidth: index < group.length - 1 ? 1 : 0,
+                        borderBottomColor: colors.line,
+                        borderRadius: 10,
+                      },
+                      pressed && { backgroundColor: colors.overlay1 },
+                    ]}
                   >
-                    <row.icon
-                      size={23}
-                      color={row.brand ? serviceBrands[row.brand].fg : colors.primary}
-                    />
-                  </View>
-                  <Text style={[s.text, { flex: 1 }]}>{row.name}</Text>
-                  {row.connected && row.group === "google" && w.mode === "sample" && (
-                    <Text style={s.small}>{t("screens.connectionsLocalData")}</Text>
-                  )}
-                  {row.connected && row.group === "model" && w.runtime.model && (
-                    <Text style={s.small}>{shortModel(w.runtime.model)}</Text>
-                  )}
-                  {row.connected ? (
-                    <ChevronRight size={18} color={colors.faint} />
-                  ) : (
-                    <Text
+                    <View
                       style={{
-                        fontSize: 13,
-                        // 链接型操作文字统一用品牌强调色 primary
-                        color: row.group === "google" ? colors.primary : colors.muted,
+                        width: 29,
+                        height: 29,
+                        borderRadius: 7,
+                        backgroundColor: row.brand
+                          ? serviceBrands[row.brand].surface
+                          : colors.surface,
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
-                      {row.group === "google"
-                        ? t("screens.connectionsConnect")
-                        : t("screens.connectionsSetup")}
-                    </Text>
-                  )}
-                </Pressable>
-              ))}
+                      <row.icon
+                        size={23}
+                        color={row.brand ? serviceBrands[row.brand].fg : colors.primary}
+                      />
+                    </View>
+                    <Text style={[s.text, { flex: 1 }]}>{row.name}</Text>
+                    {row.connected && row.group === "model" && w.runtime.model && (
+                      <Text style={s.small}>{shortModel(w.runtime.model)}</Text>
+                    )}
+                    <StatusBadge tone={badge.tone} label={badge.label} />
+                    <ChevronRight size={18} color={colors.faint} />
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         );

@@ -257,7 +257,7 @@ const agent = {
   "agent.searchApps": "Search apps",
   "agent.searchConnectors": "Search connectors",
   "agent.searchCapabilities": "Search plugins, skills or connectors",
-  "agent.hubMarketplace": "Capability marketplace",
+  "agent.hubMarketplace": "Apps & resources",
   "agent.hubMine": "My capabilities",
   "agent.hubPluginsDetail": "Explore and install research workflows",
   "agent.hubSkillsDetail": "Enable specialist research actions",
