@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
 import { ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
-import { colors, fonts, radius, space, statusColors, typography } from "./theme";
+import { breakpoints, colors, fonts, radius, space, statusColors, typography } from "./theme";
 import { useReducedMotion } from "./use-reduced-motion";
 
 /**
@@ -322,6 +322,8 @@ export function Sheet({
   const { t } = useTranslation();
   const reducedMotion = useReducedMotion();
   const compact = width < 600;
+  // 标题字号按 <760 收敛（弹层布局仍用 600 断点）
+  const mobileTitle = width < breakpoints.mobile;
   return (
     <Modal
       transparent
@@ -386,7 +388,12 @@ export function Sheet({
             ]}
           >
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={s.title}>{title}</Text>
+              <Text
+                numberOfLines={2}
+                style={[s.title, mobileTitle && { fontSize: 22, lineHeight: 32 }]}
+              >
+                {title}
+              </Text>
               {!!subtitle && <Text style={s.muted}>{subtitle}</Text>}
             </View>
             <IconButton icon={X} label={t("ui.closeDetails")} onPress={onClose} />

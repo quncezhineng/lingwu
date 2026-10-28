@@ -7,8 +7,8 @@ import { Check, ChevronDown, ChevronUp, CircleX, Clock3 } from "./icons";
 import { colors, radius, space, statusColors, typography } from "./theme";
 import { s } from "./ui";
 
-/** 步骤标记：完成对勾（低饱和蓝灰）、进行中转圈、失败叉、等待时钟、未开始序号。 */
-function StepMark({ step, index }: { step: TaskStep; index: number }) {
+/** 步骤标记：完成对勾、进行中转圈、失败叉、等待时钟、未开始空心圆点（同一套图标语言）。 */
+function StepMark({ step }: { step: TaskStep }) {
   switch (step.status) {
     case "succeeded":
       return <Check size={16} color={statusColors.stepDone} />;
@@ -20,14 +20,15 @@ function StepMark({ step, index }: { step: TaskStep; index: number }) {
       return <Clock3 size={15} color={statusColors.waiting} />;
     default:
       return (
-        <Text
-          style={[
-            s.metric,
-            { fontSize: typography.caption.fontSize, lineHeight: 18, color: colors.faint },
-          ]}
-        >
-          {index + 1}.
-        </Text>
+        <View
+          style={{
+            width: 9,
+            height: 9,
+            borderRadius: radius.full,
+            borderWidth: 1.5,
+            borderColor: colors.lineStrong,
+          }}
+        />
       );
   }
 }
@@ -116,10 +117,10 @@ export function PlanCard({
       </View>
 
       {!collapsed &&
-        steps.map((step, index) => (
+        steps.map((step) => (
           <View key={step.id} style={[s.row, { gap: space.sm, alignItems: "flex-start" }]}>
             <View style={{ width: 18, alignItems: "center", paddingTop: 3 }}>
-              <StepMark step={step} index={index} />
+              <StepMark step={step} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.text, { color: colors.text }]}>{runtimeLabel(step.title)}</Text>
