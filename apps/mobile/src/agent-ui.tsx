@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Switch,
   Text,
   type TextStyle,
   useWindowDimensions,
@@ -57,6 +56,7 @@ import { PlanCard } from "./plan-card";
 import { ActivityScreen } from "./screens";
 import { StatusBadge, taskStatusTone } from "./status-badge";
 import { breakpoints } from "./theme";
+import { Toggle } from "./toggle";
 import {
   Button,
   Card,
@@ -1282,21 +1282,8 @@ export function GoalsScreen() {
     <View style={{ gap: 22 }}>
       <AgentStatus />
       <View style={{ gap: 8 }}>
-        <View style={[s.between, { marginBottom: 5 }]}>
-          <View style={[s.row, { gap: 10 }]}>
-            <View
-              style={{
-                width: 16,
-                height: 16,
-                borderRadius: 7,
-                borderWidth: 5,
-                // 状态点用实心成功色，避免半透明语义底导致几乎不可见。
-                borderColor: colors.success,
-                backgroundColor: colors.success,
-              }}
-            />
-            <Text style={[s.heading, { color: colors.success }]}>{t("agent.trackingHeading")}</Text>
-          </View>
+        {/* H2：页面 H1 已叫「盯盘与提醒」，这里不再重复分区标题；H3：不再用 green 语义色做追踪标识 */}
+        <View style={[s.row, { justifyContent: "flex-end", marginBottom: 5 }]}>
           <Button small icon={Plus} onPress={() => setAdding("Tracking")}>
             {t("agent.track")}
           </Button>
@@ -1795,14 +1782,11 @@ function MonitorRow({ monitor, onOpen }: { monitor: Monitor; onOpen: () => void 
               : statusLabel(monitor.status)}
           </Text>
         </View>
-        <Switch
-          accessibilityLabel={t("agent.openTrackingLabel", { title: monitor.title })}
-          accessibilityState={{ checked: active, disabled: busy }}
+        <Toggle
+          label={t("agent.openTrackingLabel", { title: monitor.title })}
           value={active}
           disabled={busy}
           onValueChange={(next) => void toggle(next)}
-          trackColor={{ false: colors.lineStrong, true: colors.primary }}
-          thumbColor={colors.paper}
         />
       </View>
       <View style={[s.between, { paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.line }]}>
