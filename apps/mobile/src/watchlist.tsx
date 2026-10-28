@@ -961,17 +961,7 @@ export function WatchlistScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [menuFor, setMenuFor] = useState<WatchlistSymbol | null>(null);
-  const [pendingRemove, setPendingRemove] = useState<WatchlistSymbol | null>(null);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shimmer = useShimmer();
-
-  // 离开页面时清掉 6s 撤销计时器，避免在已卸载组件上 setState。
-  useEffect(
-    () => () => {
-      if (undoTimer.current) clearTimeout(undoTimer.current);
-    },
-    [],
-  );
 
   useEffect(() => {
     void loadWatchlists(api, locale);
@@ -1030,21 +1020,15 @@ export function WatchlistScreen() {
     setMenuFor(null);
   };
 
-  // 移除后保留 6 秒撤销窗口；撤销会把标的重新加回列表（追加到末尾）。
+  // 移除后通过统一 Toast 提供撤销（3.2s，动作即把标的重新加回列表）。
   const removeItem = (item: WatchlistSymbol) => {
     if (!list) return;
     removeSymbol(api, list.id, item.symbol.code);
     setMenuFor(null);
-    setPendingRemove(item);
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    undoTimer.current = setTimeout(() => setPendingRemove(null), 6000);
-  };
-
-  const undoRemove = () => {
-    if (!pendingRemove || !list) return;
-    addSymbols(api, list.id, [pendingRemove.symbol]);
-    setPendingRemove(null);
-    if (undoTimer.current) clearTimeout(undoTimer.current);
+    notify(t("markets.watchlistRemoved", { name: item.symbol.name }), {
+      label: t("markets.watchlistUndo"),
+      onPress: () => addSymbols(api, list.id, [item.symbol]),
+    });
   };
 
   const counts = useMemo(() => {
@@ -1197,34 +1181,6 @@ export function WatchlistScreen() {
           <Button small onPress={() => void loadWatchlists(api, locale, true)}>
             {t("markets.watchlistRetry")}
           </Button>
-        </View>
-      )}
-
-      {/* 删除撤销条：6 秒内可恢复，aria-live 让读屏用户也能感知 */}
-      {!!pendingRemove && (
-        <View
-          accessibilityLiveRegion="polite"
-          style={[
-            s.between,
-            {
-              gap: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: colors.line,
-              backgroundColor: colors.surfaceSoft,
-            },
-          ]}
-        >
-          <Text style={[s.small, { flex: 1, color: colors.text }]} numberOfLines={1}>
-            {t("markets.watchlistRemoved", { name: pendingRemove.symbol.name })}
-          </Text>
-          <Pressable accessibilityRole="button" hitSlop={10} onPress={undoRemove}>
-            <Text style={[s.small, { color: colors.link, fontWeight: "600" }]}>
-              {t("markets.watchlistUndo")}
-            </Text>
-          </Pressable>
         </View>
       )}
 

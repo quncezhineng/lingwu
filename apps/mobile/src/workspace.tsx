@@ -42,7 +42,7 @@ export interface WorkspaceContextValue {
   refresh: () => Promise<void>;
   open: (detail: Detail) => void;
   close: () => void;
-  notify: (message: string) => void;
+  notify: (message: string, action?: { label: string; onPress: () => void }) => void;
   ask: (prompt: string) => void;
 }
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);

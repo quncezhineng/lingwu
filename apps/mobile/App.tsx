@@ -34,7 +34,7 @@ import { I18nProvider, localizeAgentName, useTranslation } from "./src/i18n";
 import { LanguageSwitcher } from "./src/i18n/LanguageSwitcher";
 import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
-import { Bell, Check, Menu, Search, X } from "./src/icons";
+import { Bell, Menu, Search } from "./src/icons";
 import { PageHeader } from "./src/page-header";
 import { PortfolioScreen } from "./src/portfolio-screen";
 import { PreferencesScreen } from "./src/preferences-screen";
@@ -43,6 +43,7 @@ import { GlobalSearchSheet } from "./src/search-sheet";
 import { ACCOUNT_NAV, BrandMark, ChatsColumn, MOBILE_NAV, Rail } from "./src/shell";
 import { breakpoints } from "./src/theme";
 import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
+import { Toast, type ToastState } from "./src/toast";
 import {
   Button,
   Card,
@@ -289,7 +290,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   const [workspace, setWorkspace] = useState<Workspace>();
   const [section, setSection] = useState<Section>("today");
   const [detail, setDetail] = useState<Detail>();
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<ToastState>();
   const [error, setError] = useState("");
   const [prompt, setPrompt] = useState<{ id: number; text: string }>();
   const refresh = useCallback(async () => {
@@ -315,9 +316,15 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   }, [runRefresh]);
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 5500);
+    // P2-3：统一 3.2s 自动消失
+    const timer = setTimeout(() => setToast(undefined), 3200);
     return () => clearTimeout(timer);
   }, [toast]);
+  const notify = useCallback(
+    (message: string, action?: { label: string; onPress: () => void }) =>
+      setToast({ text: message, action }),
+    [],
+  );
   const navigate = useCallback(
     (next: Section) => setSection(next === "connections" ? "apps" : next),
     [],
@@ -361,7 +368,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
     );
   return (
     <WorkspaceContext.Provider
-      value={{ workspace, api, section, navigate, refresh, open, close, notify: setToast, ask }}
+      value={{ workspace, api, section, navigate, refresh, open, close, notify, ask }}
     >
       <AgentWorkspaceProvider>
         <ComputerDraftProvider key={token}>
@@ -369,7 +376,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
             <WorkspaceShell
               detail={detail}
               toast={toast}
-              clearToast={() => setToast("")}
+              clearToast={() => setToast(undefined)}
               error={error}
               prompt={prompt}
               onSignOut={signOut}
@@ -389,7 +396,7 @@ function WorkspaceShell({
   onSignOut,
 }: {
   detail?: Detail;
-  toast: string;
+  toast?: ToastState;
   clearToast: () => void;
   error: string;
   prompt?: { id: number; text: string };
@@ -797,35 +804,7 @@ function WorkspaceShell({
             </View>
           </View>
         </View>
-        {!!toast && (
-          <View
-            pointerEvents="box-none"
-            style={{ position: "absolute", bottom: 94, left: 20, right: 20, alignItems: "center" }}
-          >
-            <View
-              style={[
-                s.row,
-                {
-                  gap: 10,
-                  padding: 14,
-                  backgroundColor: colors.toast,
-                  borderRadius: radius.field,
-                  maxWidth: 560,
-                },
-              ]}
-            >
-              <Check size={16} color={colors.onToast} />
-              <Text style={{ color: colors.onToast, fontSize: 13, flexShrink: 1 }}>{toast}</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("app.dismissNotification")}
-                onPress={clearToast}
-              >
-                <X size={16} color={colors.onToast} />
-              </Pressable>
-            </View>
-          </View>
-        )}
+        <Toast toast={toast} onDismiss={clearToast} />
         {threadsOpen && <ThreadsSheet onClose={() => setThreadsOpen(false)} />}
         {searchOpen && <GlobalSearchSheet onClose={() => setSearchOpen(false)} />}
         {detail && (
