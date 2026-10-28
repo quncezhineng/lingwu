@@ -445,6 +445,15 @@ export function ChatScreen({
   const lastSent = useRef("");
   const [focused, setFocused] = useState(false);
   const [inputHeight, setInputHeight] = useState(44);
+  const composerInput = useRef<TextInput>(null);
+
+  // ⌘J（App 层派发）聚焦输入框；仅 Web 生效。
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const focusComposer = () => composerInput.current?.focus();
+    window.addEventListener("lingwu:focus-composer", focusComposer);
+    return () => window.removeEventListener("lingwu:focus-composer", focusComposer);
+  }, []);
   const [showResults, setShowResults] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1524,6 +1533,7 @@ export function ChatScreen({
                 <Plus size={22} color={colors.text} />
               </Pressable>
               <TextInput
+                ref={composerInput}
                 accessibilityLabel={t("chat.messageLingWu")}
                 value={draft}
                 onChangeText={setDraft}

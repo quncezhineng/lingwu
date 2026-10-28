@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -394,7 +395,7 @@ function WorkspaceShell({
   prompt?: { id: number; text: string };
   onSignOut: () => void;
 }) {
-  const { workspace, section, navigate, open } = useWorkspace();
+  const { workspace, section, navigate, open, close } = useWorkspace();
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const {
@@ -409,6 +410,40 @@ function WorkspaceShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const { width } = useWindowDimensions();
   const desktop = width >= breakpoints.desktop;
+
+  // P2-1 快捷键（仅 Web）：⌘J 新分析、⌘K 全局搜索、Esc 关闭浮层。
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const mod = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      if (mod && key === "k") {
+        event.preventDefault();
+        setSearchOpen((value) => !value);
+        return;
+      }
+      if (mod && key === "j") {
+        event.preventDefault();
+        navigate("chat");
+        // 对话页监听该事件并聚焦输入框；输入法组合输入不受影响（仅带修饰键触发）。
+        window.dispatchEvent(new Event("lingwu:focus-composer"));
+        return;
+      }
+      if (event.key === "Escape") {
+        if (searchOpen) {
+          setSearchOpen(false);
+          return;
+        }
+        if (threadsOpen) {
+          setThreadsOpen(false);
+          return;
+        }
+        if (detail) close();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [searchOpen, threadsOpen, detail, close, navigate]);
   // 工作台采用宽幅编辑画布，右侧信息轨由页面内部负责。
   const contentMax = desktop ? 1340 : 760;
   const pending =
