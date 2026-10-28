@@ -5,6 +5,45 @@
 
 ## 变更记录
 
+### 2026-10-29 · 修复 lingwu-browser 磁盘写满导致启动崩溃（ENOSPC 自愈 + LRU 淘汰）
+
+**现象**
+
+Render 部署 `lingwu-browser` 服务启动即崩溃并反复重启，日志：
+
+```
+Error: ENOSPC: no space left on device, mkdir '/data/<uuid>/download-outcomes'
+  at async readDownloadFailures (src/downloads.ts:32:3)
+  at async createBrowserManager (src/browser.ts:61:27)
+  at async createWorkerServer (src/server.ts:46:19)
+==> Exited with status 1
+```
+
+**根因**
+
+- 持久盘 `/data`（1 GB）被无界累积的 Chromium 持久化 profile（最多 20 个，仅拒绝新会话、从不淘汰）与已下载 PDF（按会话限 20 份，但跨会话 × 20 个 profile 可累积 GB 级）占满。
+- `createBrowserManager` 启动时恢复会话并调用 `readDownloadFailures`（内部执行 `mkdir download-outcomes`）→ 磁盘满抛 `ENOSPC` → 进程退出 → 重启永远失败，形成死循环。
+
+**修复（四层）**
+
+- `apps/worker/src/browser.ts`：
+  - 启动恢复逻辑增加 ENOSPC 自愈：捕捉错误码 `ENOSPC` 时先调用新增的 `reclaimSessionSpace(dataDir, maxProfiles)` 紧急回收空间（清理 `.tmp` 半成品、每个会话保留最新 4 份已发布 PDF 及对应 `.json` 元数据、按 `updatedAt` 淘汰超限的最旧配置目录），随后重试一次恢复。
+  - `maxProfiles` 硬拒绝改为 LRU 淘汰：达上限时用 `selectEvictionVictim` 优先淘汰「未运行中最旧」配置，关闭其运行中 context 并删除目录（防御性保留 `PROFILE_LIMIT` 抛错）。
+  - Chromium 启动参数新增 `--disk-cache-size=1`，禁用磁盘缓存以压缩 profile 体积。
+- `render.yaml`：`lingwu-browser` 服务磁盘 `sizeGB: 1` → `2`，留足余量。
+
+**验证**
+
+- `pnpm typecheck`：通过。
+- `tests/browser.test.ts`：27 项全部通过（新增 2 项：`selectEvictionVictim` 淘汰选择、`reclaimSessionSpace` 全盘回收）。
+- `pnpm test`：775 项全部通过 / 0 失败。
+- `ruby -ryaml` 校验 `render.yaml` 合法（3 个服务、`lingwu-browser.disk.sizeGB == 2`、`mountPath == /data`）。
+
+**注意事项**
+
+- Render 控制台需对 `lingwu-browser` 手动应用新配置并重新部署，才会挂载 2 GB 磁盘；当前已写满的旧磁盘数据可能需在控制台清理后重建。
+- 磁盘回收是启动期兜底，正常运行阶段依赖 LRU 淘汰与 PDF 保留上限控制增长。
+
 ### 2026-10-28 · 图标替换终审：emoji/文本字形功能图标清零、线宽离群归一
 
 **背景**

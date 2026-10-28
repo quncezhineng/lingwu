@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  truncate,
+  writeFile,
+} from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +19,11 @@ import { createApp } from "../apps/server/src/app.ts";
 import { Auth } from "../apps/server/src/auth.ts";
 import { BrowserService } from "../apps/server/src/browser.ts";
 import { Files } from "../apps/server/src/files.ts";
+import {
+  reclaimSessionSpace,
+  type Session,
+  selectEvictionVictim,
+} from "../apps/worker/src/browser.ts";
 import { capturePdfDownload, readDownloadFailures } from "../apps/worker/src/downloads.ts";
 import { isPublicIp, validatePublicUrl } from "../apps/worker/src/network.ts";
 import { startEgressProxy } from "../apps/worker/src/proxy.ts";
@@ -739,4 +753,79 @@ test("the workspace reports the browser offline while its worker's health check 
       up ? "connected" : "unavailable",
     );
   }
+});
+
+test("worker evicts the least-used saved profile instead of rejecting new ones", async () => {
+  const one = "00000000-0000-4000-8000-000000000101";
+  const two = "00000000-0000-4000-8000-000000000102";
+  const three = "00000000-0000-4000-8000-000000000103";
+  const saved = (id: string, updatedAt: string): Session => ({
+    id,
+    title: "Saved",
+    url: "https://example.com",
+    status: "closed",
+    updatedAt,
+  });
+  const sessions = new Map<string, Session>([
+    [one, saved(one, "2026-09-01T00:00:00.000Z")],
+    [two, saved(two, "2026-09-03T00:00:00.000Z")],
+    [three, saved(three, "2026-09-02T00:00:00.000Z")],
+  ]);
+  // 有一个配置在运行：优先淘汰空闲配置中最旧的一个（three，09-02）。
+  const running = new Map<string, unknown>([[one, {}]]);
+  assert.equal(selectEvictionVictim(sessions, running), three);
+  // 所有配置都在运行：回退到淘汰最旧的整体（one，09-01）。
+  running.set(two, {});
+  running.set(three, {});
+  assert.equal(selectEvictionVictim(sessions, running), one);
+  // 空的运行集：直接淘汰最旧配置。
+  assert.equal(selectEvictionVictim(sessions, new Map()), one);
+});
+
+test("worker startup reclaims a full disk by pruning leftovers and old profiles", async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "lingwu-reclaim-"));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+  const recent = "00000000-0000-4000-8000-000000000111";
+  const middle = "00000000-0000-4000-8000-000000000112";
+  const oldest = "00000000-0000-4000-8000-000000000113";
+  const seed = async (id: string, updatedAt: string) => {
+    const folder = join(dataDir, id);
+    const downloads = join(folder, "downloads");
+    const outcomes = join(folder, "download-outcomes");
+    await mkdir(downloads, { recursive: true });
+    await mkdir(outcomes, { recursive: true });
+    await writeFile(join(folder, "session.json"), JSON.stringify({ id, updatedAt }));
+    await writeFile(join(downloads, `${id}.pdf`), "%PDF-1.7\npublished");
+    await writeFile(join(downloads, `${id}.json`), JSON.stringify({ id }));
+    await writeFile(join(downloads, "partial.json.tmp"), '{"id":');
+    await writeFile(join(outcomes, "partial.json.tmp"), '{"id":');
+  };
+  await seed(recent, "2026-10-28T00:00:00.000Z");
+  await seed(middle, "2026-10-15T00:00:00.000Z");
+  await seed(oldest, "2026-10-01T00:00:00.000Z");
+  // 给 recent 会话多加几份已发布 PDF，验证超过保留数的下载也会被修剪。
+  for (let i = 0; i < 5; i += 1) {
+    const id = `00000000-0000-4000-8000-0000000001${10 + i}`;
+    await writeFile(join(dataDir, recent, "downloads", `${id}.pdf`), "%PDF-1.7\nextra");
+  }
+  await reclaimSessionSpace(dataDir, 2);
+  // 最旧配置被删除以执行保留上限。
+  await assert.rejects(readFile(join(dataDir, oldest, "session.json")), { code: "ENOENT" });
+  // 新配置及其会话元信息保留。
+  assert.equal(
+    await readFile(join(dataDir, middle, "session.json"), "utf8"),
+    JSON.stringify({ id: middle, updatedAt: "2026-10-15T00:00:00.000Z" }),
+  );
+  // 半成品 .tmp 文件始终被清理。
+  await assert.rejects(readFile(join(dataDir, recent, "downloads", "partial.json.tmp")), {
+    code: "ENOENT",
+  });
+  await assert.rejects(readFile(join(dataDir, middle, "download-outcomes", "partial.json.tmp")), {
+    code: "ENOENT",
+  });
+  // 每会话下载 PDF 被修剪到保留数以内。
+  const remaining = (await readdir(join(dataDir, recent, "downloads"))).filter((file) =>
+    file.endsWith(".pdf"),
+  );
+  assert.ok(remaining.length > 0 && remaining.length <= 4);
 });

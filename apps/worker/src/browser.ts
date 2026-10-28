@@ -33,6 +33,84 @@ export function validateSessionId(id: unknown): string {
   return id.toLowerCase();
 }
 
+function isEnospc(error: unknown): boolean {
+  return (
+    error instanceof Error && "code" in error && (error as { code?: unknown }).code === "ENOSPC"
+  );
+}
+
+/**
+ * 选择淘汰的已保存配置：优先淘汰非运行中的配置，其次按最近活跃时间淘汰最旧
+ * 的那个。仅当所有配置都在运行时，才允许淘汰最旧的运行中配置。
+ */
+export function selectEvictionVictim(
+  sessions: Map<string, Session>,
+  running: ReadonlyMap<string, unknown>,
+): string | undefined {
+  let victim: string | undefined;
+  let score = Number.POSITIVE_INFINITY;
+  for (const [id, session] of sessions) {
+    const parsed = Date.parse(session.updatedAt);
+    const activity = Number.isNaN(parsed) ? 0 : parsed;
+    const candidate = (running.has(id) ? 1_000_000_000_000 : 0) + activity;
+    if (candidate < score) {
+      victim = id;
+      score = candidate;
+    }
+  }
+  return victim;
+}
+
+/**
+ * 磁盘满时的应急空间回收：仅在 ENOSPC 时调用，只做删除操作。
+ * 依次清理：半成品 .tmp 传输文件 → 每个会话多余的下载 PDF → 超过保留上限的
+ * 最旧配置目录。
+ */
+export async function reclaimSessionSpace(dataDir: string, keepSessions = 16) {
+  const sessionNames = (await readdir(dataDir)).filter((name) => SESSION_ID.test(name));
+  const pruneTempFiles = async (folder: string) => {
+    for (const file of await readdir(folder).catch(() => []))
+      if (file.endsWith(".tmp")) await rm(join(folder, file), { force: true });
+  };
+  // 半成品传输日志与元数据永远不会成为已发布数据，始终删除。
+  await Promise.all(
+    sessionNames.map(async (id) => {
+      const folder = join(dataDir, id);
+      await pruneTempFiles(join(folder, "downloads"));
+      await pruneTempFiles(join(folder, "download-outcomes"));
+    }),
+  );
+  // 每个会话仅保留最新的几个已导入 PDF，为容量挤出一档安全空间。
+  await Promise.all(
+    sessionNames.map(async (id) => {
+      const folder = join(dataDir, id, "downloads");
+      const pdfs = (await readdir(folder).catch(() => [])).filter((file) => file.endsWith(".pdf"));
+      pdfs.sort();
+      for (const pdf of pdfs.slice(0, Math.max(0, pdfs.length - 4))) {
+        await rm(join(folder, pdf), { force: true });
+        await rm(join(folder, pdf.slice(0, -4).concat(".json")), { force: true });
+      }
+    }),
+  );
+  // 配置目录是最大的空间消耗者，删除超过保留上限的最旧配置。
+  const dated = await Promise.all(
+    sessionNames.map(async (id) => {
+      const updatedAt = await readFile(join(dataDir, id, "session.json"), "utf8")
+        .then((raw) => {
+          const parsed: unknown = JSON.parse(raw);
+          if (typeof parsed !== "object" || parsed === null) return "";
+          const value = (parsed as { updatedAt?: unknown }).updatedAt;
+          return typeof value === "string" ? value : "";
+        })
+        .catch(() => "");
+      return { id, updatedAt };
+    }),
+  );
+  dated.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+  for (const { id } of dated.slice(0, Math.max(0, dated.length - keepSessions)))
+    await rm(join(dataDir, id), { recursive: true, force: true });
+}
+
 export async function createBrowserManager(
   options: {
     dataDir: string;
@@ -48,17 +126,28 @@ export async function createBrowserManager(
   const running = new Map<string, Running>();
   const queues = new Map<string, Promise<unknown>>();
   const proxy = await createProxy();
-  for (const id of await readdir(dataDir)) {
-    if (!SESSION_ID.test(id)) continue;
-    try {
-      const stored = JSON.parse(
-        await readFile(join(dataDir, id, "session.json"), "utf8"),
-      ) as Session;
-      sessions.set(id, { ...stored, id, status: "closed" });
-    } catch {
-      /* An incomplete first launch has no session metadata to restore. */
+  const restoreSessions = async () => {
+    for (const id of await readdir(dataDir)) {
+      if (!SESSION_ID.test(id)) continue;
+      try {
+        const stored = JSON.parse(
+          await readFile(join(dataDir, id, "session.json"), "utf8"),
+        ) as Session;
+        sessions.set(id, { ...stored, id, status: "closed" });
+      } catch {
+        /* An incomplete first launch has no session metadata to restore. */
+      }
+      if (sessions.has(id)) await readDownloadFailures(join(dataDir, id), true);
     }
-    if (sessions.has(id)) await readDownloadFailures(join(dataDir, id), true);
+  };
+  try {
+    await restoreSessions();
+  } catch (error) {
+    // 磁盘写满时绝不能让 worker 陷入反复崩溃的循环：先回收空间（清理半成品、
+    // 修剪旧 PDF、淘汰最旧配置），再重试一次恢复。
+    if (!isEnospc(error)) throw error;
+    await reclaimSessionSpace(dataDir, maxProfiles);
+    await restoreSessions();
   }
   const directory = (id: string) => join(dataDir, validateSessionId(id));
   async function persist(session: Session) {
@@ -167,12 +256,27 @@ export async function createBrowserManager(
         `Close an active session before opening another (limit ${maxSessions}).`,
         409,
       );
-    if (!sessions.has(id) && sessions.size >= maxProfiles)
-      throw new WorkerError(
-        "PROFILE_LIMIT",
-        `The worker has reached its ${maxProfiles} saved-profile limit.`,
-        409,
-      );
+    if (!sessions.has(id) && sessions.size >= maxProfiles) {
+      // 达到配置上限时不再拒绝新用户：淘汰最近最少使用的已保存配置，让磁盘
+      // 占用始终有界，避免配置目录无限增长把持久盘写满。
+      const victim = selectEvictionVictim(sessions, running);
+      if (victim) {
+        const instance = running.get(victim);
+        if (instance) {
+          await instance.context.close().catch(() => {});
+          await Promise.allSettled(instance.pending);
+          running.delete(victim);
+        }
+        sessions.delete(victim);
+        await rm(directory(victim), { recursive: true, force: true });
+      }
+      if (!sessions.has(id) && sessions.size >= maxProfiles)
+        throw new WorkerError(
+          "PROFILE_LIMIT",
+          `The worker has reached its ${maxProfiles} saved-profile limit.`,
+          409,
+        );
+    }
     const previous = sessions.get(id);
     const profileDir = join(directory(id), "profile");
     const tempDirectory = join("/tmp", `lingwu-downloads-${id}`);
@@ -196,6 +300,9 @@ export async function createBrowserManager(
         downloadsPath: tempDirectory,
         timeout: 25_000,
         args: [
+          // 禁用 Chromium 磁盘缓存：持久化配置目录的体积主要是缓存造成的，
+          // 关闭后可让单个配置保持在几十 MB 以内，大幅缓解持久盘容量压力。
+          "--disk-cache-size=1",
           "--disable-quic",
           "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
           "--disable-extensions",

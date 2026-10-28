@@ -147,7 +147,7 @@ pnpm dev:web
 | --- | --- | --- |
 | `lingwu-api` | Standard，1 GB 磁盘 `/var/data` | Hono API 与进程内任务执行器 |
 | `lingwu-web` | 静态站点 | Expo Web 导出 |
-| `lingwu-browser` | 私有服务，Standard，1 GB 磁盘 `/data` | Playwright 与 Chromium |
+| `lingwu-browser` | 私有服务，Standard，2 GB 磁盘 `/data`（持久化 Chromium profile 与已下载 PDF，1 GB 会写满导致启动崩溃，见下方「部署」章节） | Playwright 与 Chromium |
 
 **注意**：Standard 是最小可用计划（512 MB 会因 PGlite 加载嵌入式 Postgres 而内存不足）。磁盘保存数据库、PDF 与签名密钥，重新部署不挂载会清空数据。**必须启用 live 模式**（`WORKSPACE_MODE=live`）。
 

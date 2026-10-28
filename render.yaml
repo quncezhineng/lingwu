@@ -141,7 +141,10 @@ services:
     disk:
       name: lingwu-browser-data
       mountPath: /data
-      sizeGB: 1
+      # Chromium 持久化配置（每个数十 MB）+ 已下载 PDF（每会话上限 20 份、
+      # 每份 ≤10 MiB）会随使用累积；1 GB 会在长时间运行后被写满并导致 worker
+      # 启动即崩（ENOSPC）。代码已加 LRU 淘汰与磁盘满自愈，此处保留 2 GB 余量。
+      sizeGB: 2
     envVars:
       - key: WORKER_TOKEN
         generateValue: true
