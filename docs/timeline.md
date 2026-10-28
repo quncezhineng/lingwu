@@ -5,6 +5,37 @@
 
 ## 变更记录
 
+### 2026-10-28 · 图标体系补全：Doubao 库 40 枚资产全量注册可用（蓝色/白色主题不变）
+
+**背景**
+
+用户再次发起基于「Doubao Copy」设计系统的视觉重构，明确要求保留当前蓝色（`#3A83F7`）与白色主题，并优先以设计系统图标替换前端图标。本轮 Design Canvas 依然不可用，故在**项目内已转写的 Doubao 图标资产**（`apps/mobile/src/icons/library.ts`，40 枚）范围内推进；未读取、未依赖设计库外部文件。
+
+**审计结论**
+
+- 盘点 `keys.ts` 全部 86 个语义导出：已注册的映射均为库内最贴合图标（`AlertTriangle→triangle-alert`、`FileText→file`、`Play→circle-play` 等），无「本应使用库内资产却走项目补齐」的错配。
+- 前端无 Lucide 残留、无 emoji 功能性图标、无绕过 icons 层的自定义 SVG——图标消费 100% 收敛于自有 SVG 层，符合项目既定规范。
+
+**实现（本轮的实质增量：库内资产 100% 可消费）**
+
+- `apps/mobile/src/icons/keys.ts` + `icons/index.tsx`：新增注册 17 枚此前未暴露的库内资产，使「Doubao Copy 转写图标」40 枚全量可用——
+  - 导航/方向：`ChevronUp`、`ChevronsDownUp`、`ChevronsUpDown`
+  - 状态反馈：`CircleAlert`、`CircleCheck`、`CircleMinus`、`CirclePlus`
+  - 新增语义：`Box`、`Funnel`（筛选）、`Grip`、`Home`（house）、`MapPin`、`MousePointerClick`、`Star`、`Tag`、`ThumbsDown`、`ThumbsUp`
+  - 全部沿用统一 Icon 层：线宽默认 1.8、描边/填充语义一致、渲染走 `createIcon`。
+- 未改动：`ui.tsx` 品牌色令牌（保留蓝色 `#3A83F7` 与白色主题）、`library.ts`/`project.ts` 几何数据、50 枚项目补齐图标（库内无对应语义，所需映射仍由 project 补齐，语义已在 keys.ts 注释说明）。
+
+**验证**
+
+- `pnpm --filter mobile typecheck`：退出码 0。
+- `pnpm test`：772 项测试全部通过 / 0 失败（含 `icons.test.ts` 注册表完整性：库内 40 枚、来源标记、唯一性、几何元素完整性全部校验通过）。
+- 库内 40 枚资产 = 已注册 23 枚（首轮 23 个库键被引用） + 本轮 17 枚，覆盖率达到 100%。
+
+**注意**
+
+- 「Doubao Copy」设计库（V.3RSOA.PBS1K2）本轮 Design Canvas 不可用：本轮仅在项目内既有转写资产的范围内做全量注册，未转写任何新几何；若需进一步按设计库新增/复核图标，待设计库恢复后进行。
+- 新增导出均为库内资产，未来前端新增功能可直接 `import { Star, Home, Funnel } from "../icons"` 消费设计系统风格图标，不再需要新画面补 project 补齐图标（除非新语义库内确实缺资产）。
+
 ### 2026-10-28 · 视觉重构收尾：清除紫色品牌残留并统一图标线宽（遵循已确认 Doubao 规范）
 
 **背景**
