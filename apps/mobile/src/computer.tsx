@@ -91,7 +91,7 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
           style={{
             width: "100%",
             aspectRatio: 1.6,
-            borderRadius: 11,
+            borderRadius: 10,
             backgroundColor: colors.paper,
           }}
           resizeMode="contain"

@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 13,
+    borderRadius: 10,
     // 图标底座走中性面（surface），敏感操作才切到语义浅底。
     backgroundColor: colors.surface,
   },

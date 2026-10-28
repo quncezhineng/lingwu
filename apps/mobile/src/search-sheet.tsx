@@ -250,7 +250,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
               paddingHorizontal: 14,
               borderWidth: 1,
               borderColor: colors.lineStrong,
-              borderRadius: 11,
+              borderRadius: 9,
               backgroundColor: colors.paper,
             },
           ]}

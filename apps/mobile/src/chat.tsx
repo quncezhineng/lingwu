@@ -1781,7 +1781,7 @@ function ArtifactsPanel({
                       style={{
                         width: 40,
                         height: 40,
-                        borderRadius: 13,
+                        borderRadius: 10,
                         backgroundColor: colors.surface,
                         alignItems: "center",
                         justifyContent: "center",
@@ -1823,7 +1823,7 @@ function ArtifactsPanel({
                       style={{
                         width: 40,
                         height: 40,
-                        borderRadius: 13,
+                        borderRadius: 10,
                         backgroundColor: colors.surface,
                         alignItems: "center",
                         justifyContent: "center",

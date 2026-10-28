@@ -1890,7 +1890,7 @@ function CapabilityCard({ item, twoColumns }: { item: CapabilityItem; twoColumns
             {
               width: 38,
               height: 38,
-              borderRadius: 11,
+              borderRadius: 10,
               backgroundColor: plugin ? colors.sky : colors.orange,
             },
           ]}
@@ -2159,7 +2159,7 @@ export function AppsScreen() {
             gap: 9,
             minHeight: 44,
             paddingHorizontal: 13,
-            borderRadius: 11,
+            borderRadius: 9,
             borderWidth: 1,
             borderColor: colors.line,
             backgroundColor: colors.paper,
@@ -2483,7 +2483,7 @@ export function AgentPersonalitySheet() {
                 style={{
                   width: 26,
                   height: 26,
-                  borderRadius: 13,
+                  borderRadius: 999,
                   backgroundColor: colors.success,
                   alignItems: "center",
                   justifyContent: "center",
