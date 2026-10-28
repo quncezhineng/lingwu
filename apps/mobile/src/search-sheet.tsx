@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { TextInput, View } from "react-native";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
+import { fileSourceLabel } from "./file-library";
 import {
   type GlobalSearchKind,
   rankSearchDocuments,
@@ -142,7 +143,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
         id: file.id,
         kind: "file" as const,
         title: file.name,
-        detail: [file.source, file.mimeType].filter(Boolean).join(" · "),
+        detail: [fileSourceLabel(file.source, t), file.mimeType].filter(Boolean).join(" · "),
         keywords: `${file.mimeType} ${file.source}`,
         updatedAt: file.createdAt,
       })),

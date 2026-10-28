@@ -57,7 +57,6 @@ function MemoryCard({
         s.card,
         {
           flexGrow: 1,
-          flexBasis: 320,
           minHeight: 132,
           padding: 18,
           gap: 11,

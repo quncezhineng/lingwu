@@ -1,5 +1,6 @@
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import type { TranslationKey } from "./i18n/locales/en";
 
 type Dated = Pick<Artifact | AgentArtifact, "createdAt">;
 
@@ -22,8 +23,21 @@ export function buildFileLibrary(
   };
 }
 
-/** A short card preview should not expose Markdown control characters. */
-export function markdownExcerpt(value: string, maxLength = 140): string {
+/**
+ * 文件来源标签本地化：upload/analysis/export 映射为界面文案，
+ * 未知来源回落原文（资料卡、搜索结果共用同一映射）。
+ */
+export function fileSourceLabel(source: string, t: (key: TranslationKey) => string) {
+  if (source === "upload") return t("screens.filesSourceUpload");
+  if (source === "analysis") return t("screens.filesSourceAnalysis");
+  if (source === "export") return t("screens.filesSourceExport");
+  return source;
+}
+
+/** A short card preview should not expose Markdown control characters. */ export function markdownExcerpt(
+  value: string,
+  maxLength = 140,
+): string {
   const text = value
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/!\[([^\]]*)]\([^)]*\)/g, "$1")

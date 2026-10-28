@@ -54,6 +54,7 @@ import {
   Users,
   X,
 } from "./icons";
+import { PageHeader } from "./page-header";
 import { PlanCard } from "./plan-card";
 import { ActivityScreen } from "./screens";
 import { StatusBadge, taskStatusTone } from "./status-badge";
@@ -1317,6 +1318,7 @@ export function GoalsScreen() {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const { open } = useWorkspace();
+  const { width } = useWindowDimensions();
   const [adding, setAdding] = useState<string>();
   const [selectedGoal, setSelectedGoal] = useState<string>();
   const [selectedMonitor, setSelectedMonitor] = useState<string>();
@@ -1327,14 +1329,19 @@ export function GoalsScreen() {
   const monitors = (data?.monitors || []).filter((item) => item.status !== "stopped");
   return (
     <View style={{ gap: 12 }}>
-      <AgentStatus />
-      <View style={{ gap: 8 }}>
-        {/* H2：页面 H1 已叫「盯盘与提醒」，这里不再重复分区标题；H3：不再用 green 语义色做追踪标识 */}
-        <View style={[s.row, { justifyContent: "flex-end", marginBottom: 5 }]}>
+      <PageHeader
+        title={t("app.titleGoals")}
+        description={t("app.subtitleGoals")}
+        compact={width < breakpoints.desktop}
+        actions={
           <Button small icon={Plus} onPress={() => setAdding("Tracking")}>
             {t("agent.track")}
           </Button>
-        </View>
+        }
+        style={{ marginBottom: 0 }}
+      />
+      <AgentStatus />
+      <View style={{ gap: 8 }}>
         {(showAll ? monitors : monitors.slice(0, 3)).map((item) => (
           <MonitorRow key={item.id} monitor={item} onOpen={() => setSelectedMonitor(item.id)} />
         ))}

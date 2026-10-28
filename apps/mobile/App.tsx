@@ -668,29 +668,32 @@ function WorkspaceShell({
                     }}
                     keyboardShouldPersistTaps="handled"
                   >
-                    {section !== "today" && section !== "files" && section !== "notes" && (
-                      <PageHeader
-                        title={title ? t(title.titleKey) : ""}
-                        description={title ? t(title.subtitleKey) : undefined}
-                        compact={!desktop}
-                        actions={
-                          section === "portfolio" ? (
-                            <Button
-                              small
-                              onPress={() =>
-                                navigate(section === "portfolio" ? "preferences" : "files")
-                              }
-                            >
-                              {t(
-                                section === "portfolio"
-                                  ? "preferences.backToPreferences"
-                                  : "app.backToFiles",
-                              )}
-                            </Button>
-                          ) : undefined
-                        }
-                      />
-                    )}
+                    {section !== "today" &&
+                      section !== "files" &&
+                      section !== "notes" &&
+                      section !== "goals" && (
+                        <PageHeader
+                          title={title ? t(title.titleKey) : ""}
+                          description={title ? t(title.subtitleKey) : undefined}
+                          compact={!desktop}
+                          actions={
+                            section === "portfolio" ? (
+                              <Button
+                                small
+                                onPress={() =>
+                                  navigate(section === "portfolio" ? "preferences" : "files")
+                                }
+                              >
+                                {t(
+                                  section === "portfolio"
+                                    ? "preferences.backToPreferences"
+                                    : "app.backToFiles",
+                                )}
+                              </Button>
+                            ) : undefined
+                          }
+                        />
+                      )}
                     <ErrorNotice error={error} />
                     {section === "account" ? (
                       <AccountScreen onSignOut={onSignOut} />

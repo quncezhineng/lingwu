@@ -24,7 +24,7 @@ import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
 import { fileKind } from "./file-kind";
-import { buildFileLibrary } from "./file-library";
+import { buildFileLibrary, fileSourceLabel } from "./file-library";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel } from "./i18n/translate";
 import {
@@ -1038,13 +1038,6 @@ export function BrowserScreen() {
 type LibrarySection = "files" | "insights" | "notes";
 
 /** 文件来源标签本地化；未知来源回落原文，避免出现没做完的英文键。 */
-function fileSourceLabel(source: string, t: ReturnType<typeof useTranslation>["t"]) {
-  if (source === "upload") return t("screens.filesSourceUpload");
-  if (source === "analysis") return t("screens.filesSourceAnalysis");
-  if (source === "export") return t("screens.filesSourceExport");
-  return source;
-}
-
 export function FilesScreen({ initialSection = "files" }: { initialSection?: LibrarySection }) {
   const { workspace: w, api, refresh, open } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
