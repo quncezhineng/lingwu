@@ -17,9 +17,11 @@ import {
   ArrowUpRight,
   Bell,
   Check,
+  ChevronLeft,
   ChevronRight,
   CircleX,
   Clock3,
+  FolderOpen,
   Heart,
   ListChecks,
   Plus,
@@ -32,10 +34,12 @@ import { InsightCard } from "./insight-card";
 import { activeWatchlist, loadWatchlists, useWatchlistState } from "./market";
 import { availabilityFromQuote, useQuotes } from "./quotes";
 import { StatusBadge, statusToneColors, taskStatusTone } from "./status-badge";
+import { breakpoints } from "./theme";
 import {
   Button,
   colors,
   fonts,
+  IconButton,
   marketDirectionColor,
   radius,
   SectionHeading,
@@ -43,6 +47,7 @@ import {
   s,
   typography,
 } from "./ui";
+
 import { useWorkspace } from "./workspace";
 
 function greetingKey(hour: number) {
@@ -361,9 +366,7 @@ function TaskRow({ task }: { task: AgentTask }) {
         </Text>
         <View style={s.between}>
           <Text numberOfLines={1} style={{ flex: 1, fontSize: 11, color: colors.muted }}>
-            {task.plan.find((step) => step.status === "running")?.title ||
-              task.error ||
-              statusLabel(task.status)}
+            {task.plan.find((step) => step.status === "running")?.title || task.error || ""}
           </Text>
           <Text style={{ fontSize: 10, color: colors.faint }}>{taskTime(task)}</Text>
         </View>
@@ -393,19 +396,44 @@ export function WorkbenchScreen() {
   const [draft, setDraft] = useState("");
   const [briefingOpen, setBriefingOpen] = useState(false);
   const composerRef = useRef<TextInput>(null);
-  const sideBySide = width >= 1180;
+  const sideBySide = width >= breakpoints.desktop;
+  const narrow = width < breakpoints.mobile;
+  const [insightIndex, setInsightIndex] = useState(0);
   const now = new Date();
   const name =
     shortName(workspace.profile.name) || shortName(workspace.profile.email) || t("workbench.there");
   const agentName = localizeAgentName(data?.identity.name);
-  const tasks = [...(data?.tasks ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  // 进行中的任务优先，其次按更新时间倒序（与 Demo 的任务区排序一致）。
+  const rank = (status: AgentTask["status"]) =>
+    status === "running" || status === "queued"
+      ? 0
+      : status === "waiting_approval" || status === "waiting_input"
+        ? 1
+        : 2;
+  const tasks = [...(data?.tasks ?? [])].sort(
+    (a, b) => rank(a.status) - rank(b.status) || b.updatedAt.localeCompare(a.updatedAt),
+  );
   const activeTasks = tasks.filter(
     (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
   );
   const visibleTasks = activeTasks.length ? activeTasks : tasks;
-  const insight = [...(data?.artifacts ?? [])].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
-  )[0];
+  // 今日领悟：最多 3 条，按时间倒序做 1/3 轮播。
+  const insights = [...(data?.artifacts ?? [])]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 3);
+  const insight = insights[Math.min(insightIndex, Math.max(0, insights.length - 1))];
+  // 三段内容只在 artifact.data 明确提供时渲染，不做推断或造数据（PM A6 裁决）。
+  const insightData = (insight?.data ?? {}) as Record<string, unknown>;
+  const insightField = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = insightData[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+    return undefined;
+  };
+  const insightBasis = insightField("basis", "evidence", "evidenceSummary");
+  const insightLimits = insightField("limits", "caveats", "unknowns");
+  const insightRevisit = insightField("revisit", "reviewAt", "revisitAt");
   const dateLine = now.toLocaleDateString(activeLocaleTag(), {
     month: "long",
     day: "numeric",
@@ -444,9 +472,14 @@ export function WorkbenchScreen() {
       >
         <View style={{ flex: 1, minWidth: 0, width: sideBySide ? undefined : "100%", gap: 26 }}>
           <View style={{ gap: 18 }}>
-            <View style={[s.between, { alignItems: "flex-start", gap: 16 }]}>
-              <View style={{ flex: 1, gap: 6 }}>
-                <Text style={{ fontSize: 11, color: colors.faint, letterSpacing: 0.2 }}>
+            <View
+              style={[
+                narrow ? null : s.between,
+                { alignItems: "flex-start", gap: narrow ? 12 : 16 },
+              ]}
+            >
+              <View style={{ flex: 1, gap: 6, width: narrow ? "100%" : undefined }}>
+                <Text style={[typography.eyebrow, { color: colors.faint }]}>
                   {dateLine} · {t("workbench.marketContext")}
                 </Text>
                 <Text
@@ -463,7 +496,7 @@ export function WorkbenchScreen() {
                 accessibilityLabel={t("workbench.briefing")}
                 onPress={() => setBriefingOpen(true)}
                 style={({ pressed }) => ({
-                  width: 180,
+                  width: narrow ? "100%" : 180,
                   minHeight: 62,
                   flexDirection: "row",
                   alignItems: "center",
@@ -535,6 +568,7 @@ export function WorkbenchScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={t("workbench.attachMaterial")}
+                    hitSlop={7}
                     onPress={() => navigate("chat")}
                     style={({ pressed }) => ({
                       width: 30,
@@ -546,6 +580,22 @@ export function WorkbenchScreen() {
                     })}
                   >
                     <Upload size={16} strokeWidth={1.7} color={colors.muted} />
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("app.navFiles")}
+                    hitSlop={7}
+                    onPress={() => navigate("files")}
+                    style={({ pressed }) => ({
+                      width: 30,
+                      height: 30,
+                      borderRadius: radius.control,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: pressed ? colors.overlay1 : "transparent",
+                    })}
+                  >
+                    <FolderOpen size={16} strokeWidth={1.7} color={colors.muted} />
                   </Pressable>
                   <View
                     style={[
@@ -575,6 +625,7 @@ export function WorkbenchScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t("workbench.sendAnalysis")}
+                  hitSlop={4}
                   disabled={!draft.trim()}
                   onPress={submit}
                   style={({ pressed }) => ({
@@ -601,6 +652,7 @@ export function WorkbenchScreen() {
                 <Pressable
                   key={item.label}
                   accessibilityRole="button"
+                  hitSlop={6}
                   onPress={() => ask(item.prompt)}
                   style={({ pressed }) => ({
                     minHeight: 32,
@@ -624,9 +676,41 @@ export function WorkbenchScreen() {
           <View style={{ gap: 10 }}>
             <SectionHeading
               title={t("workbench.todayInsight")}
-              count={insight ? "1 / 1" : undefined}
-              action={insight ? t("workbench.expand") : undefined}
-              onPress={insight ? () => open({ type: "artifact", artifact: insight }) : undefined}
+              count={insights.length ? `${insightIndex + 1} / ${insights.length}` : undefined}
+              actions={
+                <View style={[s.row, { gap: 2 }]}>
+                  {insights.length > 1 && (
+                    <>
+                      <IconButton
+                        size={28}
+                        icon={ChevronLeft}
+                        label={t("ui.previous")}
+                        onPress={() =>
+                          setInsightIndex(
+                            (value) => (value - 1 + insights.length) % insights.length,
+                          )
+                        }
+                      />
+                      <IconButton
+                        size={28}
+                        icon={ChevronRight}
+                        label={t("ui.next")}
+                        onPress={() => setInsightIndex((value) => (value + 1) % insights.length)}
+                      />
+                    </>
+                  )}
+                  {!!insight && (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => open({ type: "artifact", artifact: insight })}
+                      style={[s.row, { gap: 3, paddingHorizontal: 4, paddingVertical: 4 }]}
+                    >
+                      <Text style={[s.small, { color: colors.link }]}>{t("workbench.expand")}</Text>
+                      <ArrowUpRight size={13} color={colors.link} />
+                    </Pressable>
+                  )}
+                </View>
+              }
               style={{ marginBottom: 0 }}
             />
             <InsightCard
@@ -634,6 +718,19 @@ export function WorkbenchScreen() {
                 insight ? statusLabel(insight.kind) : t("workbench.researchNote")
               }`}
               title={insight?.summary || insight?.title || t("workbench.insightEmptyTitle")}
+              basis={insightBasis}
+              limits={insightLimits}
+              revisit={insightRevisit}
+              onSimplify={
+                insight
+                  ? () => ask(t("workbench.insightSimplifyPrompt", { title: insight.title }))
+                  : undefined
+              }
+              onDisagree={
+                insight
+                  ? () => ask(t("workbench.insightDisagreePrompt", { title: insight.title }))
+                  : undefined
+              }
               meta={
                 insight
                   ? `${localizeAgentName(data?.identity.name)} · ${insight.title}`

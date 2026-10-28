@@ -11,6 +11,13 @@ const ui = {
   "ui.saveInsight": "收藏洞察",
   "ui.unsaveInsight": "取消收藏",
   "ui.planProgress": "{done}/{total} 步",
+  "ui.previous": "上一条",
+  "ui.next": "下一条",
+  "ui.insightBasis": "依据",
+  "ui.insightLimits": "还不能判断什么",
+  "ui.insightRevisit": "何时回看",
+  "ui.insightSimplify": "讲浅一点",
+  "ui.insightDisagree": "我有不同看法",
 } satisfies Dictionary;
 
 export default ui;

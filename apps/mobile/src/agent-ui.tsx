@@ -201,7 +201,7 @@ export function TaskCard({
         style={{
           padding: compact ? 14 : 16,
           gap: 12,
-          borderRadius: 14,
+          borderRadius: 10,
           backgroundColor: colors.paper,
         }}
       >

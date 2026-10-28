@@ -146,6 +146,10 @@ const app = {
   "workbench.researchNote": "研究笔记",
   "workbench.insightEmptyTitle": "从第一个可解释的领悟开始。",
   "workbench.insightEmptyDetail": "完成的研究会沉淀成一张简洁、可追溯来源的领悟卡。",
+  "workbench.insightSimplifyPrompt":
+    "请把「{title}」讲得更浅一点：保留结论、关键依据和边界，不要新增未经证实的信息。",
+  "workbench.insightDisagreePrompt":
+    "我对「{title}」有不同看法。请列出反方证据，并说明在什么条件下原结论会失效。",
   "workbench.whatAgentDoing": "{name}正在为你做",
   "workbench.recentAnalyses": "最近的分析",
   "workbench.allTasks": "全部分析",

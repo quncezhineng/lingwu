@@ -11,6 +11,13 @@ const ui = {
   "ui.saveInsight": "Save insight",
   "ui.unsaveInsight": "Remove from saved",
   "ui.planProgress": "{done}/{total} steps",
+  "ui.previous": "Previous",
+  "ui.next": "Next",
+  "ui.insightBasis": "Basis",
+  "ui.insightLimits": "What it cannot tell yet",
+  "ui.insightRevisit": "When to revisit",
+  "ui.insightSimplify": "Explain simply",
+  "ui.insightDisagree": "I see it differently",
 } satisfies Dictionary;
 
 export default ui;

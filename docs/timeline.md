@@ -5,6 +5,74 @@
 
 ## 变更记录
 
+### 2026-10-28 · 图标替换终审：emoji/文本字形功能图标清零、线宽离群归一
+
+**背景**
+
+用户再次发起基于「Doubao」设计系统（V.3RSOA.PBS1K2）的视觉重构，要求保留当前蓝色（`#3A83F7`）与白色主题，并优先以设计系统图标替换前端图标。本轮 Design Canvas 依然不可用，故在项目内已转写的 Doubao 图标资产（`icons/library.ts` 40 枚 + `icons/project.ts` 补齐）范围内推进；未读取、未依赖设计库外部文件。
+
+**全站扫描结论**
+
+- 图标消费已 100% 收敛于自有 SVG 图标层（`apps/mobile/src/icons`）：无 `lucide-react-native` 残留、无紫色 `#4B3FE3`/`blueDark` 残留。
+- 84 个语义导出键全部映射库内/项目几何，注册表完整性由 `icons.test.ts` 覆盖。
+- 残余缺口 2 类（本轮修复）：
+  - **emoji/文本字形充当功能图标**：`briefing-card.tsx` 事件行日历 emoji `📅`；`symbol-detail.tsx` 任务计划步骤状态字形 `✓`/`✕`。
+  - **线宽离群**：`briefing-card.tsx` 2 处（`1.9`、`1.6`），违反「常规 1.8 / 强调 2 / 填充 0」图标规范。
+
+**修正（最小必要改动，仅样式/图标，无逻辑变化）**
+
+- `apps/mobile/src/briefing-card.tsx`：
+  - 事件行 `📅` emoji → `CalendarDays` 图标（`size 14` / `strokeWidth 1.8` / `colors.faint`，与时间列对齐）。
+  - 标题行 `Activity` 线宽 `1.9` → `1.8`（常规档）。
+  - 空态占位 `Activity` 线宽 `1.6` → `1.8`。
+- `apps/mobile/src/symbol-detail.tsx`：
+  - 计划步骤「成功」状态 `✓` 文本字形 → `Check` 图标（`size 14` / `strokeWidth 2` 强调档 / 状态色）。
+  - 计划步骤「失败」状态 `✕` 文本字形 → `CircleX` 图标（同上）。
+
+**验证**
+
+- `pnpm typecheck`：通过（根 + mobile 两个工程）。
+- `pnpm test`：772 项全部通过 / 0 失败。
+- `biome check`：目标文件无告警。
+
+**说明**
+
+- 设计库本轮仍不可用：未转写任何新几何；本轮全部改动仅为既有图标资产替换与线宽收敛，蓝色 `#3A83F7` 与白色主题保持不变。
+- 待「Doubao」设计库 Design Canvas 恢复后，可再按设计库原始规格复核图标几何与 token 映射。
+
+### 2026-10-28 · 修复后端启动崩溃：PGlite 本地数据目录损坏（WAL 重放失败）
+
+**现象**
+
+`pnpm dev` 启动即崩溃，终端报：
+
+```
+RuntimeError: Aborted(). Build with -sASSERTIONS for more info.
+  at async createStore (apps/server/src/db.ts:199:5)
+```
+
+**根因**
+
+- 本地嵌入数据库 PGlite 的数据目录 `.lingwu/postgres` 因之前进程被强杀而损坏（WAL/checkpoint 状态与数据不一致）。
+- PGlite 每次打开该目录重放 WAL 失败，Emscripten 仅暴露不透明 `Aborted()`，无法直接定位。
+- 佐证：`.lingwu` 下已存在 10-25 的损坏备份 `postgres.corrupt-20261025`，说明该类问题曾发生过。
+
+**修复（数据保留，不删除）**
+
+- 将损坏目录移走存档：`.lingwu/postgres` → `.lingwu/postgres.corrupt-20261028`。
+- 服务启动时自动重建全新数据库，业务数据仍存于 Supabase，不受影响。
+
+**验证**
+
+- `pnpm dev`：API 正常拉起，输出 `LingWu live API ready at http://localhost:8787`。
+- `curl /api/health`：返回 `{"ok":true,...}`。
+
+**注意事项（复发时的处理步骤）**
+
+1. 停止后端：`lsof -i :8787` 找到残留进程后退出。
+2. 备份损坏目录：`mv .lingwu/postgres .lingwu/postgres.corrupt-$(date +%Y%m%d)`。
+3. 重新 `pnpm dev`。
+
 ### 2026-10-28 · 视觉一致性终审：圆角体系偏离项归零（修正 7 处 11/13 离群值）
 
 **背景**
@@ -33,13 +101,13 @@
 **注意**
 
 - 全部改动仅为 1–2px 的圆角量化收敛，不涉及布局、配色或图标几何变更；蓝色 `#3A83F7` 与白色主题保持不变。
-- 待「Doubao Copy」设计库 Design Canvas 恢复后，可再按设计库原始规格复核圆角档位。
+- 待「Doubao」设计库 Design Canvas 恢复后，可再按设计库原始规格复核圆角档位。
 
 ### 2026-10-28 · 图标体系补全：Doubao 库 40 枚资产全量注册可用（蓝色/白色主题不变）
 
 **背景**
 
-用户再次发起基于「Doubao Copy」设计系统的视觉重构，明确要求保留当前蓝色（`#3A83F7`）与白色主题，并优先以设计系统图标替换前端图标。本轮 Design Canvas 依然不可用，故在**项目内已转写的 Doubao 图标资产**（`apps/mobile/src/icons/library.ts`，40 枚）范围内推进；未读取、未依赖设计库外部文件。
+用户再次发起基于「Doubao」设计系统的视觉重构，明确要求保留当前蓝色（`#3A83F7`）与白色主题，并优先以设计系统图标替换前端图标。本轮 Design Canvas 依然不可用，故在**项目内已转写的 Doubao 图标资产**（`apps/mobile/src/icons/library.ts`，40 枚）范围内推进；未读取、未依赖设计库外部文件。
 
 **审计结论**
 
@@ -48,7 +116,7 @@
 
 **实现（本轮的实质增量：库内资产 100% 可消费）**
 
-- `apps/mobile/src/icons/keys.ts` + `icons/index.tsx`：新增注册 17 枚此前未暴露的库内资产，使「Doubao Copy 转写图标」40 枚全量可用——
+- `apps/mobile/src/icons/keys.ts` + `icons/index.tsx`：新增注册 17 枚此前未暴露的库内资产，使「Doubao 转写图标」40 枚全量可用——
   - 导航/方向：`ChevronUp`、`ChevronsDownUp`、`ChevronsUpDown`
   - 状态反馈：`CircleAlert`、`CircleCheck`、`CircleMinus`、`CirclePlus`
   - 新增语义：`Box`、`Funnel`（筛选）、`Grip`、`Home`（house）、`MapPin`、`MousePointerClick`、`Star`、`Tag`、`ThumbsDown`、`ThumbsUp`
@@ -63,14 +131,14 @@
 
 **注意**
 
-- 「Doubao Copy」设计库（V.3RSOA.PBS1K2）本轮 Design Canvas 不可用：本轮仅在项目内既有转写资产的范围内做全量注册，未转写任何新几何；若需进一步按设计库新增/复核图标，待设计库恢复后进行。
+- 「Doubao」设计库（V.3RSOA.PBS1K2）本轮 Design Canvas 不可用：本轮仅在项目内既有转写资产的范围内做全量注册，未转写任何新几何；若需进一步按设计库新增/复核图标，待设计库恢复后进行。
 - 新增导出均为库内资产，未来前端新增功能可直接 `import { Star, Home, Funnel } from "../icons"` 消费设计系统风格图标，不再需要新画面补 project 补齐图标（除非新语义库内确实缺资产）。
 
 ### 2026-10-28 · 视觉重构收尾：清除紫色品牌残留并统一图标线宽（遵循已确认 Doubao 规范）
 
 **背景**
 
-用户基于「Doubao Copy」设计系统发起前端 UI 视觉重构。本次会话 Design Canvas 暂不可用，因此以会话中已沉淀并经代码固化的 Doubao 规范（中性面阶梯、边框优先弱阴影、圆角体系、图标线宽 1.8/2/0、品牌色隔离）为基准，并维持当前蓝色（`#3A83F7`）品牌主色、不回归紫色 `#4B3FE3`（经用户确认）。
+用户基于「Doubao」设计系统发起前端 UI 视觉重构。本次会话 Design Canvas 暂不可用，因此以会话中已沉淀并经代码固化的 Doubao 规范（中性面阶梯、边框优先弱阴影、圆角体系、图标线宽 1.8/2/0、品牌色隔离）为基准，并维持当前蓝色（`#3A83F7`）品牌主色、不回归紫色 `#4B3FE3`（经用户确认）。
 
 **实现**
 
@@ -91,7 +159,7 @@
 **注意**
 
 - 本次不回归紫色：`ui.tsx` 品牌主操作保留 `#3A83F7`；品牌位图 `assets/logo.png` 维持蓝色系，无需替换。
-- 依据会话中确认的 Doubao 视觉规范执行；「Doubao Copy」设计库（V.3RSOA.PBS1K2）本次 Design Canvas 不可用，尺寸/间距/圆角体系的最终复核待设计库恢复后进行。
+- 依据会话中确认的 Doubao 视觉规范执行；「Doubao」设计库（V.3RSOA.PBS1K2）本次 Design Canvas 不可用，尺寸/间距/圆角体系的最终复核待设计库恢复后进行。
 - 图标线宽规范已内置于 `apps/mobile/src/icons/index.tsx`（`DEFAULT_STROKE_WIDTH = 1.8`），后续新增图标默认即合规。
 
 ### 2026-10-27 · render.yaml 补齐每日简报定时调度环境变量（O2）

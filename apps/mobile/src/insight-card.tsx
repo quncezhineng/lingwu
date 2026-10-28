@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useTranslation } from "./i18n";
 import { ArrowUpRight, Heart, type IconComponent, Sparkles } from "./icons";
-import { colors, radius, space, statusColors, typography } from "./theme";
+import { breakpoints, colors, radius, space, statusColors, typography } from "./theme";
 import { s } from "./ui";
 
 /**
@@ -29,8 +29,13 @@ export function InsightCard({
   eyebrow,
   title,
   detail,
+  basis,
+  limits,
+  revisit,
   meta,
   onPress,
+  onSimplify,
+  onDisagree,
   onToggleSave,
   saved = false,
   collapsed = false,
@@ -42,9 +47,18 @@ export function InsightCard({
   title: string;
   /** 一句话结论 / 摘要；收起态不展示。 */
   detail?: string;
+  /** 「依据」段；缺省不渲染。 */
+  basis?: string;
+  /** 「还不能判断什么」段；缺省不渲染。 */
+  limits?: string;
+  /** 「何时回看」段；缺省不渲染。 */
+  revisit?: string;
   /** 底部元信息：来源、作者、时间等。 */
   meta?: string;
   onPress?: () => void;
+  /** 底部动作：讲浅一点 / 我有不同看法。 */
+  onSimplify?: () => void;
+  onDisagree?: () => void;
   /** 传入后展示收藏按钮；由调用方决定是否持久化。 */
   onToggleSave?: () => void;
   saved?: boolean;
@@ -54,7 +68,7 @@ export function InsightCard({
 }) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
-  const compact = width < 760;
+  const compact = width < breakpoints.mobile;
 
   const cardStyle: ViewStyle = {
     minHeight: collapsed ? undefined : compact ? 106 : undefined,
@@ -68,6 +82,12 @@ export function InsightCard({
     justifyContent: "space-between",
     gap: space.sm,
   };
+
+  const sections = [
+    { label: t("ui.insightBasis"), value: basis },
+    { label: t("ui.insightLimits"), value: limits },
+    { label: t("ui.insightRevisit"), value: revisit },
+  ].filter((item) => !!item.value);
 
   const body = (
     <View style={{ gap: space.xs, minWidth: 0 }}>
@@ -96,6 +116,13 @@ export function InsightCard({
           {detail}
         </Text>
       )}
+      {!collapsed &&
+        sections.map((item) => (
+          <View key={item.label} style={{ gap: 2, marginTop: 2 }}>
+            <Text style={[typography.eyebrow, { color: colors.faint }]}>{item.label}</Text>
+            <Text style={[typography.prose, { color: colors.text }]}>{item.value}</Text>
+          </View>
+        ))}
     </View>
   );
 
@@ -112,39 +139,56 @@ export function InsightCard({
       >
         {meta}
       </Text>
-      {onToggleSave ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t(saved ? "ui.unsaveInsight" : "ui.saveInsight")}
-          accessibilityState={{ selected: saved }}
-          hitSlop={8}
-          onPress={onToggleSave}
-          style={({ pressed }) => ({
-            width: 28,
-            height: 28,
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: radius.micro,
-            backgroundColor: saved
-              ? statusColors.surface
-              : pressed
-                ? colors.overlay1
-                : "transparent",
-          })}
-        >
-          <Heart
-            size={15}
-            color={saved ? colors.primary : colors.faint}
-            fill={saved ? colors.primary : "none"}
-          />
-        </Pressable>
-      ) : (
-        !!onPress && <ArrowUpRight size={14} color={colors.faint} />
-      )}
+      <View style={[s.row, { gap: space.sm }]}>
+        {!!onSimplify && (
+          <Pressable accessibilityRole="button" hitSlop={6} onPress={onSimplify}>
+            <Text style={[typography.caption, { color: colors.link }]}>
+              {t("ui.insightSimplify")}
+            </Text>
+          </Pressable>
+        )}
+        {!!onDisagree && (
+          <Pressable accessibilityRole="button" hitSlop={6} onPress={onDisagree}>
+            <Text style={[typography.caption, { color: colors.link }]}>
+              {t("ui.insightDisagree")}
+            </Text>
+          </Pressable>
+        )}
+        {onToggleSave ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t(saved ? "ui.unsaveInsight" : "ui.saveInsight")}
+            accessibilityState={{ selected: saved }}
+            hitSlop={8}
+            onPress={onToggleSave}
+            style={({ pressed }) => ({
+              width: 28,
+              height: 28,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: radius.micro,
+              backgroundColor: saved
+                ? statusColors.surface
+                : pressed
+                  ? colors.overlay1
+                  : "transparent",
+            })}
+          >
+            <Heart
+              size={15}
+              color={saved ? colors.primary : colors.faint}
+              fill={saved ? colors.primary : "none"}
+            />
+          </Pressable>
+        ) : (
+          !!onPress && <ArrowUpRight size={14} color={colors.faint} />
+        )}
+      </View>
     </View>
   );
 
-  if (onToggleSave) {
+  // 有内嵌动作时必须拆分布局，避免 Pressable 嵌套在 Web 上冒泡误触。
+  if (onToggleSave || onSimplify || onDisagree) {
     return (
       <View style={[cardStyle, style]}>
         <Pressable
@@ -155,7 +199,7 @@ export function InsightCard({
         >
           {body}
         </Pressable>
-        {footer}
+        {!collapsed && footer}
       </View>
     );
   }

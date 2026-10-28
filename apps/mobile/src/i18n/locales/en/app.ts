@@ -156,6 +156,10 @@ const app = {
   "workbench.insightEmptyTitle": "Build the first explainable insight.",
   "workbench.insightEmptyDetail":
     "Completed research will settle here as a concise, source-backed note.",
+  "workbench.insightSimplifyPrompt":
+    "Explain “{title}” more simply: keep the conclusion, key evidence and limits, and do not add unverified information.",
+  "workbench.insightDisagreePrompt":
+    "I see “{title}” differently. List the counter-evidence and say under what conditions the original conclusion would fail.",
   "workbench.whatAgentDoing": "What {name} is doing",
   "workbench.recentAnalyses": "Recent analyses",
   "workbench.allTasks": "All tasks",

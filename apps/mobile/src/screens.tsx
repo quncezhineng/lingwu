@@ -1140,7 +1140,7 @@ export function FilesScreen() {
                       >
                         <View style={[s.row, { gap: 5, marginBottom: 15 }]}>
                           <FileText size={13} color={colors.primary} />
-                          <Text style={{ fontSize: 7, color: colors.primaryStrong }}>
+                          <Text style={{ fontSize: 10, color: colors.primaryStrong }}>
                             {t("screens.filesDocumentBadge")}
                           </Text>
                         </View>
@@ -1243,7 +1243,7 @@ function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
               >
                 <Sparkles size={13} color={colors.primary} />
               </View>
-              <Text style={{ flex: 1, fontSize: 7, color: colors.primaryStrong }}>
+              <Text style={{ flex: 1, fontSize: 10, color: colors.primaryStrong }}>
                 {t("screens.filesResearchBadge")}
               </Text>
             </View>

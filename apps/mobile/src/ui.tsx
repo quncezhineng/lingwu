@@ -445,12 +445,15 @@ export function SectionHeading({
   count,
   action,
   onPress,
+  actions,
   style,
 }: {
   title: string;
   count?: number | string;
   action?: string;
   onPress?: () => void;
+  /** 自定义右侧动作（如轮播切换），优先于文本按钮。 */
+  actions?: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
@@ -479,12 +482,14 @@ export function SectionHeading({
           </View>
         )}
       </View>
-      {action && onPress && (
+      {actions ? (
+        actions
+      ) : action && onPress ? (
         <Pressable accessibilityRole="button" onPress={onPress} style={[s.row, { gap: 4 }]}>
           <Text style={[s.small, { color: colors.link }]}>{action}</Text>
           <ArrowUpRight size={13} color={colors.link} />
         </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
