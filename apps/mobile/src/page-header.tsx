@@ -63,7 +63,7 @@ export function PageHeader({
         </Text>
         {!!description && (
           <Text
-            numberOfLines={1}
+            numberOfLines={compact ? 2 : 1}
             style={[
               typography.caption,
               { lineHeight: 20, color: colors.faint, maxWidth: 720, marginTop: 2 },

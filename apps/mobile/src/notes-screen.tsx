@@ -398,7 +398,7 @@ export function NotesScreen() {
           </View>
         </View>
         <Button
-          primary
+          primary={state.notes.length > 0}
           icon={Plus}
           style={{ minHeight: 44 }}
           onPress={() =>
@@ -484,43 +484,46 @@ export function NotesScreen() {
         </View>
       ) : tab === "notes" ? (
         <>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            <ChipButton
-              label={t("notes.allTypes")}
-              count={typeCounts.all}
-              selected={typeFilter === "all"}
-              onPress={() => setTypeFilter("all")}
-            />
-            {NOTE_TYPES.map((type) => (
+          {/* 空笔记时隐藏第三排筛选，避免首屏被筛选占满 */}
+          {state.notes.length > 0 && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               <ChipButton
-                key={type}
-                label={t(TYPE_KEYS[type])}
-                count={typeCounts[type] ?? 0}
-                selected={typeFilter === type}
-                onPress={() => setTypeFilter(type)}
+                label={t("notes.allTypes")}
+                count={typeCounts.all}
+                selected={typeFilter === "all"}
+                onPress={() => setTypeFilter("all")}
               />
-            ))}
-            <ChipButton
-              label={symbolFilter ? `${symbolFilter} ×` : `${t("notes.allSymbols")} ▾`}
-              selected={!!symbolFilter}
-              onPress={() => (symbolFilter ? setSymbolFilter(undefined) : setSymbolPicker(true))}
-            />
-            {filtersActive && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  setTypeFilter("all");
-                  setSymbolFilter(undefined);
-                  setQuery("");
-                }}
-                style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 6 }}
-              >
-                <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
-                  {t("notes.clearFilters")}
-                </Text>
-              </Pressable>
-            )}
-          </View>
+              {NOTE_TYPES.map((type) => (
+                <ChipButton
+                  key={type}
+                  label={t(TYPE_KEYS[type])}
+                  count={typeCounts[type] ?? 0}
+                  selected={typeFilter === type}
+                  onPress={() => setTypeFilter(type)}
+                />
+              ))}
+              <ChipButton
+                label={symbolFilter ? `${symbolFilter} ×` : `${t("notes.allSymbols")} ▾`}
+                selected={!!symbolFilter}
+                onPress={() => (symbolFilter ? setSymbolFilter(undefined) : setSymbolPicker(true))}
+              />
+              {filtersActive && (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setTypeFilter("all");
+                    setSymbolFilter(undefined);
+                    setQuery("");
+                  }}
+                  style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 6 }}
+                >
+                  <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
+                    {t("notes.clearFilters")}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {filteredNotes.length === 0 ? (
             state.notes.length === 0 ? (

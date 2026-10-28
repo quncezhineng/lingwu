@@ -99,6 +99,10 @@ const screens = {
   "screens.libraryInsightsEmptyTitle": "No saved insights yet",
   "screens.libraryInsightsEmptyDetail":
     "Finished reports, comparisons and briefings are filed here automatically.",
+  "screens.filesImportShort": "Import",
+  "screens.filesSourceUpload": "Uploaded",
+  "screens.filesSourceAnalysis": "From analysis",
+  "screens.filesSourceExport": "Exported",
   "screens.filesDocumentBadge": "DOCUMENT",
   "screens.filesResearchHeading": "Research outputs",
   "screens.filesDocumentsHeading": "Files",

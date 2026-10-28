@@ -1036,6 +1036,14 @@ export function BrowserScreen() {
 }
 type LibrarySection = "files" | "insights" | "notes";
 
+/** 文件来源标签本地化；未知来源回落原文，避免出现没做完的英文键。 */
+function fileSourceLabel(source: string, t: ReturnType<typeof useTranslation>["t"]) {
+  if (source === "upload") return t("screens.filesSourceUpload");
+  if (source === "analysis") return t("screens.filesSourceAnalysis");
+  if (source === "export") return t("screens.filesSourceExport");
+  return source;
+}
+
 export function FilesScreen({ initialSection = "files" }: { initialSection?: LibrarySection }) {
   const { workspace: w, api, refresh, open } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
@@ -1112,8 +1120,14 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
         compact={width < breakpoints.desktop}
         actions={
           section === "files" ? (
-            <Button primary icon={Upload} busy={busy} onPress={() => void upload()}>
-              {t("screens.filesImport")}
+            <Button
+              primary
+              small={width < breakpoints.desktop}
+              icon={Upload}
+              busy={busy}
+              onPress={() => void upload()}
+            >
+              {t(width < breakpoints.desktop ? "screens.filesImportShort" : "screens.filesImport")}
             </Button>
           ) : undefined
         }
@@ -1174,7 +1188,9 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
                   accessibilityRole="button"
                   accessibilityLabel={f.name}
                   onPress={() => open({ type: "file", file: f })}
-                  style={{ width: library.files.length === 1 ? "100%" : cardWidth }}
+                  style={{
+                    width: library.files.length === 1 ? Math.min(contentWidth, 520) : cardWidth,
+                  }}
                 >
                   <Card style={{ padding: 0, overflow: "hidden", width: "100%" }}>
                     {/* L2：封面 175→120，移动端首屏至少露出两张卡 */}
@@ -1232,7 +1248,7 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
                         · {Math.max(1, Math.round(f.size / 1024))} KB
                       </Text>
                       <View style={[s.between, { marginTop: 9 }]}>
-                        <Chip>{f.source}</Chip>
+                        <Chip>{fileSourceLabel(f.source, t)}</Chip>
                         <Text style={s.small}>{dateLabel(f.createdAt)}</Text>
                       </View>
                     </View>
@@ -1261,7 +1277,9 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
             {library.artifacts.map((artifact) => (
               <View
                 key={artifact.id}
-                style={{ width: library.artifacts.length === 1 ? "100%" : cardWidth }}
+                style={{
+                  width: library.artifacts.length === 1 ? Math.min(contentWidth, 760) : cardWidth,
+                }}
               >
                 <InsightCard
                   eyebrow={`${t("screens.libraryInsights")} · ${statusLabel(artifact.kind)}`}
