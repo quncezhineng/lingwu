@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Switch,
   Text,
   type TextStyle,
   useWindowDimensions,
@@ -37,6 +38,7 @@ import {
   Check,
   ChevronRight,
   CircleDollarSign,
+  Clock3,
   FileText,
   Heart,
   Lightbulb,
@@ -1274,7 +1276,8 @@ export function GoalsScreen() {
   const [showAll, setShowAll] = useState(false);
   const goal = data?.goals.find((item) => item.id === selectedGoal);
   const monitor = data?.monitors.find((item) => item.id === selectedMonitor);
-  const monitors = data?.monitors || [];
+  // 已停止的盯盘不再出现在列表里（服务端无删除接口，停止即视为移除）。
+  const monitors = (data?.monitors || []).filter((item) => item.status !== "stopped");
   return (
     <View style={{ gap: 22 }}>
       <AgentStatus />
@@ -1299,29 +1302,7 @@ export function GoalsScreen() {
           </Button>
         </View>
         {(showAll ? monitors : monitors.slice(0, 3)).map((item) => (
-          <Pressable
-            key={item.id}
-            accessibilityRole="button"
-            accessibilityLabel={t("agent.openTrackingLabel", { title: item.title })}
-            onPress={() => setSelectedMonitor(item.id)}
-            // 可点击列表行：紧凑内边距 + overlay1 按压态 + 10px 圆角。
-            style={({ pressed }) => [
-              s.row,
-              { gap: 12, paddingVertical: 12, borderRadius: 10 },
-              pressed && { backgroundColor: colors.overlay1 },
-            ]}
-          >
-            <Square size={21} color={colors.muted} />
-            <View style={{ flex: 1, gap: 4 }}>
-              <Text style={s.text}>{item.title}</Text>
-              <Text numberOfLines={1} style={[s.muted, s.metric]}>
-                {item.status === "active"
-                  ? t("agent.checkingEvery", { minutes: item.intervalMinutes })
-                  : statusLabel(item.status)}
-              </Text>
-            </View>
-            <ChevronRight size={18} color={colors.muted} />
-          </Pressable>
+          <MonitorRow key={item.id} monitor={item} onOpen={() => setSelectedMonitor(item.id)} />
         ))}
         {!monitors.length && (
           <Text style={[s.muted, { paddingVertical: 10 }]}>{t("agent.trackingEmpty")}</Text>
@@ -1628,6 +1609,14 @@ function GoalCard({ goal, onOpenTask }: { goal: Goal; onOpenTask?: () => void })
     </Card>
   );
 }
+/** 盯盘调度 4 档预设（分钟）。 */
+const MONITOR_SCHEDULES = [
+  { minutes: 15, labelKey: "agent.scheduleEvery15m" },
+  { minutes: 60, labelKey: "agent.scheduleHourly" },
+  { minutes: 360, labelKey: "agent.scheduleEvery6h" },
+  { minutes: 1440, labelKey: "agent.scheduleDaily" },
+] as const satisfies ReadonlyArray<{ minutes: number; labelKey: TranslationKey }>;
+
 function MonitorForm({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation();
   const { workspace } = useWorkspace();
@@ -1706,12 +1695,20 @@ function MonitorForm({ onDone }: { onDone: () => void }) {
           onChangeText={setValue}
         />
       )}
-      <Field
-        label={t("agent.checkEveryMinutes")}
-        value={interval}
-        onChangeText={setInterval}
-        keyboardType="number-pad"
-      />
+      <Text style={[s.small, { marginBottom: 10 }]}>{t("agent.checkEveryMinutes")}</Text>
+      {/* 调度固定 4 档预设，避免用户输入不可控的轮询频率 */}
+      <View style={[s.row, { gap: 7, flexWrap: "wrap", marginBottom: 16 }]}>
+        {MONITOR_SCHEDULES.map((item) => (
+          <Button
+            small
+            primary={interval === String(item.minutes)}
+            key={item.minutes}
+            onPress={() => setInterval(String(item.minutes))}
+          >
+            {t(item.labelKey)}
+          </Button>
+        ))}
+      </View>
       <Text style={[s.small, { marginBottom: 14 }]}>
         {sample ? t("agent.samplePageNote") : t("agent.monitorServerNote")}
       </Text>
@@ -1729,6 +1726,120 @@ function MonitorForm({ onDone }: { onDone: () => void }) {
     </Card>
   );
 }
+function monitorConditionText(monitor: Monitor, t: ReturnType<typeof useTranslation>["t"]) {
+  return monitor.condition === "change"
+    ? t("agent.watchForPageChange")
+    : monitor.condition === "contains"
+      ? t("agent.watchForText", { value: monitor.value })
+      : t("agent.priceBelow", { value: monitor.value });
+}
+
+/**
+ * 盯盘卡片：图标 + 标题 + 条件 + 调度 + 开关 + 编辑/停止。
+ * 开关直接暂停/恢复；停止需二次确认，停止后从列表移除（服务端暂无 DELETE）。
+ */
+function MonitorRow({ monitor, onOpen }: { monitor: Monitor; onOpen: () => void }) {
+  const { t } = useTranslation();
+  const { mutate } = useAgentWorkspace();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  // 开关先本地反馈，失败回退到服务端状态。
+  const [optimistic, setOptimistic] = useState<boolean>();
+  const active = optimistic ?? monitor.status === "active";
+
+  async function toggle(next: boolean) {
+    setOptimistic(next);
+    setBusy(true);
+    setError("");
+    try {
+      await mutate(`/monitors/${monitor.id}/control`, { action: next ? "resume" : "pause" });
+      setOptimistic(undefined);
+    } catch (e) {
+      setOptimistic(undefined);
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function stop() {
+    setBusy(true);
+    setError("");
+    try {
+      await mutate(`/monitors/${monitor.id}/control`, { action: "stop" });
+      setConfirming(false);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card style={{ gap: 8, borderRadius: 11, padding: 14 }}>
+      <View style={[s.row, { gap: 12, alignItems: "flex-start" }]}>
+        <View style={[s.glyph, { backgroundColor: colors.surface }]}>
+          <Clock3 size={17} color={colors.muted} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <Text numberOfLines={2} style={s.heading}>
+            {monitor.title}
+          </Text>
+          <Text numberOfLines={1} style={s.small}>
+            {monitorConditionText(monitor, t)}
+          </Text>
+          <Text numberOfLines={1} style={[s.small, s.metric]}>
+            {active
+              ? t("agent.checkingEvery", { minutes: monitor.intervalMinutes })
+              : statusLabel(monitor.status)}
+          </Text>
+        </View>
+        <Switch
+          accessibilityLabel={t("agent.openTrackingLabel", { title: monitor.title })}
+          accessibilityState={{ checked: active, disabled: busy }}
+          value={active}
+          disabled={busy}
+          onValueChange={(next) => void toggle(next)}
+          trackColor={{ false: colors.lineStrong, true: colors.primary }}
+          thumbColor={colors.paper}
+        />
+      </View>
+      <View style={[s.between, { paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.line }]}>
+        <Text numberOfLines={1} style={[s.small, { flex: 1, marginRight: 8 }]}>
+          {t("agent.monitorLastCheck", { time: stamp(monitor.lastCheckedAt) })}
+        </Text>
+        <View style={[s.row, { gap: 12 }]}>
+          <Pressable accessibilityRole="button" hitSlop={8} onPress={onOpen}>
+            <Text style={[s.small, { color: colors.link }]}>{t("agent.edit")}</Text>
+          </Pressable>
+          {confirming ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setConfirming(false)}
+              >
+                <Text style={s.small}>{t("common.cancel")}</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" hitSlop={8} onPress={() => void stop()}>
+                <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
+                  {t("agent.stopConfirm")}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setConfirming(true)}>
+              <Text style={s.small}>{t("agent.stopTracking")}</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+      <ErrorNotice error={error} />
+    </Card>
+  );
+}
+
 function MonitorCard({ monitor, onOpenTask }: { monitor: Monitor; onOpenTask?: () => void }) {
   const { t } = useTranslation();
   const { mutate } = useAgentWorkspace();
