@@ -255,7 +255,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
             },
           ]}
         >
-          <SearchIcon size={18} strokeWidth={1.8} color={colors.muted} />
+          <SearchIcon size={18} color={colors.muted} />
           <TextInput
             autoFocus
             value={query}

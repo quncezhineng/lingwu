@@ -46,10 +46,10 @@ function SourceLink({ title, url }: { title: string; url: string }) {
       onPress={() => void Linking.openURL(url)}
       style={({ pressed }) => [s.row, { gap: 4, opacity: pressed ? 0.65 : 1 }]}
     >
-      <Text style={[s.small, { color: colors.primary, textDecorationLine: "underline" }]}>
+      <Text style={[s.small, { color: colors.primaryStrong, textDecorationLine: "underline" }]}>
         {title}
       </Text>
-      <ExternalLink size={12} strokeWidth={1.8} color={colors.primary} />
+      <ExternalLink size={12} color={colors.primary} />
     </Pressable>
   );
 }
@@ -97,7 +97,7 @@ function ChoiceButton({
         {pending ? (
           <ActivityIndicator size="small" color={colors.onPrimary} />
         ) : selected ? (
-          <Check size={15} strokeWidth={1.8} color={colors.onPrimary} />
+          <Check size={15} color={colors.onPrimary} />
         ) : null}
         <Text style={[s.buttonText, { color: colors.onPrimary }]}>{caption}</Text>
       </Pressable>

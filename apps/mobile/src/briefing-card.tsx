@@ -11,6 +11,7 @@ import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
   Activity,
   AlertTriangle,
+  CalendarDays,
   ChevronDown,
   FileText,
   type IconComponent,
@@ -153,13 +154,13 @@ function WatchlistSection({ rows }: { rows: BriefingSymbolUpdate[] }) {
                 {row.changePercent >= 0 ? "▲" : "▼"}
               </Text>
             ) : row.alert === "volume_spike" ? (
-              <Activity size={13} strokeWidth={2} color={colors.alertVolume} />
+              <Activity size={13} strokeWidth={1.9} color={colors.alertVolume} />
             ) : row.alert === "price_break" ? (
               <View
                 style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: colors.danger }}
               />
             ) : row.alert === "news" ? (
-              <FileText size={13} strokeWidth={1.8} color={colors.primary} />
+              <FileText size={13} color={colors.primary} />
             ) : (
               <View
                 style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: colors.faint }}
@@ -203,7 +204,7 @@ function EventsSection({ rows }: { rows: BriefingEvent[] }) {
             },
           ]}
         >
-          <Text style={{ fontSize: 12 }}>📅</Text>
+          <CalendarDays size={14} color={colors.faint} />
           <Text style={[s.small, s.metric, { color: colors.faint, width: 64 }]}>{row.time}</Text>
           <Text style={[s.text, { flex: 1, fontSize: 13 }]} numberOfLines={2}>
             {row.title}
@@ -241,8 +242,8 @@ function ActionButton({
         },
       ]}
     >
-      <Icon size={15} strokeWidth={1.8} color={colors.primary} />
-      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>{label}</Text>
+      <Icon size={15} color={colors.primary} />
+      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primaryStrong }}>{label}</Text>
     </Pressable>
   );
 }
@@ -289,7 +290,7 @@ export function MarketBriefingCard() {
     <Card style={{ gap: 0 }}>
       <View style={[s.between, { gap: 10 }]}>
         <View style={[s.row, { gap: 8, flex: 1, minWidth: 0 }]}>
-          <Activity size={18} strokeWidth={1.9} color={colors.primary} />
+          <Activity size={18} color={colors.primary} />
           <Text style={s.heading} numberOfLines={1}>
             {title}
           </Text>
@@ -318,12 +319,12 @@ export function MarketBriefingCard() {
                 height: 32,
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 8,
+                borderRadius: 7,
                 backgroundColor: pressed ? colors.overlay1 : "transparent",
               })}
             >
               <View style={{ transform: [{ rotate: expanded ? "180deg" : "0deg" }] }}>
-                <ChevronDown size={16} strokeWidth={1.8} color={colors.faint} />
+                <ChevronDown size={16} color={colors.faint} />
               </View>
             </Pressable>
           )}
@@ -351,7 +352,7 @@ export function MarketBriefingCard() {
             </>
           ) : (
             <View style={{ alignItems: "center", gap: 10, paddingHorizontal: 12 }}>
-              <Activity size={28} strokeWidth={1.6} color={colors.faint} />
+              <Activity size={28} color={colors.faint} />
               <Text style={s.heading}>{t("markets.briefingEmptyTitle")}</Text>
               <Text style={[s.muted, { textAlign: "center" }]}>
                 {t("markets.briefingEmptyDetail")}
@@ -383,7 +384,7 @@ export function MarketBriefingCard() {
                 },
               ]}
             >
-              <AlertTriangle size={15} strokeWidth={1.8} color={colors.alertVolumeText} />
+              <AlertTriangle size={15} color={colors.alertVolumeText} />
               <View style={{ flex: 1, minWidth: 160, gap: 2 }}>
                 <Text style={{ fontSize: 12, fontWeight: "600", color: colors.alertVolumeText }}>
                   {t("markets.briefingPartial")}

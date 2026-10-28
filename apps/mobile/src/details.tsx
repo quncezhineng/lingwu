@@ -702,7 +702,7 @@ function ReviewDetail({ initial }: { initial: ActionProposal }) {
     >
       <View style={[s.row, { gap: 13, marginBottom: 21 }]}>
         <View style={[s.iconBox, { backgroundColor: colors.surface }]}>
-          <ShieldCheck size={22} strokeWidth={1.8} color={colors.primary} />
+          <ShieldCheck size={22} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={s.heading}>{action.title}</Text>

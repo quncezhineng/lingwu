@@ -17,7 +17,6 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Svg, { Circle, Ellipse } from "react-native-svg";
 import type { Section } from "../../../packages/domain/src";
 import { useAgentWorkspace } from "./agent-workspace";
 import type { AccountProfile } from "./api";
@@ -48,7 +47,7 @@ import {
 } from "./icons";
 import { relativeDate } from "./relative-date";
 import { useLingWuThread } from "./threads";
-import { Button, colors, ErrorNotice, fonts, Mascot, s } from "./ui";
+import { Button, colors, ErrorNotice, fonts, Mascot, s, shadow } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 侧栏中的导航项：都对应一个页面，点击切换到对应 section。 */
@@ -124,7 +123,7 @@ function SidebarNavItem({
     >
       <Icon
         size={18}
-        strokeWidth={active ? 2 : 1.7}
+        strokeWidth={active ? 1.9 : 1.7}
         color={active ? colors.primary : colors.muted}
       />
       <Text
@@ -159,22 +158,15 @@ function SidebarNavItem({
   );
 }
 
-/** 四瓣花品牌符号，与 Web favicon 使用同一套几何形状。 */
+/** 品牌 Logo（四瓣花图形已替换为 logo.png 静态资产）。 */
 export function BrandMark({ size = 28 }: { size?: number }) {
   return (
-    <Svg
-      accessibilityElementsHidden
-      width={size}
-      height={size}
-      viewBox="0 0 64 64"
-      style={{ flexShrink: 0 }}
-    >
-      <Ellipse cx="26" cy="23" rx="9" ry="14" fill={colors.primary} transform="rotate(-42 26 23)" />
-      <Ellipse cx="41" cy="26" rx="14" ry="9" fill={colors.primary} transform="rotate(-42 41 26)" />
-      <Ellipse cx="38" cy="41" rx="9" ry="14" fill={colors.primary} transform="rotate(-42 38 41)" />
-      <Ellipse cx="23" cy="38" rx="14" ry="9" fill={colors.primary} transform="rotate(-42 23 38)" />
-      <Circle cx="32" cy="32" r="5" fill={colors.sky} />
-    </Svg>
+    <Image
+      source={require("../assets/logo.png")}
+      resizeMode="contain"
+      style={{ width: size, height: size, flexShrink: 0 }}
+      accessible={false}
+    />
   );
 }
 
@@ -185,7 +177,7 @@ function SidebarAccountAvatar({ avatarUrl, name }: { avatarUrl?: string; name: s
       style={{
         width: 24,
         height: 24,
-        borderRadius: 12,
+        borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
@@ -200,7 +192,9 @@ function SidebarAccountAvatar({ avatarUrl, name }: { avatarUrl?: string; name: s
           style={{ width: 24, height: 24 }}
         />
       ) : (
-        <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>{initial}</Text>
+        <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primaryStrong }}>
+          {initial}
+        </Text>
       )}
     </View>
   );
@@ -254,29 +248,17 @@ export function Rail({ name }: { name: string }) {
     >
       <View style={[s.row, { gap: 10, paddingHorizontal: 2 }]}>
         <BrandMark size={27} />
-        <View style={[s.row, { gap: 8, alignItems: "baseline" }]}>
-          <Text
-            style={{
-              fontSize: 21,
-              lineHeight: 27,
-              fontWeight: "600",
-              color: colors.text,
-              fontFamily: fonts.serif,
-            }}
-          >
-            {t("common.agentName")}
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: colors.muted,
-              fontStyle: "italic",
-              fontFamily: fonts.number,
-            }}
-          >
-            lingwu
-          </Text>
-        </View>
+        <Text
+          style={{
+            fontSize: 21,
+            lineHeight: 27,
+            fontWeight: "600",
+            color: colors.text,
+            fontFamily: fonts.serif,
+          }}
+        >
+          {t("common.agentName")}
+        </Text>
       </View>
 
       <Pressable
@@ -336,7 +318,7 @@ export function Rail({ name }: { name: string }) {
             onPress={() => navigate("chat")}
             hitSlop={8}
           >
-            <Plus size={14} strokeWidth={1.8} color={colors.faint} />
+            <Plus size={14} color={colors.faint} />
           </Pressable>
         </View>
         {recent.length ? (
@@ -354,12 +336,10 @@ export function Rail({ name }: { name: string }) {
                 gap: 3,
               })}
             >
-              <Text numberOfLines={1} style={{ fontSize: 12.5, color: colors.text }}>
+              <Text numberOfLines={1} style={{ fontSize: 12, color: colors.text }}>
                 {task.title}
               </Text>
-              <Text style={{ fontSize: 10.5, color: colors.faint }}>
-                {statusLabel(task.status)}
-              </Text>
+              <Text style={{ fontSize: 10, color: colors.faint }}>{statusLabel(task.status)}</Text>
             </Pressable>
           ))
         ) : (
@@ -406,10 +386,10 @@ export function Rail({ name }: { name: string }) {
             <Mascot size={27} variant={data?.identity.avatar} />
           </View>
           <View style={{ flex: 1, gap: 1 }}>
-            <Text style={{ fontSize: 12.5, fontWeight: "600", color: colors.text }}>
+            <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
               {t("app.agentWatching", { name })}
             </Text>
-            <Text style={{ fontSize: 10.5, color: colors.muted }}>
+            <Text style={{ fontSize: 10, color: colors.muted }}>
               {t("app.activeAnalyses", { count: activeCount })}
             </Text>
           </View>
@@ -438,14 +418,14 @@ export function Rail({ name }: { name: string }) {
               <Text
                 numberOfLines={1}
                 style={{
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: "600",
                   color: section === ACCOUNT_NAV.id ? colors.primaryStrong : colors.text,
                 }}
               >
                 {t(ACCOUNT_NAV.labelKey)}
               </Text>
-              <Text numberOfLines={1} style={{ fontSize: 10.5, color: colors.muted }}>
+              <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
                 {t("app.personalSpace")}
               </Text>
             </View>
@@ -502,7 +482,7 @@ function MenuAction({
         backgroundColor: pressed ? colors.overlay1 : "transparent",
       })}
     >
-      <Icon size={16} strokeWidth={1.8} color={color} />
+      <Icon size={16} color={color} />
       <Text style={{ fontSize: 14, fontWeight: "500", color }}>{label}</Text>
     </Pressable>
   );
@@ -543,11 +523,7 @@ function ThreadActionsMenu({
     borderColor: colors.line,
     backgroundColor: colors.paper,
     padding: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    ...shadow.card,
   } as const;
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
@@ -667,7 +643,7 @@ function ThreadRow({
             returnKeyType="done"
             accessibilityLabel={t("app.renameChatPlaceholder")}
             style={{
-              fontSize: 13.5,
+              fontSize: 14,
               fontWeight: "500",
               color: colors.text,
               paddingVertical: 0,
@@ -676,11 +652,11 @@ function ThreadRow({
             }}
           />
         ) : (
-          <Text numberOfLines={1} style={{ fontSize: 13.5, fontWeight: "500", color: colors.text }}>
+          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "500", color: colors.text }}>
             {title}
           </Text>
         )}
-        <Text numberOfLines={1} style={{ fontSize: 11.5, lineHeight: 16, color: colors.muted }}>
+        <Text numberOfLines={1} style={{ fontSize: 11, lineHeight: 16, color: colors.muted }}>
           {detail}
         </Text>
       </Pressable>
@@ -705,9 +681,9 @@ function ThreadRow({
           })}
         >
           {editing ? (
-            <Check size={15} strokeWidth={2} color={colors.primary} />
+            <Check size={15} strokeWidth={1.9} color={colors.primary} />
           ) : (
-            <MoreHorizontal size={15} strokeWidth={2} color={colors.muted} />
+            <MoreHorizontal size={15} strokeWidth={1.9} color={colors.muted} />
           )}
         </Pressable>
       )}
@@ -859,7 +835,7 @@ export function ChatsColumn() {
             fontSize: 15,
             fontWeight: "600",
             color: colors.text,
-            letterSpacing: -0.3,
+            letterSpacing: 0,
           }}
         >
           {t("app.chatsColumnTitle")}
@@ -879,7 +855,7 @@ export function ChatsColumn() {
             },
           ]}
         >
-          <Search size={15} strokeWidth={1.8} color={colors.faint} />
+          <Search size={15} color={colors.faint} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -894,7 +870,7 @@ export function ChatsColumn() {
               accessibilityLabel={t("common.close")}
               onPress={() => setQuery("")}
             >
-              <X size={14} strokeWidth={1.8} color={colors.muted} />
+              <X size={14} color={colors.muted} />
             </Pressable>
           )}
         </View>
@@ -942,11 +918,11 @@ export function ChatsColumn() {
                   height: 24,
                   alignItems: "center",
                   justifyContent: "center",
-                  borderRadius: 12,
+                  borderRadius: 999,
                   backgroundColor: pressed ? colors.overlay1 : "transparent",
                 })}
               >
-                <Plus size={15} strokeWidth={1.8} color={colors.muted} />
+                <Plus size={15} color={colors.muted} />
               </Pressable>
             </View>
 
@@ -1022,12 +998,12 @@ export function ChatsColumn() {
             height: 36,
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: 18,
+            borderRadius: 999,
             backgroundColor: colors.primary,
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Plus size={17} strokeWidth={2} color={colors.onPrimary} />
+          <Plus size={17} strokeWidth={1.9} color={colors.onPrimary} />
         </Pressable>
       </View>
       {menuThread && menuAnchor && (

@@ -83,7 +83,7 @@ function StepIndicator({ current }: { current: number }) {
               }}
             >
               {done ? (
-                <Check size={12} strokeWidth={2} color={colors.onPrimary} />
+                <Check size={12} strokeWidth={1.9} color={colors.onPrimary} />
               ) : (
                 <Text
                   style={{
@@ -502,7 +502,7 @@ export function ImportWizard({
             onPress={() => void saveTextFile("lingwu-holdings-template.csv", templateCsv())}
             style={{ minHeight: 44, justifyContent: "center" }}
           >
-            <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+            <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
               {t("portfolio.template")}
             </Text>
           </Pressable>
@@ -741,11 +741,11 @@ export function ImportWizard({
                     )}
                     <View style={{ width: 46, flexDirection: "row", alignItems: "center", gap: 4 }}>
                       {isError ? (
-                        <CircleX size={12} strokeWidth={2} color={colors.danger} />
+                        <CircleX size={12} strokeWidth={1.9} color={colors.danger} />
                       ) : isWarning ? (
-                        <AlertTriangle size={12} strokeWidth={2} color={colors.alertVolume} />
+                        <AlertTriangle size={12} strokeWidth={1.9} color={colors.alertVolume} />
                       ) : (
-                        <Check size={12} strokeWidth={2} color={colors.success} />
+                        <Check size={12} strokeWidth={1.9} color={colors.success} />
                       )}
                       <Text style={[s.small, isError && { color: colors.danger }]}>{row.line}</Text>
                     </View>
@@ -827,7 +827,7 @@ export function ImportWizard({
               }
               style={{ minHeight: 44, justifyContent: "center" }}
             >
-              <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+              <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
                 {t("portfolio.downloadErrors")}
               </Text>
             </Pressable>
@@ -878,9 +878,9 @@ export function ImportWizard({
             ]}
           >
             {result.duplicateImport || result.accepted > 0 ? (
-              <Check size={26} strokeWidth={2} color={colors.success} />
+              <Check size={26} strokeWidth={1.9} color={colors.success} />
             ) : (
-              <CircleX size={26} strokeWidth={2} color={colors.danger} />
+              <CircleX size={26} strokeWidth={1.9} color={colors.danger} />
             )}
           </View>
           <Text style={s.heading}>

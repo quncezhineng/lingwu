@@ -13,13 +13,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import type { Section, Workspace } from "../../packages/domain/src";
 import { AccountScreen } from "./src/account";
-import {
-  AgentActivityScreen,
-  AgentStatus,
-  AppsScreen,
-  GoalsScreen,
-  IdeasScreen,
-} from "./src/agent-ui";
+import { AgentActivityScreen, AgentStatus, GoalsScreen, IdeasScreen } from "./src/agent-ui";
 import { AgentWorkspaceProvider, useAgentWorkspace } from "./src/agent-workspace";
 import {
   API_URL,
@@ -30,6 +24,7 @@ import {
   requestOtp,
   verifyOtp,
 } from "./src/api";
+import { CapabilityHubScreen } from "./src/capability-hub";
 import { ChatScreen, WorkspaceTools } from "./src/chat";
 import { ComputerEntry } from "./src/computer";
 import { ComputerDraftProvider } from "./src/computer-drafts";
@@ -40,13 +35,29 @@ import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
 import { Bell, Check, Menu, Search, X } from "./src/icons";
 import { NotesScreen } from "./src/notes-screen";
+import { PageHeader } from "./src/page-header";
 import { PortfolioScreen } from "./src/portfolio-screen";
 import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
 import { GlobalSearchSheet } from "./src/search-sheet";
 import { ACCOUNT_NAV, BrandMark, ChatsColumn, MOBILE_NAV, Rail } from "./src/shell";
 import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
-import { Button, Card, colors, ErrorNotice, Field, fonts, IconButton, Mascot, s } from "./src/ui";
+import {
+  Button,
+  Card,
+  colors,
+  ErrorNotice,
+  Field,
+  fonts,
+  IconButton,
+  iconStroke,
+  Mascot,
+  radius,
+  s,
+  shadow,
+  space,
+  typography,
+} from "./src/ui";
 import { WatchlistScreen } from "./src/watchlist";
 import { WorkbenchScreen } from "./src/workbench";
 import { type Detail, useWorkspace, WorkspaceContext } from "./src/workspace";
@@ -196,9 +207,7 @@ function Root() {
         >
           <View style={{ width: "100%", maxWidth: 420, gap: 22, alignItems: "center" }}>
             <Mascot size={72} />
-            <Text
-              style={{ fontSize: 32, color: colors.text, letterSpacing: -1, fontWeight: "500" }}
-            >
+            <Text style={{ ...typography.display, color: colors.text }}>
               {t("app.welcomeTitle")}
             </Text>
             <Text style={[s.muted, { textAlign: "center" }]}>{t("app.welcomeSubtitle")}</Text>
@@ -446,7 +455,7 @@ function WorkspaceShell({
                           ? GoalsScreen
                           : section === "preferences"
                             ? PreferencesScreen
-                            : AppsScreen;
+                            : CapabilityHubScreen;
   return (
     <>
       <WorkspaceTools />
@@ -497,14 +506,14 @@ function WorkspaceShell({
                           fontSize: 17,
                           fontWeight: "600",
                           color: colors.text,
-                          letterSpacing: -0.3,
+                          letterSpacing: 0,
                           fontFamily: fonts.serif,
                         }}
                       >
                         {t("common.agentName")}
                       </Text>
                     </View>
-                    <Text numberOfLines={1} style={{ fontSize: 10.5, color: colors.muted }}>
+                    <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
                       {status}
                     </Text>
                   </View>
@@ -530,7 +539,7 @@ function WorkspaceShell({
                           style={{
                             width: 6,
                             height: 6,
-                            borderRadius: 3,
+                            borderRadius: radius.full,
                             position: "absolute",
                             top: 8,
                             right: 9,
@@ -595,7 +604,7 @@ function WorkspaceShell({
                           style={{
                             width: 6,
                             height: 6,
-                            borderRadius: 3,
+                            borderRadius: radius.full,
                             position: "absolute",
                             top: 8,
                             right: 9,
@@ -613,48 +622,36 @@ function WorkspaceShell({
                   <ScrollView
                     key={section}
                     showsVerticalScrollIndicator={false}
+                    style={section === "apps" ? { backgroundColor: colors.paper } : undefined}
                     contentContainerStyle={{
-                      paddingHorizontal: desktop ? 42 : 22,
+                      paddingHorizontal: desktop ? space.page : space.pageMobile,
                       paddingTop: desktop ? 20 : 16,
                       paddingBottom: desktop ? 48 : 30,
                     }}
                     keyboardShouldPersistTaps="handled"
                   >
                     {section !== "today" && (
-                      <View
-                        style={[s.between, { alignItems: "flex-start", gap: 16, marginBottom: 24 }]}
-                      >
-                        <View style={{ flex: 1, gap: 6 }}>
-                          <Text
-                            style={[
-                              s.title,
-                              {
-                                fontSize: desktop ? 30 : 26,
-                                lineHeight: desktop ? 40 : 35,
-                              },
-                            ]}
-                          >
-                            {title && t(title.titleKey)}
-                          </Text>
-                          {title && (
-                            <Text style={[s.muted, { maxWidth: 720 }]}>{t(title.subtitleKey)}</Text>
-                          )}
-                        </View>
-                        {(section === "portfolio" || section === "notes") && (
-                          <Button
-                            small
-                            onPress={() =>
-                              navigate(section === "portfolio" ? "preferences" : "files")
-                            }
-                          >
-                            {t(
-                              section === "portfolio"
-                                ? "preferences.backToPreferences"
-                                : "app.backToFiles",
-                            )}
-                          </Button>
-                        )}
-                      </View>
+                      <PageHeader
+                        title={title ? t(title.titleKey) : ""}
+                        description={title ? t(title.subtitleKey) : undefined}
+                        compact={!desktop}
+                        actions={
+                          section === "portfolio" || section === "notes" ? (
+                            <Button
+                              small
+                              onPress={() =>
+                                navigate(section === "portfolio" ? "preferences" : "files")
+                              }
+                            >
+                              {t(
+                                section === "portfolio"
+                                  ? "preferences.backToPreferences"
+                                  : "app.backToFiles",
+                              )}
+                            </Button>
+                          ) : undefined
+                        }
+                      />
                     )}
                     <ErrorNotice error={error} />
                     {section === "account" ? <AccountScreen onSignOut={onSignOut} /> : <Screen />}
@@ -664,7 +661,7 @@ function WorkspaceShell({
                   style={{
                     display: section === "chat" ? "flex" : "none",
                     flex: 1,
-                    paddingHorizontal: desktop ? 42 : 17,
+                    paddingHorizontal: desktop ? space.page : 17,
                   }}
                 >
                   <AgentStatus />
@@ -713,12 +710,8 @@ function WorkspaceShell({
                       maxWidth: 430,
                       padding: 5,
                       backgroundColor: colors.paper,
-                      borderRadius: 18,
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.06,
-                      shadowRadius: 14,
-                      elevation: 3,
+                      borderRadius: radius.composer,
+                      ...shadow.card,
                       borderWidth: 1,
                       borderColor: colors.line,
                     }}
@@ -740,18 +733,18 @@ function WorkspaceShell({
                             justifyContent: "center",
                             gap: 3,
                             backgroundColor: active ? colors.sky : "transparent",
-                            borderRadius: 13,
+                            borderRadius: radius.card,
                           }}
                         >
                           <item.icon
                             size={19}
-                            strokeWidth={active ? 2 : 1.7}
+                            strokeWidth={active ? iconStroke.nav : iconStroke.tab}
                             color={active ? colors.primary : colors.muted}
                           />
                           <Text
                             numberOfLines={1}
                             style={{
-                              fontSize: 9.5,
+                              fontSize: typography.eyebrow.fontSize,
                               fontWeight: active ? "600" : "500",
                               color: active ? colors.primaryStrong : colors.muted,
                             }}
@@ -778,20 +771,20 @@ function WorkspaceShell({
                 {
                   gap: 10,
                   padding: 14,
-                  backgroundColor: colors.text,
-                  borderRadius: 20,
+                  backgroundColor: colors.toast,
+                  borderRadius: radius.field,
                   maxWidth: 560,
                 },
               ]}
             >
-              <Check size={16} strokeWidth={1.8} color={colors.onPrimary} />
-              <Text style={{ color: colors.onPrimary, fontSize: 13, flexShrink: 1 }}>{toast}</Text>
+              <Check size={16} color={colors.onToast} />
+              <Text style={{ color: colors.onToast, fontSize: 13, flexShrink: 1 }}>{toast}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("app.dismissNotification")}
                 onPress={clearToast}
               >
-                <X size={16} strokeWidth={1.8} color={colors.onPrimary} />
+                <X size={16} color={colors.onToast} />
               </Pressable>
             </View>
           </View>

@@ -68,7 +68,7 @@ export default function PdfReader({ url, token, pageCount }: PdfReaderProps) {
         onLoadComplete={(n) => setPages(n)}
         onPageChanged={(p) => setPage(p)}
         onError={(e) => setError(String(e))}
-        style={{ height: 530, width: "100%", backgroundColor: colors.line, borderRadius: 12 }}
+        style={{ height: 530, width: "100%", backgroundColor: colors.line, borderRadius: 17 }}
       />
     </View>
   );

@@ -89,7 +89,7 @@ export function NoteTypeChip({ type }: { type: NoteType }) {
         { gap: 4, backgroundColor: colors.surface, minHeight: 22, paddingVertical: 2 },
       ]}
     >
-      <Icon size={11} strokeWidth={1.8} color={colors.text} />
+      <Icon size={11} color={colors.text} />
       <Text style={[s.chipText, { color: colors.text }]}>{t(TYPE_LABEL[type])}</Text>
     </View>
   );
@@ -113,7 +113,7 @@ export function ThesisStatusChip({ status }: { status?: ThesisStatus }) {
         },
       ]}
     >
-      <Icon size={11} strokeWidth={2} color={config.text} />
+      <Icon size={11} strokeWidth={1.9} color={config.text} />
       <Text style={{ fontSize: 11, fontWeight: "600", color: config.text }}>
         {t(STATUS_LABEL[status])}
       </Text>
@@ -138,7 +138,7 @@ export function ThesisCheckChip({ note }: { note: InvestmentNote }) {
         },
       ]}
     >
-      <AlertTriangle size={11} strokeWidth={2} color={colors.alertVolumeText} />
+      <AlertTriangle size={11} strokeWidth={1.9} color={colors.alertVolumeText} />
       <Text style={{ fontSize: 11, fontWeight: "600", color: colors.alertVolumeText }}>
         {t("notes.checkPendingConfirm")}
       </Text>
@@ -315,7 +315,7 @@ function SymbolPicker({
           },
         ]}
       >
-        <Search size={17} strokeWidth={1.8} color={colors.faint} />
+        <Search size={17} color={colors.faint} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -1032,7 +1032,7 @@ export function SymbolNotesSection({
             onPress={() => setAllOpen(true)}
             style={{ minHeight: 44, justifyContent: "center" }}
           >
-            <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+            <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
               {t("notes.viewAll")}
             </Text>
           </Pressable>
@@ -1068,7 +1068,7 @@ export function SymbolNotesSection({
             onPress={() => setEditorOpen(true)}
             style={{ minHeight: 44, justifyContent: "center" }}
           >
-            <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+            <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
               {t("notes.writeFirst")}
             </Text>
           </Pressable>
@@ -1095,7 +1095,7 @@ export function SymbolNotesSection({
             onPress={onOpenTheses}
             style={{ minHeight: 44, justifyContent: "center" }}
           >
-            <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+            <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
               {t("notes.viewThesis")}
             </Text>
           </Pressable>
@@ -1148,7 +1148,7 @@ export function SymbolNotesSection({
                 },
               ]}
             >
-              <Search size={17} strokeWidth={1.8} color={colors.faint} />
+              <Search size={17} color={colors.faint} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}

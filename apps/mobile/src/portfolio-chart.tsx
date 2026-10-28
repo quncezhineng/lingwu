@@ -9,9 +9,9 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import Svg, { Line, Path, Text as SvgText } from "react-native-svg";
 import { directionOf } from "./market-format";
 import type { RiskSeriesPoint } from "./portfolio";
-import { colors, marketDirectionColor, s } from "./ui";
+import { chartNeutral, colors, marketDirectionColor, s } from "./ui";
 
-const NEUTRAL = "#8A8F98";
+const NEUTRAL = chartNeutral;
 const HEIGHT = 120;
 const PADDING = { top: 8, right: 8, bottom: 20, left: 32 };
 
@@ -182,7 +182,9 @@ export function ReturnComparisonChart({
           onPress={() => setShowTable((current) => !current)}
           style={{ minHeight: 44, justifyContent: "center" }}
         >
-          <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>{tableLabel}</Text>
+          <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
+            {tableLabel}
+          </Text>
         </Pressable>
       </View>
       {showTable && (

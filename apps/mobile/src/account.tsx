@@ -45,7 +45,7 @@ function ProfileRow({
       ]}
     >
       <View style={s.iconBox}>
-        <Icon size={18} strokeWidth={1.8} color={colors.primary} />
+        <Icon size={18} color={colors.primary} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={s.small}>{label}</Text>
@@ -123,7 +123,7 @@ function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
           },
         ]}
       >
-        <Search size={17} strokeWidth={1.8} color={colors.muted} />
+        <Search size={17} color={colors.muted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -158,7 +158,7 @@ function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
             >
               <View style={[s.row, { gap: 12 }]}>
                 <View style={s.iconBox}>
-                  <MessageCircle size={19} strokeWidth={1.8} color={colors.primary} />
+                  <MessageCircle size={19} color={colors.primary} />
                 </View>
                 <Text style={[s.text, { flex: 1, fontWeight: "500" }]}>
                   {thread.name || t("threads.untitledConversation")}
@@ -296,7 +296,7 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
           style={{
             width: 60,
             height: 60,
-            borderRadius: 30,
+            borderRadius: 999,
             backgroundColor: colors.surface,
             alignItems: "center",
             justifyContent: "center",
@@ -306,7 +306,7 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
           {profile.avatarUrl ? (
             <Image source={{ uri: profile.avatarUrl }} style={{ width: 60, height: 60 }} />
           ) : (
-            <Text style={{ fontSize: 24, fontWeight: "600", color: colors.primary }}>
+            <Text style={{ fontSize: 24, fontWeight: "600", color: colors.primaryStrong }}>
               {initial}
             </Text>
           )}

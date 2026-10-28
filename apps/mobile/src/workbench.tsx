@@ -28,9 +28,21 @@ import {
   Target,
   Upload,
 } from "./icons";
+import { InsightCard } from "./insight-card";
 import { activeWatchlist, loadWatchlists, useWatchlistState } from "./market";
 import { availabilityFromQuote, useQuotes } from "./quotes";
-import { Button, colors, fonts, marketDirectionColor, Sheet, s } from "./ui";
+import { StatusBadge, statusToneColors, taskStatusTone } from "./status-badge";
+import {
+  Button,
+  colors,
+  fonts,
+  marketDirectionColor,
+  radius,
+  SectionHeading,
+  Sheet,
+  s,
+  typography,
+} from "./ui";
 import { useWorkspace } from "./workspace";
 
 function greetingKey(hour: number) {
@@ -43,15 +55,6 @@ function shortName(value: string | undefined) {
   if (!value?.trim()) return "";
   const trimmed = value.trim();
   return trimmed.includes("@") ? trimmed.split("@")[0] : trimmed;
-}
-
-function taskStatusColor(task: AgentTask) {
-  if (task.status === "waiting_approval" || task.status === "waiting_input")
-    return colors.alertVolumeText;
-  if (task.status === "running" || task.status === "queued") return colors.primary;
-  if (task.status === "succeeded") return colors.success;
-  if (task.status === "failed") return colors.danger;
-  return colors.muted;
 }
 
 function taskTime(task: AgentTask) {
@@ -103,22 +106,13 @@ function WatchlistRail() {
 
   return (
     <View style={{ gap: 10 }}>
-      <View style={s.between}>
-        <View style={[s.row, { gap: 7 }]}>
-          <Text style={[s.heading, { fontSize: 15 }]}>{t("workbench.myWatchlist")}</Text>
-          {!!list?.symbols.length && (
-            <Text style={{ fontSize: 11, color: colors.faint }}>{list.symbols.length}</Text>
-          )}
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => navigate("watchlist")}
-          style={[s.row, { gap: 3 }]}
-        >
-          <Text style={{ fontSize: 11, color: colors.muted }}>{t("workbench.viewAll")}</Text>
-          <ChevronRight size={12} strokeWidth={1.7} color={colors.faint} />
-        </Pressable>
-      </View>
+      <SectionHeading
+        title={t("workbench.myWatchlist")}
+        count={list?.symbols.length}
+        action={t("workbench.viewAll")}
+        onPress={() => navigate("watchlist")}
+        style={{ marginBottom: 0 }}
+      />
 
       {watchState.status === "loading" && !list ? (
         <View style={[s.card, { paddingVertical: 24, alignItems: "center" }]}>
@@ -160,11 +154,11 @@ function WatchlistRail() {
                 <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
                   <Text
                     numberOfLines={1}
-                    style={{ fontSize: 12.5, fontWeight: "500", color: colors.text }}
+                    style={{ fontSize: 12, fontWeight: "500", color: colors.text }}
                   >
                     {item.symbol.name}
                   </Text>
-                  <Text numberOfLines={1} style={{ fontSize: 10.5, color: colors.faint }}>
+                  <Text numberOfLines={1} style={{ fontSize: 10, color: colors.faint }}>
                     {item.symbol.code} · {item.symbol.market}
                   </Text>
                 </View>
@@ -175,7 +169,7 @@ function WatchlistRail() {
                     {
                       width: 51,
                       textAlign: "right",
-                      fontSize: 11.5,
+                      fontSize: 11,
                       color: marketDirectionColor(direction),
                     },
                   ]}
@@ -203,7 +197,7 @@ function WatchlistRail() {
               backgroundColor: pressed ? colors.overlay1 : "transparent",
             })}
           >
-            <Plus size={13} strokeWidth={1.8} color={colors.muted} />
+            <Plus size={13} color={colors.muted} />
             <Text style={{ fontSize: 11, color: colors.muted }}>{t("workbench.addWatch")}</Text>
           </Pressable>
         </View>
@@ -231,7 +225,7 @@ function ApprovalCard() {
       <View style={[s.card, { gap: 11, padding: 14, backgroundColor: colors.surface }]}>
         <View style={[s.row, { gap: 7 }]}>
           <Bell size={14} strokeWidth={1.7} color={colors.muted} />
-          <Text style={{ fontSize: 11.5, fontWeight: "600", color: colors.text }}>
+          <Text style={{ fontSize: 11, fontWeight: "600", color: colors.text }}>
             {t("workbench.noPendingTitle")}
           </Text>
         </View>
@@ -241,7 +235,7 @@ function ApprovalCard() {
           onPress={() => navigate("goals")}
           style={[s.between, { paddingTop: 9, borderTopWidth: 1, borderTopColor: colors.line }]}
         >
-          <Text style={{ fontSize: 11.5, color: colors.text }}>{t("workbench.setupAlert")}</Text>
+          <Text style={{ fontSize: 11, color: colors.text }}>{t("workbench.setupAlert")}</Text>
           <ChevronRight size={13} strokeWidth={1.7} color={colors.faint} />
         </Pressable>
       </View>
@@ -255,7 +249,7 @@ function ApprovalCard() {
       </View>
       <Text
         numberOfLines={2}
-        style={{ fontSize: 13.5, lineHeight: 20, fontWeight: "600", color: colors.text }}
+        style={{ fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.text }}
       >
         {task.title}
       </Text>
@@ -269,7 +263,7 @@ function ApprovalCard() {
         onPress={() => open({ type: "task", taskId: task.id })}
         style={[s.between, { paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line }]}
       >
-        <Text style={{ fontSize: 11.5, color: colors.text }}>{t("workbench.viewAndConfirm")}</Text>
+        <Text style={{ fontSize: 11, color: colors.text }}>{t("workbench.viewAndConfirm")}</Text>
         <ChevronRight size={13} strokeWidth={1.7} color={colors.faint} />
       </Pressable>
     </View>
@@ -285,7 +279,7 @@ function PreferenceRail() {
     <View style={{ gap: 9 }}>
       <View style={[s.row, { gap: 7 }]}>
         <Heart size={14} strokeWidth={1.7} color={colors.muted} />
-        <Text style={{ fontSize: 11.5, fontWeight: "600", color: colors.text }}>
+        <Text style={{ fontSize: 11, fontWeight: "600", color: colors.text }}>
           {t("workbench.remembers")}
         </Text>
       </View>
@@ -294,7 +288,7 @@ function PreferenceRail() {
           <Text
             key={memory.id}
             numberOfLines={2}
-            style={{ fontSize: 12.5, lineHeight: 20, color: colors.muted }}
+            style={{ fontSize: 12, lineHeight: 20, color: colors.muted }}
           >
             “{memory.text}”
           </Text>
@@ -311,8 +305,8 @@ function PreferenceRail() {
         <ChevronRight size={12} strokeWidth={1.7} color={colors.faint} />
       </Pressable>
       <View style={[s.row, { gap: 6, marginTop: 4 }]}>
-        <ShieldCheck size={13} strokeWidth={1.6} color={colors.faint} />
-        <Text style={{ fontSize: 10.5, color: colors.faint }}>{t("workbench.privacy")}</Text>
+        <ShieldCheck size={13} color={colors.faint} />
+        <Text style={{ fontSize: 10, color: colors.faint }}>{t("workbench.privacy")}</Text>
       </View>
     </View>
   );
@@ -323,6 +317,8 @@ function TaskRow({ task }: { task: AgentTask }) {
   const { open } = useWorkspace();
   const done = task.plan.filter((step) => step.status === "succeeded").length;
   const progress = task.plan.length ? done / task.plan.length : 0;
+  const tone = taskStatusTone(task.status);
+  const toneColor = statusToneColors[tone].foreground;
   return (
     <Pressable
       accessibilityRole="button"
@@ -341,9 +337,9 @@ function TaskRow({ task }: { task: AgentTask }) {
     >
       <View
         style={{
-          width: 34,
-          height: 34,
-          borderRadius: 9,
+          width: 36,
+          height: 39,
+          borderRadius: radius.field,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: colors.surface,
@@ -352,15 +348,15 @@ function TaskRow({ task }: { task: AgentTask }) {
         {task.status === "running" || task.status === "queued" ? (
           <Sparkles size={16} strokeWidth={1.7} color={colors.primary} />
         ) : task.status === "waiting_approval" || task.status === "waiting_input" ? (
-          <Clock3 size={16} strokeWidth={1.7} color={colors.alertVolumeText} />
+          <Clock3 size={16} strokeWidth={1.7} color={statusToneColors.waiting.foreground} />
         ) : task.status === "failed" || task.status === "cancelled" ? (
-          <CircleX size={16} strokeWidth={1.8} color={colors.danger} />
+          <CircleX size={16} color={colors.danger} />
         ) : (
           <Check size={16} strokeWidth={1.9} color={colors.success} />
         )}
       </View>
       <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ fontSize: 13.5, fontWeight: "600", color: colors.text }}>
+        <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "600", color: colors.text }}>
           {task.title}
         </Text>
         <View style={s.between}>
@@ -369,38 +365,22 @@ function TaskRow({ task }: { task: AgentTask }) {
               task.error ||
               statusLabel(task.status)}
           </Text>
-          <Text style={{ fontSize: 10.5, color: colors.faint }}>{taskTime(task)}</Text>
+          <Text style={{ fontSize: 10, color: colors.faint }}>{taskTime(task)}</Text>
         </View>
         {!!task.plan.length && (
-          <View style={{ height: 2, borderRadius: 2, backgroundColor: colors.line }}>
+          <View style={{ height: 2, borderRadius: radius.full, backgroundColor: colors.line }}>
             <View
               style={{
                 width: `${Math.max(3, Math.round(progress * 100))}%`,
                 height: 2,
-                borderRadius: 2,
-                backgroundColor: taskStatusColor(task),
+                borderRadius: radius.full,
+                backgroundColor: toneColor,
               }}
             />
           </View>
         )}
       </View>
-      <View
-        style={{
-          paddingHorizontal: 7,
-          paddingVertical: 3,
-          borderRadius: 5,
-          backgroundColor:
-            task.status === "waiting_approval" || task.status === "waiting_input"
-              ? colors.orange
-              : task.status === "failed"
-                ? colors.errorSoft
-                : colors.surface,
-        }}
-      >
-        <Text style={{ fontSize: 10.5, color: taskStatusColor(task) }}>
-          {statusLabel(task.status)}
-        </Text>
-      </View>
+      <StatusBadge tone={tone} label={statusLabel(task.status)} />
     </Pressable>
   );
 }
@@ -471,12 +451,8 @@ export function WorkbenchScreen() {
                 </Text>
                 <Text
                   style={{
-                    fontSize: sideBySide ? 36 : 30,
-                    lineHeight: sideBySide ? 47 : 40,
-                    color: colors.text,
-                    fontWeight: "500",
-                    letterSpacing: -1.1,
-                    fontFamily: fonts.serif,
+                    ...(sideBySide ? typography.display : typography.displayCompact),
+                    color: colors.heading,
                   }}
                 >
                   {t(greetingKey(now.getHours()), { name })}
@@ -495,7 +471,7 @@ export function WorkbenchScreen() {
                   paddingHorizontal: 13,
                   borderWidth: 1,
                   borderColor: colors.line,
-                  borderRadius: 10,
+                  borderRadius: radius.field,
                   backgroundColor: pressed ? colors.surface : colors.paper,
                 })}
               >
@@ -503,7 +479,7 @@ export function WorkbenchScreen() {
                   style={{
                     width: 31,
                     height: 31,
-                    borderRadius: 16,
+                    borderRadius: radius.full,
                     alignItems: "center",
                     justifyContent: "center",
                     backgroundColor: colors.sky,
@@ -515,7 +491,7 @@ export function WorkbenchScreen() {
                   <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
                     {t("workbench.briefing")}
                   </Text>
-                  <Text numberOfLines={1} style={{ fontSize: 10.5, color: colors.muted }}>
+                  <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
                     {t("workbench.briefingDetail")}
                   </Text>
                 </View>
@@ -528,7 +504,7 @@ export function WorkbenchScreen() {
                 minHeight: 162,
                 borderWidth: 1,
                 borderColor: colors.line,
-                borderRadius: 12,
+                borderRadius: radius.composer,
                 backgroundColor: colors.paper,
                 padding: 18,
                 justifyContent: "space-between",
@@ -563,7 +539,7 @@ export function WorkbenchScreen() {
                     style={({ pressed }) => ({
                       width: 30,
                       height: 30,
-                      borderRadius: 8,
+                      borderRadius: radius.control,
                       alignItems: "center",
                       justifyContent: "center",
                       backgroundColor: pressed ? colors.overlay1 : "transparent",
@@ -578,7 +554,7 @@ export function WorkbenchScreen() {
                         gap: 5,
                         paddingHorizontal: 8,
                         paddingVertical: 4,
-                        borderRadius: 6,
+                        borderRadius: radius.control,
                         backgroundColor: colors.sky,
                       },
                     ]}
@@ -587,11 +563,11 @@ export function WorkbenchScreen() {
                       style={{
                         width: 5,
                         height: 5,
-                        borderRadius: 3,
+                        borderRadius: radius.full,
                         backgroundColor: colors.primary,
                       }}
                     />
-                    <Text style={{ fontSize: 10.5, color: colors.primaryAction }}>
+                    <Text style={{ fontSize: 10, color: colors.primaryAction }}>
                       {t("workbench.depthAnalysis")}
                     </Text>
                   </View>
@@ -604,7 +580,7 @@ export function WorkbenchScreen() {
                   style={({ pressed }) => ({
                     width: 36,
                     height: 36,
-                    borderRadius: 18,
+                    borderRadius: radius.full,
                     alignItems: "center",
                     justifyContent: "center",
                     backgroundColor: draft.trim() ? colors.primary : colors.tertiary,
@@ -634,7 +610,7 @@ export function WorkbenchScreen() {
                     paddingHorizontal: 10,
                     borderWidth: 1,
                     borderColor: colors.line,
-                    borderRadius: 7,
+                    borderRadius: radius.control,
                     backgroundColor: pressed ? colors.surface : colors.paper,
                   })}
                 >
@@ -646,92 +622,44 @@ export function WorkbenchScreen() {
           </View>
 
           <View style={{ gap: 10 }}>
-            <View style={s.between}>
-              <View style={[s.row, { gap: 8 }]}>
-                <Text style={[s.heading, { fontSize: 15 }]}>{t("workbench.todayInsight")}</Text>
-                <Text style={{ fontSize: 10.5, color: colors.faint }}>
-                  {insight ? "1 / 1" : "—"}
-                </Text>
-              </View>
-              {!!insight && (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => open({ type: "artifact", artifact: insight })}
-                  style={[s.row, { gap: 3 }]}
-                >
-                  <Text style={{ fontSize: 11, color: colors.muted }}>{t("workbench.expand")}</Text>
-                  <ChevronRight size={12} strokeWidth={1.7} color={colors.faint} />
-                </Pressable>
-              )}
-            </View>
-            <Pressable
-              accessibilityRole="button"
+            <SectionHeading
+              title={t("workbench.todayInsight")}
+              count={insight ? "1 / 1" : undefined}
+              action={insight ? t("workbench.expand") : undefined}
+              onPress={insight ? () => open({ type: "artifact", artifact: insight }) : undefined}
+              style={{ marginBottom: 0 }}
+            />
+            <InsightCard
+              eyebrow={`${t("workbench.insightCard")} · ${
+                insight ? statusLabel(insight.kind) : t("workbench.researchNote")
+              }`}
+              title={insight?.summary || insight?.title || t("workbench.insightEmptyTitle")}
+              meta={
+                insight
+                  ? `${localizeAgentName(data?.identity.name)} · ${insight.title}`
+                  : t("workbench.insightEmptyDetail")
+              }
               accessibilityLabel={insight ? t("workbench.expand") : t("workbench.askPlaceholder")}
               onPress={() =>
                 insight
                   ? open({ type: "artifact", artifact: insight })
                   : composerRef.current?.focus()
               }
-              style={({ pressed }) => ({
-                minHeight: 106,
-                padding: 15,
-                borderWidth: 1,
-                borderColor: colors.line,
-                borderRadius: 10,
-                backgroundColor: pressed ? colors.surface : colors.paper,
-                justifyContent: "space-between",
-                gap: 12,
-              })}
-            >
-              <View style={[s.row, { gap: 7 }]}>
-                <Sparkles size={14} strokeWidth={1.7} color={colors.primary} />
-                <Text style={{ fontSize: 10.5, color: colors.muted }}>
-                  {t("workbench.insightCard")} ·{" "}
-                  {insight ? statusLabel(insight.kind) : t("workbench.researchNote")}
-                </Text>
-              </View>
-              <Text
-                numberOfLines={2}
-                style={{
-                  fontSize: 17,
-                  lineHeight: 24,
-                  fontWeight: "600",
-                  color: colors.text,
-                  fontFamily: fonts.serif,
-                }}
-              >
-                {insight?.summary || insight?.title || t("workbench.insightEmptyTitle")}
-              </Text>
-              <View style={s.between}>
-                <Text numberOfLines={1} style={{ flex: 1, fontSize: 10.5, color: colors.faint }}>
-                  {insight
-                    ? `${localizeAgentName(data?.identity.name)} · ${insight.title}`
-                    : t("workbench.insightEmptyDetail")}
-                </Text>
-                {!!insight && <ArrowUpRight size={14} strokeWidth={1.7} color={colors.faint} />}
-              </View>
-            </Pressable>
+            />
           </View>
 
           <View>
-            <View style={[s.between, { marginBottom: 2 }]}>
-              <View style={[s.row, { gap: 7 }]}>
-                <Text style={[s.heading, { fontSize: 15 }]}>
-                  {activeTasks.length
-                    ? t("workbench.whatAgentDoing", { name: agentName })
-                    : t("workbench.recentAnalyses")}
-                </Text>
-                <Text style={{ fontSize: 11, color: colors.faint }}>{visibleTasks.length}</Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => navigate("activity")}
-                style={[s.row, { gap: 3 }]}
-              >
-                <Text style={{ fontSize: 11, color: colors.muted }}>{t("workbench.allTasks")}</Text>
-                <ChevronRight size={12} strokeWidth={1.7} color={colors.faint} />
-              </Pressable>
-            </View>
+            <SectionHeading
+              title={
+                activeTasks.length
+                  ? t("workbench.whatAgentDoing", { name: agentName })
+                  : t("workbench.recentAnalyses")
+              }
+              count={visibleTasks.length}
+              action={t("workbench.allTasks")}
+              onPress={() => navigate("activity")}
+              style={{ marginBottom: 2 }}
+            />
             {visibleTasks.length ? (
               visibleTasks.slice(0, 3).map((task) => <TaskRow key={task.id} task={task} />)
             ) : (
@@ -746,7 +674,7 @@ export function WorkbenchScreen() {
                   },
                 ]}
               >
-                <ListChecks size={24} strokeWidth={1.6} color={colors.faint} />
+                <ListChecks size={24} color={colors.faint} />
                 <Text style={s.heading}>{t("workbench.noTasksTitle")}</Text>
                 <Text style={[s.small, { textAlign: "center" }]}>
                   {t("workbench.noTasksDetail")}

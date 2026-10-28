@@ -29,7 +29,7 @@ export default function HtmlPreview({
           height: "100%",
           width: "100%",
           border: 0,
-          borderRadius: 12,
+          borderRadius: 9,
           background: colors.paper,
         }}
       />

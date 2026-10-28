@@ -248,9 +248,9 @@ export function ApprovalCard({
         <View style={styles.header}>
           <View style={[styles.iconBox, sensitive && pending && styles.sensitiveIconBox]}>
             {sensitive && pending ? (
-              <ShieldAlert size={22} strokeWidth={1.8} color={colors.danger} />
+              <ShieldAlert size={22} color={colors.danger} />
             ) : (
-              <Icon size={22} strokeWidth={1.8} color={colors.primary} />
+              <Icon size={22} color={colors.primary} />
             )}
           </View>
           <View style={styles.headerText}>
@@ -259,9 +259,9 @@ export function ApprovalCard({
             {!!destination && (
               <View style={styles.destination}>
                 {action.kind === "email.send" ? (
-                  <Mail size={13} strokeWidth={1.8} color={colors.muted} />
+                  <Mail size={13} color={colors.muted} />
                 ) : (
-                  <CalendarDays size={13} strokeWidth={1.8} color={colors.muted} />
+                  <CalendarDays size={13} color={colors.muted} />
                 )}
                 <Text numberOfLines={1} style={styles.destinationText}>
                   {destination}
@@ -278,7 +278,7 @@ export function ApprovalCard({
 
         {pending && sensitive && (
           <View style={styles.warning}>
-            <AlertTriangle size={13} strokeWidth={1.8} color={colors.danger} />
+            <AlertTriangle size={13} color={colors.danger} />
             <Text style={styles.warningText}>
               {destructive ? t("tools.approvalDeleteWarning") : t("tools.approvalEmailWarning")}
             </Text>
@@ -309,9 +309,9 @@ export function ApprovalCard({
               style={({ pressed }) => [styles.more, pressed && styles.morePressed]}
             >
               {expanded ? (
-                <ChevronDown size={13} strokeWidth={1.8} color={colors.muted} />
+                <ChevronDown size={13} color={colors.muted} />
               ) : (
-                <ChevronRight size={13} strokeWidth={1.8} color={colors.muted} />
+                <ChevronRight size={13} color={colors.muted} />
               )}
               <Text style={styles.moreText}>
                 {expanded ? t("tools.approvalShowLess") : t("tools.approvalShowAll")}
@@ -350,7 +350,6 @@ export function ApprovalCard({
             ) : (
               <StatusIcon
                 size={15}
-                strokeWidth={1.8}
                 color={action.status === "succeeded" ? colors.success : colors.muted}
               />
             )}
@@ -416,7 +415,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 10,
   },
-  warningText: { flex: 1, color: colors.danger, fontSize: 12.5, lineHeight: 17 },
+  warningText: { flex: 1, color: colors.danger, fontSize: 12, lineHeight: 17 },
   previewOuter: { paddingHorizontal: 14, paddingBottom: 10 },
   /** 明细区：次级面填充 + 10px 圆角，与主卡形成面阶梯。 */
   preview: {
@@ -438,7 +437,7 @@ const styles = StyleSheet.create({
   // 明细值用等宽数字对齐（tabular-nums），避免逐行参差。
   rowValue: {
     color: colors.text,
-    fontSize: 12.5,
+    fontSize: 12,
     lineHeight: 18,
     fontVariant: ["tabular-nums"] as const,
   },
@@ -452,7 +451,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   morePressed: { backgroundColor: colors.overlay1 },
-  moreText: { color: colors.text, fontSize: 12.5, fontWeight: "500" },
+  moreText: { color: colors.text, fontSize: 12, fontWeight: "500" },
   actions: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 14, gap: 8 },
   fullButton: { width: "100%", minHeight: 38, borderRadius: 999 },
   detailsButton: {
@@ -463,7 +462,7 @@ const styles = StyleSheet.create({
   },
   detailsPressed: { backgroundColor: colors.overlay1 },
   // 链接型强调文字统一用品牌深紫（colors.primary）。
-  detailsText: { color: colors.primary, fontSize: 12.5, fontWeight: "500" },
+  detailsText: { color: colors.primaryStrong, fontSize: 12, fontWeight: "500" },
   onceNote: { color: colors.faint, fontSize: 12, lineHeight: 16, textAlign: "center" },
   statusRow: {
     flexDirection: "row",

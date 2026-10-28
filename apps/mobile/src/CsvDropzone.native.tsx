@@ -31,7 +31,7 @@ export function CsvDropzone({
         },
       ]}
     >
-      <Upload size={24} strokeWidth={1.8} color={colors.primary} />
+      <Upload size={24} color={colors.primary} />
       <Text style={[s.text, { fontWeight: "600" }]}>{title}</Text>
       <Text style={s.muted}>{hint}</Text>
       <Button

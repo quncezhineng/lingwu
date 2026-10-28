@@ -24,7 +24,16 @@ import type { AgentTask, RunEvent } from "../../../packages/domain/src/agent";
 import { FinancialsSection } from "./financials-card";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
-import { FileText, MessageCircle, Plus, RefreshCw, Sparkles, Trash2 } from "./icons";
+import {
+  Check,
+  CircleX,
+  FileText,
+  MessageCircle,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+} from "./icons";
 import { type Quote, removeSymbol, type SymbolMeta } from "./market";
 import { directionOf, formatPercent } from "./market-format";
 import { SymbolNotesSection } from "./note-ui";
@@ -262,7 +271,7 @@ function ReportView({
           onPress={() => setShowAllFields((current) => !current)}
           style={{ paddingVertical: 6 }}
         >
-          <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+          <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
             {showAllFields
               ? t("research.showLess")
               : t("research.showAll", { count: financialEntries.length })}
@@ -287,7 +296,7 @@ function ReportView({
               pressed && { backgroundColor: colors.overlay1 },
             ]}
           >
-            <Text style={[s.text, { fontSize: 13, color: colors.primary }]} numberOfLines={2}>
+            <Text style={[s.text, { fontSize: 13, color: colors.primaryStrong }]} numberOfLines={2}>
               {item.title}
             </Text>
             {!!item.publishedAt && <Text style={s.small}>{item.publishedAt}</Text>}
@@ -447,7 +456,7 @@ function ReportView({
             accessibilityRole="link"
             onPress={() => void Linking.openURL(item.url)}
           >
-            <Text style={[s.small, { color: colors.primary }]} numberOfLines={1}>
+            <Text style={[s.small, { color: colors.primaryStrong }]} numberOfLines={1}>
               {item.url}
             </Text>
           </Pressable>
@@ -502,9 +511,9 @@ function ResearchProgress({ task, events }: { task: AgentTask; events: RunEvent[
               {step.status === "running" ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : step.status === "succeeded" ? (
-                <Text style={{ color, fontSize: 12, fontWeight: "700" }}>✓</Text>
+                <Check size={14} strokeWidth={1.9} color={color} />
               ) : step.status === "failed" ? (
-                <Text style={{ color, fontSize: 12, fontWeight: "700" }}>✕</Text>
+                <CircleX size={14} strokeWidth={1.9} color={color} />
               ) : (
                 <View
                   style={{
@@ -1043,7 +1052,7 @@ export function SymbolDetailSheet({
               pressed && { backgroundColor: colors.overlay1 },
             ]}
           >
-            <Text style={[s.text, { fontSize: 13, color: colors.primary }]} numberOfLines={2}>
+            <Text style={[s.text, { fontSize: 13, color: colors.primaryStrong }]} numberOfLines={2}>
               {item.title}
             </Text>
             {!!item.publishedAt && <Text style={s.small}>{item.publishedAt}</Text>}

@@ -16,7 +16,7 @@ import { colors } from "./ui";
 
 // 记忆卡片上的 Markdown 渲染：与正文沿用同一字号/行高，标题逐级缩小，
 // 链接使用品牌主色并保持 selectable，长文本记忆仍可整段复制。
-const memoryMarkdownTextStyle: TextStyle = { color: colors.text, fontSize: 13.5, lineHeight: 19 };
+const memoryMarkdownTextStyle: TextStyle = { color: colors.text, fontSize: 14, lineHeight: 19 };
 const memoryMarkdownStyle: Partial<MarkdownStyles> = {
   text: memoryMarkdownTextStyle,
   paragraph: { marginTop: 0, marginBottom: 2 },
@@ -25,17 +25,17 @@ const memoryMarkdownStyle: Partial<MarkdownStyles> = {
   heading1: { fontSize: 15, lineHeight: 19, color: colors.text },
   heading2: { fontSize: 14, lineHeight: 19, color: colors.text },
   heading3: { fontSize: 13, lineHeight: 19, color: colors.text },
-  link: { color: colors.primary, textDecorationLine: "underline" },
+  link: { color: colors.primaryStrong, textDecorationLine: "underline" },
   codeInline: {
     backgroundColor: colors.tertiary,
-    color: colors.primary,
+    color: colors.primaryStrong,
     borderRadius: 4,
     paddingHorizontal: 3,
     paddingVertical: 0,
     fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
     fontSize: 11,
   },
-  codeBlock: { borderRadius: 8, backgroundColor: colors.tertiary, color: colors.text },
+  codeBlock: { borderRadius: 7, backgroundColor: colors.tertiary, color: colors.text },
 };
 // 文本节点显式 selectable，与助手消息保持一致，便于复制记忆内容。
 const memoryMarkdownRules: RenderRules = {
@@ -82,7 +82,7 @@ function MemoryRow({ memory }: { memory: RecalledMemory }) {
   return (
     <View style={styles.memory}>
       <View style={styles.icon}>
-        <Brain size={14} strokeWidth={1.8} color={colors.primary} />
+        <Brain size={14} color={colors.primary} />
       </View>
       <View style={styles.body}>
         <Markdown

@@ -246,7 +246,6 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
                 >
                   <MessageCircle
                     size={19}
-                    strokeWidth={1.8}
                     color={selection.id === thread.id ? colors.primary : colors.muted}
                   />
                   <Text style={[s.text, { flex: 1 }]}>

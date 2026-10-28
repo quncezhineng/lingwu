@@ -101,7 +101,7 @@ export function DesktopToolCard({
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 10 }]}>
-          <Monitor size={21} strokeWidth={1.8} color={colors.primary} />
+          <Monitor size={21} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("tools.desktopTitle")}</Text>
@@ -117,7 +117,7 @@ export function DesktopToolCard({
       </View>
       <ErrorNotice error={value?.error || error} />
       {latest && snapshot && !running ? (
-        <View style={{ backgroundColor: colors.tertiary, borderRadius: 12, padding: 16, gap: 10 }}>
+        <View style={{ backgroundColor: colors.tertiary, borderRadius: 11, padding: 16, gap: 10 }}>
           <Text style={s.small}>{t("tools.computerOffline")}</Text>
           <Button small icon={Play} disabled={starting} onPress={() => void start()}>
             {starting ? t("tools.starting") : t("tools.startComputer")}
@@ -135,7 +135,7 @@ export function DesktopToolCard({
                   uri: api.url(`/api/computer/desktop/screenshot?receipt=${value.receiptId}`),
                   headers: { Authorization: `Bearer ${api.token}` },
                 }}
-                style={{ width: "100%", aspectRatio: 1.6, borderRadius: 12 }}
+                style={{ width: "100%", aspectRatio: 1.6, borderRadius: 9 }}
                 resizeMode="contain"
               />
             )}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "./i18n";
 import { ChevronLeft, ChevronRight, Minus, Plus } from "./icons";
-import { Button, s } from "./ui";
+import { Button, colors, s } from "./ui";
 
 interface PdfReaderProps {
   url: string;
@@ -46,7 +46,13 @@ export default function PdfReader({ url, pageCount }: PdfReaderProps) {
         key={`${page}:${zoom}`}
         title={t("tools.pdfReaderTitle")}
         src={`${url}#page=${page}&zoom=${zoom}`}
-        style={{ height: 570, width: "100%", border: 0, borderRadius: 12, background: "#e7e9e3" }}
+        style={{
+          height: 570,
+          width: "100%",
+          border: 0,
+          borderRadius: 17,
+          background: colors.viewport,
+        }}
       />
       <Text style={s.small}>{t("tools.pdfReaderHint")}</Text>
     </View>

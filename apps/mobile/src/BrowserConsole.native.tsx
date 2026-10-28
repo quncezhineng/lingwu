@@ -17,7 +17,7 @@ export default function BrowserConsole({
       <WebView
         source={{ uri: url }}
         onError={(event) => setError(event.nativeEvent.description)}
-        style={{ height: 520, borderRadius: 12 }}
+        style={{ height: 520, borderRadius: 9 }}
       />
     </View>
   );

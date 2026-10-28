@@ -41,7 +41,7 @@ export function BackgroundUpdates() {
     <Card style={{ padding: 16, gap: 10 }}>
       <View style={[s.between, { gap: 12 }]}>
         <View style={[s.row, { gap: 7 }]}>
-          <Bell size={14} strokeWidth={1.8} color={colors.primary} />
+          <Bell size={14} color={colors.primary} />
           <Text style={s.small}>{t("tools.updateForYou")}</Text>
         </View>
         <Pressable
@@ -52,7 +52,7 @@ export function BackgroundUpdates() {
           hitSlop={10}
           style={{ padding: 6 }}
         >
-          <X size={16} strokeWidth={1.8} color={colors.muted} />
+          <X size={16} color={colors.muted} />
         </Pressable>
       </View>
       <Text style={s.heading}>{update.title}</Text>

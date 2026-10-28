@@ -143,7 +143,7 @@ function SymbolFilterModal({
               minHeight: 44,
               justifyContent: "center",
               paddingHorizontal: 8,
-              borderRadius: 8,
+              borderRadius: 7,
               backgroundColor: selected ? "transparent" : colors.sky,
             }}
           >
@@ -220,7 +220,7 @@ function ThesisCard({
           onPress={() => setExpanded((current) => !current)}
           style={{ minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }}
         >
-          <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+          <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
             {expanded ? t("notes.collapse") : t("notes.expand")}
           </Text>
         </Pressable>
@@ -375,7 +375,7 @@ export function NotesScreen() {
               },
             ]}
           >
-            <Search size={17} strokeWidth={1.8} color={colors.faint} />
+            <Search size={17} color={colors.faint} />
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -514,7 +514,7 @@ export function NotesScreen() {
                 }}
                 style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 6 }}
               >
-                <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+                <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
                   {t("notes.clearFilters")}
                 </Text>
               </Pressable>
@@ -581,7 +581,7 @@ export function NotesScreen() {
               },
             ]}
           >
-            <CalendarClock size={15} strokeWidth={1.8} color={colors.muted} />
+            <CalendarClock size={15} color={colors.muted} />
             <Text style={{ flex: 1, fontSize: 12, color: colors.muted }}>
               {state.check
                 ? t("notes.weeklyBanner", {
@@ -608,7 +608,7 @@ export function NotesScreen() {
                 },
               ]}
             >
-              <AlertTriangle size={15} strokeWidth={1.8} color={colors.alertVolumeText} />
+              <AlertTriangle size={15} color={colors.alertVolumeText} />
               <Text
                 style={{ flex: 1, fontSize: 12, fontWeight: "600", color: colors.alertVolumeText }}
               >

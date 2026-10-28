@@ -5,13 +5,14 @@
  * 图标（`project.ts`），渲染统一交给 react-native-svg，从而在 iOS / Android / Web
  * 三端得到一致的线宽与端点表现。
  *
- * 使用约定（与全站既有图标规范一致）：
- * - `strokeWidth`：常规 1.8、强调/激活 2、填充态 0。
+ * 使用约定（与 Demo-v7 图标规范一致）：
+ * - `strokeWidth`：常规 1.65、底栏 1.7、导航 1.9；不传则取常规值。
  * - `color`：描边色；`fill` 缺省为 `none`（纯描边），传入时为填充态。
  * - `size`：默认 24，实际按调用点传入。
  */
 import type { FC } from "react";
 import Svg, { Circle, Line, Path, Polygon, Polyline, Rect } from "react-native-svg";
+import { colors, iconStroke } from "../theme";
 import { ICON_KEYS } from "./keys";
 import { LIBRARY_ICONS } from "./library";
 import { PROJECT_ICONS } from "./project";
@@ -23,7 +24,7 @@ export type IconProps = {
   size?: number;
   /** 描边色，默认正文色。 */
   color?: string;
-  /** 描边宽度，默认 1.8（常规）。 */
+  /** 描边宽度，默认 1.65（常规）。 */
   strokeWidth?: number;
   /** 填充色，缺省 `none`（纯描边）。 */
   fill?: string;
@@ -38,11 +39,11 @@ export type IconProps = {
 /** 项目自有图标组件类型，替代第三方图标库的组件类型。 */
 export type IconComponent = FC<IconProps>;
 
-/** 常规描边宽度基准。 */
-export const DEFAULT_STROKE_WIDTH = 1.8;
+/** 常规描边宽度基准（导航 1.9 / 底栏 1.7 见 `iconStroke`）。 */
+export const DEFAULT_STROKE_WIDTH = iconStroke.regular;
 
 /** 未显式指定颜色时的兜底前景色，与正文色保持一致。 */
-const FALLBACK_COLOR = "#171717";
+const FALLBACK_COLOR = colors.iconFallback;
 
 /** 图标视图框边长。 */
 const VIEW_BOX = 24;

@@ -52,7 +52,7 @@ function ReminderList({ data, t }: { data: ReminderResult; t: TranslationFn }) {
       {data.reminders.map((reminder) => (
         <View key={reminder.id} style={styles.item}>
           <View style={styles.itemIcon}>
-            <Clock3 size={14} strokeWidth={1.8} color={colors.primary} />
+            <Clock3 size={14} color={colors.primary} />
           </View>
           <View style={styles.itemBody}>
             <Text style={styles.itemTitle}>{reminder.title}</Text>
@@ -69,7 +69,7 @@ function ReminderList({ data, t }: { data: ReminderResult; t: TranslationFn }) {
           {data.alerts.map((alert) => (
             <View key={alert.id} style={styles.item}>
               <View style={styles.itemIcon}>
-                <Bell size={14} strokeWidth={1.8} color={colors.primary} />
+                <Bell size={14} color={colors.primary} />
               </View>
               <View style={styles.itemBody}>
                 <Text style={styles.itemTitle}>{alert.title}</Text>
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   itemBody: { flex: 1, gap: 2 },
-  itemTitle: { color: colors.text, fontSize: 13.5, lineHeight: 19, fontWeight: "500" },
+  itemTitle: { color: colors.text, fontSize: 14, lineHeight: 19, fontWeight: "500" },
   meta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   sectionLabel: {
     color: colors.muted,

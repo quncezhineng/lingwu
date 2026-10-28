@@ -225,7 +225,7 @@ export function HoldingFormSheet({
               },
             ]}
           >
-            <Search size={17} strokeWidth={1.8} color={colors.faint} />
+            <Search size={17} color={colors.faint} />
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -350,7 +350,7 @@ export function HoldingFormSheet({
             onPress={() => setEditCurrency((current) => !current)}
             style={{ minHeight: 44, justifyContent: "center" }}
           >
-            <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+            <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
               {t("portfolio.changeSymbol")}
             </Text>
           </Pressable>

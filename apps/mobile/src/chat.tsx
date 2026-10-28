@@ -60,7 +60,7 @@ import { SearchToolCard } from "./search-tool-card";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
 import { type Selection, useLingWuThread } from "./threads";
 import { parseToolArguments, ToolStep, type ToolStepStatus } from "./tool-step";
-import { Button, Card, CheckRow, colors, dateLabel, Empty, ErrorNotice, s } from "./ui";
+import { Button, Card, CheckRow, colors, dateLabel, Empty, ErrorNotice, s, shadow } from "./ui";
 import { useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
@@ -88,14 +88,14 @@ const userMarkdownStyle: Partial<MarkdownStyles> = {
   link: { color: colors.onPrimary, textDecorationLine: "underline" },
   codeInline: {
     backgroundColor: colors.tertiary,
-    color: colors.primary,
+    color: colors.primaryStrong,
     borderRadius: 5,
     paddingHorizontal: 4,
     paddingVertical: 1,
     fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
     fontSize: 13,
   },
-  codeBlock: { borderRadius: 8, backgroundColor: colors.tertiary, color: colors.text },
+  codeBlock: { borderRadius: 7, backgroundColor: colors.tertiary, color: colors.text },
 };
 // 与助手消息一致，文本节点显式 selectable，保证长文本可复制。
 const userMarkdownRules: RenderRules = {
@@ -925,7 +925,7 @@ export function ChatScreen({
               <Text
                 style={{
                   fontSize: 28,
-                  letterSpacing: -1,
+                  letterSpacing: 0.5,
                   color: colors.text,
                   textAlign: "center",
                   maxWidth: 350,
@@ -1032,7 +1032,7 @@ export function ChatScreen({
                               backgroundColor: pressed ? colors.overlay1 : colors.paper,
                             })}
                           >
-                            <FileText size={14} strokeWidth={1.8} color={colors.primary} />
+                            <FileText size={14} color={colors.primary} />
                             <Text
                               numberOfLines={1}
                               style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
@@ -1049,9 +1049,9 @@ export function ChatScreen({
                       style={{
                         paddingHorizontal: 16,
                         paddingVertical: 13,
-                        borderRadius: 18,
-                        borderBottomRightRadius: user ? 6 : 18,
-                        borderBottomLeftRadius: user ? 18 : 6,
+                        borderRadius: 14,
+                        borderBottomRightRadius: user ? 4 : 14,
+                        borderBottomLeftRadius: user ? 14 : 4,
                         borderWidth: user ? 0 : 1,
                         borderColor: colors.line,
                         backgroundColor: user ? colors.primary : colors.paper,
@@ -1154,8 +1154,8 @@ export function ChatScreen({
                 style={{
                   paddingHorizontal: 16,
                   paddingVertical: 13,
-                  borderRadius: 18,
-                  borderBottomLeftRadius: 6,
+                  borderRadius: 14,
+                  borderBottomLeftRadius: 4,
                   borderWidth: 1,
                   borderColor: colors.line,
                   backgroundColor: colors.paper,
@@ -1268,8 +1268,8 @@ export function ChatScreen({
                   backgroundColor: colors.paper,
                   borderWidth: 1,
                   borderColor: colors.line,
-                  borderRadius: 18,
-                  borderBottomLeftRadius: 6,
+                  borderRadius: 14,
+                  borderBottomLeftRadius: 4,
                 },
               ]}
             >
@@ -1391,7 +1391,7 @@ export function ChatScreen({
                     }}
                     style={{ padding: 8 }}
                   >
-                    <X size={16} strokeWidth={1.8} color={colors.muted} />
+                    <X size={16} color={colors.muted} />
                   </Pressable>
                 </View>
               ))}
@@ -1444,7 +1444,7 @@ export function ChatScreen({
           <View
             style={{
               backgroundColor: colors.paper,
-              borderRadius: 22,
+              borderRadius: 17,
               borderWidth: 1,
               borderColor: focused ? colors.primary : colors.line,
               padding: 8,
@@ -1474,14 +1474,14 @@ export function ChatScreen({
                         },
                       ]}
                     >
-                      <FileText size={14} strokeWidth={1.8} color={colors.primary} />
+                      <FileText size={14} color={colors.primary} />
                       <Text
                         numberOfLines={1}
                         style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
                       >
                         {f.name}
                       </Text>
-                      <X size={13} strokeWidth={1.8} color={colors.muted} />
+                      <X size={13} color={colors.muted} />
                     </Pressable>
                   ))}
               </View>
@@ -1497,11 +1497,11 @@ export function ChatScreen({
                   height: 44,
                   alignItems: "center",
                   justifyContent: "center",
-                  borderRadius: 22,
+                  borderRadius: 999,
                   backgroundColor: picking || pressed ? colors.overlay1 : "transparent",
                 })}
               >
-                <Plus size={22} strokeWidth={1.8} color={colors.text} />
+                <Plus size={22} color={colors.text} />
               </Pressable>
               <TextInput
                 accessibilityLabel={t("chat.messageLingWu")}
@@ -1560,7 +1560,7 @@ export function ChatScreen({
                 style={({ pressed }) => ({
                   width: 44,
                   height: 44,
-                  borderRadius: 22,
+                  borderRadius: 999,
                   backgroundColor: replying || draft.trim() ? colors.primary : colors.tertiary,
                   alignItems: "center",
                   justifyContent: "center",
@@ -1570,11 +1570,7 @@ export function ChatScreen({
                 {replying ? (
                   <Square size={18} fill={colors.onPrimary} strokeWidth={0} />
                 ) : (
-                  <ArrowUp
-                    size={25}
-                    strokeWidth={1.8}
-                    color={draft.trim() ? colors.onPrimary : colors.disabled}
-                  />
+                  <ArrowUp size={25} color={draft.trim() ? colors.onPrimary : colors.disabled} />
                 )}
               </Pressable>
             </View>
@@ -1717,11 +1713,7 @@ function ArtifactsPanel({
                 backgroundColor: colors.paper,
                 borderLeftWidth: 1,
                 borderLeftColor: colors.line,
-                shadowColor: "#000",
-                shadowOffset: { width: -4, height: 0 },
-                shadowOpacity: 0.08,
-                shadowRadius: 14,
-                elevation: 10,
+                ...shadow.drawer,
               }
         }
       >
@@ -1752,7 +1744,7 @@ function ArtifactsPanel({
               backgroundColor: pressed ? colors.overlay1 : "transparent",
             })}
           >
-            <X size={17} strokeWidth={1.8} color={colors.muted} />
+            <X size={17} color={colors.muted} />
           </Pressable>
         </View>
         {files.length === 0 && artifacts.length === 0 ? (
@@ -1788,9 +1780,9 @@ function ArtifactsPanel({
                       }}
                     >
                       {artifact.kind === "finance" ? (
-                        <Lightbulb size={19} strokeWidth={1.8} color={colors.primary} />
+                        <Lightbulb size={19} color={colors.primary} />
                       ) : (
-                        <FileText size={19} strokeWidth={1.8} color={colors.primary} />
+                        <FileText size={19} color={colors.primary} />
                       )}
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
@@ -1829,7 +1821,7 @@ function ArtifactsPanel({
                         justifyContent: "center",
                       }}
                     >
-                      <FileText size={19} strokeWidth={1.8} color={colors.primary} />
+                      <FileText size={19} color={colors.primary} />
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text

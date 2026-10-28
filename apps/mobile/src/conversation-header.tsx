@@ -70,7 +70,7 @@ export function ConversationHeader({
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           numberOfLines={1}
-          style={{ fontSize: 14, fontWeight: "600", color: colors.text, letterSpacing: -0.2 }}
+          style={{ fontSize: 14, fontWeight: "600", color: colors.text, letterSpacing: 0 }}
         >
           {title}
         </Text>
@@ -103,7 +103,7 @@ export function ConversationHeader({
         >
           <FileText
             size={17}
-            strokeWidth={filesOpen ? 2 : 1.8}
+            strokeWidth={filesOpen ? 1.9 : 1.65}
             color={filesOpen ? colors.primary : colors.muted}
           />
         </Pressable>

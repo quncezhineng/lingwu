@@ -105,7 +105,7 @@ export function BrowserToolCard({
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 10 }]}>
-          <Globe2 size={21} strokeWidth={1.8} color={colors.primary} />
+          <Globe2 size={21} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("app.titleBrowser")}</Text>
@@ -122,12 +122,7 @@ export function BrowserToolCard({
         {working ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : visited ? (
-          <Check
-            size={17}
-            strokeWidth={1.8}
-            color={colors.success}
-            accessibilityLabel={t("tools.pageRead")}
-          />
+          <Check size={17} color={colors.success} accessibilityLabel={t("tools.pageRead")} />
         ) : null}
       </View>
       {preview ? (
@@ -137,14 +132,14 @@ export function BrowserToolCard({
           style={{
             width: "100%",
             aspectRatio: 1.7,
-            borderRadius: 12,
+            borderRadius: 9,
             backgroundColor: colors.paper,
           }}
           resizeMode="contain"
           onError={() => setPreviewFailed(true)}
         />
       ) : (
-        <View style={{ backgroundColor: colors.tertiary, borderRadius: 12, padding: 21, gap: 12 }}>
+        <View style={{ backgroundColor: colors.tertiary, borderRadius: 11, padding: 21, gap: 12 }}>
           <Text numberOfLines={2} style={[s.text, { fontSize: 14 }]}>
             {visited?.title || siteLabel(url)}
           </Text>

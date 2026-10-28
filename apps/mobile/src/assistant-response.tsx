@@ -23,11 +23,11 @@ const style: Partial<MarkdownStyles> = {
   heading1: { fontSize: 21, lineHeight: 27 },
   heading2: { fontSize: 19, lineHeight: 25 },
   heading3: { fontSize: 17, lineHeight: 23 },
-  link: { color: colors.primary, textDecorationLine: "underline" },
+  link: { color: colors.primaryStrong, textDecorationLine: "underline" },
   codeInline: {
     backgroundColor: colors.tertiary,
-    color: colors.primary,
-    borderRadius: 6,
+    color: colors.primaryStrong,
+    borderRadius: 5,
     paddingHorizontal: 4,
     paddingVertical: 1,
     fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
@@ -45,10 +45,10 @@ const compactStyle: Partial<MarkdownStyles> = {
   heading1: { fontSize: 15, lineHeight: 19 },
   heading2: { fontSize: 14, lineHeight: 19 },
   heading3: { fontSize: 13, lineHeight: 19 },
-  link: { color: colors.primary, textDecorationLine: "underline" },
+  link: { color: colors.primaryStrong, textDecorationLine: "underline" },
   codeInline: {
     backgroundColor: colors.tertiary,
-    color: colors.primary,
+    color: colors.primaryStrong,
     borderRadius: 4,
     paddingHorizontal: 3,
     paddingVertical: 0,
@@ -109,7 +109,7 @@ function StreamingCursor() {
         width: 7,
         height: 18,
         marginBottom: 3,
-        borderRadius: 2,
+        borderRadius: 4,
         backgroundColor: colors.primary,
         opacity,
       }}
@@ -203,7 +203,7 @@ export function AssistantResponse({
               ...(onPress
                 ? [
                     {
-                      color: colors.primary,
+                      color: colors.primaryStrong,
                       backgroundColor: colors.tertiary,
                       textDecorationLine: "underline" as const,
                       textDecorationStyle: "dotted" as const,

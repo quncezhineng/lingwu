@@ -212,7 +212,7 @@ export function QuoteCard({
                   onPress={onRetry}
                   style={{ minHeight: 44, justifyContent: "center", paddingHorizontal: 6 }}
                 >
-                  <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+                  <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
                     {t("quotes.retry")}
                   </Text>
                 </Pressable>

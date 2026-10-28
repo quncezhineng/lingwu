@@ -290,22 +290,22 @@ export function ToolStep({
           !canExpand && styles.headerStatic,
         ]}
       >
-        <Icon size={15} strokeWidth={1.8} color={colors.muted} />
+        <Icon size={15} color={colors.muted} />
         <Text numberOfLines={1} style={styles.title}>
           {title}
         </Text>
         {failed ? (
-          <X size={14} strokeWidth={1.8} color={colors.danger} />
+          <X size={14} color={colors.danger} />
         ) : running ? (
           <ActivityIndicator size="small" color={colors.primary} style={styles.spinner} />
         ) : (
-          <Check size={14} strokeWidth={1.8} color={colors.success} />
+          <Check size={14} color={colors.success} />
         )}
         {canExpand &&
           (expanded ? (
-            <ChevronDown size={14} strokeWidth={1.8} color={colors.muted} />
+            <ChevronDown size={14} color={colors.muted} />
           ) : (
-            <ChevronRight size={14} strokeWidth={1.8} color={colors.muted} />
+            <ChevronRight size={14} color={colors.muted} />
           ))}
       </Pressable>
       {expanded && canExpand && (
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   },
   outputScroll: {
     maxHeight: 260,
-    borderRadius: 12,
+    borderRadius: 9,
     backgroundColor: colors.paper,
   },
   outputContent: {

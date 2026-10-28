@@ -8,7 +8,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { Check, Languages } from "../icons";
-import { colors } from "../ui";
+import { colors, shadow } from "../ui";
 import { useTranslation } from "./index";
 import { LOCALE_LABELS, type Locale } from "./types";
 
@@ -81,7 +81,7 @@ export function LanguageSwitcher({
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
-                borderRadius: 19,
+                borderRadius: 999,
                 borderWidth: 1,
                 borderColor: colors.line,
                 backgroundColor: pressed ? colors.overlay2 : colors.paper,
@@ -90,17 +90,17 @@ export function LanguageSwitcher({
       >
         {vertical ? (
           <>
-            <Languages size={21} strokeWidth={1.8} color={colors.muted} />
+            <Languages size={21} color={colors.muted} />
             <Text
               numberOfLines={1}
-              style={{ fontSize: 10.5, lineHeight: 13, fontWeight: "500", color: colors.muted }}
+              style={{ fontSize: 10, lineHeight: 13, fontWeight: "500", color: colors.muted }}
             >
               {t("common.language")}
             </Text>
           </>
         ) : (
           <>
-            <Languages size={15} strokeWidth={1.8} color={colors.text} />
+            <Languages size={15} color={colors.text} />
             <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
               {current.short}
             </Text>
@@ -128,15 +128,11 @@ export function LanguageSwitcher({
                 bottom: anchor.bottom,
                 minWidth: 144,
                 backgroundColor: colors.paper,
-                borderRadius: 12,
+                borderRadius: 14,
                 borderWidth: 1,
                 borderColor: colors.line,
                 paddingVertical: 8,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.08,
-                shadowRadius: 12,
-                elevation: 5,
+                ...shadow.card,
               }}
             >
               <Text
@@ -183,7 +179,7 @@ export function LanguageSwitcher({
                         {meta.native}
                       </Text>
                     </View>
-                    {selected && <Check size={15} strokeWidth={1.8} color={colors.primary} />}
+                    {selected && <Check size={15} color={colors.primary} />}
                   </Pressable>
                 );
               })}

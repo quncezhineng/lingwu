@@ -21,7 +21,7 @@ export default function BrowserConsole({
         height: 540,
         width: "100%",
         border: 0,
-        borderRadius: 12,
+        borderRadius: 9,
         background: colors.paper,
       }}
     />

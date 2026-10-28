@@ -49,7 +49,7 @@ export function SearchToolCard({ result, loading }: { result: unknown; loading: 
         {working ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
-          <Search size={18} strokeWidth={1.8} color={colors.primary} />
+          <Search size={18} color={colors.primary} />
         )}
         <Text style={s.text}>
           {failure
@@ -71,7 +71,7 @@ export function SearchToolCard({ result, loading }: { result: unknown; loading: 
             <Text
               key={source.url}
               accessibilityRole="link"
-              style={[s.text, { color: colors.primary }]}
+              style={[s.text, { color: colors.primaryStrong }]}
               onPress={() => {
                 setLinkError("");
                 void Linking.openURL(source.url).catch(() =>

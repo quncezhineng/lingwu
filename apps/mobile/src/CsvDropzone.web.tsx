@@ -65,7 +65,7 @@ export function CsvDropzone({
         outline: "none",
       },
     },
-    createElement(Upload, { size: 24, strokeWidth: 1.8, color: colors.primary }),
+    createElement(Upload, { size: 24, color: colors.primary }),
     createElement(Text, { style: [s.text, { fontWeight: "600" }] }, title),
     createElement(Text, { style: s.muted }, hint),
   );

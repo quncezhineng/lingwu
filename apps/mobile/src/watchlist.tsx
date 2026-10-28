@@ -161,14 +161,14 @@ function AlertBadge({ alert }: { alert: SymbolAlert }) {
         return {
           color: colors.alertVolumeText,
           background: colors.alertVolumeSurface,
-          icon: <Activity size={12} strokeWidth={2} color={colors.alertVolume} />,
+          icon: <Activity size={12} strokeWidth={1.9} color={colors.alertVolume} />,
           label: t("markets.alertVolumeSpike", { multiple: (alert.multiple ?? 2).toFixed(1) }),
         };
       default:
         return {
-          color: colors.primary,
+          color: colors.primaryStrong,
           background: colors.sky,
-          icon: <FileText size={12} strokeWidth={1.8} color={colors.primary} />,
+          icon: <FileText size={12} color={colors.primary} />,
           label: alert.headline
             ? t("markets.alertNews", { headline: alert.headline })
             : t("markets.alertNews", { headline: "" }),
@@ -289,7 +289,7 @@ function SymbolSearch({
           },
         ]}
       >
-        <Search size={17} strokeWidth={1.8} color={colors.faint} />
+        <Search size={17} color={colors.faint} />
         <TextInput
           value={value}
           onChangeText={onChange}
@@ -319,7 +319,7 @@ function SymbolSearch({
             onPress={() => onChange("")}
             style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }}
           >
-            <X size={15} strokeWidth={1.8} color={colors.faint} />
+            <X size={15} color={colors.faint} />
           </Pressable>
         ) : null}
       </View>
@@ -393,7 +393,7 @@ function SymbolSearch({
                       },
                     ]}
                   >
-                    {added && <Check size={12} strokeWidth={2} color={colors.muted} />}
+                    {added && <Check size={12} strokeWidth={1.9} color={colors.muted} />}
                     <Text
                       style={{
                         fontSize: 12,
@@ -666,7 +666,7 @@ function WatchlistSheet({
             style={[s.row, s.chip, { gap: 6, minHeight: 30 }]}
           >
             <Text style={[s.chipText, { fontSize: 11, color: colors.text }]}>{symbol.code}</Text>
-            <X size={11} strokeWidth={2} color={colors.faint} />
+            <X size={11} strokeWidth={1.9} color={colors.faint} />
           </Pressable>
         ))}
       </View>
@@ -907,7 +907,7 @@ export function WatchlistScreen() {
       )}
 
       <View style={[s.row, { gap: 6, justifyContent: "flex-end" }]}>
-        <RefreshCw size={11} strokeWidth={1.8} color={colors.faint} />
+        <RefreshCw size={11} color={colors.faint} />
         <Text style={s.small}>
           {t("markets.watchlistUpdated", {
             time: new Date(list?.updatedAt ?? new Date().toISOString()).toLocaleTimeString(

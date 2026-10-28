@@ -67,8 +67,8 @@ function MemoryCard({
       <View style={{ gap: 11 }}>
         <View style={[s.between]}>
           <View style={[s.row, { gap: 7 }]}>
-            <Heart size={13} strokeWidth={1.8} color={colors.primary} />
-            <Text style={{ fontSize: 10.5, color: colors.muted }}>{t("preferences.type")}</Text>
+            <Heart size={13} color={colors.primary} />
+            <Text style={{ fontSize: 10, color: colors.muted }}>{t("preferences.type")}</Text>
           </View>
           <Text style={{ fontSize: 10, color: colors.faint }}>
             {Number.isNaN(date.getTime())
@@ -89,7 +89,7 @@ function MemoryCard({
             style={{
               minHeight: 78,
               padding: 10,
-              borderRadius: 8,
+              borderRadius: 7,
               borderWidth: 1,
               borderColor: colors.primary,
               color: colors.text,
@@ -150,13 +150,13 @@ function MemoryCard({
               style={({ pressed }) => ({
                 width: 32,
                 height: 32,
-                borderRadius: 8,
+                borderRadius: 7,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: pressed ? colors.overlay1 : "transparent",
               })}
             >
-              <Pencil size={14} strokeWidth={1.8} color={colors.muted} />
+              <Pencil size={14} color={colors.muted} />
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -165,13 +165,13 @@ function MemoryCard({
               style={({ pressed }) => ({
                 width: 32,
                 height: 32,
-                borderRadius: 8,
+                borderRadius: 7,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: pressed ? colors.errorSoft : "transparent",
               })}
             >
-              <Trash2 size={14} strokeWidth={1.8} color={colors.muted} />
+              <Trash2 size={14} color={colors.muted} />
             </Pressable>
           </View>
         )}
@@ -267,13 +267,13 @@ export function PreferencesScreen() {
           style={{
             width: 42,
             height: 42,
-            borderRadius: 21,
+            borderRadius: 999,
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: colors.paper,
           }}
         >
-          <Heart size={20} strokeWidth={1.8} color={colors.primary} />
+          <Heart size={20} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 5 }}>
           <Text style={{ fontSize: 18, lineHeight: 26, fontWeight: "600", color: colors.text }}>
@@ -307,13 +307,13 @@ export function PreferencesScreen() {
             style={{
               width: 38,
               height: 38,
-              borderRadius: 19,
+              borderRadius: 999,
               alignItems: "center",
               justifyContent: "center",
               backgroundColor: colors.sky,
             }}
           >
-            <CircleDollarSign size={18} strokeWidth={1.8} color={colors.primary} />
+            <CircleDollarSign size={18} color={colors.primary} />
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={s.heading}>{t("app.titlePortfolio")}</Text>
@@ -323,7 +323,7 @@ export function PreferencesScreen() {
             <Text style={{ fontSize: 11, color: colors.muted }}>
               {t("preferences.openPortfolio")}
             </Text>
-            <ChevronRight size={13} strokeWidth={1.8} color={colors.faint} />
+            <ChevronRight size={13} color={colors.faint} />
           </View>
         </Pressable>
       </View>
@@ -331,7 +331,7 @@ export function PreferencesScreen() {
       {adding && (
         <Card style={{ gap: 12, padding: 18 }}>
           <View style={[s.row, { gap: 7 }]}>
-            <Plus size={14} strokeWidth={1.8} color={colors.primary} />
+            <Plus size={14} color={colors.primary} />
             <Text style={s.heading}>{t("preferences.addTitle")}</Text>
           </View>
           <Field
@@ -381,7 +381,7 @@ export function PreferencesScreen() {
         </View>
       ) : (
         <View style={[s.card, { alignItems: "center", paddingVertical: 42, gap: 10 }]}>
-          <Heart size={26} strokeWidth={1.8} color={colors.faint} />
+          <Heart size={26} color={colors.faint} />
           <Text style={s.heading}>{t("preferences.emptyTitle")}</Text>
           <Text style={[s.muted, { textAlign: "center", maxWidth: 420 }]}>
             {t("preferences.emptyDetail")}
@@ -390,7 +390,7 @@ export function PreferencesScreen() {
       )}
 
       <View style={[s.row, { gap: 7 }]}>
-        <ShieldCheck size={14} strokeWidth={1.8} color={colors.faint} />
+        <ShieldCheck size={14} color={colors.faint} />
         <Text style={[s.small, { flex: 1 }]}>{t("preferences.privacy")}</Text>
       </View>
       <ErrorNotice error={error || workspaceError} />
@@ -403,12 +403,12 @@ export function PreferencesScreen() {
               gap: 7,
               paddingHorizontal: 12,
               paddingVertical: 8,
-              borderRadius: 8,
+              borderRadius: 7,
               backgroundColor: colors.green,
             },
           ]}
         >
-          <Check size={14} strokeWidth={1.8} color={colors.success} />
+          <Check size={14} color={colors.success} />
           <Text style={{ fontSize: 12, color: colors.success }}>{notice}</Text>
         </View>
       )}

@@ -40,6 +40,8 @@ import {
   Button,
   Card,
   Chip,
+  chartNeutral,
+  chartSeries,
   colors,
   DisclaimerNote,
   Empty,
@@ -52,16 +54,8 @@ import {
 } from "./ui";
 import { useWorkspace } from "./workspace";
 
-const ALLOCATION_COLORS = [
-  "#3A83F7",
-  "#2FB3FF",
-  "#3C7FB1",
-  "#2A9D8F",
-  "#C9922E",
-  "#7B61A8",
-  "#8A8F98",
-];
-const OTHER_COLOR = "#B0B6BF";
+const ALLOCATION_COLORS = chartSeries;
+const OTHER_COLOR = chartNeutral;
 
 const BENCHMARKS: Record<Currency, Array<{ id: string; labelKey: TranslationKey }>> = {
   CNY: [
@@ -310,7 +304,7 @@ function RiskSection({
             onPress={onExplain}
             style={{ minHeight: 44, justifyContent: "center" }}
           >
-            <Text style={[s.small, { color: colors.primary, fontWeight: "600" }]}>
+            <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
               {t("portfolio.riskExplain")}
             </Text>
           </Pressable>
@@ -517,7 +511,7 @@ function AllocationSection({
                   style={{
                     width: 8,
                     height: 8,
-                    borderRadius: 2,
+                    borderRadius: 4,
                     backgroundColor:
                       slice.key === "__other__"
                         ? OTHER_COLOR
@@ -574,10 +568,10 @@ function AllocationSection({
             <View
               style={[
                 s.row,
-                { gap: 6, padding: 8, borderRadius: 8, backgroundColor: colors.alertVolumeSurface },
+                { gap: 6, padding: 8, borderRadius: 7, backgroundColor: colors.alertVolumeSurface },
               ]}
             >
-              <AlertTriangle size={14} strokeWidth={1.8} color={colors.alertVolumeText} />
+              <AlertTriangle size={14} color={colors.alertVolumeText} />
               <Text style={{ flex: 1, fontSize: 11, color: colors.alertVolumeText }}>
                 {t("portfolio.concentrationWarning", {
                   name: lead.key,
@@ -635,7 +629,7 @@ function TopHoldingsSection({
                 borderTopWidth: index ? 1 : 0,
                 borderTopColor: colors.line,
                 paddingHorizontal: 4,
-                borderRadius: 8,
+                borderRadius: 7,
               },
               pressed && { backgroundColor: colors.overlay1 },
             ]}

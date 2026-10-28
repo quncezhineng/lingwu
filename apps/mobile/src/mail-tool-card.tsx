@@ -49,7 +49,7 @@ export function MailToolCard({
         {active ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : (
-          <Mail size={16} strokeWidth={1.8} color={colors.muted} />
+          <Mail size={16} color={colors.muted} />
         )}
         <Text style={s.muted}>
           {!active
@@ -68,7 +68,7 @@ export function MailToolCard({
     const count = parsed.data.matches.length;
     return (
       <View style={[s.row, { gap: 9, padding: 12 }]}>
-        <Search size={16} strokeWidth={1.8} color={colors.muted} />
+        <Search size={16} color={colors.muted} />
         <Text style={s.muted}>
           {count
             ? t(
@@ -103,7 +103,7 @@ export function MailToolCard({
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 10 }]}>
-          <Mail size={20} strokeWidth={1.8} color={colors.primary} />
+          <Mail size={20} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{message.sender}</Text>

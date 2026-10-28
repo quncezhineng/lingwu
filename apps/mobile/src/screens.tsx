@@ -106,8 +106,10 @@ export function TodayScreen() {
       >
         <View style={{ flex: 1, gap: 12, zIndex: 1 }}>
           <View style={[s.row, { gap: 7 }]}>
-            <Sparkles size={13} strokeWidth={1.8} color={colors.primary} />
-            <Text style={[s.label, { color: colors.primary, fontSize: 11, letterSpacing: 1.2 }]}>
+            <Sparkles size={13} color={colors.primary} />
+            <Text
+              style={[s.label, { color: colors.primaryStrong, fontSize: 11, letterSpacing: 1.2 }]}
+            >
               {t("screens.todayEyebrow")}
             </Text>
           </View>
@@ -115,7 +117,7 @@ export function TodayScreen() {
             style={{
               fontSize: wide ? 28 : 24,
               lineHeight: wide ? 34 : 30,
-              letterSpacing: -0.8,
+              letterSpacing: 0.5,
               fontWeight: "600",
               color: colors.text,
             }}
@@ -180,7 +182,7 @@ export function TodayScreen() {
                 },
               ]}
             >
-              <Check size={14} strokeWidth={1.8} color={colors.success} />
+              <Check size={14} color={colors.success} />
               <Text style={s.small}>{t("screens.todayLighterDay")}</Text>
             </View>
             <View
@@ -201,7 +203,7 @@ export function TodayScreen() {
                 },
               ]}
             >
-              <CalendarDays size={17} strokeWidth={1.8} color={colors.primary} />
+              <CalendarDays size={17} color={colors.primary} />
               <Text style={s.small}>{t("screens.todayEverythingTogether")}</Text>
             </View>
           </View>
@@ -247,13 +249,13 @@ export function TodayScreen() {
               <Text style={[s.label, { fontSize: 11, letterSpacing: 1 }]}>{item.label}</Text>
               {/* 图标底座统一用 surface，品牌浅底只留给小面积状态 Chip */}
               <View style={[s.iconBox, { width: 34, height: 34, borderRadius: 10 }]}>
-                <item.icon size={15} strokeWidth={1.8} color={colors.primary} />
+                <item.icon size={15} color={colors.primary} />
               </View>
             </View>
             <Text
               style={[
                 s.metric,
-                { fontSize: 24, color: colors.text, letterSpacing: -0.6, marginTop: 2 },
+                { fontSize: 24, color: colors.text, letterSpacing: 0.5, marginTop: 2 },
               ]}
             >
               {String(item.value).padStart(2, "0")}
@@ -294,7 +296,7 @@ export function TodayScreen() {
               pressed && { backgroundColor: colors.overlay1 },
             ]}
           >
-            <Plus size={15} strokeWidth={1.8} color={colors.muted} />
+            <Plus size={15} color={colors.muted} />
             <Text style={s.small}>{t("screens.todayMakeTime")}</Text>
           </Pressable>
         </Card>
@@ -340,7 +342,7 @@ export function TodayScreen() {
                     style={{
                       width: 6,
                       height: 6,
-                      borderRadius: 3,
+                      borderRadius: 4,
                       backgroundColor: colors.primary,
                     }}
                   />
@@ -382,7 +384,7 @@ export function TodayScreen() {
               ]}
             >
               <Text style={[s.text, { fontSize: 12 }]}>{prompt}</Text>
-              <ArrowUpRight size={15} strokeWidth={1.8} color={colors.muted} />
+              <ArrowUpRight size={15} color={colors.muted} />
             </Pressable>
           ))}
         </Card>
@@ -414,7 +416,7 @@ export function TodayScreen() {
                       { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.green },
                     ]}
                   >
-                    <Check size={14} strokeWidth={1.8} color={colors.text} />
+                    <Check size={14} color={colors.text} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.text, { fontSize: 12 }]}>{runtimeLabel(a.title)}</Text>
@@ -483,7 +485,7 @@ export function AgendaRow({
         style={{
           width: 3,
           height: 36,
-          borderRadius: 2,
+          borderRadius: 4,
           backgroundColor: colors.lineStrong,
         }}
       />
@@ -496,7 +498,7 @@ export function AgendaRow({
               : t("screens.agendaTimeForYou"))}
         </Text>
       </View>
-      <ChevronRight size={14} strokeWidth={1.8} color={colors.muted} />
+      <ChevronRight size={14} color={colors.muted} />
     </Pressable>
   );
 }
@@ -548,7 +550,7 @@ export function MailScreen() {
             },
           ]}
         >
-          <Search size={16} strokeWidth={1.8} color={colors.muted} />
+          <Search size={16} color={colors.muted} />
           <TextInput
             accessibilityLabel={t("screens.mailSearchLabel")}
             placeholder={t("screens.mailSearchPlaceholder")}
@@ -626,7 +628,7 @@ export function MailScreen() {
                 </Text>
                 {!!m.attachments.length && (
                   <View style={[s.row, { gap: 4, marginTop: 2 }]}>
-                    <FileText size={13} strokeWidth={1.8} color={colors.muted} />
+                    <FileText size={13} color={colors.muted} />
                     <Text style={s.small}>
                       {m.attachments.length}{" "}
                       {t(
@@ -640,7 +642,7 @@ export function MailScreen() {
               </View>
               {m.unread && (
                 <View
-                  style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }}
+                  style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: colors.primary }}
                 />
               )}
             </Pressable>
@@ -942,7 +944,7 @@ export function BrowserScreen() {
       {/* 面板统一白底 + 1px 描边（不用品牌浅底做大块底色） */}
       <Card>
         <View style={[s.row, { gap: 12, marginBottom: 15 }]}>
-          <Globe2 size={22} strokeWidth={1.8} color={colors.primary} />
+          <Globe2 size={22} color={colors.primary} />
           <View>
             <Text style={s.heading}>{t("screens.browserHeading")}</Text>
             <Text style={s.muted}>{t("screens.browserSubtitle")}</Text>
@@ -992,7 +994,7 @@ export function BrowserScreen() {
             >
               <View style={[s.row, { gap: 14 }]}>
                 <View style={s.iconBox}>
-                  <Globe2 size={20} strokeWidth={1.8} color={colors.primary} />
+                  <Globe2 size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.heading}>{b.title || t("screens.browserSessionFallback")}</Text>
@@ -1003,7 +1005,7 @@ export function BrowserScreen() {
                 <Chip tint={b.status === "active" ? colors.green : colors.paper}>
                   {statusLabel(b.status)}
                 </Chip>
-                <ArrowUpRight size={17} strokeWidth={1.8} color={colors.muted} />
+                <ArrowUpRight size={17} color={colors.muted} />
               </View>
               {!!b.previewUrl && (
                 <Image
@@ -1137,8 +1139,8 @@ export function FilesScreen() {
                         }}
                       >
                         <View style={[s.row, { gap: 5, marginBottom: 15 }]}>
-                          <FileText size={13} strokeWidth={1.8} color={colors.primary} />
-                          <Text style={{ fontSize: 7, color: colors.primary }}>
+                          <FileText size={13} color={colors.primary} />
+                          <Text style={{ fontSize: 7, color: colors.primaryStrong }}>
                             {t("screens.filesDocumentBadge")}
                           </Text>
                         </View>
@@ -1150,7 +1152,7 @@ export function FilesScreen() {
                               backgroundColor: i === 0 ? colors.primary : colors.tertiary,
                               width: `${width}%`,
                               marginBottom: 7,
-                              borderRadius: 3,
+                              borderRadius: 4,
                             }}
                           />
                         ))}
@@ -1219,7 +1221,7 @@ function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
             style={{
               width: 103,
               height: 127,
-              borderRadius: 8,
+              borderRadius: 7,
               backgroundColor: colors.paper,
               padding: 15,
               transform: [{ rotate: "2deg" }],
@@ -1233,15 +1235,15 @@ function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
                 style={{
                   width: 24,
                   height: 24,
-                  borderRadius: 8,
+                  borderRadius: 7,
                   backgroundColor: colors.surface,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Sparkles size={13} strokeWidth={1.8} color={colors.primary} />
+                <Sparkles size={13} color={colors.primary} />
               </View>
-              <Text style={{ flex: 1, fontSize: 7, color: colors.primary }}>
+              <Text style={{ flex: 1, fontSize: 7, color: colors.primaryStrong }}>
                 {t("screens.filesResearchBadge")}
               </Text>
             </View>
@@ -1264,7 +1266,7 @@ function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
         {/* 卡片正文收紧到紧凑密度：内边距 14、间距 6 */}
         <View style={{ padding: 14, gap: 6 }}>
           <View style={[s.row, { gap: 8 }]}>
-            <Icon size={15} strokeWidth={1.8} color={colors.primary} />
+            <Icon size={15} color={colors.primary} />
             <Text numberOfLines={1} style={[s.heading, { flex: 1, fontSize: 14 }]}>
               {artifact.title}
             </Text>
@@ -1329,9 +1331,9 @@ export function ActivityScreen() {
                 ]}
               >
                 {a.status === "awaiting_review" ? (
-                  <ShieldCheck size={18} strokeWidth={1.8} color={colors.primary} />
+                  <ShieldCheck size={18} color={colors.primary} />
                 ) : (
-                  <CheckCheck size={18} strokeWidth={1.8} color={colors.text} />
+                  <CheckCheck size={18} color={colors.text} />
                 )}
               </View>
               <View style={{ flex: 1, gap: 4 }}>
@@ -1349,7 +1351,7 @@ export function ActivityScreen() {
               >
                 {statusLabel(a.status)}
               </Chip>
-              <ChevronRight size={16} strokeWidth={1.8} color={colors.muted} />
+              <ChevronRight size={16} color={colors.muted} />
             </Pressable>
           ))}
         </Card>
@@ -1373,7 +1375,7 @@ export function ActivityScreen() {
                 ]}
               >
                 <View style={[s.iconBox, { height: 34, width: 34, backgroundColor: colors.paper }]}>
-                  <Clock3 size={16} strokeWidth={1.8} color={colors.muted} />
+                  <Clock3 size={16} color={colors.muted} />
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={s.text}>{runtimeLabel(a.title)}</Text>
@@ -1557,7 +1559,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                     style={{
                       width: 29,
                       height: 29,
-                      borderRadius: 8,
+                      borderRadius: 7,
                       backgroundColor: row.brand
                         ? serviceBrands[row.brand].surface
                         : colors.surface,
@@ -1567,7 +1569,6 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                   >
                     <row.icon
                       size={23}
-                      strokeWidth={1.8}
                       color={row.brand ? serviceBrands[row.brand].fg : colors.primary}
                     />
                   </View>
@@ -1579,7 +1580,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                     <Text style={s.small}>{shortModel(w.runtime.model)}</Text>
                   )}
                   {row.connected ? (
-                    <ChevronRight size={18} strokeWidth={1.8} color={colors.faint} />
+                    <ChevronRight size={18} color={colors.faint} />
                   ) : (
                     <Text
                       style={{
@@ -1686,9 +1687,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
                             style={[s.row, { gap: 4, opacity: busy ? 0.5 : 1 }]}
                           >
                             <Chip tint={current ? colors.sky : undefined}>{shortModel(spec)}</Chip>
-                            {current && (
-                              <Check size={13} strokeWidth={1.8} color={colors.primary} />
-                            )}
+                            {current && <Check size={13} color={colors.primary} />}
                           </Pressable>
                         );
                       })}

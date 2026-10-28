@@ -63,7 +63,7 @@ export function FileThreadCard({ file }: { file: Artifact }) {
       </View>
       <View style={[s.row, { gap: 12 }]}>
         <View style={[s.iconBox, { width: 40, height: 40 }]}>
-          <FileText size={20} strokeWidth={1.8} color={colors.primary} />
+          <FileText size={20} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 3 }}>
           <Text numberOfLines={2} style={s.heading}>
@@ -71,7 +71,7 @@ export function FileThreadCard({ file }: { file: Artifact }) {
           </Text>
           <Text style={s.muted}>{kind === "html" ? "HTML" : "PDF"}</Text>
         </View>
-        <ChevronRight size={18} strokeWidth={1.8} color={colors.muted} />
+        <ChevronRight size={18} color={colors.muted} />
       </View>
     </Pressable>
   );

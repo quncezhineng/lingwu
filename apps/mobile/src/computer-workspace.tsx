@@ -156,7 +156,7 @@ export function LinuxWorkspace({
     <View style={{ gap: 16 }}>
       <Card style={{ gap: 12 }}>
         <View style={[s.row, { gap: 12 }]}>
-          <Terminal size={24} strokeWidth={1.8} color={colors.primary} />
+          <Terminal size={24} color={colors.primary} />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={s.heading}>{t("computer.yourLinuxWorkspace")}</Text>
             <Text style={s.muted}>

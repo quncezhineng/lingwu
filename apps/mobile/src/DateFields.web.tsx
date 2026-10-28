@@ -13,7 +13,7 @@ export default function DateFields({ label, date, time, allDay, onChange }: Date
   const { t } = useTranslation();
   const style = {
     border: `1px solid ${colors.line}`,
-    borderRadius: 12,
+    borderRadius: 9,
     padding: 13,
     fontSize: 14,
     color: colors.text,

@@ -32,12 +32,12 @@ export function ComputerEntry() {
           gap: 6,
           paddingHorizontal: 12,
           paddingVertical: 7,
-          borderRadius: 20,
+          borderRadius: 999,
           backgroundColor: colors.tertiary,
         },
       ]}
     >
-      <Monitor size={13} strokeWidth={1.8} color={colors.muted} />
+      <Monitor size={13} color={colors.muted} />
       <Text style={{ fontSize: 12, color: colors.muted }}>
         {t("computer.entryStatus", { status })}
       </Text>
@@ -45,7 +45,7 @@ export function ComputerEntry() {
         style={{
           width: 5,
           height: 5,
-          borderRadius: 3,
+          borderRadius: 4,
           backgroundColor: available ? colors.success : colors.disabled,
         }}
       />
@@ -71,7 +71,7 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
     >
       <View style={[s.row, { gap: 10 }]}>
         <View style={[s.iconBox, { width: 36, height: 36, borderRadius: 9 }]}>
-          <Globe2 size={21} strokeWidth={1.8} color={colors.primary} />
+          <Globe2 size={21} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[s.text, { fontWeight: "600" }]}>{t("app.titleBrowser")}</Text>
@@ -101,13 +101,13 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
         <View
           style={{
             padding: 24,
-            borderRadius: 12,
+            borderRadius: 11,
             backgroundColor: colors.paper,
             alignItems: "center",
             gap: 10,
           }}
         >
-          <Globe2 size={30} strokeWidth={1.8} color={colors.muted} />
+          <Globe2 size={30} color={colors.muted} />
           <Text numberOfLines={2} style={[s.muted, { textAlign: "center" }]}>
             {failed ? t("computer.previewUnavailable") : browser.url}
           </Text>
@@ -203,7 +203,7 @@ export function ComputerSheet() {
               },
             ]}
           >
-            <Monitor size={28} strokeWidth={1.8} color={colors.primary} />
+            <Monitor size={28} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={s.heading}>
                 {available ? t("computer.browserConnected") : t("computer.browserOffline")}

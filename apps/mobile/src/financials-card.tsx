@@ -356,7 +356,7 @@ export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolC
                 <Text
                   accessibilityRole="link"
                   onPress={() => void Linking.openURL(report.sourceUrl ?? "")}
-                  style={[s.small, { color: colors.primary }]}
+                  style={[s.small, { color: colors.primaryStrong }]}
                   numberOfLines={1}
                 >
                   {report.sourceUrl}
@@ -376,7 +376,7 @@ export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolC
       {editorOpen && (
         <Card style={{ padding: 12, gap: 10 }}>
           <View style={[s.row, { gap: 8 }]}>
-            <FileText size={15} strokeWidth={1.8} color={colors.primary} />
+            <FileText size={15} color={colors.primary} />
             <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
               {t("financials.pasteTitle")}
             </Text>
