@@ -51,6 +51,7 @@ import {
 } from "./icons";
 import { PlanCard } from "./plan-card";
 import { ActivityScreen } from "./screens";
+import { StatusBadge, taskStatusTone } from "./status-badge";
 import {
   Button,
   Card,
@@ -223,22 +224,22 @@ export function TaskCard({
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={s.heading}>{task.title}</Text>
             <Text style={[s.small, s.metric]}>
-              {statusLabel(task.status)}
               {task.plan.length
                 ? t("agent.planStepsProgress", { done, total: task.plan.length })
-                : ""}
+                : (task.question ?? task.error ?? "")}
             </Text>
           </View>
+          <StatusBadge tone={taskStatusTone(task.status)} label={statusLabel(task.status)} />
           <ChevronRight size={17} color={colors.muted} />
         </View>
         {!!task.plan.length && (
-          <View style={{ height: 4, backgroundColor: colors.line, borderRadius: 4 }}>
+          <View style={{ height: 3, backgroundColor: colors.line, borderRadius: 3 }}>
             <View
               style={{
-                height: 4,
+                height: 3,
                 width: `${Math.round((done / task.plan.length) * 100)}%`,
                 backgroundColor: colors.primary,
-                borderRadius: 4,
+                borderRadius: 3,
               }}
             />
           </View>
@@ -278,29 +279,49 @@ export function ChatWork() {
     </View>
   );
 }
+type TaskFilter = "all" | "running" | "waiting" | "finished" | "paused";
+
+const TASK_FILTERS: ReadonlyArray<{ id: TaskFilter; labelKey: TranslationKey }> = [
+  { id: "all", labelKey: "agent.filterAll" },
+  { id: "running", labelKey: "agent.filterInProgress" },
+  { id: "waiting", labelKey: "agent.filterWaiting" },
+  { id: "finished", labelKey: "agent.filterFinished" },
+  { id: "paused", labelKey: "agent.filterPaused" },
+];
+
+/** 五态筛选：全部 / 分析中 / 待确认 / 已完成 / 已暂停。 */
+function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
+  switch (filter) {
+    case "running":
+      return ["queued", "running", "scheduled"].includes(task.status);
+    case "waiting":
+      return ["waiting_input", "waiting_approval"].includes(task.status);
+    case "finished":
+      return ["succeeded", "failed", "cancelled"].includes(task.status);
+    case "paused":
+      return task.status === "paused";
+    default:
+      return true;
+  }
+}
+
 export function AgentActivityScreen() {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
-  const [filter, setFilter] = useState("All");
-  const tasks = [...(data?.tasks || [])]
-    .filter(
-      (task) =>
-        filter === "All" || (filter === "In progress" ? activeTask(task) : !activeTask(task)),
-    )
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const [filter, setFilter] = useState<TaskFilter>("all");
+  const all = [...(data?.tasks ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const counts = Object.fromEntries(
+    TASK_FILTERS.map(({ id }) => [id, all.filter((task) => matchesTaskFilter(task, id)).length]),
+  ) as Record<TaskFilter, number>;
+  const tasks = all.filter((task) => matchesTaskFilter(task, filter));
   return (
     <View style={{ gap: 20 }}>
       <AgentStatus />
-      <View style={[s.row, { gap: 8 }]}>
-        {(
-          [
-            ["All", "agent.filterAll"],
-            ["In progress", "agent.filterInProgress"],
-            ["Finished", "agent.filterFinished"],
-          ] as const
-        ).map(([item, label]) => (
-          <Button key={item} small primary={filter === item} onPress={() => setFilter(item)}>
-            {t(label)}
+      {/* 唯一一套筛选：五个状态 Tab + 计数，下方只保留一份任务列表 */}
+      <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+        {TASK_FILTERS.map(({ id, labelKey }) => (
+          <Button key={id} small primary={filter === id} onPress={() => setFilter(id)}>
+            {`${t(labelKey)} · ${counts[id]}`}
           </Button>
         ))}
       </View>
@@ -310,12 +331,17 @@ export function AgentActivityScreen() {
       {!tasks.length && (
         <Empty
           icon={ListChecks}
-          title={t("agent.activityEmptyTitle")}
+          title={t(filter === "all" ? "agent.activityEmptyTitle" : "agent.activityEmptyFiltered")}
           detail={t("agent.activityEmptyDetail")}
         />
       )}
-      <SectionHeading title={t("agent.reviewsReceipts")} />
-      <ActivityScreen />
+      {/* 回执与审批记录只出现在「已完成」分区，作为任务的追溯资料 */}
+      {filter === "finished" && (
+        <>
+          <SectionHeading title={t("agent.reviewsReceipts")} />
+          <ActivityScreen />
+        </>
+      )}
     </View>
   );
 }

@@ -326,6 +326,21 @@ function Sparkline({
   );
 }
 
+/**
+ * 表格列宽（1000 宽时内容区约 684）：
+ * 名称 ≥132 + 88 + 96 + 76 + (90) + 111 + gap 10 + 左右 padding 12 → 667（含走势列）以内。
+ * 走势列在可见行全部无数据时整列隐藏，行内有数据时才逐行展示。
+ */
+const TABLE_NAME_MIN = 132;
+const TABLE_GAP = 10;
+const TABLE_PAD = 12;
+
+function tableQuote(item: WatchlistSymbol, quotes: Record<string, QuoteAvailability>) {
+  const availability =
+    quotes[item.symbol.code] ?? availabilityFromQuote(item.quote, item.unavailable);
+  return availability.status === "ready" ? availability.quote : item.quote;
+}
+
 /** 桌面六列表格：名称/代码 · 现价 · 涨跌额 · 涨跌幅 · 走势 · 操作。 */
 function WatchTable({
   items,
@@ -341,6 +356,8 @@ function WatchTable({
   onRemove: (item: WatchlistSymbol) => void;
 }) {
   const { t } = useTranslation();
+  const rows = items.map((item) => ({ item, quote: tableQuote(item, quotes) }));
+  const showTrend = rows.some(({ quote }) => !!quote?.sparkline);
   const header = (label: string, style?: TextStyle) => (
     <Text style={[{ fontSize: 11, lineHeight: 17, color: colors.muted }, style]}>{label}</Text>
   );
@@ -355,17 +372,14 @@ function WatchTable({
       }}
     >
       <View style={[s.row, headerRow]}>
-        {header(t("markets.tableName"), { flex: 1.75, minWidth: 155 })}
-        {header(t("markets.tablePrice"), { width: 70, textAlign: "right" })}
-        {header(t("markets.tableChange"), { width: 105, textAlign: "right" })}
-        {header(t("markets.tableChangePercent"), { width: 80, textAlign: "right" })}
-        {header(t("markets.tableTrend"), { width: 90, textAlign: "center" })}
+        {header(t("markets.tableName"), { flex: 1.75, minWidth: TABLE_NAME_MIN })}
+        {header(t("markets.tablePrice"), { width: 88, textAlign: "right" })}
+        {header(t("markets.tableChange"), { width: 96, textAlign: "right" })}
+        {header(t("markets.tableChangePercent"), { width: 76, textAlign: "right" })}
+        {showTrend && header(t("markets.tableTrend"), { width: 90, textAlign: "center" })}
         {header(t("markets.tableActions"), { width: 111, textAlign: "right" })}
       </View>
-      {items.map((item, index) => {
-        const availability =
-          quotes[item.symbol.code] ?? availabilityFromQuote(item.quote, item.unavailable);
-        const quote = availability.status === "ready" ? availability.quote : item.quote;
+      {rows.map(({ item, quote }, index) => {
         const currency = quote?.currency ?? defaultCurrency(item.symbol.market);
         const change = quote?.change;
         const changePercent = quote?.changePercent;
@@ -386,11 +400,11 @@ function WatchTable({
               onPress={() => onOpen(item)}
               style={({ pressed }) => [
                 s.row,
-                { flex: 1, minWidth: 0, gap: 14, paddingVertical: 14 },
+                { flex: 1, minWidth: 0, gap: TABLE_GAP, paddingVertical: 14 },
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <View style={{ flex: 1.75, minWidth: 155, gap: 2 }}>
+              <View style={{ flex: 1.75, minWidth: TABLE_NAME_MIN, gap: 2 }}>
                 <Text
                   numberOfLines={1}
                   style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
@@ -402,29 +416,38 @@ function WatchTable({
                 </Text>
               </View>
               <Text
+                numberOfLines={1}
                 style={[
                   s.metric,
-                  { width: 70, textAlign: "right", fontSize: 14, color: colors.text },
+                  { width: 88, textAlign: "right", fontSize: 14, color: colors.text },
                 ]}
               >
                 {quote ? formatPrice(quote.price, currency) : "—"}
               </Text>
-              <Text style={[s.metric, { width: 105, textAlign: "right", fontSize: 13, color }]}>
+              <Text
+                numberOfLines={1}
+                style={[s.metric, { width: 96, textAlign: "right", fontSize: 13, color }]}
+              >
                 {change === undefined
                   ? "—"
                   : `${change > 0 ? "+" : change < 0 ? "−" : ""}${currencySymbol(currency)}${Math.abs(change).toFixed(2)}`}
               </Text>
-              <Text style={[s.metric, { width: 80, textAlign: "right", fontSize: 13, color }]}>
+              <Text
+                numberOfLines={1}
+                style={[s.metric, { width: 76, textAlign: "right", fontSize: 13, color }]}
+              >
                 {changePercent === undefined ? "—" : formatPercent(changePercent)}
               </Text>
-              <View style={{ width: 90, alignItems: "center" }}>
-                <Sparkline points={quote?.sparkline} />
-                {!quote?.sparkline && (
-                  <Text style={{ fontSize: 10, color: colors.faint }}>
-                    {t("markets.trendUnavailable")}
-                  </Text>
-                )}
-              </View>
+              {showTrend && (
+                <View style={{ width: 90, alignItems: "center" }}>
+                  <Sparkline points={quote?.sparkline} />
+                  {!quote?.sparkline && (
+                    <Text style={{ fontSize: 10, color: colors.faint }}>
+                      {t("markets.trendUnavailable")}
+                    </Text>
+                  )}
+                </View>
+              )}
             </Pressable>
             <View style={[s.row, { width: 111, justifyContent: "flex-end", gap: 12 }]}>
               <Pressable accessibilityRole="button" hitSlop={6} onPress={() => onAnalyze(item)}>
@@ -477,17 +500,17 @@ function SymbolMenu({
 }
 
 const headerRow: ViewStyle = {
-  paddingHorizontal: 16,
+  paddingHorizontal: TABLE_PAD,
   minHeight: 38,
-  gap: 14,
+  gap: TABLE_GAP,
   backgroundColor: colors.surface,
   borderBottomWidth: 1,
   borderBottomColor: colors.line,
 };
 
 const rowStyle: ViewStyle = {
-  paddingHorizontal: 16,
-  gap: 14,
+  paddingHorizontal: TABLE_PAD,
+  gap: TABLE_GAP,
 };
 
 /** 搜索栏 + 下拉匹配面板。 */
@@ -1219,19 +1242,24 @@ export function WatchlistScreen() {
         ) : (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, alignItems: "stretch" }}>
             {visibleSymbols.map((item) => (
-              <SymbolCard
+              // 尺寸落在外层容器，卡片本身撑满：单列时 wrapper 100% 宽，避免卡片只占 240 留白
+              <View
                 key={item.symbol.code}
-                item={item}
-                availability={quotes[item.symbol.code]}
-                onRetry={retry}
                 style={{
                   width: cardWidth,
                   flexGrow: columns === 1 ? 0 : 1,
-                  minWidth: columns === 3 ? 230 : 240,
+                  minWidth: columns === 3 ? 230 : columns === 2 ? 240 : 0,
                 }}
-                onPress={() => openSymbol(item)}
-                onMore={() => setMenuFor(item)}
-              />
+              >
+                <SymbolCard
+                  item={item}
+                  availability={quotes[item.symbol.code]}
+                  onRetry={retry}
+                  style={{ width: "100%", flexGrow: 1 }}
+                  onPress={() => openSymbol(item)}
+                  onMore={() => setMenuFor(item)}
+                />
+              </View>
             ))}
           </View>
         )

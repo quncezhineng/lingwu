@@ -397,7 +397,8 @@ export function WorkbenchScreen() {
   const [briefingOpen, setBriefingOpen] = useState(false);
   const composerRef = useRef<TextInput>(null);
   const sideBySide = width >= breakpoints.desktop;
-  const narrow = width < breakpoints.mobile;
+  // 1024 宽时主列约 380–400，问候（31 号）与 180 简报卡会撞行 → 主列不足 520 时上下分行。
+  const narrow = width < 1180;
   const [insightIndex, setInsightIndex] = useState(0);
   const now = new Date();
   const name =
@@ -721,6 +722,7 @@ export function WorkbenchScreen() {
               basis={insightBasis}
               limits={insightLimits}
               revisit={insightRevisit}
+              showSections={false}
               onSimplify={
                 insight
                   ? () => ask(t("workbench.insightSimplifyPrompt", { title: insight.title }))

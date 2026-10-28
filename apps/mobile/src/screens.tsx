@@ -1288,19 +1288,14 @@ function ResearchArtifactCard({ artifact }: { artifact: AgentArtifact }) {
 export function ActivityScreen() {
   const { workspace: w, open } = useWorkspace();
   const { t } = useTranslation();
-  const [filter, setFilter] = useState("all");
-  const pending = w.actions.filter((a) => a.status === "awaiting_review");
-  const actions = w.actions.filter((a) => filter === "all" || a.status === "awaiting_review");
+  // 审批记录只作为「已完成」分区的追溯资料：不再自带第二套筛选。
+  const actions = [...w.actions].sort(
+    (a, b) =>
+      Number(b.status === "awaiting_review") - Number(a.status === "awaiting_review") ||
+      b.createdAt.localeCompare(a.createdAt),
+  );
   return (
     <View style={{ gap: 20 }}>
-      <View style={[s.row, { gap: 10 }]}>
-        <Button small primary={filter === "all"} onPress={() => setFilter("all")}>
-          {t("screens.activityFilterAll")}
-        </Button>
-        <Button small primary={filter === "review"} onPress={() => setFilter("review")}>
-          {t("screens.activityFilterReview", { count: pending.length })}
-        </Button>
-      </View>
       {actions.length > 0 && (
         <Card>
           <SectionHeading title={t("screens.activityActionsHeading")} />
@@ -1356,55 +1351,44 @@ export function ActivityScreen() {
           ))}
         </Card>
       )}
-      {filter === "all" && (
-        <Card>
-          <SectionHeading title={t("screens.activityTimelineHeading")} />
-          {w.activity.length ? (
-            w.activity.map((a, i) => (
-              <View
-                key={a.id}
-                style={[
-                  s.row,
-                  {
-                    alignItems: "flex-start",
-                    gap: 14,
-                    paddingVertical: 12,
-                    borderTopWidth: i ? 1 : 0,
-                    borderTopColor: colors.line,
-                  },
-                ]}
-              >
-                <View style={[s.iconBox, { height: 34, width: 34, backgroundColor: colors.paper }]}>
-                  <Clock3 size={16} color={colors.muted} />
-                </View>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={s.text}>{runtimeLabel(a.title)}</Text>
-                  <Text style={s.muted}>{resultSummary(a.detail)}</Text>
-                  <Text style={s.small}>
-                    {dateLabel(a.date)} · {timeLabel(a.date)}
-                  </Text>
-                </View>
-                <Chip>{statusLabel(a.status)}</Chip>
+      <Card>
+        <SectionHeading title={t("screens.activityTimelineHeading")} />
+        {w.activity.length ? (
+          w.activity.map((a, i) => (
+            <View
+              key={a.id}
+              style={[
+                s.row,
+                {
+                  alignItems: "flex-start",
+                  gap: 14,
+                  paddingVertical: 12,
+                  borderTopWidth: i ? 1 : 0,
+                  borderTopColor: colors.line,
+                },
+              ]}
+            >
+              <View style={[s.iconBox, { height: 34, width: 34, backgroundColor: colors.paper }]}>
+                <Clock3 size={16} color={colors.muted} />
               </View>
-            ))
-          ) : (
-            <Empty
-              icon={Clock3}
-              title={t("screens.activityEmptyTitle")}
-              detail={t("screens.activityEmptyDetail")}
-            />
-          )}
-        </Card>
-      )}
-      {filter === "review" && !actions.length && (
-        <Card>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={s.text}>{runtimeLabel(a.title)}</Text>
+                <Text style={s.muted}>{resultSummary(a.detail)}</Text>
+                <Text style={s.small}>
+                  {dateLabel(a.date)} · {timeLabel(a.date)}
+                </Text>
+              </View>
+              <Chip>{statusLabel(a.status)}</Chip>
+            </View>
+          ))
+        ) : (
           <Empty
-            icon={ShieldCheck}
-            title={t("screens.activityCaughtUpTitle")}
-            detail={t("screens.activityCaughtUpDetail")}
+            icon={Clock3}
+            title={t("screens.activityEmptyTitle")}
+            detail={t("screens.activityEmptyDetail")}
           />
-        </Card>
-      )}
+        )}
+      </Card>
     </View>
   );
 }

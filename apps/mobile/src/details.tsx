@@ -1027,8 +1027,23 @@ function FileDetail({ file: f }: { file: Artifact }) {
  */
 function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
   const { close } = useWorkspace();
+  const { t } = useTranslation();
   const html = useMemo(() => renderArtifactHtml(artifact), [artifact]);
   const hasHtmlPreview = useMemo(() => artifactHasHtmlPreview(artifact), [artifact]);
+  // 洞察三段只在 artifact.data 明确提供时展示（工作台卡面折叠，详情浮层里读全文）。
+  const data = (artifact.data ?? {}) as Record<string, unknown>;
+  const field = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = data[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+    return undefined;
+  };
+  const sections = [
+    { label: t("ui.insightBasis"), value: field("basis", "evidence", "evidenceSummary") },
+    { label: t("ui.insightLimits"), value: field("limits", "caveats", "unknowns") },
+    { label: t("ui.insightRevisit"), value: field("revisit", "reviewAt", "revisitAt") },
+  ].filter((item) => !!item.value);
   return (
     <Sheet
       title={artifact.title}
@@ -1036,6 +1051,16 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
       onClose={close}
       fullscreen
     >
+      {sections.length > 0 && (
+        <View style={{ gap: 12, marginBottom: 16 }}>
+          {sections.map((item) => (
+            <View key={item.label} style={{ gap: 3 }}>
+              <Text style={s.label}>{item.label}</Text>
+              <Text style={s.muted}>{item.value}</Text>
+            </View>
+          ))}
+        </View>
+      )}
       <HtmlPreview html={html} title={artifact.title} interactive={hasHtmlPreview} />
     </Sheet>
   );

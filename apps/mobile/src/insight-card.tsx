@@ -39,6 +39,7 @@ export function InsightCard({
   onToggleSave,
   saved = false,
   collapsed = false,
+  showSections = true,
   accessibilityLabel,
   style,
 }: {
@@ -63,6 +64,8 @@ export function InsightCard({
   onToggleSave?: () => void;
   saved?: boolean;
   collapsed?: boolean;
+  /** 是否在卡面展开三段；工作台首屏传 false，把三段留给详情浮层。 */
+  showSections?: boolean;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
@@ -117,6 +120,7 @@ export function InsightCard({
         </Text>
       )}
       {!collapsed &&
+        showSections &&
         sections.map((item) => (
           <View key={item.label} style={{ gap: 2, marginTop: 2 }}>
             <Text style={[typography.eyebrow, { color: colors.faint }]}>{item.label}</Text>
