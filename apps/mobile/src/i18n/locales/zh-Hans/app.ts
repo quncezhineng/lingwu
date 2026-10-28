@@ -104,6 +104,7 @@ const app = {
   "app.noRecentAnalyses": "你的研究记录会出现在这里。",
   "app.agentWatching": "{name}在为你关注市场",
   "app.activeAnalyses": "{count} 项分析正在进行",
+  "app.agentSettingsLabel": "打开{name}的智能体设置",
   "app.personalSpace": "个人空间",
   "app.personalInvestmentSpace": "个人投资空间",
   "app.settingsLabel": "设置",

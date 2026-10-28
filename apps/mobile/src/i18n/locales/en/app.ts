@@ -107,6 +107,7 @@ const app = {
   "app.noRecentAnalyses": "Your research history will appear here.",
   "app.agentWatching": "{name} is watching the market",
   "app.activeAnalyses": "{count} active analyses",
+  "app.agentSettingsLabel": "Open agent settings for {name}",
   "app.personalSpace": "Personal space",
   "app.personalInvestmentSpace": "Personal investment space",
   "app.settingsLabel": "Settings",

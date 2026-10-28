@@ -5,6 +5,34 @@
 
 ## 变更记录
 
+### 2026-10-28 · 视觉重构收尾：清除紫色品牌残留并统一图标线宽（遵循已确认 Doubao 规范）
+
+**背景**
+
+用户基于「Doubao Copy」设计系统发起前端 UI 视觉重构。本次会话 Design Canvas 暂不可用，因此以会话中已沉淀并经代码固化的 Doubao 规范（中性面阶梯、边框优先弱阴影、圆角体系、图标线宽 1.8/2/0、品牌色隔离）为基准，并维持当前蓝色（`#3A83F7`）品牌主色、不回归紫色 `#4B3FE3`（经用户确认）。
+
+**实现**
+
+- `apps/mobile/src/artifact-html.ts`：产物 HTML 模板 5 处紫色残留改为蓝色系——
+  - `.chip` 标签底色 `#E5EAFF` → `#EDF3FF`（对齐 `colors.sky` 轻蓝底座），文字 `#4B3FE3` → `#245FC4`（`colors.primaryStrong`，保证浅底小字对比度）。
+  - `.summary` 左侧强调条、`.summary a` 链接、`.summary code` 行内代码、`.bar-fill` 分配条填充统一 `#4B3FE3` → `#3A83F7`（`colors.primary`）。
+- `apps/mobile/src/portfolio-screen.tsx`：`ALLOCATION_COLORS` 分配色板去紫——首色 `#4B3FE3` → `#3A83F7`（品牌主色），次色 `#6E5AF0` → `#2FB3FF`（明亮青蓝，与 `#3C7FB1` 钢蓝保持区分度）。
+- `apps/mobile/src/research.ts`：研报打印模板链接色 `#4b3fe3` → `#3A83F7`。
+- `apps/mobile/src/preferences-screen.tsx`：8 处图标线宽偏差统一回常规档 1.8（`1.7`×6、`1.5`×1、`1.6`×1），符合「常规 1.8 / 强调 2 / 填充 0」图标规范。
+
+**验证**
+
+- 全库 grep `#4B3FE3` / `#6E5AF0` / `#E5EAFF`：`apps/` 与 `packages/` 0 命中，紫色彻底清零。
+- 组件层硬编码色值审计：除 `ui.tsx` 设计令牌、图表色板、自包含 HTML 模板与 `shadowColor` 外，无散落色值。
+- 测试无颜色断言引用：`*.test.*` 对 `ALLOCATION_COLORS` / `bar-fill` / 相关色值 0 命中。
+- `pnpm typecheck`（server + mobile）退出码 0；`pnpm test`：772 项测试全部通过 / 0 失败。
+
+**注意**
+
+- 本次不回归紫色：`ui.tsx` 品牌主操作保留 `#3A83F7`；品牌位图 `assets/logo.png` 维持蓝色系，无需替换。
+- 依据会话中确认的 Doubao 视觉规范执行；「Doubao Copy」设计库（V.3RSOA.PBS1K2）本次 Design Canvas 不可用，尺寸/间距/圆角体系的最终复核待设计库恢复后进行。
+- 图标线宽规范已内置于 `apps/mobile/src/icons/index.tsx`（`DEFAULT_STROKE_WIDTH = 1.8`），后续新增图标默认即合规。
+
 ### 2026-10-27 · render.yaml 补齐每日简报定时调度环境变量（O2）
 
 **背景**

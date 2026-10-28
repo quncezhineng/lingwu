@@ -378,7 +378,21 @@ export function Rail({ name }: { name: string }) {
           borderTopColor: colors.line,
         }}
       >
-        <View style={[s.row, { gap: 10, paddingHorizontal: 4 }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("app.agentSettingsLabel", { name })}
+          onPress={() => open({ type: "personality" })}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            marginHorizontal: -4,
+            paddingHorizontal: 8,
+            paddingVertical: 8,
+            borderRadius: 9,
+            backgroundColor: pressed ? colors.overlay1 : "transparent",
+          })}
+        >
           <View
             style={{
               width: 34,
@@ -399,7 +413,7 @@ export function Rail({ name }: { name: string }) {
               {t("app.activeAnalyses", { count: activeCount })}
             </Text>
           </View>
-        </View>
+        </Pressable>
         <View style={[s.row, { gap: 6, paddingHorizontal: 2, paddingBottom: 4 }]}>
           <Pressable
             accessibilityRole="button"

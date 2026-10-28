@@ -250,10 +250,10 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
     font: 14px/1.6 -apple-system, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
   }
   .page { max-width: 780px; margin: 24px auto; background: #FFFFFF; border: 1px solid #E7EAEF; border-radius: 14px; padding: 28px 32px; }
-  .chip { display: inline-block; padding: 3px 10px; border-radius: 8px; background: #E5EAFF; color: #4B3FE3; font-size: 12px; font-weight: 600; }
+  .chip { display: inline-block; padding: 3px 10px; border-radius: 8px; background: #EDF3FF; color: #245FC4; font-size: 12px; font-weight: 600; }
   h1 { margin: 10px 0 4px; font-size: 22px; line-height: 1.35; }
   .meta { margin: 0 0 18px; color: #737373; font-size: 13px; }
-  .summary { margin: 0 0 22px; padding: 14px 16px; background: #EFF1F4; border-left: 3px solid #4B3FE3; border-radius: 10px; color: #404040; }
+  .summary { margin: 0 0 22px; padding: 14px 16px; background: #EFF1F4; border-left: 3px solid #3A83F7; border-radius: 10px; color: #404040; }
   .summary > :first-child { margin-top: 0; }
   .summary > :last-child { margin-bottom: 0; }
   .summary h1, .summary h2, .summary h3, .summary h4, .summary h5, .summary h6 { color: #0E1115; line-height: 1.4; margin: 18px 0 8px; }
@@ -263,9 +263,9 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
   .summary p { margin: 0 0 10px; }
   .summary ul, .summary ol { margin: 0 0 12px; padding-left: 22px; }
   .summary li + li { margin-top: 4px; }
-  .summary a { color: #4B3FE3; }
+  .summary a { color: #3A83F7; }
   .summary blockquote { margin: 12px 0; padding: 4px 0 4px 14px; border-left: 3px solid #D5DBE3; color: #737373; }
-  .summary code { padding: 1px 5px; border-radius: 4px; background: #E7EAEF; color: #4B3FE3; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .summary code { padding: 1px 5px; border-radius: 4px; background: #E7EAEF; color: #3A83F7; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .summary pre { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: #1F2430; color: #D7DAE0; overflow: auto; }
   .summary pre code { padding: 0; background: transparent; color: inherit; }
   .block { margin-top: 24px; }
@@ -286,7 +286,7 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
   .bar-row { display: grid; grid-template-columns: minmax(90px, 22%) 1fr 90px; align-items: center; gap: 12px; margin: 8px 0; }
   .bar-name { font-size: 13px; color: #404040; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bar { height: 8px; border-radius: 6px; background: #E7EAEF; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 6px; background: #4B3FE3; }
+  .bar-fill { height: 100%; border-radius: 6px; background: #3A83F7; }
   .bar-value { font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
   .empty { color: #A1A1A1; }
   .note { color: #A1A1A1; font-size: 12px; }

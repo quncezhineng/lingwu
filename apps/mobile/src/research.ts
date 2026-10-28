@@ -318,7 +318,7 @@ export function researchReportDocument(report: ResearchReport, labels: ReportLab
   .badge { display: inline-block; margin: 4px 0 10px; padding: 4px 10px; border-radius: 999px; background: rgba(226,121,0,.12); color: #994f00; font-size: 12px; font-weight: 600; }
   .muted { color: #737373; font-size: 12px; }
   footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid #e7eaef; }
-  a { color: #4b3fe3; word-break: break-all; }
+  a { color: #3A83F7; word-break: break-all; }
   @media print {
     body { background: #fff; }
     main { width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; }

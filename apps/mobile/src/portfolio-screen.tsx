@@ -53,8 +53,8 @@ import {
 import { useWorkspace } from "./workspace";
 
 const ALLOCATION_COLORS = [
-  "#4B3FE3",
-  "#6E5AF0",
+  "#3A83F7",
+  "#2FB3FF",
   "#3C7FB1",
   "#2A9D8F",
   "#C9922E",

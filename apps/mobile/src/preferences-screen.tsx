@@ -67,7 +67,7 @@ function MemoryCard({
       <View style={{ gap: 11 }}>
         <View style={[s.between]}>
           <View style={[s.row, { gap: 7 }]}>
-            <Heart size={13} strokeWidth={1.7} color={colors.primary} />
+            <Heart size={13} strokeWidth={1.8} color={colors.primary} />
             <Text style={{ fontSize: 10.5, color: colors.muted }}>{t("preferences.type")}</Text>
           </View>
           <Text style={{ fontSize: 10, color: colors.faint }}>
@@ -156,7 +156,7 @@ function MemoryCard({
                 backgroundColor: pressed ? colors.overlay1 : "transparent",
               })}
             >
-              <Pencil size={14} strokeWidth={1.7} color={colors.muted} />
+              <Pencil size={14} strokeWidth={1.8} color={colors.muted} />
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -171,7 +171,7 @@ function MemoryCard({
                 backgroundColor: pressed ? colors.errorSoft : "transparent",
               })}
             >
-              <Trash2 size={14} strokeWidth={1.7} color={colors.muted} />
+              <Trash2 size={14} strokeWidth={1.8} color={colors.muted} />
             </Pressable>
           </View>
         )}
@@ -273,7 +273,7 @@ export function PreferencesScreen() {
             backgroundColor: colors.paper,
           }}
         >
-          <Heart size={20} strokeWidth={1.7} color={colors.primary} />
+          <Heart size={20} strokeWidth={1.8} color={colors.primary} />
         </View>
         <View style={{ flex: 1, gap: 5 }}>
           <Text style={{ fontSize: 18, lineHeight: 26, fontWeight: "600", color: colors.text }}>
@@ -313,7 +313,7 @@ export function PreferencesScreen() {
               backgroundColor: colors.sky,
             }}
           >
-            <CircleDollarSign size={18} strokeWidth={1.7} color={colors.primary} />
+            <CircleDollarSign size={18} strokeWidth={1.8} color={colors.primary} />
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={s.heading}>{t("app.titlePortfolio")}</Text>
@@ -323,7 +323,7 @@ export function PreferencesScreen() {
             <Text style={{ fontSize: 11, color: colors.muted }}>
               {t("preferences.openPortfolio")}
             </Text>
-            <ChevronRight size={13} strokeWidth={1.7} color={colors.faint} />
+            <ChevronRight size={13} strokeWidth={1.8} color={colors.faint} />
           </View>
         </Pressable>
       </View>
@@ -381,7 +381,7 @@ export function PreferencesScreen() {
         </View>
       ) : (
         <View style={[s.card, { alignItems: "center", paddingVertical: 42, gap: 10 }]}>
-          <Heart size={26} strokeWidth={1.5} color={colors.faint} />
+          <Heart size={26} strokeWidth={1.8} color={colors.faint} />
           <Text style={s.heading}>{t("preferences.emptyTitle")}</Text>
           <Text style={[s.muted, { textAlign: "center", maxWidth: 420 }]}>
             {t("preferences.emptyDetail")}
@@ -390,7 +390,7 @@ export function PreferencesScreen() {
       )}
 
       <View style={[s.row, { gap: 7 }]}>
-        <ShieldCheck size={14} strokeWidth={1.6} color={colors.faint} />
+        <ShieldCheck size={14} strokeWidth={1.8} color={colors.faint} />
         <Text style={[s.small, { flex: 1 }]}>{t("preferences.privacy")}</Text>
       </View>
       <ErrorNotice error={error || workspaceError} />
