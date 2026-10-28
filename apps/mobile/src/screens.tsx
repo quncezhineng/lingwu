@@ -1496,7 +1496,7 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
       name: t("screens.connectionsModelLabel"),
       icon: Cpu,
       brand: undefined,
-      connected: Boolean(w.runtime.model) && modelOptions.length > 0,
+      connected: Boolean(w.runtime.model),
       group: "model",
     },
     {

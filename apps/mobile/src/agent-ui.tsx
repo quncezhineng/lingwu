@@ -1307,7 +1307,7 @@ export function GoalsScreen() {
   // 已停止的盯盘不再出现在列表里（服务端无删除接口，停止即视为移除）。
   const monitors = (data?.monitors || []).filter((item) => item.status !== "stopped");
   return (
-    <View style={{ gap: 22 }}>
+    <View style={{ gap: 12 }}>
       <AgentStatus />
       <View style={{ gap: 8 }}>
         {/* H2：页面 H1 已叫「盯盘与提醒」，这里不再重复分区标题；H3：不再用 green 语义色做追踪标识 */}
@@ -1330,19 +1330,7 @@ export function GoalsScreen() {
       </View>
       <View style={{ height: 1, backgroundColor: colors.line }} />
       <View style={{ gap: 8 }}>
-        <View style={[s.row, { gap: 10, marginBottom: 5 }]}>
-          <View
-            style={{
-              width: 16,
-              height: 16,
-              borderRadius: 7,
-              borderWidth: 5,
-              borderColor: colors.lineStrong,
-              backgroundColor: colors.primary,
-            }}
-          />
-          <Text style={[s.heading, { color: colors.primaryStrong }]}>{t("app.titleGoals")}</Text>
-        </View>
+        {/* I5：页面 H1 已叫「盯盘与提醒」，目标分区不再重复同名标题 */}
         {data?.goals.map((item) => (
           <Pressable
             key={item.id}

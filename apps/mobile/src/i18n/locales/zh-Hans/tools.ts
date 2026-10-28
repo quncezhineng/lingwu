@@ -73,6 +73,7 @@ const tools = {
   "tools.approvalAllowOnce": "允许一次",
   "tools.approvalDeny": "拒绝",
   "tools.approvalViewDetails": "查看完整详情",
+  "tools.approvalDetailsShort": "详情",
   "tools.approvalOneAtATime": "此类操作仅按次批准。",
   "tools.approvalShowAll": "展开全部",
   "tools.approvalShowLess": "收起",

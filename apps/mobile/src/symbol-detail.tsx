@@ -15,7 +15,6 @@ import {
   Linking,
   Platform,
   Pressable,
-  Switch,
   Text,
   TextInput,
   View,
@@ -58,6 +57,7 @@ import {
   researchReportDocument,
   startResearch,
 } from "./research";
+import { Toggle } from "./toggle";
 import {
   Button,
   Card,
@@ -167,13 +167,11 @@ function AlertRow({
               : ""}
           </Text>
         </Pressable>
-        <Switch
+        <Toggle
           value={alert.enabled}
           disabled={busy}
           onValueChange={onToggle}
-          trackColor={{ false: colors.lineStrong, true: colors.primary }}
-          thumbColor={colors.paper}
-          accessibilityLabel={t("research.enabled")}
+          label={t("research.enabled")}
         />
       </View>
       {confirming ? (
@@ -1009,12 +1007,10 @@ export function SymbolDetailSheet({
           </View>
           <View style={[s.between, { minHeight: 40 }]}>
             <Text style={[s.text, { fontSize: 14 }]}>{t("research.enabled")}</Text>
-            <Switch
+            <Toggle
               value={form.enabled}
               onValueChange={(enabled) => setForm({ ...form, enabled })}
-              trackColor={{ false: colors.lineStrong, true: colors.primary }}
-              thumbColor={colors.paper}
-              accessibilityLabel={t("research.enabled")}
+              label={t("research.enabled")}
             />
           </View>
           <View style={[s.row, { gap: 10 }]}>

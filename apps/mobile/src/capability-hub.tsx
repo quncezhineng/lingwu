@@ -21,6 +21,7 @@ import {
   X,
 } from "./icons";
 import { ConnectionsScreen } from "./screens";
+import { StatusBadge } from "./status-badge";
 import { breakpoints } from "./theme";
 import { appBrands, colors, Empty, fonts, Sheet, s, serviceBrands, statusColors } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -85,13 +86,6 @@ const STATE_KEYS: Record<CapabilityState, TranslationKey> = {
   connected: "agent.hubStateConnected",
   available: "agent.hubStateAvailable",
   open: "agent.hubStateOpen",
-};
-
-const STATE_COLORS: Record<CapabilityState, string> = {
-  ready: colors.primary,
-  connected: colors.success,
-  available: colors.muted,
-  open: colors.text,
 };
 
 function chunk<T>(items: T[], size: number) {
@@ -280,17 +274,10 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
         >
           {item.source}
         </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            color: STATE_COLORS[item.state],
-            fontSize: 11,
-            lineHeight: 16,
-            fontFamily: fonts.sans,
-          }}
-        >
-          {t(STATE_KEYS[item.state])}
-        </Text>
+        <StatusBadge
+          tone={item.state === "connected" || item.state === "ready" ? "done" : "paused"}
+          label={t(STATE_KEYS[item.state])}
+        />
       </View>
     </Pressable>
   );
@@ -447,7 +434,8 @@ export function CapabilityHubScreen() {
   const browserConnected = workspace.connections.some(
     (connection) => connection.id === "browser" && connection.status === "connected",
   );
-  const modelConnected = workspace.runtime.configured || Boolean(workspace.runtime.model);
+  // 与连接器面板同一口径：选中模型即视为已连接（不再看 modelOptions 是否可切换）
+  const modelConnected = Boolean(workspace.runtime.model);
   const openConnections = () => setConnectionsOpen(true);
   const builtInSource = t("agent.hubSourceLingwu");
   const workspaceSource = t("agent.hubSourceWorkspace");

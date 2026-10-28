@@ -58,7 +58,7 @@ function MemoryCard({
         {
           flexGrow: 1,
           flexBasis: 320,
-          minHeight: 172,
+          minHeight: 132,
           padding: 18,
           gap: 11,
           justifyContent: "space-between",
@@ -66,11 +66,8 @@ function MemoryCard({
       ]}
     >
       <View style={{ gap: 11 }}>
-        <View style={[s.between]}>
-          <View style={[s.row, { gap: 7 }]}>
-            <Heart size={13} color={colors.primary} />
-            <Text style={{ fontSize: 10, color: colors.muted }}>{t("preferences.type")}</Text>
-          </View>
+        {/* I6：四类分类契约落实前，不再重复展示与页面同名的「投资偏好」标签，只保留日期 */}
+        <View style={{ alignItems: "flex-end" }}>
           <Text style={{ fontSize: 10, color: colors.faint }}>
             {Number.isNaN(date.getTime())
               ? memory.createdAt

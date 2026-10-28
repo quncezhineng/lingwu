@@ -288,7 +288,10 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
   const bio = profile.bio || t("app.profileUnset");
   // 头像优先用 Supabase 里的头像地址，取不到再退回昵称/邮箱首字母。
   const initial = (profile.displayName || profile.email || "?").trim().charAt(0).toUpperCase();
-  const expiresAt = new Date(profile.expiresAt).toISOString();
+  // I8：接口缺少 expiresAt 时不能直接 toISOString（会抛错导致整页白屏）
+  const expiresRaw = profile.expiresAt ? new Date(profile.expiresAt) : undefined;
+  const expiresAt =
+    expiresRaw && !Number.isNaN(expiresRaw.getTime()) ? expiresRaw.toISOString() : undefined;
   return (
     <View style={{ gap: 20 }}>
       <Card style={{ alignItems: "center", gap: 8, paddingVertical: 20 }}>
@@ -340,7 +343,9 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
             divided
             icon={CalendarClock}
             label={t("app.profileSessionExpires")}
-            value={`${dateLabel(expiresAt)} ${timeLabel(expiresAt)}`}
+            value={
+              expiresAt ? `${dateLabel(expiresAt)} ${timeLabel(expiresAt)}` : t("app.profileUnset")
+            }
           />
         </Card>
       </View>

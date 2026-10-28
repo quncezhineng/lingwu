@@ -264,6 +264,14 @@ export function ApprovalCard({
             {statusText(action.status, t)}
           </Text>
           <Text style={styles.time}>{requestTime(action.createdAt)}</Text>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => onOpenDetails(action)}
+            style={({ pressed }) => [pressed && styles.detailsPressed, { borderRadius: 7 }]}
+          >
+            <Text style={styles.detailsLink}>{t("tools.approvalDetailsShort")}</Text>
+          </Pressable>
         </View>
         {!!(error || action.error) && <ErrorNotice error={error || action.error} />}
       </View>
@@ -505,6 +513,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper,
   },
   resolvedSummary: { flex: 1, color: colors.muted, fontSize: 13 },
+  /** 折叠态的「详情」文字链。 */
+  detailsLink: { color: colors.link, fontSize: 11, lineHeight: 16 },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",

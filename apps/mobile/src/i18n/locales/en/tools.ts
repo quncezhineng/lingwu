@@ -73,6 +73,7 @@ const tools = {
   "tools.approvalAllowOnce": "Allow once",
   "tools.approvalDeny": "Deny",
   "tools.approvalViewDetails": "Review full details",
+  "tools.approvalDetailsShort": "Details",
   "tools.approvalOneAtATime": "This action is approved one at a time.",
   "tools.approvalShowAll": "Show all",
   "tools.approvalShowLess": "Show less",

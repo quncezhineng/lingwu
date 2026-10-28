@@ -1245,9 +1245,10 @@ export function ChatScreen({
                     )
                     .slice(0, 2)
                     .reverse()
-                    .map((artifact, index, items) =>
-                      // 最新一条用洞察卡（衬线标题 + 可读结论），其余保持产物卡
-                      index === items.length - 1 ? (
+                    .map((artifact) =>
+                      // 洞察卡只给「结论型」产物（研究报告 / 报告），其余一律产物卡；
+                      // 市场简报有自己的简报卡，不在这里冒充洞察。
+                      artifact.kind === "research_report" || artifact.kind === "report" ? (
                         <InsightCard
                           key={artifact.id}
                           eyebrow={`${t("workbench.insightCard")} · ${statusLabel(artifact.kind)}`}
