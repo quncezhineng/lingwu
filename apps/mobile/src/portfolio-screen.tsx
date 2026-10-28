@@ -36,6 +36,7 @@ import {
 import { ReturnComparisonChart } from "./portfolio-chart";
 import { HoldingFormSheet, PortfolioCreateSheet } from "./portfolio-forms";
 import { ImportWizard } from "./portfolio-import";
+import { breakpoints } from "./theme";
 import {
   Button,
   Card,
@@ -956,7 +957,7 @@ export function PortfolioScreen() {
   const { api, notify, open } = useWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
-  const desktop = width >= 900;
+  const desktop = width >= breakpoints.desktop;
   const state = usePortfolioState();
   const [createOpen, setCreateOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);

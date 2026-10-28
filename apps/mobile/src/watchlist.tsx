@@ -52,6 +52,7 @@ import {
 import { directionOf } from "./market-format";
 import { QuoteCard } from "./quote-card";
 import { availabilityFromQuote, type QuoteAvailability, useQuotes } from "./quotes";
+import { breakpoints, layout, space } from "./theme";
 import {
   Button,
   Card,
@@ -723,7 +724,13 @@ export function WatchlistScreen() {
     [list],
   );
   const { quotes, retry } = useQuotes(api, quoteSymbols, { refreshMs: 60_000 });
-  const columns = width >= 900 ? 3 : width >= 600 ? 2 : 1;
+  // 栅格列数按「内容宽度」而不是窗口宽度计算：桌面壳要扣掉侧栏与页面左右 padding，
+  // 否则 1000 宽附近会出现「壳层已进入桌面、内容区只剩 584」的断点悬崖。
+  const contentWidth =
+    width >= breakpoints.desktop
+      ? width - layout.sidebar - space.page * 2
+      : width - space.pageMobile * 2;
+  const columns = contentWidth >= 960 ? 3 : contentWidth >= 560 ? 2 : 1;
   const cardWidth = columns === 1 ? "100%" : columns === 2 ? "48%" : "31.5%";
 
   const counts = useMemo(() => {

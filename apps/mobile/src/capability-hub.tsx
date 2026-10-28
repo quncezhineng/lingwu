@@ -21,6 +21,7 @@ import {
   X,
 } from "./icons";
 import { ConnectionsScreen } from "./screens";
+import { breakpoints } from "./theme";
 import { appBrands, colors, Empty, fonts, Sheet, s, serviceBrands, statusColors } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -428,7 +429,7 @@ export function CapabilityHubScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
 
-  const desktop = width >= 900;
+  const desktop = width >= breakpoints.desktop;
   const railWidth = desktop ? 232 : 0;
   const pagePadding = desktop ? 84 : 44;
   const contentWidth = Math.max(0, Math.min(width - railWidth, 1340) - pagePadding);

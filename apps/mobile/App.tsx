@@ -41,6 +41,7 @@ import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
 import { GlobalSearchSheet } from "./src/search-sheet";
 import { ACCOUNT_NAV, BrandMark, ChatsColumn, MOBILE_NAV, Rail } from "./src/shell";
+import { breakpoints } from "./src/theme";
 import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
 import {
   Button,
@@ -408,7 +409,7 @@ function WorkspaceShell({
   const [threadsOpen, setThreadsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const { width } = useWindowDimensions();
-  const desktop = width >= 900;
+  const desktop = width >= breakpoints.desktop;
   // 工作台采用宽幅编辑画布，右侧信息轨由页面内部负责。
   const contentMax = desktop ? 1340 : 760;
   const pending =

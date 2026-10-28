@@ -57,6 +57,7 @@ import { QuestionCard, taskHasQuestion } from "./question-card";
 import { QuoteToolCard } from "./quote-tool-card";
 import { ReminderToolCard } from "./reminder-tool-card";
 import { SearchToolCard } from "./search-tool-card";
+import { breakpoints } from "./theme";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
 import { type Selection, useLingWuThread } from "./threads";
 import { parseToolArguments, ToolStep, type ToolStepStatus } from "./tool-step";
@@ -418,9 +419,9 @@ export function ChatScreen({
 }) {
   const { api, workspace: w, refresh, navigate, open } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
-  // 宽屏（>= 900，与 App 外壳的 desktop 判断一致）时文件产物面板停靠为右侧栏；
+  // 宽屏（>= breakpoints.desktop，与 App 外壳的 desktop 判断一致）时文件产物面板停靠为右侧栏；
   // 窄屏回退为覆盖式弹层，避免把对话列压缩到无法阅读。
-  const wide = windowWidth >= 900;
+  const wide = windowWidth >= breakpoints.desktop;
   const { t } = useTranslation();
   const { data: agentWorkspace, refresh: refreshAgent } = useAgentWorkspace();
   const { enabled: richThreads, mainId, claimPrompt } = useLingWuThread();

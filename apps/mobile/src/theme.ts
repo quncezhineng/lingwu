@@ -316,6 +316,24 @@ export const shadow = {
 } as const satisfies Record<string, ViewStyle>;
 
 /**
+ * 断点。
+ *
+ * 与 Demo 一致：<760 为 App 单列 + 底栏；≥1000 为 Web 三栏（侧栏 + 内容 + 右栏）；
+ * ≥1340 为超宽内容上限。页面里不再写裸数字，统一从这里取。
+ */
+export const breakpoints = {
+  mobile: 760,
+  desktop: 1000,
+  wide: 1340,
+} as const;
+
+/** 壳层固定宽度（侧栏、会话列表），页面计算内容宽度时复用。 */
+export const layout = {
+  sidebar: 232,
+  chats: 248,
+} as const;
+
+/**
  * 图标线宽：常规 1.65 / 底栏 1.7 / 导航激活 1.9。
  *
  * 除这三档与填充态 0 之外不允许其它线宽。

@@ -46,6 +46,7 @@ import {
   X,
 } from "./icons";
 import { relativeDate } from "./relative-date";
+import { layout } from "./theme";
 import { useLingWuThread } from "./threads";
 import { Button, colors, ErrorNotice, fonts, Mascot, s, shadow } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -81,10 +82,10 @@ export const ACCOUNT_NAV: NavItem = {
   icon: CircleUserRound,
 };
 
-export const SIDEBAR_WIDTH = 232;
+export const SIDEBAR_WIDTH = layout.sidebar;
 /** 兼容仍在引用的旧常量名。 */
 export const RAIL_WIDTH = SIDEBAR_WIDTH;
-export const CHATS_WIDTH = 248;
+export const CHATS_WIDTH = layout.chats;
 
 function errorText(e: unknown) {
   return e instanceof Error ? e.message : String(e);

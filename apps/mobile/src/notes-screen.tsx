@@ -33,6 +33,7 @@ import {
   type ThesisStatus,
   useNotesState,
 } from "./notes";
+import { breakpoints } from "./theme";
 import { Button, Card, Chip, colors, DisclaimerNote, Empty, ErrorNotice, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -680,7 +681,7 @@ export function NotesScreen() {
                 <View
                   key={note.id}
                   style={{
-                    flexBasis: width >= 900 ? "48%" : width >= 600 ? "48%" : "100%",
+                    flexBasis: width >= breakpoints.desktop ? "48%" : width >= 600 ? "48%" : "100%",
                     flexGrow: 1,
                   }}
                 >
