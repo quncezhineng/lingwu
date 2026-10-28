@@ -29,6 +29,8 @@ export interface QuoteView {
   asOf?: string;
   stale?: boolean;
   marketState?: "pre" | "regular" | "post" | "closed";
+  /** 近 12 个采样点的迷你走势；后端未提供时为 undefined（前端不合成）。 */
+  sparkline?: number[];
 }
 
 export type QuoteAvailability =
@@ -52,6 +54,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function num(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** 只接受 ≥2 个有限数字的数组；缺省/脏数据返回 undefined。 */
+function numArray(value: unknown): number[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  if (!value.every((item) => typeof item === "number" && Number.isFinite(item))) return undefined;
+  return value.length >= 2 ? [...(value as number[])] : undefined;
 }
 
 function str(value: unknown): string | undefined {
@@ -104,6 +113,7 @@ export function parseBatchQuotes(payload: unknown): Record<string, QuoteAvailabi
         asOf: str(item.asOf) ?? str(item.as_of),
         stale: item.stale === true,
         marketState: marketStateOf(item.market_state ?? item.marketState),
+        sparkline: numArray(item.sparkline ?? item.points),
       },
     };
   }

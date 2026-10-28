@@ -36,6 +36,29 @@ test("批量报价解析：逐项 ready / unavailable 与错误映射", () => {
   assert.equal(parsed.HANG?.status === "unavailable" ? parsed.HANG.reason : "", "timeout");
 });
 
+test("sparkline：仅接受全部为有限数字且 ≥2 点的数组", () => {
+  const parsed = parseBatchQuotes({
+    quotes: [
+      { symbol: "AAPL", price: 1, sparkline: [1, 2, 3] },
+      { symbol: "MSFT", price: 2, points: [1, 2] },
+      { symbol: "TSLA", price: 3, sparkline: [1] },
+      { symbol: "NVDA", price: 4, sparkline: [1, "x", 3] },
+      { symbol: "AMD", price: 5 },
+    ],
+  });
+  assert.deepEqual(
+    parsed.AAPL?.status === "ready" ? parsed.AAPL.quote.sparkline : undefined,
+    [1, 2, 3],
+  );
+  assert.deepEqual(
+    parsed.MSFT?.status === "ready" ? parsed.MSFT.quote.sparkline : undefined,
+    [1, 2],
+  );
+  assert.equal(parsed.TSLA?.status === "ready" ? parsed.TSLA.quote.sparkline : "x", undefined);
+  assert.equal(parsed.NVDA?.status === "ready" ? parsed.NVDA.quote.sparkline : "x", undefined);
+  assert.equal(parsed.AMD?.status === "ready" ? parsed.AMD.quote.sparkline : "x", undefined);
+});
+
 test("market_state：只接受明确时段，unknown/缺省保持 undefined", () => {
   const parsed = parseBatchQuotes({
     quotes: [

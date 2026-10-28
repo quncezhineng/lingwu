@@ -19,6 +19,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
+import Svg, { Polyline } from "react-native-svg";
 import type { LingWuApi } from "./api";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
@@ -41,6 +42,7 @@ import {
   loadWatchlists,
   type MarketKind,
   refreshWatchlists,
+  removeSymbol,
   type SymbolAlert,
   type SymbolMeta,
   searchSymbols,
@@ -49,7 +51,13 @@ import {
   useWatchlistState,
   type WatchlistSymbol,
 } from "./market";
-import { directionOf } from "./market-format";
+import {
+  currencySymbol,
+  defaultCurrency,
+  directionOf,
+  formatPercent,
+  formatPrice,
+} from "./market-format";
 import { QuoteCard } from "./quote-card";
 import { availabilityFromQuote, type QuoteAvailability, useQuotes } from "./quotes";
 import { breakpoints, layout, space } from "./theme";
@@ -212,12 +220,14 @@ function SymbolCard({
   availability,
   onRetry,
   onPress,
+  onMore,
 }: {
   item: WatchlistSymbol;
   style?: ViewStyle;
   availability?: QuoteAvailability;
   onRetry?: () => void;
   onPress: () => void;
+  onMore?: () => void;
 }) {
   const { t } = useTranslation();
   const { symbol, quote, alerts, unavailable } = item;
@@ -235,15 +245,250 @@ function SymbolCard({
       onPress={onPress}
       style={style}
       footer={
-        alert ? (
-          <AlertBadge alert={alert} />
-        ) : unavailable && !quote ? (
-          <Text style={s.small}>{t("markets.quoteUnavailable")}</Text>
-        ) : undefined
+        <View style={[s.between, { gap: 8, minHeight: 24 }]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            {alert ? (
+              <AlertBadge alert={alert} />
+            ) : unavailable && !quote ? (
+              <Text style={s.small}>{t("markets.quoteUnavailable")}</Text>
+            ) : null}
+          </View>
+          {!!onMore && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("markets.symbolMore", { name: symbol.name })}
+              hitSlop={10}
+              onPress={(event) => {
+                event.stopPropagation();
+                onMore();
+              }}
+              style={({ pressed }) => ({
+                width: 28,
+                height: 24,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 7,
+                backgroundColor: pressed ? colors.overlay1 : "transparent",
+              })}
+            >
+              <MoreHorizontal size={15} color={colors.faint} />
+            </Pressable>
+          )}
+        </View>
       }
     />
   );
 }
+
+/**
+ * 迷你走势：仅当行情显式提供 `sparkline`（≥2 个点）时渲染。
+ * 没有数据时返回 null，由调用方展示「—」，不在前端合成走势（金融图不得造数）。
+ */
+function Sparkline({
+  points,
+  width = 90,
+  height = 24,
+}: {
+  points?: number[];
+  width?: number;
+  height?: number;
+}) {
+  if (!points || points.length < 2) return null;
+  const pad = 2;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = max - min || 1;
+  const coords = points
+    .map((value, index) => {
+      const x = pad + (index / (points.length - 1)) * (width - pad * 2);
+      const y = pad + (1 - (value - min) / span) * (height - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const rising = points[points.length - 1] >= points[0];
+  return (
+    <Svg
+      accessibilityElementsHidden
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      style={{ flexShrink: 0 }}
+    >
+      <Polyline
+        points={coords}
+        fill="none"
+        stroke={rising ? colors.marketUp : colors.marketDown}
+        strokeWidth={1.1}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/** 桌面六列表格：名称/代码 · 现价 · 涨跌额 · 涨跌幅 · 走势 · 操作。 */
+function WatchTable({
+  items,
+  quotes,
+  onOpen,
+  onAnalyze,
+  onRemove,
+}: {
+  items: WatchlistSymbol[];
+  quotes: Record<string, QuoteAvailability>;
+  onOpen: (item: WatchlistSymbol) => void;
+  onAnalyze: (item: WatchlistSymbol) => void;
+  onRemove: (item: WatchlistSymbol) => void;
+}) {
+  const { t } = useTranslation();
+  const header = (label: string, style?: TextStyle) => (
+    <Text style={[{ fontSize: 11, lineHeight: 17, color: colors.muted }, style]}>{label}</Text>
+  );
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: colors.line,
+        borderRadius: 10,
+        backgroundColor: colors.paper,
+        overflow: "hidden",
+      }}
+    >
+      <View style={[s.row, headerRow]}>
+        {header(t("markets.tableName"), { flex: 1.75, minWidth: 155 })}
+        {header(t("markets.tablePrice"), { width: 70, textAlign: "right" })}
+        {header(t("markets.tableChange"), { width: 105, textAlign: "right" })}
+        {header(t("markets.tableChangePercent"), { width: 80, textAlign: "right" })}
+        {header(t("markets.tableTrend"), { width: 90, textAlign: "center" })}
+        {header(t("markets.tableActions"), { width: 111, textAlign: "right" })}
+      </View>
+      {items.map((item, index) => {
+        const availability =
+          quotes[item.symbol.code] ?? availabilityFromQuote(item.quote, item.unavailable);
+        const quote = availability.status === "ready" ? availability.quote : item.quote;
+        const currency = quote?.currency ?? defaultCurrency(item.symbol.market);
+        const change = quote?.change;
+        const changePercent = quote?.changePercent;
+        const direction = directionOf(changePercent ?? 0);
+        const color = changePercent === undefined ? colors.muted : marketDirectionColor(direction);
+        return (
+          <View
+            key={item.symbol.code}
+            style={[
+              s.row,
+              rowStyle,
+              index > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${item.symbol.name} ${item.symbol.code}`}
+              onPress={() => onOpen(item)}
+              style={({ pressed }) => [
+                s.row,
+                { flex: 1, minWidth: 0, gap: 14, paddingVertical: 14 },
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <View style={{ flex: 1.75, minWidth: 155, gap: 2 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
+                >
+                  {item.symbol.name}
+                </Text>
+                <Text numberOfLines={1} style={{ fontSize: 11, color: colors.faint }}>
+                  {item.symbol.code} · {item.symbol.market}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  s.metric,
+                  { width: 70, textAlign: "right", fontSize: 14, color: colors.text },
+                ]}
+              >
+                {quote ? formatPrice(quote.price, currency) : "—"}
+              </Text>
+              <Text style={[s.metric, { width: 105, textAlign: "right", fontSize: 13, color }]}>
+                {change === undefined
+                  ? "—"
+                  : `${change > 0 ? "+" : change < 0 ? "−" : ""}${currencySymbol(currency)}${Math.abs(change).toFixed(2)}`}
+              </Text>
+              <Text style={[s.metric, { width: 80, textAlign: "right", fontSize: 13, color }]}>
+                {changePercent === undefined ? "—" : formatPercent(changePercent)}
+              </Text>
+              <View style={{ width: 90, alignItems: "center" }}>
+                <Sparkline points={quote?.sparkline} />
+                {!quote?.sparkline && (
+                  <Text style={{ fontSize: 10, color: colors.faint }}>
+                    {t("markets.trendUnavailable")}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+            <View style={[s.row, { width: 111, justifyContent: "flex-end", gap: 12 }]}>
+              <Pressable accessibilityRole="button" hitSlop={6} onPress={() => onAnalyze(item)}>
+                <Text style={{ fontSize: 11, color: colors.link }}>
+                  {t("markets.watchlistAnalyze")}
+                </Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" hitSlop={6} onPress={() => onRemove(item)}>
+                <Text style={{ fontSize: 11, color: colors.muted }}>
+                  {t("markets.watchlistRemove")}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** 卡片形态的「⋯」菜单：分析 / 从列表移除。 */
+function SymbolMenu({
+  item,
+  onClose,
+  onAnalyze,
+  onRemove,
+}: {
+  item: WatchlistSymbol;
+  onClose: () => void;
+  onAnalyze: () => void;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Sheet
+      title={item.symbol.name}
+      subtitle={`${item.symbol.code} · ${item.symbol.market}`}
+      onClose={onClose}
+    >
+      <View style={{ gap: 10 }}>
+        <Button primary onPress={onAnalyze}>
+          {t("markets.watchlistAnalyze")}
+        </Button>
+        <Button danger onPress={onRemove}>
+          {t("markets.watchlistRemove")}
+        </Button>
+      </View>
+    </Sheet>
+  );
+}
+
+const headerRow: ViewStyle = {
+  paddingHorizontal: 16,
+  minHeight: 38,
+  gap: 14,
+  backgroundColor: colors.surface,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.line,
+};
+
+const rowStyle: ViewStyle = {
+  paddingHorizontal: 16,
+  gap: 14,
+};
 
 /** 搜索栏 + 下拉匹配面板。 */
 function SymbolSearch({
@@ -684,7 +929,7 @@ function WatchlistSheet({
 }
 
 export function WatchlistScreen() {
-  const { api, navigate, notify, open } = useWorkspace();
+  const { api, navigate, notify, open, ask } = useWorkspace();
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const state = useWatchlistState();
@@ -694,7 +939,18 @@ export function WatchlistScreen() {
   const [sheet, setSheet] = useState<"create" | "edit" | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [menuFor, setMenuFor] = useState<WatchlistSymbol | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<WatchlistSymbol | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shimmer = useShimmer();
+
+  // 离开页面时清掉 6s 撤销计时器，避免在已卸载组件上 setState。
+  useEffect(
+    () => () => {
+      if (undoTimer.current) clearTimeout(undoTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     void loadWatchlists(api, locale);
@@ -732,6 +988,43 @@ export function WatchlistScreen() {
       : width - space.pageMobile * 2;
   const columns = contentWidth >= 960 ? 3 : contentWidth >= 560 ? 2 : 1;
   const cardWidth = columns === 1 ? "100%" : columns === 2 ? "48%" : "31.5%";
+  // ≥1000 用六列表格（信息密度），窄屏回落卡片 + 「⋯」操作（Demo D4）。
+  const table = width >= breakpoints.desktop;
+
+  const openSymbol = (item: WatchlistSymbol) =>
+    open({
+      type: "symbol",
+      symbol: item.symbol,
+      quote: item.quote,
+      watchlist: { id: list?.id ?? "", name: list?.name ?? "" },
+    });
+
+  const analyzeSymbol = (item: WatchlistSymbol) => {
+    ask(
+      t("markets.watchlistAnalyzePrompt", {
+        name: item.symbol.name,
+        code: item.symbol.code,
+      }),
+    );
+    setMenuFor(null);
+  };
+
+  // 移除后保留 6 秒撤销窗口；撤销会把标的重新加回列表（追加到末尾）。
+  const removeItem = (item: WatchlistSymbol) => {
+    if (!list) return;
+    removeSymbol(api, list.id, item.symbol.code);
+    setMenuFor(null);
+    setPendingRemove(item);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setPendingRemove(null), 6000);
+  };
+
+  const undoRemove = () => {
+    if (!pendingRemove || !list) return;
+    addSymbols(api, list.id, [pendingRemove.symbol]);
+    setPendingRemove(null);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+  };
 
   const counts = useMemo(() => {
     const symbols = list?.symbols ?? [];
@@ -877,30 +1170,71 @@ export function WatchlistScreen() {
 
       <SegmentedTabs counts={counts} active={marketFilter} onChange={setMarketFilter} />
 
-      {visibleSymbols.length ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, alignItems: "stretch" }}>
-          {visibleSymbols.map((item) => (
-            <SymbolCard
-              key={item.symbol.code}
-              item={item}
-              availability={quotes[item.symbol.code]}
-              onRetry={retry}
-              style={{
-                width: cardWidth,
-                flexGrow: columns === 1 ? 0 : 1,
-                minWidth: columns === 3 ? 230 : 240,
-              }}
-              onPress={() =>
-                open({
-                  type: "symbol",
-                  symbol: item.symbol,
-                  quote: item.quote,
-                  watchlist: { id: list?.id ?? "", name: list?.name ?? "" },
-                })
-              }
-            />
-          ))}
+      {!!state.degraded && (
+        <View style={{ gap: 8 }}>
+          <ErrorNotice error={t("markets.watchlistLoadError")} />
+          <Button small onPress={() => void loadWatchlists(api, locale, true)}>
+            {t("markets.watchlistRetry")}
+          </Button>
         </View>
+      )}
+
+      {/* 删除撤销条：6 秒内可恢复，aria-live 让读屏用户也能感知 */}
+      {!!pendingRemove && (
+        <View
+          accessibilityLiveRegion="polite"
+          style={[
+            s.between,
+            {
+              gap: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: colors.surfaceSoft,
+            },
+          ]}
+        >
+          <Text style={[s.small, { flex: 1, color: colors.text }]} numberOfLines={1}>
+            {t("markets.watchlistRemoved", { name: pendingRemove.symbol.name })}
+          </Text>
+          <Pressable accessibilityRole="button" hitSlop={10} onPress={undoRemove}>
+            <Text style={[s.small, { color: colors.link, fontWeight: "600" }]}>
+              {t("markets.watchlistUndo")}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {visibleSymbols.length ? (
+        table ? (
+          <WatchTable
+            items={visibleSymbols}
+            quotes={quotes}
+            onOpen={openSymbol}
+            onAnalyze={analyzeSymbol}
+            onRemove={removeItem}
+          />
+        ) : (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, alignItems: "stretch" }}>
+            {visibleSymbols.map((item) => (
+              <SymbolCard
+                key={item.symbol.code}
+                item={item}
+                availability={quotes[item.symbol.code]}
+                onRetry={retry}
+                style={{
+                  width: cardWidth,
+                  flexGrow: columns === 1 ? 0 : 1,
+                  minWidth: columns === 3 ? 230 : 240,
+                }}
+                onPress={() => openSymbol(item)}
+                onMore={() => setMenuFor(item)}
+              />
+            ))}
+          </View>
+        )
       ) : (
         <Empty
           icon={CircleDollarSign}
@@ -948,6 +1282,14 @@ export function WatchlistScreen() {
             updateWatchlist(api, list.id, { name, symbols });
             setSheet(null);
           }}
+        />
+      )}
+      {!!menuFor && (
+        <SymbolMenu
+          item={menuFor}
+          onClose={() => setMenuFor(null)}
+          onAnalyze={() => analyzeSymbol(menuFor)}
+          onRemove={() => removeItem(menuFor)}
         />
       )}
       {menuOpen && list && (

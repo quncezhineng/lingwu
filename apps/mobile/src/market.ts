@@ -35,6 +35,8 @@ export interface Quote {
   volumeRatio?: number;
   currency?: string;
   stale?: boolean;
+  /** 近 12 个采样点的迷你走势；缺省表示无数据，前端不合成。 */
+  sparkline?: number[];
 }
 
 export type AlertKind = "price_break" | "change_threshold" | "volume_spike" | "news";
