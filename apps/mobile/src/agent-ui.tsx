@@ -32,6 +32,7 @@ import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
 import {
   ArrowRight,
+  ArrowUpRight,
   Bell,
   CalendarDays,
   Check,
@@ -779,13 +780,40 @@ export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
   const { t } = useTranslation();
   const { open } = useWorkspace();
   const Icon = artifact.kind === "finance" ? CircleDollarSign : FileText;
+  // 产物卡：独立的「文件产物」视觉，与洞察卡（衬线标题）、计划卡（步骤）、审批卡区分开。
   return (
-    <LinkRow
-      title={artifact.title}
-      detail={`${statusLabel(artifact.kind)} · ${t("agent.artifactOpenDetail")}`}
-      icon={Icon}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={artifact.title}
       onPress={() => open({ type: "artifact", artifact })}
-    />
+      style={({ pressed }) => [
+        {
+          width: "100%",
+          maxWidth: 520,
+          padding: 12,
+          gap: 6,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.line,
+          backgroundColor: pressed ? colors.overlay1 : colors.paper,
+        },
+      ]}
+    >
+      <View style={[s.row, { gap: 10 }]}>
+        <View style={[s.glyph, { width: 34, height: 34, backgroundColor: colors.surface }]}>
+          <Icon size={16} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: 10, lineHeight: 14, color: colors.faint }}>
+            {`${statusLabel(artifact.kind)} · ${t("agent.artifactOpenDetail")}`}
+          </Text>
+          <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
+            {artifact.title}
+          </Text>
+        </View>
+        <ArrowUpRight size={15} color={colors.faint} />
+      </View>
+    </Pressable>
   );
 }
 export function DelegateSheet({ goalId, milestoneId }: { goalId?: string; milestoneId?: string }) {

@@ -242,6 +242,34 @@ export function ApprovalCard({
     }
   }
 
+  // 决议后折叠为一行结果，不再占用整卡（预览与按钮只在 pending 时需要）。
+  if (!pending) {
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.resolvedCard}>
+          {action.status === "executing" ? (
+            <ActivityIndicator size="small" color={colors.muted} />
+          ) : (
+            <StatusIcon
+              size={15}
+              color={action.status === "succeeded" ? colors.success : colors.muted}
+            />
+          )}
+          <Text numberOfLines={1} style={styles.resolvedSummary}>
+            {summary}
+          </Text>
+          <Text
+            style={[styles.statusText, action.status === "succeeded" && styles.statusSucceeded]}
+          >
+            {statusText(action.status, t)}
+          </Text>
+          <Text style={styles.time}>{requestTime(action.createdAt)}</Text>
+        </View>
+        {!!(error || action.error) && <ErrorNotice error={error || action.error} />}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.wrap}>
       <View style={[styles.card, pending && sensitive && styles.sensitiveCard]}>
@@ -374,11 +402,11 @@ export function ApprovalCard({
 
 const styles = StyleSheet.create({
   wrap: { alignSelf: "flex-start", width: "100%", maxWidth: 600 },
-  /** 审批卡：白底 + 1px 描边 + 14px 圆角，靠边框分层而不是阴影。 */
+  /** 审批卡：白底 + 1px 描边 + 11px 圆角，靠边框分层而不是阴影。 */
   card: {
     width: "100%",
     overflow: "hidden",
-    borderRadius: 14,
+    borderRadius: 11,
     backgroundColor: colors.paper,
     borderWidth: 1,
     borderColor: colors.line,
@@ -464,6 +492,19 @@ const styles = StyleSheet.create({
   // 链接型强调文字统一用品牌深紫（colors.primary）。
   detailsText: { color: colors.primaryStrong, fontSize: 12, fontWeight: "500" },
   onceNote: { color: colors.faint, fontSize: 12, lineHeight: 16, textAlign: "center" },
+  /** 决议后的一行结果：只保留标题、状态与时间。 */
+  resolvedCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.paper,
+  },
+  resolvedSummary: { flex: 1, color: colors.muted, fontSize: 13 },
   statusRow: {
     flexDirection: "row",
     alignItems: "center",

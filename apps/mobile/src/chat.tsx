@@ -49,6 +49,7 @@ import { DesktopToolCard } from "./desktop-tool-card";
 import { type TranslationKey, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
 import { ArrowDown, ArrowUp, FileText, Lightbulb, Plus, RotateCcw, Square, X } from "./icons";
+import { InsightCard } from "./insight-card";
 import { confirmedJevSelection, displayJevUserMessage, latestJevPanelId } from "./jev-actions";
 import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
@@ -440,6 +441,8 @@ export function ChatScreen({
   const { copilotkit } = useCopilotKit();
   const renderToolCall = useRenderToolCall();
   const [draft, setDraft] = useState("");
+  // 最近一次提交的文本：停止生成时回填到输入框，避免用户重写。
+  const lastSent = useRef("");
   const [focused, setFocused] = useState(false);
   const [inputHeight, setInputHeight] = useState(44);
   const [showResults, setShowResults] = useState(false);
@@ -686,6 +689,9 @@ export function ChatScreen({
       await copilotkit.stopAgent({ agent });
     } catch (e) {
       setError(t("chat.stopError", { detail: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      // 停止后保留草稿：把刚提交的内容回填到输入框（用户可改写后重发）。
+      if (!draft.trim() && lastSent.current) setDraft(lastSent.current);
     }
   }
   function send() {
@@ -695,6 +701,7 @@ export function ChatScreen({
     if (!busy && !agent.isRunning && !saveError && !queue.getSnapshot().pending.length)
       queue.resume();
     setShowResults(false);
+    lastSent.current = text;
     const files = w.files.filter((f) => attachments.includes(f.id));
     enqueue(
       text +
@@ -1238,9 +1245,20 @@ export function ChatScreen({
                     )
                     .slice(0, 2)
                     .reverse()
-                    .map((artifact) => (
-                      <ArtifactCard key={artifact.id} artifact={artifact} />
-                    ))}
+                    .map((artifact, index, items) =>
+                      // 最新一条用洞察卡（衬线标题 + 可读结论），其余保持产物卡
+                      index === items.length - 1 ? (
+                        <InsightCard
+                          key={artifact.id}
+                          eyebrow={`${t("workbench.insightCard")} · ${statusLabel(artifact.kind)}`}
+                          title={artifact.summary || artifact.title}
+                          meta={artifact.title}
+                          onPress={() => open({ type: "artifact", artifact })}
+                        />
+                      ) : (
+                        <ArtifactCard key={artifact.id} artifact={artifact} />
+                      ),
+                    )}
                 </>
               )}
             </>

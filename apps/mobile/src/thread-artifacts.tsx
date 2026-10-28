@@ -8,6 +8,7 @@ import { BrowserThreadCard } from "./computer";
 import { fileKind } from "./file-kind";
 import { useTranslation } from "./i18n";
 import { ChevronRight, FileText } from "./icons";
+import { PlanCard } from "./plan-card";
 import { QuestionCard, taskHasQuestion } from "./question-card";
 import { Button, colors, ErrorNotice, s } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -111,7 +112,13 @@ export function TaskThreadCard({ task }: { task: AgentTask }) {
   return (
     <View style={{ gap: 12 }}>
       <QuestionCard task={task} agentName={data?.identity.name} />
-      {!hasQuestion && <TaskCard task={task} compact />}
+      {/* 计划卡独立视觉：有步骤就展示步骤列表，不再用任务卡冒充计划卡 */}
+      {!hasQuestion &&
+        (task.plan.length ? (
+          <PlanCard steps={task.plan} title={task.title} />
+        ) : (
+          <TaskCard task={task} compact />
+        ))}
       {detail?.browsers.map((browser) => (
         <BrowserThreadCard key={browser.id} browser={browser} />
       ))}
