@@ -14,6 +14,7 @@ import {
   Trash2,
   X,
 } from "./icons";
+import { breakpoints } from "./theme";
 import { Button, Card, colors, ErrorNotice, Field, fonts, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -248,6 +249,8 @@ export function PreferencesScreen() {
   };
 
   const memories = data?.memories ?? [];
+  // P1-6：≥1000 两列、<1000 单列（用视口断点，与壳层一致）
+  const columns = width >= breakpoints.desktop ? 2 : 1;
 
   return (
     <View style={{ gap: 22 }}>
@@ -358,25 +361,27 @@ export function PreferencesScreen() {
       {memories.length ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {memories.map((memory) => (
-            <MemoryCard
-              key={memory.id}
-              memory={memory}
-              editing={editingId === memory.id}
-              draft={draft}
-              onDraft={setDraft}
-              onEdit={() => {
-                setEditingId(memory.id);
-                setDraft(memory.text);
-                setConfirmId(undefined);
-              }}
-              onCancel={() => setEditingId(undefined)}
-              onSave={() => saveMemory(memory)}
-              onDelete={() => setConfirmId(memory.id)}
-              busy={busy}
-              confirming={confirmId === memory.id}
-              onConfirm={() => deleteMemory(memory)}
-              onCancelConfirm={() => setConfirmId(undefined)}
-            />
+            // P1-6：≥1000 两列、<1000 单列；宽度落在外层容器避免卡片各自计算
+            <View key={memory.id} style={{ width: columns === 2 ? "48.8%" : "100%" }}>
+              <MemoryCard
+                memory={memory}
+                editing={editingId === memory.id}
+                draft={draft}
+                onDraft={setDraft}
+                onEdit={() => {
+                  setEditingId(memory.id);
+                  setDraft(memory.text);
+                  setConfirmId(undefined);
+                }}
+                onCancel={() => setEditingId(undefined)}
+                onSave={() => saveMemory(memory)}
+                onDelete={() => setConfirmId(memory.id)}
+                busy={busy}
+                confirming={confirmId === memory.id}
+                onConfirm={() => deleteMemory(memory)}
+                onCancelConfirm={() => setConfirmId(undefined)}
+              />
+            </View>
           ))}
         </View>
       ) : (
@@ -386,6 +391,9 @@ export function PreferencesScreen() {
           <Text style={[s.muted, { textAlign: "center", maxWidth: 420 }]}>
             {t("preferences.emptyDetail")}
           </Text>
+          <Button primary icon={Plus} onPress={() => setAdding(true)}>
+            {t("preferences.addPreference")}
+          </Button>
         </View>
       )}
 
