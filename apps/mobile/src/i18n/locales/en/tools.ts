@@ -193,7 +193,9 @@ const tools = {
   "tools.fileTapSingle": "1 page · Tap to read the document",
   "tools.fileTapPlural": "{pageCount} pages · Tap to read the document",
   "tools.fileHtmlTap": "Web page · Tap to open",
+  "tools.fileOpenTap": "Tap to open this file",
   "tools.openHtml": "Open {name}",
+  "tools.openFile": "Open {name}",
   "tools.reloadTaskResults": "Reload task results",
   // 浏览器地址校验
   "tools.enterWebsiteAddress":

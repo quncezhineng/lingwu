@@ -6,7 +6,7 @@ import { browserAddress } from "./browser-address";
 import { useComputerDraft } from "./computer-drafts";
 import { computerStatus } from "./computer-status";
 import { LinuxWorkspace } from "./computer-workspace";
-import { fileKind } from "./file-kind";
+import { fileKind, fileTypeName } from "./file-kind";
 import { useTranslation } from "./i18n";
 import { FileText, FolderOpen, Globe2, Monitor, Plus, RefreshCw, Terminal } from "./icons";
 import { Button, Card, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";
@@ -276,7 +276,9 @@ export function ComputerSheet() {
                 detail={
                   fileKind(file) === "html"
                     ? t("screens.filesWebPage")
-                    : t("computer.pdfPages", { count: file.pageCount })
+                    : fileKind(file) === "pdf"
+                      ? t("computer.pdfPages", { count: file.pageCount })
+                      : fileTypeName(file)
                 }
                 onPress={() => open({ type: "file", file })}
               />

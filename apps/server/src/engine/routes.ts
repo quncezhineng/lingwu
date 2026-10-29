@@ -6,12 +6,20 @@ import type {
   AgentMemory,
   AgentNotification,
 } from "../../../../packages/domain/src/agent.ts";
-import { createTaskSchema } from "../../../../packages/domain/src/agent.ts";
+import {
+  createTaskSchema,
+  DEFAULT_MEMORY_CATEGORY,
+  MEMORY_CATEGORIES,
+} from "../../../../packages/domain/src/agent.ts";
 import { AppError } from "../errors.ts";
 import type { AgentService } from "./service.ts";
 
 const text = z.string().trim().min(1).max(4000);
-const memorySchema = z.object({ text, source: z.string().trim().min(1).max(200).optional() });
+const memorySchema = z.object({
+  text,
+  source: z.string().trim().min(1).max(200).optional(),
+  category: z.enum(MEMORY_CATEGORIES).optional(),
+});
 const goalPatchSchema = z.object({
   status: z.enum(["active", "paused", "completed"]).optional(),
   milestones: z
@@ -78,6 +86,9 @@ export function agentRoutes(service: AgentService): Hono<{ Variables: { owner: s
   app.post("/monitors", async (c) =>
     c.json(await service.createMonitor(c.get("owner"), await c.req.json()), 201),
   );
+  app.post("/monitors/:id", async (c) =>
+    c.json(await service.updateMonitor(c.get("owner"), c.req.param("id"), await c.req.json())),
+  );
   app.post("/monitors/:id/control", async (c) => {
     const { action } = z
       .object({ action: z.enum(["pause", "resume", "stop", "check"]) })
@@ -102,6 +113,7 @@ export function agentRoutes(service: AgentService): Hono<{ Variables: { owner: s
       id: randomUUID(),
       text: body.text,
       source: body.source ?? "You",
+      category: body.category ?? DEFAULT_MEMORY_CATEGORY,
       createdAt: new Date().toISOString(),
     };
     return c.json(await service.db.put(c.get("owner"), "memories", memory), 201);
@@ -113,7 +125,7 @@ export function agentRoutes(service: AgentService): Hono<{ Variables: { owner: s
       "memories",
       c.req.param("id"),
       {},
-      body,
+      { ...body, updatedAt: new Date().toISOString() },
     );
     if (!memory) throw new AppError("Memory not found", 404);
     return c.json(memory);

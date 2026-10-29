@@ -197,15 +197,38 @@ test("goal updates validate milestones and pausing a goal pauses its task", asyn
 test("memories can be edited and forgotten while identity changes persist", async () => {
   const memory = await read<AgentMemory>(
     "/memories",
-    { text: "I prefer morning meetings", source: "You" },
+    { text: "I prefer morning meetings", source: "You", category: "风险偏好" },
     201,
   );
+  assert.equal(memory.category, "风险偏好");
   const updated = await read<AgentMemory>(`/memories/${memory.id}`, {
     text: "I prefer afternoon meetings",
+    category: "分析习惯",
   });
   assert.equal(updated.id, memory.id);
   assert.equal(updated.createdAt, memory.createdAt);
   assert.equal(updated.source, "You");
+  assert.equal(updated.category, "分析习惯");
+  assert.equal(typeof updated.updatedAt, "string");
+  assert.equal(
+    (
+      await request("/memories", {
+        text: "Invalid category",
+        category: "Unknown",
+      })
+    ).status,
+    422,
+  );
+  await db.put("local-user", "memories", {
+    id: "legacy-memory-without-category",
+    text: "Legacy preference",
+    source: "You",
+    createdAt: "2026-10-01T00:00:00.000Z",
+  });
+  const legacyMemory = (await read<AgentWorkspace>("")).memories.find(
+    (item) => item.id === "legacy-memory-without-category",
+  );
+  assert.equal(legacyMemory?.category, undefined);
   await db.put("other-user", "memories", { ...memory, id: "private-memory" });
   const privateIdentity = await db.get("other-user", "agent-settings", "identity");
   assert.equal((await request("/memories/private-memory", { text: "Overwrite" })).status, 404);
@@ -226,8 +249,10 @@ test("memories can be edited and forgotten while identity changes persist", asyn
     422,
   );
   assert.equal(snapshot.memories.find((item) => item.id === memory.id)?.text, updated.text);
+  assert.equal(snapshot.memories.find((item) => item.id === memory.id)?.category, "分析习惯");
   assert.deepEqual(await db.get("other-user", "agent-settings", "identity"), privateIdentity);
   assert.deepEqual(await read(`/memories/${memory.id}/forget`, {}), { ok: true });
+  assert.deepEqual(await read("/memories/legacy-memory-without-category/forget", {}), { ok: true });
   assert.ok(!(await read<AgentWorkspace>("")).memories.some((item) => item.id === memory.id));
   assert.ok(await db.get("other-user", "memories", "private-memory"));
 });
@@ -368,6 +393,51 @@ test("sample monitor saves its baseline and deduplicates notifications for repea
     (await db.get<AgentNotification>("other-user", "notifications", privateNotification.id))?.read,
     false,
   );
+});
+
+test("editing a monitor updates its task and clears the previous page baseline", async () => {
+  const monitor = await read<Monitor>(
+    "/monitors",
+    {
+      title: "Old availability",
+      url: "sample://availability",
+      condition: "change",
+      intervalMinutes: 15,
+    },
+    201,
+  );
+  await db.put("local-user", "monitor-pages", {
+    id: monitor.id,
+    hash: "old-hash",
+    timelessHash: "old-timeless-hash",
+    lines: ["Old line"],
+  });
+  const task = await server.agent.getTask("local-user", monitor.taskId);
+  await db.put("local-user", "tasks", {
+    ...task,
+    state: { ...task.state, lastHash: "old-hash" },
+  });
+
+  const updated = await read<Monitor>(`/monitors/${monitor.id}`, {
+    title: "Updated availability",
+    url: "sample://availability",
+    condition: "contains",
+    value: "table",
+    intervalMinutes: 30,
+  });
+  assert.equal(updated.title, "Updated availability");
+  assert.equal(updated.condition, "contains");
+  assert.equal(updated.value, "table");
+  assert.equal(updated.intervalMinutes, 30);
+  assert.equal(updated.lastHash, "");
+  assert.equal(updated.lastValue, "");
+  assert.equal(await db.get("local-user", "monitor-pages", monitor.id), null);
+
+  const savedTask = await server.agent.getTask("local-user", monitor.taskId);
+  assert.equal(savedTask.title, "Updated availability");
+  assert.equal(savedTask.prompt, "Watch sample://availability for contains: table");
+  assert.equal(savedTask.state.lastHash, null);
+  await read(`/monitors/${monitor.id}/control`, { action: "stop" });
 });
 
 test("live mode rejects sample sources and hides the fixture mutation endpoint", async () => {

@@ -192,7 +192,9 @@ const tools = {
   "tools.fileTapSingle": "1 页 · 点击阅读文档",
   "tools.fileTapPlural": "{pageCount} 页 · 点击阅读文档",
   "tools.fileHtmlTap": "网页 · 点击打开",
+  "tools.fileOpenTap": "点击打开文件",
   "tools.openHtml": "打开 {name}",
+  "tools.openFile": "打开 {name}",
   "tools.reloadTaskResults": "重新加载任务结果",
   // 浏览器地址校验
   "tools.enterWebsiteAddress": "请输入网址，例如 copilotkit.ai 或 https://news.ycombinator.com。",

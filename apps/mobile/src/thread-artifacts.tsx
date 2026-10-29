@@ -5,7 +5,7 @@ import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agen
 import { ArtifactCard, TaskCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { BrowserThreadCard } from "./computer";
-import { fileKind } from "./file-kind";
+import { fileKind, fileTypeName } from "./file-kind";
 import { useTranslation } from "./i18n";
 import { ChevronRight, FileText } from "./icons";
 import { PlanCard } from "./plan-card";
@@ -20,9 +20,10 @@ export function FileThreadCard({ file }: { file: Artifact }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t(kind === "html" ? "tools.openHtml" : "tools.openPdf", {
-        name: file.name,
-      })}
+      accessibilityLabel={t(
+        kind === "html" ? "tools.openHtml" : kind === "pdf" ? "tools.openPdf" : "tools.openFile",
+        { name: file.name },
+      )}
       onPress={() => open({ type: "file", file })}
       // 产物条目：白底 + 1px 描边的紧凑卡片，按压态用 overlay1
       style={({ pressed }) => [
@@ -56,9 +57,11 @@ export function FileThreadCard({ file }: { file: Artifact }) {
           <Text style={s.muted}>
             {kind === "html"
               ? t("tools.fileHtmlTap")
-              : file.pageCount === 1
-                ? t("tools.fileTapSingle")
-                : t("tools.fileTapPlural", { pageCount: file.pageCount })}
+              : kind === "pdf"
+                ? file.pageCount === 1
+                  ? t("tools.fileTapSingle")
+                  : t("tools.fileTapPlural", { pageCount: file.pageCount })
+                : t("tools.fileOpenTap")}
           </Text>
         )}
       </View>
@@ -70,7 +73,7 @@ export function FileThreadCard({ file }: { file: Artifact }) {
           <Text numberOfLines={2} style={s.heading}>
             {file.name}
           </Text>
-          <Text style={s.muted}>{kind === "html" ? "HTML" : "PDF"}</Text>
+          <Text style={s.muted}>{fileTypeName(file)}</Text>
         </View>
         <ChevronRight size={18} color={colors.muted} />
       </View>

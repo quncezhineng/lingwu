@@ -1,5 +1,6 @@
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import { type FileKind, fileKind } from "./file-kind";
 import type { TranslationKey } from "./i18n/locales/en";
 
 type Dated = Pick<Artifact | AgentArtifact, "createdAt">;
@@ -28,10 +29,38 @@ export function buildFileLibrary(
  * 未知来源回落原文（资料卡、搜索结果共用同一映射）。
  */
 export function fileSourceLabel(source: string, t: (key: TranslationKey) => string) {
-  if (source === "upload") return t("screens.filesSourceUpload");
-  if (source === "analysis") return t("screens.filesSourceAnalysis");
-  if (source === "export") return t("screens.filesSourceExport");
+  const normalized = source.trim().toLowerCase();
+  if (normalized === "upload" || normalized === "uploaded by you")
+    return t("screens.filesSourceUpload");
+  if (normalized === "analysis") return t("screens.filesSourceAnalysis");
+  if (normalized === "export") return t("screens.filesSourceExport");
   return source;
+}
+
+export type FileSourceFilter = "all" | "analysis" | "upload";
+export type FileFormatFilter = "all" | FileKind;
+
+/** Uploaded-by-you files are separate from analysis, mail and browser-generated files. */
+export function fileSourceBucket(file: Pick<Artifact, "source">): Exclude<FileSourceFilter, "all"> {
+  const normalized = file.source.trim().toLowerCase();
+  return normalized === "upload" || normalized === "uploaded by you" ? "upload" : "analysis";
+}
+
+/** Filtering stays pure so the page's empty state and counts can be tested directly. */
+export function filterFileLibrary(
+  files: readonly Artifact[],
+  filters: {
+    source: FileSourceFilter;
+    format: FileFormatFilter;
+    query: string;
+  },
+): Artifact[] {
+  const query = filters.query.trim().toLowerCase();
+  return files.filter((file) => {
+    if (filters.source !== "all" && fileSourceBucket(file) !== filters.source) return false;
+    if (filters.format !== "all" && fileKind(file) !== filters.format) return false;
+    return !query || file.name.toLowerCase().includes(query);
+  });
 }
 
 /** A short card preview should not expose Markdown control characters. */ export function markdownExcerpt(

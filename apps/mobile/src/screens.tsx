@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -9,13 +9,25 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import type { BrowserSession, CalendarEvent, EmailDraft } from "../../../packages/domain/src";
+import type {
+  Artifact,
+  BrowserSession,
+  CalendarEvent,
+  EmailDraft,
+} from "../../../packages/domain/src";
 import { useAgentWorkspace } from "./agent-workspace";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
-import { fileKind } from "./file-kind";
-import { buildFileLibrary, fileSourceLabel } from "./file-library";
+import { fileBadge, fileExtension, fileKind } from "./file-kind";
+import {
+  buildFileLibrary,
+  type FileFormatFilter,
+  type FileSourceFilter,
+  fileSourceBucket,
+  fileSourceLabel,
+  filterFileLibrary,
+} from "./file-library";
 import { pickAndUploadFile } from "./file-upload";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel } from "./i18n/translate";
@@ -30,6 +42,7 @@ import {
   Clock3,
   Cpu,
   FileText,
+  Folder,
   Globe2,
   Inbox,
   Link2,
@@ -46,7 +59,7 @@ import { NotesScreen } from "./notes-screen";
 import { PageHeader } from "./page-header";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { StatusBadge, type StatusTone } from "./status-badge";
-import { breakpoints, layout, space } from "./theme";
+import { breakpoints, fonts, layout, radius, space } from "./theme";
 import {
   Button,
   Card,
@@ -1031,20 +1044,43 @@ export function BrowserScreen() {
 }
 type LibrarySection = "files" | "insights" | "notes";
 
-/** 文件来源标签本地化；未知来源回落原文，避免出现没做完的英文键。 */
+/**
+ * 资料库承接三类内容：文件、收藏的领悟卡和个人笔记。
+ * 文件区对齐 Demo 的来源/格式筛选与批量投入分析，同时只展示服务端真实文件。
+ */
 export function FilesScreen({ initialSection = "files" }: { initialSection?: LibrarySection }) {
-  const { workspace: w, api, refresh, open } = useWorkspace();
+  const { workspace: w, api, refresh, open, ask, notify } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [section, setSection] = useState<LibrarySection>(initialSection);
+  const [sourceFilter, setSourceFilter] = useState<FileSourceFilter>("all");
+  const [formatFilter, setFormatFilter] = useState<FileFormatFilter>("all");
+  const [query, setQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const savedInsightIds = useSavedInsightIds();
-  const library = buildFileLibrary(w.files, agent?.artifacts || []);
-  const savedArtifacts = library.artifacts.filter((artifact) =>
-    savedInsightIds.includes(artifact.id),
+  const library = useMemo(
+    () => buildFileLibrary(w.files, agent?.artifacts || []),
+    [w.files, agent?.artifacts],
   );
+  const savedArtifacts = useMemo(
+    () => library.artifacts.filter((artifact) => savedInsightIds.includes(artifact.id)),
+    [library.artifacts, savedInsightIds],
+  );
+  const fileCounts = useMemo(() => {
+    const counts = { all: library.files.length, analysis: 0, upload: 0 };
+    for (const file of library.files) counts[fileSourceBucket(file)] += 1;
+    return counts;
+  }, [library.files]);
+  const visibleFiles = useMemo(
+    () => filterFileLibrary(library.files, { source: sourceFilter, format: formatFilter, query }),
+    [library.files, sourceFilter, formatFilter, query],
+  );
+  const selectedFiles = library.files.filter((file) => selectedIds.has(file.id));
+  const filtersActive = sourceFilter !== "all" || formatFilter !== "all" || query.trim().length > 0;
+  const compact = width < breakpoints.mobile;
   // 内容区宽度：桌面扣侧栏与页面 padding，决定资料卡栅格列数（避免单卡右侧大片留白）。
   const contentWidth =
     width >= breakpoints.desktop
@@ -1062,6 +1098,60 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
     { id: "insights", label: t("screens.libraryInsights") },
     { id: "notes", label: t("screens.libraryNotes") },
   ];
+  const sourceFilters: ReadonlyArray<{ id: FileSourceFilter; label: string; count: number }> = [
+    { id: "all", label: t("screens.filesFilterAll"), count: fileCounts.all },
+    { id: "analysis", label: t("screens.filesFilterAnalysis"), count: fileCounts.analysis },
+    { id: "upload", label: t("screens.filesFilterUpload"), count: fileCounts.upload },
+  ];
+  const formatFilters: ReadonlyArray<{ id: FileFormatFilter; label: string }> = [
+    { id: "all", label: t("screens.filesFormatAll") },
+    { id: "pdf", label: "PDF" },
+    { id: "word", label: t("screens.filesKindWord") },
+    { id: "excel", label: t("screens.filesKindExcel") },
+    { id: "ppt", label: t("screens.filesKindPpt") },
+    { id: "markdown", label: t("screens.filesKindMarkdown") },
+    { id: "image", label: t("screens.filesKindImage") },
+    { id: "html", label: "HTML" },
+    { id: "text", label: t("screens.filesKindText") },
+    { id: "other", label: t("screens.filesKindOther") },
+  ];
+
+  function changeSection(next: LibrarySection) {
+    setSection(next);
+    setSelectedIds(new Set());
+  }
+
+  function clearFilters() {
+    setSourceFilter("all");
+    setFormatFilter("all");
+    setQuery("");
+  }
+
+  function toggleSelection(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function analyzeFiles(files: readonly Artifact[]) {
+    if (!files.length) return;
+    ask(
+      t("screens.filesAnalyzePrompt"),
+      files.map((file) => file.id),
+    );
+    setSelectedIds(new Set());
+  }
+
+  function download(file: Artifact) {
+    setError("");
+    void Linking.openURL(api.url(file.url || `/api/files/${file.id}/content`)).catch((e) => {
+      setError(e instanceof Error ? e.message : String(e));
+    });
+  }
+
   async function upload() {
     setError("");
     setBusy(true);
@@ -1069,6 +1159,7 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
       const artifact = await pickAndUploadFile(api);
       if (!artifact) return;
       await refresh();
+      clearFilters();
       open({ type: "file", file: artifact });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -1085,28 +1176,20 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
         compact={width < breakpoints.desktop}
         actions={
           section === "files" ? (
-            <Button
-              primary
-              small={width < breakpoints.desktop}
-              icon={Upload}
-              busy={busy}
-              onPress={() => void upload()}
-            >
-              {t(width < breakpoints.desktop ? "screens.filesImportShort" : "screens.filesImport")}
+            <Button primary small={compact} icon={Upload} busy={busy} onPress={() => void upload()}>
+              {t(compact ? "screens.filesImportShort" : "screens.filesImport")}
             </Button>
           ) : undefined
         }
         style={{ marginBottom: 0 }}
       />
-      {/* D3：单页三分区，旧「资料/笔记」两页入口都落到这里 */}
+
       <View
         style={{
           flexDirection: "row",
-          alignSelf: "flex-start",
-          padding: 4,
-          gap: 4,
-          borderRadius: 14,
-          backgroundColor: colors.surface,
+          gap: compact ? 20 : 30,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.line,
         }}
       >
         {sections.map((item) => {
@@ -1116,22 +1199,20 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
               key={item.id}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              onPress={() => setSection(item.id)}
+              onPress={() => changeSection(item.id)}
               style={{
-                minHeight: 34,
-                paddingHorizontal: 14,
-                borderRadius: 9,
+                minHeight: 42,
                 justifyContent: "center",
-                backgroundColor: active ? colors.paper : "transparent",
-                borderWidth: 1,
-                borderColor: active ? colors.line : "transparent",
+                paddingBottom: 11,
+                borderBottomWidth: 2,
+                borderBottomColor: active ? colors.primary : "transparent",
               }}
             >
               <Text
                 style={{
                   fontSize: 13,
                   fontWeight: active ? "600" : "500",
-                  color: active ? colors.text : colors.muted,
+                  color: active ? colors.primaryStrong : colors.muted,
                 }}
               >
                 {item.label}
@@ -1142,99 +1223,422 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
       </View>
       <ErrorNotice error={error || agentError} />
 
-      {section === "files" &&
-        (library.files.length ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, alignItems: "stretch" }}>
-            {library.files.map((f) => {
-              const kind = fileKind(f);
-              return (
-                <Pressable
-                  key={f.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={f.name}
-                  onPress={() => open({ type: "file", file: f })}
-                  style={{
-                    width: library.files.length === 1 ? Math.min(contentWidth, 520) : cardWidth,
-                  }}
-                >
-                  <Card style={{ padding: 0, overflow: "hidden", width: "100%" }}>
-                    {/* L2：封面 175→120，移动端首屏至少露出两张卡 */}
-                    <View
+      {section === "files" && (
+        <View style={{ gap: 16 }}>
+          <View style={{ gap: 14 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: compact ? 16 : 24 }}>
+                {sourceFilters.map((item) => {
+                  const active = item.id === sourceFilter;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => setSourceFilter(item.id)}
                       style={{
-                        height: 120,
-                        backgroundColor: colors.tertiary,
-                        justifyContent: "center",
+                        minHeight: 38,
+                        flexDirection: "row",
                         alignItems: "center",
+                        gap: 6,
+                        borderBottomWidth: 2,
+                        borderBottomColor: active ? colors.primary : "transparent",
                       }}
                     >
-                      <View
+                      <Text
                         style={{
-                          width: 64,
-                          height: 84,
-                          borderRadius: 5,
-                          backgroundColor: colors.paper,
-                          padding: 9,
-                          transform: [{ rotate: "-4deg" }],
-                          borderWidth: 1,
-                          borderColor: colors.line,
+                          fontSize: 12,
+                          fontWeight: active ? "600" : "500",
+                          color: active ? colors.primaryStrong : colors.muted,
                         }}
                       >
-                        <View style={[s.row, { gap: 3, marginBottom: 8 }]}>
-                          <FileText size={10} color={colors.primary} />
-                          <Text style={{ fontSize: 10, color: colors.primaryStrong }}>
-                            {t("screens.filesDocumentBadge")}
-                          </Text>
-                        </View>
-                        {[100, 75, 90, 95, 60].map((barWidth, i) => (
+                        {item.label}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.faint }}>{item.count}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={s.small}>
+                {t("screens.filesVisibleCount", { count: visibleFiles.length })}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flexDirection: compact ? "column" : "row",
+                alignItems: compact ? "stretch" : "center",
+                gap: 10,
+              }}
+            >
+              <View
+                style={[
+                  s.row,
+                  {
+                    flex: 1,
+                    minWidth: compact ? undefined : 260,
+                    minHeight: 44,
+                    gap: 9,
+                    paddingHorizontal: 12,
+                    borderWidth: 1,
+                    borderColor: colors.line,
+                    borderRadius: radius.field,
+                    backgroundColor: colors.paper,
+                  },
+                ]}
+              >
+                <Search size={15} color={colors.faint} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder={t("screens.filesSearchPlaceholder")}
+                  placeholderTextColor={colors.faint}
+                  accessibilityLabel={t("screens.filesSearchLabel")}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: 42,
+                    paddingVertical: 0,
+                    borderWidth: 0,
+                    color: colors.text,
+                    fontSize: 13,
+                    fontFamily: fonts.sans,
+                  }}
+                />
+              </View>
+              <View
+                accessibilityLabel={t("screens.filesFormatFilter")}
+                style={{ flexDirection: "row", flexWrap: "wrap", gap: 7 }}
+              >
+                {formatFilters.map((item) => {
+                  const active = item.id === formatFilter;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => setFormatFilter(item.id)}
+                      style={{
+                        minHeight: 38,
+                        justifyContent: "center",
+                        paddingHorizontal: 12,
+                        borderRadius: radius.full,
+                        borderWidth: 1,
+                        borderColor: active ? colors.accentLine : colors.line,
+                        backgroundColor: active ? colors.sky : colors.paper,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: active ? "600" : "500",
+                          color: active ? colors.primaryStrong : colors.muted,
+                        }}
+                      >
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+
+          {!!selectedFiles.length && (
+            <View
+              style={[
+                s.row,
+                {
+                  flexWrap: "wrap",
+                  gap: 12,
+                  padding: 12,
+                  borderRadius: radius.card,
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                },
+              ]}
+            >
+              <Text style={s.text}>
+                {t("screens.filesSelectedCount", { count: selectedFiles.length })}
+              </Text>
+              <Button
+                small
+                style={{ marginLeft: "auto", minHeight: compact ? 44 : 34 }}
+                onPress={() => setSelectedIds(new Set())}
+              >
+                {t("screens.filesClearSelection")}
+              </Button>
+              <Button
+                primary
+                small
+                icon={Sparkles}
+                style={{ minHeight: compact ? 44 : 34 }}
+                onPress={() => analyzeFiles(selectedFiles)}
+              >
+                {t("screens.filesAttachSelected")}
+              </Button>
+            </View>
+          )}
+
+          {!!visibleFiles.length && !compact && (
+            <View
+              style={[
+                s.row,
+                {
+                  gap: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.line,
+                },
+              ]}
+            >
+              <View style={{ width: 40 }} />
+              <Text style={[s.small, { flex: 1 }]}>{t("screens.filesColumnName")}</Text>
+              <Text style={[s.small, { width: 96 }]}>{t("screens.filesColumnSource")}</Text>
+              <Text style={[s.small, { width: 72 }]}>{t("screens.filesColumnDate")}</Text>
+              <Text style={[s.small, { width: 154, textAlign: "right" }]}>
+                {t("screens.filesColumnActions")}
+              </Text>
+            </View>
+          )}
+
+          {visibleFiles.length ? (
+            <View style={{ gap: 8 }}>
+              {visibleFiles.map((file) => {
+                const kind = fileKind(file);
+                const extension = fileExtension(file);
+                const selected = selectedIds.has(file.id);
+                const fileMeta = (() => {
+                  if (kind === "pdf")
+                    return `${file.pageCount} ${t(
+                      file.pageCount === 1 ? "screens.filesPage" : "screens.filesPages",
+                    )}`;
+                  if (kind === "excel" && extension === "csv") return "CSV";
+                  return {
+                    html: t("screens.filesKindHtml"),
+                    markdown: t("screens.filesKindMarkdown"),
+                    image: t("screens.filesKindImage"),
+                    word: t("screens.filesKindWord"),
+                    excel: t("screens.filesKindExcel"),
+                    ppt: t("screens.filesKindPpt"),
+                    text: t("screens.filesKindText"),
+                    other: t("screens.filesKindOther"),
+                  }[kind];
+                })();
+                return (
+                  <Card
+                    key={file.id}
+                    style={{
+                      padding: 0,
+                      overflow: "hidden",
+                      backgroundColor: selected ? colors.sky : colors.paper,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: compact ? "column" : "row",
+                        alignItems: compact ? "stretch" : "center",
+                        gap: compact ? 10 : 12,
+                        padding: compact ? 12 : 14,
+                      }}
+                    >
+                      <View style={[s.row, { flex: 1, minWidth: 0, gap: 12 }]}>
+                        <Pressable
+                          accessibilityRole="checkbox"
+                          accessibilityLabel={t("screens.filesSelectLabel", { name: file.name })}
+                          accessibilityState={{ checked: selected }}
+                          onPress={() => toggleSelection(file.id)}
+                          style={{
+                            width: 40,
+                            height: 40,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
                           <View
-                            key={barWidth}
                             style={{
-                              height: 2,
-                              backgroundColor: i === 0 ? colors.primary : colors.tertiary,
-                              width: `${barWidth}%`,
-                              marginBottom: 5,
-                              borderRadius: 4,
+                              width: 18,
+                              height: 18,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: radius.badge,
+                              borderWidth: 1,
+                              borderColor: selected ? colors.primary : colors.lineStrong,
+                              backgroundColor: selected ? colors.primary : colors.paper,
                             }}
-                          />
-                        ))}
+                          >
+                            {selected && <Check size={12} color={colors.onPrimary} />}
+                          </View>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={t("screens.filesOpenLabel", { name: file.name })}
+                          onPress={() => open({ type: "file", file })}
+                          style={({ pressed }) => [
+                            s.row,
+                            { flex: 1, minWidth: 0, gap: 12 },
+                            pressed && { opacity: 0.78 },
+                          ]}
+                        >
+                          <View
+                            style={{
+                              width: 38,
+                              height: 43,
+                              flexShrink: 0,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: radius.control,
+                              borderWidth: 1,
+                              borderColor: colors.line,
+                              backgroundColor: colors.surface,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 9,
+                                fontWeight: "600",
+                                color: colors.muted,
+                              }}
+                            >
+                              {fileBadge(file)}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                            <Text numberOfLines={1} style={[s.text, { fontWeight: "500" }]}>
+                              {file.name}
+                            </Text>
+                            <Text numberOfLines={1} style={s.small}>
+                              {Math.max(1, Math.round(file.size / 1024))} KB · {fileMeta}
+                              {compact
+                                ? ` · ${fileSourceLabel(file.source, t)} · ${dateLabel(file.createdAt)}`
+                                : ""}
+                            </Text>
+                          </View>
+                        </Pressable>
                       </View>
-                      <View style={{ position: "absolute", bottom: 10, right: 12 }}>
-                        <Chip>{kind === "html" ? "HTML" : "PDF"}</Chip>
-                      </View>
-                    </View>
-                    <View style={{ padding: 14, gap: 6 }}>
-                      <Text numberOfLines={1} style={[s.heading, { fontSize: 14 }]}>
-                        {f.name}
-                      </Text>
-                      <Text numberOfLines={1} style={s.small}>
-                        {kind === "html"
-                          ? t("screens.filesWebPage")
-                          : `${f.pageCount} ${t(f.pageCount === 1 ? "screens.filesPage" : "screens.filesPages")}`}{" "}
-                        · {Math.max(1, Math.round(f.size / 1024))} KB
-                      </Text>
-                      <View style={[s.between, { marginTop: 9 }]}>
-                        <Chip>{fileSourceLabel(f.source, t)}</Chip>
-                        <Text style={s.small}>{dateLabel(f.createdAt)}</Text>
+
+                      {!compact && (
+                        <Text
+                          numberOfLines={1}
+                          style={[s.small, { width: 96, color: colors.faint }]}
+                        >
+                          {fileSourceLabel(file.source, t)}
+                        </Text>
+                      )}
+                      {!compact && (
+                        <Text
+                          numberOfLines={1}
+                          style={[s.small, { width: 72, color: colors.faint }]}
+                        >
+                          {dateLabel(file.createdAt)}
+                        </Text>
+                      )}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "flex-end",
+                          gap: 7,
+                          marginLeft: compact ? 40 : 0,
+                        }}
+                      >
+                        <IconButton
+                          icon={ArrowDownToLine}
+                          label={t("screens.filesDownload", { name: file.name })}
+                          size={compact ? 44 : 36}
+                          onPress={() => download(file)}
+                        />
+                        <Button
+                          small
+                          icon={Sparkles}
+                          style={{ minHeight: compact ? 44 : 34 }}
+                          onPress={() => analyzeFiles([file])}
+                        >
+                          {t("screens.filesAnalyze")}
+                        </Button>
                       </View>
                     </View>
                   </Card>
-                </Pressable>
-              );
-            })}
+                );
+              })}
+            </View>
+          ) : (
+            <Card>
+              <Empty
+                icon={filtersActive && library.files.length ? Folder : FileText}
+                title={t(
+                  filtersActive && library.files.length
+                    ? "screens.filesNoMatchTitle"
+                    : "screens.filesEmptyTitle",
+                )}
+                detail={t(
+                  filtersActive && library.files.length
+                    ? "screens.filesNoMatchDetail"
+                    : "screens.filesEmptyDetail",
+                )}
+              >
+                {filtersActive && library.files.length > 0 && (
+                  <Button icon={Search} onPress={clearFilters}>
+                    {t("screens.filesClearFilters")}
+                  </Button>
+                )}
+              </Empty>
+            </Card>
+          )}
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("screens.filesUploadAreaTitle")}
+            disabled={busy}
+            onPress={() => void upload()}
+            style={({ pressed }) => [
+              s.row,
+              {
+                gap: 14,
+                padding: compact ? 14 : 18,
+                borderWidth: 1,
+                borderStyle: "dashed",
+                borderColor: colors.lineStrong,
+                borderRadius: radius.field,
+                backgroundColor: pressed ? colors.surface : colors.surfaceSoft,
+                opacity: busy ? 0.7 : 1,
+              },
+            ]}
+          >
+            {busy ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Upload size={21} color={colors.muted} />
+            )}
+            <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+              <Text style={[s.text, { fontSize: 13, fontWeight: "500" }]}>
+                {t("screens.filesUploadAreaTitle")}
+              </Text>
+              <Text style={s.small}>{t("screens.filesUploadAreaDetail")}</Text>
+            </View>
+            {!compact && <Plus size={16} color={colors.muted} />}
+          </Pressable>
+
+          <View style={[s.row, { gap: 7, alignItems: "flex-start" }]}>
+            <View style={{ marginTop: 3 }}>
+              <ShieldCheck size={12} color={colors.faint} />
+            </View>
+            <Text style={[s.small, { flex: 1, color: colors.faint }]}>
+              {t("screens.filesWorkspaceNote")}
+            </Text>
           </View>
-        ) : (
-          <Card>
-            <Empty
-              icon={FileText}
-              title={t("screens.filesEmptyTitle")}
-              detail={t("screens.filesEmptyDetail")}
-            >
-              <Button primary icon={Upload} busy={busy} onPress={() => void upload()}>
-                {t("screens.filesImport")}
-              </Button>
-            </Empty>
-          </Card>
-        ))}
+        </View>
+      )}
 
       {section === "insights" &&
         (savedArtifacts.length ? (
@@ -1254,11 +1658,20 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
                       view.category || statusLabel(artifact.kind)
                     }`}
                     title={view.title}
-                    meta={symbol || `${artifact.title} · ${dateLabel(artifact.createdAt)}`}
+                    basis={view.basis}
+                    limits={view.limits}
+                    revisit={view.revisit}
+                    showSections={false}
+                    meta={symbol || t("workbench.insightRelatedAnalysis")}
                     saved={true}
                     savePlacement="header"
-                    onToggleSave={() => toggleSavedInsight(artifact.id)}
-                    onPress={() => open({ type: "artifact", artifact })}
+                    onToggleSave={() => {
+                      toggleSavedInsight(artifact.id);
+                      notify(t("workbench.insightUnsavedNotice"));
+                    }}
+                    actionLabel={t("workbench.expand")}
+                    accessibilityLabel={`${t("workbench.expand")}：${view.title}`}
+                    onPress={() => open({ type: "insight", artifact })}
                   />
                 </View>
               );

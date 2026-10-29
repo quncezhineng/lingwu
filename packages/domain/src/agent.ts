@@ -70,10 +70,18 @@ export interface Monitor {
   id: string;
   taskId: string;
   title: string;
+  /** 用户希望关注的内容；为空时回退到触发条件文案。 */
+  description?: string;
   url: string;
   condition: "change" | "contains" | "price_below";
   value: string;
   intervalMinutes: number;
+  /** interval 按分钟轮询；daily / weekly 在指定时间运行。 */
+  schedule?: "interval" | "daily" | "weekly";
+  /** Asia/Shanghai 时区的 HH:mm。 */
+  timeOfDay?: string;
+  /** 1=周一，7=周日；仅 weekly 使用。 */
+  weekday?: number;
   status: "active" | "paused" | "stopped";
   nextCheckAt: string;
   lastCheckedAt?: string;
@@ -94,11 +102,18 @@ export interface Idea {
   taskId?: string;
   createdAt: string;
 }
+/** Demo 投资偏好页固定使用四类记忆，值直接作为稳定的持久化契约。 */
+export const MEMORY_CATEGORIES = ["投资目标", "风险偏好", "关注领域", "分析习惯"] as const;
+export type MemoryCategory = (typeof MEMORY_CATEGORIES)[number];
+export const DEFAULT_MEMORY_CATEGORY: MemoryCategory = "投资目标";
 export interface AgentMemory {
   id: string;
   text: string;
   source: string;
   createdAt: string;
+  /** 旧版记忆没有分类；界面读取时回退到默认分类。 */
+  category?: MemoryCategory;
+  updatedAt?: string;
 }
 export interface AgentArtifact {
   id: string;
@@ -148,10 +163,17 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export const monitorInputSchema = z
   .object({
     title: z.string().min(1).max(160),
+    description: z.string().trim().max(1000).default(""),
     url: z.url().max(4096),
     condition: z.enum(["change", "contains", "price_below"]).default("change"),
     value: z.string().max(300).default(""),
     intervalMinutes: z.number().int().min(1).max(10080).default(15),
+    schedule: z.enum(["interval", "daily", "weekly"]).default("interval"),
+    timeOfDay: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .optional(),
+    weekday: z.number().int().min(1).max(7).optional(),
   })
   .superRefine((v, c) => {
     if (v.condition !== "change" && !v.value.trim())
@@ -161,6 +183,10 @@ export const monitorInputSchema = z
       (!Number.isFinite(Number(v.value)) || Number(v.value) <= 0)
     )
       c.addIssue({ code: "custom", message: "Enter a positive price" });
+    if (v.schedule !== "interval" && !v.timeOfDay)
+      c.addIssue({ code: "custom", message: "Choose a reminder time" });
+    if (v.schedule === "weekly" && !v.weekday)
+      c.addIssue({ code: "custom", message: "Choose a weekday" });
   });
 export const goalInputSchema = z.object({
   title: z.string().trim().min(1).max(160),

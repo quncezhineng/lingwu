@@ -31,7 +31,7 @@ import { browserAddress, browserSite } from "./browser-address";
 import { ComputerSheet } from "./computer";
 import DateTimeEditor from "./DateTimeEditor";
 import { localDateTime, zonedInstant } from "./date-time";
-import { fileKind } from "./file-kind";
+import { fileExtension, fileKind, fileMimeType } from "./file-kind";
 import HtmlPreview from "./HtmlPreview";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
@@ -72,6 +72,7 @@ import {
   useWatchlistState,
 } from "./market";
 import { NoteEditorSheet } from "./note-ui";
+import { markdownPreviewDocument } from "./open-html-document";
 import PdfReader from "./PdfReader";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { SymbolDetailSheet } from "./symbol-detail";
@@ -896,8 +897,10 @@ function FileDetail({ file: f }: { file: Artifact }) {
   const { t } = useTranslation();
   const { api, refresh, open, close } = useWorkspace();
   const kind = fileKind(f);
-  const [html, setHtml] = useState<string | undefined>();
-  const [htmlError, setHtmlError] = useState("");
+  const extension = fileExtension(f);
+  const textPreview = kind === "markdown" || kind === "text" || extension === "csv";
+  const [content, setContent] = useState<string | undefined>();
+  const [contentError, setContentError] = useState("");
   const [values, setValues] = useState<Record<string, string | boolean>>(() =>
     Object.fromEntries(
       (f.fields || [])
@@ -912,22 +915,22 @@ function FileDetail({ file: f }: { file: Artifact }) {
   const [busy, setBusy] = useState(false);
   const url = api.url(f.url || `/api/files/${f.id}/content`);
   useEffect(() => {
-    if (kind !== "html") return;
+    if (kind !== "html" && !textPreview) return;
     let active = true;
-    setHtml(undefined);
-    setHtmlError("");
+    setContent(undefined);
+    setContentError("");
     void api
       .text(`/api/files/${f.id}/content`)
       .then((text) => {
-        if (active) setHtml(text);
+        if (active) setContent(text);
       })
       .catch((e) => {
-        if (active) setHtmlError(e instanceof Error ? e.message : String(e));
+        if (active) setContentError(e instanceof Error ? e.message : String(e));
       });
     return () => {
       active = false;
     };
-  }, [api, f.id, kind]);
+  }, [api, f.id, kind, textPreview]);
   async function fill() {
     setBusy(true);
     setError("");
@@ -948,21 +951,65 @@ function FileDetail({ file: f }: { file: Artifact }) {
         await Linking.openURL(url);
         return;
       }
-      const extension = kind === "html" ? "html" : "pdf";
-      const target = `${FileSystem.cacheDirectory}${f.id}.${extension}`;
+      const fallbackExtension =
+        kind === "html"
+          ? "html"
+          : kind === "markdown"
+            ? "md"
+            : kind === "image"
+              ? "png"
+              : kind === "word"
+                ? "docx"
+                : kind === "excel"
+                  ? "xlsx"
+                  : kind === "ppt"
+                    ? "pptx"
+                    : kind === "text"
+                      ? "txt"
+                      : "pdf";
+      const shareExtension = extension || fallbackExtension;
+      const target = `${FileSystem.cacheDirectory}${f.id}.${shareExtension}`;
       await FileSystem.downloadAsync(url, target, {
         headers: { Authorization: `Bearer ${api.token}` },
       });
-      if (await Sharing.isAvailableAsync())
+      if (await Sharing.isAvailableAsync()) {
+        const uti =
+          kind === "pdf"
+            ? "com.adobe.pdf"
+            : kind === "html"
+              ? "public.html"
+              : kind === "image"
+                ? "public.image"
+                : kind === "text" || kind === "markdown"
+                  ? "public.plain-text"
+                  : undefined;
         await Sharing.shareAsync(target, {
-          mimeType: f.mimeType,
-          UTI: kind === "html" ? "public.html" : "com.adobe.pdf",
+          mimeType: fileMimeType(f),
+          ...(uti ? { UTI: uti } : {}),
         });
-      else throw new Error("Sharing is not available on this device.");
+      } else throw new Error("Sharing is not available on this device.");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
+  const typeLabel =
+    kind === "html"
+      ? t("screens.filesKindHtml")
+      : kind === "markdown"
+        ? t("screens.filesKindMarkdown")
+        : kind === "image"
+          ? t("screens.filesKindImage")
+          : kind === "word"
+            ? t("screens.filesKindWord")
+            : kind === "excel"
+              ? extension === "csv"
+                ? "CSV"
+                : t("screens.filesKindExcel")
+              : kind === "ppt"
+                ? t("screens.filesKindPpt")
+                : kind === "text"
+                  ? t("screens.filesKindText")
+                  : t("screens.filesKindOther");
   if (kind === "html")
     return (
       <Sheet
@@ -974,14 +1021,14 @@ function FileDetail({ file: f }: { file: Artifact }) {
         onClose={close}
         fullscreen
       >
-        {htmlError ? (
-          <ErrorNotice error={htmlError} />
-        ) : html === undefined ? (
+        {contentError ? (
+          <ErrorNotice error={contentError} />
+        ) : content === undefined ? (
           <View style={{ flex: 1, minHeight: 240, justifyContent: "center", alignItems: "center" }}>
             <ActivityIndicator color={colors.primary} />
           </View>
         ) : (
-          <HtmlPreview html={html} title={f.name} interactive />
+          <HtmlPreview html={content} title={f.name} interactive />
         )}
         <View style={[s.row, { gap: 10, marginVertical: 18, flexWrap: "wrap" }]}>
           <Button icon={Download} onPress={() => void share()}>
@@ -1000,18 +1047,77 @@ function FileDetail({ file: f }: { file: Artifact }) {
         </Text>
       </Sheet>
     );
+  const previewText = content && content.length > 200_000 ? content.slice(0, 200_000) : content;
+  const previewTruncated = !!content && content.length > 200_000;
   return (
     <Sheet
       title={f.name}
-      subtitle={t("details.fileSubtitle", {
-        pages: f.pageCount,
-        size: Math.max(1, Math.round(f.size / 1024)),
-        source: f.source,
-      })}
+      subtitle={
+        kind === "pdf"
+          ? t("details.fileSubtitle", {
+              pages: f.pageCount,
+              size: Math.max(1, Math.round(f.size / 1024)),
+              source: f.source,
+            })
+          : t("details.fileSubtitleByType", {
+              type: typeLabel,
+              size: Math.max(1, Math.round(f.size / 1024)),
+              source: f.source,
+            })
+      }
       onClose={close}
       wide
     >
-      <PdfReader url={url} token={api.token} pageCount={f.pageCount} />
+      {kind === "pdf" ? (
+        <PdfReader url={url} token={api.token} pageCount={f.pageCount} />
+      ) : kind === "image" ? (
+        <Image
+          source={{ uri: url }}
+          resizeMode="contain"
+          accessibilityLabel={f.name}
+          style={{
+            width: "100%",
+            height: 460,
+            borderRadius: radius.card,
+            backgroundColor: colors.surface,
+          }}
+        />
+      ) : kind === "markdown" ? (
+        contentError ? (
+          <ErrorNotice error={contentError} />
+        ) : previewText === undefined ? (
+          <View style={{ minHeight: 280, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : (
+          <View style={{ height: 560, minHeight: 0 }}>
+            <HtmlPreview html={markdownPreviewDocument(previewText, f.name)} title={f.name} />
+          </View>
+        )
+      ) : textPreview ? (
+        contentError ? (
+          <ErrorNotice error={contentError} />
+        ) : previewText === undefined ? (
+          <View style={{ minHeight: 240, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : (
+          <Card>
+            <Text selectable style={s.text}>
+              {previewText}
+            </Text>
+            {previewTruncated && (
+              <Text style={[s.small, { marginTop: 12 }]}>{t("details.textPreviewTruncated")}</Text>
+            )}
+          </Card>
+        )
+      ) : (
+        <Card>
+          <SectionHeading title={typeLabel} />
+          <Text style={s.muted}>{t("details.officePreviewUnavailable")}</Text>
+          <Text style={[s.small, { marginTop: 8 }]}>{t("details.officePreviewHint")}</Text>
+        </Card>
+      )}
       <View style={[s.row, { gap: 10, marginVertical: 18, flexWrap: "wrap" }]}>
         <Button icon={Download} onPress={() => void share()}>
           {Platform.OS === "web" ? t("details.openDownload") : t("details.saveOrShare")}

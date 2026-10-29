@@ -83,7 +83,7 @@ const computer = {
   "computer.browsersNote":
     "浏览会话各自保留独立的登录状态和下载内容。打开一个会话即可接管，之后再回到你的对话。",
   "computer.documents": "文档",
-  "computer.documentsDetail": "从邮件、浏览器下载和你的上传中保存的 PDF。",
+  "computer.documentsDetail": "从邮件、浏览器下载和你的上传中保存的文件。",
   "computer.pdfPages": "{count} 页 · PDF",
   "computer.importDocument": "导入文档",
   "computer.refreshComputer": "刷新电脑",

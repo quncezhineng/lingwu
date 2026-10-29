@@ -2,7 +2,7 @@
  * 应用外壳。
  *
  * 桌面端是 232px 文本侧栏 + 主工作区，信息架构对齐 Demo：
- * 工作台、对话、自选、分析任务、灵感、资料、盯盘、投资偏好和应用。
+ * 工作台、对话、自选、动态、灵感、盯盘、资料、投资偏好和应用。
  * 进入对话时额外显示会话列表栏，保留完整的历史会话管理与切换能力。
  */
 import { useThreads } from "@copilotkit/react-native/headless";
@@ -22,7 +22,6 @@ import { useAgentWorkspace } from "./agent-workspace";
 import type { AccountProfile } from "./api";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
-import { statusLabel } from "./i18n/translate";
 import {
   Archive,
   Bell,
@@ -59,11 +58,11 @@ export type NavItem = { id: Section; labelKey: TranslationKey; icon: IconCompone
 export const SECTION_NAV: NavItem[] = [
   { id: "today", labelKey: "app.navToday", icon: PanelsTopLeft },
   { id: "chat", labelKey: "app.navChat", icon: MessageCircle },
-  { id: "watchlist", labelKey: "app.navWatchlist", icon: Target },
   { id: "activity", labelKey: "app.navActivity", icon: ListChecks },
+  { id: "watchlist", labelKey: "app.navWatchlist", icon: Target },
+  { id: "goals", labelKey: "app.navGoals", icon: Bell },
   { id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb },
   { id: "files", labelKey: "app.navFiles", icon: FileText },
-  { id: "goals", labelKey: "app.navGoals", icon: Bell },
   { id: "preferences", labelKey: "app.navPreferences", icon: Heart },
   { id: "apps", labelKey: "app.navApps", icon: Shapes },
 ];
@@ -205,8 +204,8 @@ function SidebarAccountAvatar({ avatarUrl, name }: { avatarUrl?: string; name: s
 }
 
 /**
- * 桌面文本侧栏。导航上方是品牌与新建分析，导航下方是真实任务形成的
- * “最近的分析”，底部保留助手状态、通知、语言和账户入口。
+ * 桌面文本侧栏。导航上方是品牌与新建分析，底部保留助手状态、设置和账户入口。
+ * 分析记录统一留在工作台和分析任务页，不在侧栏重复展示。
  */
 export function Rail({ name }: { name: string }) {
   const { section, navigate, open, api, workspace } = useWorkspace();
@@ -229,9 +228,6 @@ export function Rail({ name }: { name: string }) {
     };
   }, [api]);
 
-  const recent = [...(data?.tasks ?? [])]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 3);
   const activeCount = (data?.tasks ?? []).filter(
     (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
   ).length;
@@ -318,47 +314,6 @@ export function Rail({ name }: { name: string }) {
             />
           ))}
         </View>
-
-        <View style={{ height: 1, backgroundColor: colors.line, margin: 12, marginTop: 18 }} />
-        <View style={[s.between, { paddingHorizontal: 10, marginBottom: 8 }]}>
-          <Text style={[s.label, { fontSize: 10, letterSpacing: 0.8 }]}>
-            {t("app.recentAnalyses")}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("app.newAnalysis")}
-            onPress={() => navigate("chat")}
-            hitSlop={8}
-          >
-            <Plus size={14} color={colors.faint} />
-          </Pressable>
-        </View>
-        {recent.length ? (
-          recent.map((task) => (
-            <Pressable
-              key={task.id}
-              accessibilityRole="button"
-              accessibilityLabel={task.title}
-              onPress={() => open({ type: "task", taskId: task.id })}
-              style={({ pressed }) => ({
-                paddingHorizontal: 10,
-                paddingVertical: 8,
-                borderRadius: 7,
-                backgroundColor: pressed ? colors.overlay1 : "transparent",
-                gap: 3,
-              })}
-            >
-              <Text numberOfLines={1} style={{ fontSize: 12, color: colors.text }}>
-                {task.title}
-              </Text>
-              <Text style={{ fontSize: 10, color: colors.faint }}>{statusLabel(task.status)}</Text>
-            </Pressable>
-          ))
-        ) : (
-          <Text style={[s.small, { paddingHorizontal: 10, lineHeight: 18 }]}>
-            {t("app.noRecentAnalyses")}
-          </Text>
-        )}
       </ScrollView>
 
       <View

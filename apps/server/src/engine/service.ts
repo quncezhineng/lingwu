@@ -59,6 +59,42 @@ const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 type MonitorPage = { id: string; hash?: string; timelessHash?: string; lines: string[] };
 const date = () => new Date().toISOString();
 const terminal = new Set(["succeeded", "failed", "cancelled"]);
+
+/**
+ * 计算下一次监控时间。每日/每周提醒按中国市场常用时区 Asia/Shanghai
+ * 解释 timeOfDay；旧数据没有 schedule 时继续沿用 intervalMinutes。
+ */
+export function nextMonitorCheckAt(
+  monitor: Pick<Monitor, "schedule" | "timeOfDay" | "weekday" | "intervalMinutes">,
+  now = new Date(),
+) {
+  const schedule = monitor.schedule ?? "interval";
+  if (schedule === "interval")
+    return new Date(now.getTime() + monitor.intervalMinutes * 60000).toISOString();
+
+  const [hour, minute] = (monitor.timeOfDay ?? "09:00").split(":").map(Number);
+  const shanghaiOffset = 8 * 60 * 60000;
+  const local = new Date(now.getTime() + shanghaiOffset);
+  let dayOffset = 0;
+  if (schedule === "weekly") {
+    // JS 周日为 0；产品里 1=周一、7=周日。
+    const currentWeekday = local.getUTCDay() || 7;
+    dayOffset = ((monitor.weekday ?? 5) - currentWeekday + 7) % 7;
+  }
+  const candidate = new Date(
+    Date.UTC(
+      local.getUTCFullYear(),
+      local.getUTCMonth(),
+      local.getUTCDate() + dayOffset,
+      hour,
+      minute,
+    ) - shanghaiOffset,
+  );
+  if (candidate.getTime() <= now.getTime())
+    candidate.setUTCDate(candidate.getUTCDate() + (schedule === "weekly" ? 7 : 1));
+  return candidate.toISOString();
+}
+
 export class AgentService {
   readonly worker: TaskWorker;
   readonly search: SearchService;
@@ -504,7 +540,7 @@ export class AgentService {
       {
         kind: "monitor",
         title: input.title,
-        prompt: `Watch ${input.url} for ${input.condition}${input.value ? `: ${input.value}` : ""}`,
+        prompt: `Watch ${input.url} for ${input.condition}${input.value ? `: ${input.value}` : ""}${input.description ? `. Context: ${input.description}` : ""}`,
         input: { monitorId: id },
       },
       `monitor:${id}`,
@@ -522,6 +558,49 @@ export class AgentService {
     await this.activateMonitor(owner, monitor);
     return monitor;
   }
+
+  async updateMonitor(owner: string, id: string, raw: unknown) {
+    const monitor = await this.db.get<Monitor>(owner, "monitors", id);
+    if (!monitor) throw new AppError("Monitor not found", 404);
+    if (monitor.status === "stopped")
+      throw new AppError("Create a new watch to restart this stopped monitor", 409);
+    const input = monitorInputSchema.parse(raw);
+    const url = new URL(input.url);
+    if (url.protocol === "sample:" && this.config.mode !== "sample")
+      throw new AppError("Sample sources are unavailable in live workspaces", 422);
+    if (!["https:", "http:", "sample:"].includes(url.protocol) || url.username || url.password)
+      throw new AppError("Use a public HTTP(S) page", 422);
+    if (url.protocol === "sample:" && input.url !== "sample://availability")
+      throw new AppError("Unknown sample source", 422);
+
+    // A changed target or condition invalidates the old baseline. Reset it before the
+    // worker can compare the next response, otherwise the first check could be skipped.
+    const saved = await this.db.put<Monitor>(owner, "monitors", {
+      ...monitor,
+      ...input,
+      lastValue: "",
+      lastHash: "",
+      error: undefined,
+      nextCheckAt: date(),
+    });
+    await this.db.remove(owner, "monitor-pages", monitor.id);
+    const task = await this.getTask(owner, monitor.taskId);
+    if (task) {
+      await this.db.compareAndSwap(
+        owner,
+        "tasks",
+        task.id,
+        { updatedAt: task.updatedAt },
+        {
+          title: input.title,
+          prompt: `Watch ${input.url} for ${input.condition}${input.value ? `: ${input.value}` : ""}${input.description ? `. Context: ${input.description}` : ""}`,
+          state: { ...task.state, lastHash: null },
+        },
+      );
+    }
+    return saved;
+  }
+
   private async activateMonitor(owner: string, monitor: Monitor) {
     if (monitor.status !== "active") return null;
     const task = await this.getTask(owner, monitor.taskId);
@@ -1275,7 +1354,7 @@ export class AgentService {
     // cleared and reappeared). Commit its sequence with the outcome so publication
     // retries still deduplicate on the same saved notice key.
     const alertSequence = Number(task.state.alertSequence ?? 0) + (shouldNotify ? 1 : 0);
-    const nextCheckAt = new Date(Date.now() + monitor.intervalMinutes * 60000).toISOString();
+    const nextCheckAt = nextMonitorCheckAt(monitor);
     await ctx.guard();
     // Worker lease is checked before each publication; monitor control also invalidates that lease.
     const savedMonitor = await this.db.compareAndSwap(

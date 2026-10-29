@@ -28,7 +28,7 @@ import type {
 import { useAgentWorkspace } from "./agent-workspace";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
-import { fileKind } from "./file-kind";
+import { fileKind, fileTypeName } from "./file-kind";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
 import {
@@ -45,10 +45,12 @@ import {
   Lightbulb,
   ListChecks,
   Pause,
+  Pencil,
   Play,
   Plus,
   RefreshCw,
   Send,
+  Sparkles,
   Square,
   Target,
   Users,
@@ -756,7 +758,9 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               detail={
                 fileKind(file) === "html"
                   ? `${t("screens.filesWebPage")} · ${Math.max(1, Math.round(file.size / 1024))} KB`
-                  : t("agent.pagesPdf", { count: file.pageCount })
+                  : fileKind(file) === "pdf"
+                    ? t("agent.pagesPdf", { count: file.pageCount })
+                    : `${fileTypeName(file)} · ${Math.max(1, Math.round(file.size / 1024))} KB`
               }
               icon={FileText}
               onPress={() => open({ type: "file", file })}
@@ -1322,127 +1326,329 @@ export function GoalsScreen() {
   const [adding, setAdding] = useState<string>();
   const [selectedGoal, setSelectedGoal] = useState<string>();
   const [selectedMonitor, setSelectedMonitor] = useState<string>();
+  const [editingMonitor, setEditingMonitor] = useState<string>();
+  const [reminderTemplate, setReminderTemplate] = useState<(typeof REMINDER_TEMPLATES)[number]>();
   const [showAll, setShowAll] = useState(false);
+  const [activeTab, setActiveTab] = useState<"goals" | "reminders">("goals");
   const goal = data?.goals.find((item) => item.id === selectedGoal);
   const monitor = data?.monitors.find((item) => item.id === selectedMonitor);
+  const monitorToEdit = data?.monitors.find((item) => item.id === editingMonitor);
   // 已停止的盯盘不再出现在列表里（服务端无删除接口，停止即视为移除）。
   const monitors = (data?.monitors || []).filter((item) => item.status !== "stopped");
   return (
-    <View style={{ gap: 12 }}>
+    <View style={{ gap: 20 }}>
       <PageHeader
-        title={t("app.titleGoals")}
-        description={t("app.subtitleGoals")}
+        title={t("agent.monitorsHeroTitle")}
+        description={t("agent.monitorsHeroDescription")}
         compact={width < breakpoints.desktop}
         actions={
-          <Button small icon={Plus} onPress={() => setAdding("Tracking")}>
-            {t("agent.track")}
-          </Button>
+          activeTab === "reminders" ? (
+            <Button
+              small
+              primary
+              icon={Plus}
+              onPress={() => {
+                setReminderTemplate(undefined);
+                setAdding("Reminder");
+              }}
+            >
+              {t("agent.addReminder")}
+            </Button>
+          ) : undefined
         }
         style={{ marginBottom: 0 }}
       />
       <AgentStatus />
-      <View style={{ gap: 8 }}>
-        {(showAll ? monitors : monitors.slice(0, 3)).map((item) => (
-          <MonitorRow key={item.id} monitor={item} onOpen={() => setSelectedMonitor(item.id)} />
-        ))}
-        {!monitors.length && (
-          <Text style={[s.muted, { paddingVertical: 10 }]}>{t("agent.trackingEmpty")}</Text>
-        )}
-        {monitors.length > 3 && (
-          <Button small onPress={() => setShowAll(!showAll)}>
-            {showAll ? t("agent.showLess") : t("agent.showMore", { count: monitors.length - 3 })}
-          </Button>
-        )}
+      <View
+        accessibilityRole="tablist"
+        style={{
+          flexDirection: "row",
+          borderBottomWidth: 1,
+          borderBottomColor: colors.line,
+        }}
+      >
+        {(
+          [
+            { id: "goals", label: t("agent.goalsTab"), count: data?.goals.length ?? 0 },
+            { id: "reminders", label: t("agent.remindersTab"), count: monitors.length },
+          ] as const
+        ).map((item) => {
+          const active = activeTab === item.id;
+          return (
+            <Pressable
+              key={item.id}
+              accessibilityRole="tab"
+              accessibilityLabel={item.label}
+              accessibilityState={{ selected: active }}
+              onPress={() => setActiveTab(item.id)}
+              style={({ pressed }) => ({
+                flex: width < 600 ? 1 : undefined,
+                minWidth: width < 600 ? 0 : 120,
+                minHeight: 44,
+                justifyContent: "center",
+                marginRight: width < 600 ? 0 : 28,
+                paddingHorizontal: 2,
+                borderBottomWidth: 2,
+                borderBottomColor: active ? colors.primary : "transparent",
+                opacity: pressed ? 0.72 : 1,
+              })}
+            >
+              <View
+                style={[s.row, { gap: 6, justifyContent: width < 600 ? "center" : "flex-start" }]}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: active ? "600" : "500",
+                    color: active ? colors.primaryStrong : colors.muted,
+                  }}
+                >
+                  {item.label}
+                </Text>
+                <Text style={{ fontSize: 10, color: active ? colors.primary : colors.faint }}>
+                  {item.count}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
-      <View style={{ height: 1, backgroundColor: colors.line }} />
-      <View style={{ gap: 8 }}>
-        {/* I5：页面 H1 已叫「盯盘与目标」，目标分区不再重复同名标题 */}
-        {data?.goals.map((item) => (
+      {activeTab === "reminders" ? (
+        <View style={{ gap: 20 }}>
+          <Card
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 14,
+              padding: 18,
+              backgroundColor: colors.sky,
+              borderColor: colors.accentLine,
+            }}
+          >
+            <View
+              style={[
+                s.iconBox,
+                {
+                  width: 38,
+                  height: 38,
+                  backgroundColor: colors.paper,
+                  borderWidth: 1,
+                  borderColor: colors.accentLine,
+                },
+              ]}
+            >
+              <Sparkles size={19} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, gap: 5 }}>
+              <Text style={[s.heading, { fontSize: 15 }]}>{t("agent.monitorContextTitle")}</Text>
+              <Text style={[s.muted, { lineHeight: 21 }]}>{t("agent.monitorContextDetail")}</Text>
+            </View>
+          </Card>
+          <View style={{ gap: 12 }}>
+            <SectionHeading title={t("agent.reminderTemplates")} />
+            <View
+              style={{
+                flexDirection: width < 760 ? "column" : "row",
+                gap: 12,
+              }}
+            >
+              {REMINDER_TEMPLATES.map((template) => {
+                const Icon =
+                  template.id === "close-review"
+                    ? CalendarDays
+                    : template.id === "filing-watch"
+                      ? Bell
+                      : RefreshCw;
+                return (
+                  <Pressable
+                    key={template.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={t(template.titleKey)}
+                    onPress={() => {
+                      setReminderTemplate(template);
+                      setAdding("Reminder");
+                    }}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      minHeight: 132,
+                      gap: 10,
+                      padding: 16,
+                      borderWidth: 1,
+                      borderColor: pressed ? colors.lineStrong : colors.line,
+                      borderRadius: 11,
+                      backgroundColor: pressed ? colors.overlay1 : colors.paper,
+                    })}
+                  >
+                    <View style={[s.between, { alignItems: "flex-start" }]}>
+                      <View
+                        style={[
+                          s.iconBox,
+                          {
+                            width: 34,
+                            height: 34,
+                            backgroundColor: colors.surface,
+                          },
+                        ]}
+                      >
+                        <Icon size={17} color={colors.primary} />
+                      </View>
+                      <ArrowUpRight size={16} color={colors.muted} />
+                    </View>
+                    <View style={{ gap: 4 }}>
+                      <Text style={[s.heading, { fontSize: 15 }]}>{t(template.titleKey)}</Text>
+                      <Text style={[s.small, { lineHeight: 19 }]}>{t(template.detailKey)}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          <View style={{ gap: 10 }}>
+            <SectionHeading title={t("agent.remindersHeading")} count={monitors.length} />
+            {(showAll ? monitors : monitors.slice(0, 3)).map((item) => (
+              <MonitorRow
+                key={item.id}
+                monitor={item}
+                onOpen={() => setSelectedMonitor(item.id)}
+                onEdit={() => setEditingMonitor(item.id)}
+              />
+            ))}
+            {!monitors.length && (
+              <Empty
+                icon={Bell}
+                title={t("agent.remindersEmptyTitle")}
+                detail={t("agent.remindersEmptyDetail")}
+              >
+                <Button
+                  small
+                  primary
+                  icon={Plus}
+                  onPress={() => {
+                    setReminderTemplate(undefined);
+                    setAdding("Reminder");
+                  }}
+                >
+                  {t("agent.addFirstReminder")}
+                </Button>
+              </Empty>
+            )}
+            {monitors.length > 3 && (
+              <Button small onPress={() => setShowAll(!showAll)}>
+                {showAll
+                  ? t("agent.showLess")
+                  : t("agent.showMore", { count: monitors.length - 3 })}
+              </Button>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={{ gap: 20 }}>
+          <View style={{ gap: 8 }}>
+            <SectionHeading title={t("agent.goalsHeading")} count={data?.goals.length ?? 0} />
+            {data?.goals.map((item) => (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                accessibilityLabel={t("agent.openGoalLabel", { title: item.title })}
+                onPress={() => setSelectedGoal(item.id)}
+                // 可点击列表行：紧凑内边距 + overlay1 按压态 + 10px 圆角。
+                style={({ pressed }) => [
+                  s.row,
+                  { gap: 12, paddingVertical: 12, borderRadius: 10 },
+                  pressed && { backgroundColor: colors.overlay1 },
+                ]}
+              >
+                <Square
+                  size={21}
+                  color={colors.muted}
+                  // 完成态用实心成功色填充，避免半透明语义底几乎不可见。
+                  fill={item.status === "completed" ? colors.success : "none"}
+                />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={s.text}>{item.title}</Text>
+                  <Text numberOfLines={2} style={s.muted}>
+                    {item.description || statusLabel(item.status)}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.muted} />
+              </Pressable>
+            ))}
+            {!data?.goals.length && (
+              <Text style={[s.muted, { paddingVertical: 10 }]}>{t("agent.goalsEmpty")}</Text>
+            )}
+          </View>
+          <View style={{ height: 1, backgroundColor: colors.line }} />
+          <Text style={s.heading}>{t("agent.createGoal")}</Text>
+          {(
+            [
+              { key: "agent.categoryHealth", name: "Health", icon: Heart },
+              { key: "agent.categoryRelationships", name: "Relationships", icon: Users },
+              { key: "agent.categoryFinances", name: "Finances", icon: CircleDollarSign },
+              { key: "agent.categorySomethingElse", name: "Something else", icon: Target },
+            ] as const
+          ).map((item) => (
+            <Pressable
+              key={item.name}
+              accessibilityRole="button"
+              accessibilityLabel={t("agent.createGoalA11y", { category: t(item.key) })}
+              onPress={() => setAdding(item.name)}
+              // 可点击行：overlay1 按压态 + 10px 圆角。
+              style={({ pressed }) => [
+                s.row,
+                { gap: 12, minHeight: 38, borderRadius: 10 },
+                pressed && { backgroundColor: colors.overlay1 },
+              ]}
+            >
+              <item.icon size={23} color={colors.muted} />
+              <Text style={[s.text, { flex: 1, color: colors.muted }]}>{t(item.key)}</Text>
+              <Plus size={18} color={colors.muted} />
+            </Pressable>
+          ))}
+          <View style={{ height: 1, backgroundColor: colors.line }} />
+          {/* 委派任务：交办一项成果，由灵悟保存计划并持续执行（原来的边栏入口，用户要求移入目标页面）。 */}
           <Pressable
-            key={item.id}
             accessibilityRole="button"
-            accessibilityLabel={t("agent.openGoalLabel", { title: item.title })}
-            onPress={() => setSelectedGoal(item.id)}
-            // 可点击列表行：紧凑内边距 + overlay1 按压态 + 10px 圆角。
+            accessibilityLabel={t("threads.delegateTask")}
+            onPress={() => open({ type: "delegate" })}
+            // 可点击行：overlay1 按压态 + 10px 圆角。
             style={({ pressed }) => [
               s.row,
-              { gap: 12, paddingVertical: 12, borderRadius: 10 },
+              { gap: 12, minHeight: 38, borderRadius: 10 },
               pressed && { backgroundColor: colors.overlay1 },
             ]}
           >
-            <Square
-              size={21}
-              color={colors.muted}
-              // 完成态用实心成功色填充，避免半透明语义底几乎不可见。
-              fill={item.status === "completed" ? colors.success : "none"}
-            />
-            <View style={{ flex: 1, gap: 4 }}>
-              <Text style={s.text}>{item.title}</Text>
-              <Text numberOfLines={2} style={s.muted}>
-                {item.description || statusLabel(item.status)}
-              </Text>
-            </View>
+            <Send size={23} color={colors.muted} />
+            <Text style={[s.text, { flex: 1, color: colors.muted }]}>
+              {t("threads.delegateTask")}
+            </Text>
             <ChevronRight size={18} color={colors.muted} />
           </Pressable>
-        ))}
-        {!data?.goals.length && (
-          <Text style={[s.muted, { paddingVertical: 10 }]}>{t("agent.goalsEmpty")}</Text>
-        )}
-      </View>
-      <View style={{ height: 1, backgroundColor: colors.line }} />
-      <Text style={s.heading}>{t("agent.createGoal")}</Text>
-      {(
-        [
-          { key: "agent.categoryHealth", name: "Health", icon: Heart },
-          { key: "agent.categoryRelationships", name: "Relationships", icon: Users },
-          { key: "agent.categoryFinances", name: "Finances", icon: CircleDollarSign },
-          { key: "agent.categorySomethingElse", name: "Something else", icon: Target },
-        ] as const
-      ).map((item) => (
-        <Pressable
-          key={item.name}
-          accessibilityRole="button"
-          accessibilityLabel={t("agent.createGoalA11y", { category: t(item.key) })}
-          onPress={() => setAdding(item.name)}
-          // 可点击行：overlay1 按压态 + 10px 圆角。
-          style={({ pressed }) => [
-            s.row,
-            { gap: 12, minHeight: 38, borderRadius: 10 },
-            pressed && { backgroundColor: colors.overlay1 },
-          ]}
-        >
-          <item.icon size={23} color={colors.muted} />
-          <Text style={[s.text, { flex: 1, color: colors.muted }]}>{t(item.key)}</Text>
-          <Plus size={18} color={colors.muted} />
-        </Pressable>
-      ))}
-      <View style={{ height: 1, backgroundColor: colors.line }} />
-      {/* 委派任务：交办一项成果，由灵悟保存计划并持续执行（原来的边栏入口，用户要求移入目标页面）。 */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("threads.delegateTask")}
-        onPress={() => open({ type: "delegate" })}
-        // 可点击行：overlay1 按压态 + 10px 圆角。
-        style={({ pressed }) => [
-          s.row,
-          { gap: 12, minHeight: 38, borderRadius: 10 },
-          pressed && { backgroundColor: colors.overlay1 },
-        ]}
-      >
-        <Send size={23} color={colors.muted} />
-        <Text style={[s.text, { flex: 1, color: colors.muted }]}>{t("threads.delegateTask")}</Text>
-        <ChevronRight size={18} color={colors.muted} />
-      </Pressable>
+        </View>
+      )}
       {adding && (
         <Sheet
-          title={adding === "Tracking" ? t("agent.trackSomething") : t("agent.createGoal")}
-          onClose={() => setAdding(undefined)}
+          title={adding === "Reminder" ? t("agent.addReminder") : t("agent.createGoal")}
+          onClose={() => {
+            setAdding(undefined);
+            setReminderTemplate(undefined);
+          }}
         >
-          {adding === "Tracking" ? (
-            <MonitorForm onDone={() => setAdding(undefined)} />
+          {adding === "Reminder" ? (
+            <MonitorForm
+              template={reminderTemplate}
+              onDone={() => {
+                setAdding(undefined);
+                setReminderTemplate(undefined);
+              }}
+            />
           ) : (
             <GoalForm category={adding} onDone={() => setAdding(undefined)} />
           )}
+        </Sheet>
+      )}
+      {monitorToEdit && (
+        <Sheet title={t("agent.editReminder")} onClose={() => setEditingMonitor(undefined)}>
+          <MonitorForm monitor={monitorToEdit} onDone={() => setEditingMonitor(undefined)} />
         </Sheet>
       )}
       {goal && (
@@ -1638,41 +1844,122 @@ function GoalCard({ goal, onOpenTask }: { goal: Goal; onOpenTask?: () => void })
     </Card>
   );
 }
-/** 盯盘调度 4 档预设（分钟）。 */
+/** 按间隔检查的 3 档预设（分钟）；每天/每周由独立调度字段承载。 */
 const MONITOR_SCHEDULES = [
   { minutes: 15, labelKey: "agent.scheduleEvery15m" },
   { minutes: 60, labelKey: "agent.scheduleHourly" },
   { minutes: 360, labelKey: "agent.scheduleEvery6h" },
-  { minutes: 1440, labelKey: "agent.scheduleDaily" },
 ] as const satisfies ReadonlyArray<{ minutes: number; labelKey: TranslationKey }>;
 
-function MonitorForm({ onDone }: { onDone: () => void }) {
+type ReminderSchedule = NonNullable<Monitor["schedule"]>;
+
+const REMINDER_TEMPLATES: ReadonlyArray<{
+  id: string;
+  titleKey: TranslationKey;
+  detailKey: TranslationKey;
+  schedule: ReminderSchedule;
+  timeOfDay: string;
+  weekday?: number;
+}> = [
+  {
+    id: "close-review",
+    titleKey: "agent.reminderTplCloseTitle",
+    detailKey: "agent.reminderTplCloseDetail",
+    schedule: "daily",
+    timeOfDay: "15:30",
+  },
+  {
+    id: "filing-watch",
+    titleKey: "agent.reminderTplFilingTitle",
+    detailKey: "agent.reminderTplFilingDetail",
+    schedule: "daily",
+    timeOfDay: "09:00",
+  },
+  {
+    id: "weekly-review",
+    titleKey: "agent.reminderTplWeeklyTitle",
+    detailKey: "agent.reminderTplWeeklyDetail",
+    schedule: "weekly",
+    timeOfDay: "18:00",
+    weekday: 5,
+  },
+];
+
+const WEEKDAYS = [
+  { value: 1, labelKey: "agent.weekdayMonday" },
+  { value: 2, labelKey: "agent.weekdayTuesday" },
+  { value: 3, labelKey: "agent.weekdayWednesday" },
+  { value: 4, labelKey: "agent.weekdayThursday" },
+  { value: 5, labelKey: "agent.weekdayFriday" },
+  { value: 6, labelKey: "agent.weekdaySaturday" },
+  { value: 7, labelKey: "agent.weekdaySunday" },
+] as const satisfies ReadonlyArray<{ value: number; labelKey: TranslationKey }>;
+
+function monitorScheduleText(monitor: Monitor, t: ReturnType<typeof useTranslation>["t"]) {
+  if (monitor.schedule === "daily")
+    return t("agent.scheduleDailyAt", { time: monitor.timeOfDay ?? "09:00" });
+  if (monitor.schedule === "weekly") {
+    const weekday = WEEKDAYS.find((item) => item.value === (monitor.weekday ?? 5));
+    return t("agent.scheduleWeeklyAt", {
+      weekday: t(weekday?.labelKey ?? "agent.weekdayFriday"),
+      time: monitor.timeOfDay ?? "09:00",
+    });
+  }
+  return t("agent.checkingEvery", { minutes: monitor.intervalMinutes });
+}
+
+function MonitorForm({
+  monitor,
+  template,
+  onDone,
+}: {
+  monitor?: Monitor;
+  template?: (typeof REMINDER_TEMPLATES)[number];
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
   const { workspace } = useWorkspace();
   const { mutate } = useAgentWorkspace();
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [condition, setCondition] = useState<Monitor["condition"]>("change");
-  const [value, setValue] = useState("");
-  const [interval, setInterval] = useState("15");
-  const [sample, setSample] = useState(false);
+  const [title, setTitle] = useState(monitor?.title ?? (template ? t(template.titleKey) : ""));
+  const [description, setDescription] = useState(
+    monitor?.description ?? (template ? t(template.detailKey) : ""),
+  );
+  const [url, setUrl] = useState(monitor && !monitor.url.startsWith("sample:") ? monitor.url : "");
+  const [condition, setCondition] = useState<Monitor["condition"]>(monitor?.condition ?? "change");
+  const [value, setValue] = useState(monitor?.value ?? "");
+  const [interval, setInterval] = useState(String(monitor?.intervalMinutes ?? 15));
+  const [schedule, setSchedule] = useState<ReminderSchedule>(
+    monitor?.schedule ?? template?.schedule ?? "interval",
+  );
+  const [timeOfDay, setTimeOfDay] = useState(monitor?.timeOfDay ?? template?.timeOfDay ?? "15:30");
+  const [weekday, setWeekday] = useState(monitor?.weekday ?? template?.weekday ?? 5);
+  const [sample, setSample] = useState(
+    monitor?.url.startsWith("sample:") ?? (!!template && workspace.mode === "sample"),
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function save() {
     setBusy(true);
     setError("");
     try {
-      const minutes = Number(interval);
+      const minutes =
+        schedule === "daily" ? 1440 : schedule === "weekly" ? 10080 : Number(interval);
       if (!Number.isInteger(minutes) || minutes < 1 || minutes > 10080)
-        throw new Error("Use a check interval from 1 to 10080 minutes.");
+        throw new Error(t("agent.invalidMonitorInterval"));
+      if (schedule !== "interval" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(timeOfDay))
+        throw new Error(t("agent.invalidReminderTime"));
       if (!sample && !/^https?:\/\//i.test(url.trim()))
-        throw new Error("Enter an http or https address for a public page.");
-      await mutate("/monitors", {
+        throw new Error(t("agent.invalidMonitorUrl"));
+      await mutate(monitor ? `/monitors/${monitor.id}` : "/monitors", {
         title: title.trim(),
+        description: description.trim(),
         url: sample ? "sample://availability" : url.trim(),
         condition,
         value,
         intervalMinutes: minutes,
+        schedule,
+        ...(schedule === "interval" ? {} : { timeOfDay }),
+        ...(schedule === "weekly" ? { weekday } : {}),
       });
       onDone();
     } catch (e) {
@@ -1682,12 +1969,20 @@ function MonitorForm({ onDone }: { onDone: () => void }) {
     }
   }
   return (
-    <Card>
+    <Card style={{ gap: 2 }}>
       <Field
-        label={t("agent.whatWatching")}
+        label={t("agent.reminderName")}
         value={title}
         onChangeText={setTitle}
         placeholder={t("agent.watchingPlaceholder")}
+      />
+      <Field
+        label={t("agent.reminderDescription")}
+        value={description}
+        onChangeText={setDescription}
+        multiline
+        style={{ minHeight: 82 }}
+        placeholder={t("agent.reminderDescriptionPlaceholder")}
       />
       {workspace.mode === "sample" && (
         <CheckRow
@@ -1698,7 +1993,7 @@ function MonitorForm({ onDone }: { onDone: () => void }) {
       )}
       {!sample && (
         <Field
-          label={t("agent.publicPageUrl")}
+          label={t("agent.monitorPageLabel")}
           value={url}
           onChangeText={setUrl}
           autoCapitalize="none"
@@ -1724,19 +2019,80 @@ function MonitorForm({ onDone }: { onDone: () => void }) {
           onChangeText={setValue}
         />
       )}
-      <Text style={[s.small, { marginBottom: 10 }]}>{t("agent.checkEveryMinutes")}</Text>
-      {/* 调度固定 4 档预设，避免用户输入不可控的轮询频率 */}
+      <Text style={[s.small, { marginBottom: 10 }]}>{t("agent.reminderTiming")}</Text>
       <View style={[s.row, { gap: 7, flexWrap: "wrap", marginBottom: 16 }]}>
-        {MONITOR_SCHEDULES.map((item) => (
+        {(
+          [
+            { value: "interval", labelKey: "agent.scheduleInterval" },
+            { value: "daily", labelKey: "agent.scheduleDaily" },
+            { value: "weekly", labelKey: "agent.scheduleWeekly" },
+          ] as const
+        ).map((item) => (
           <Button
             small
-            primary={interval === String(item.minutes)}
-            key={item.minutes}
-            onPress={() => setInterval(String(item.minutes))}
+            primary={schedule === item.value}
+            key={item.value}
+            onPress={() => setSchedule(item.value)}
           >
             {t(item.labelKey)}
           </Button>
         ))}
+      </View>
+      {schedule === "interval" ? (
+        <View style={[s.row, { gap: 7, flexWrap: "wrap", marginBottom: 16 }]}>
+          {MONITOR_SCHEDULES.map((item) => (
+            <Button
+              small
+              primary={interval === String(item.minutes)}
+              key={item.minutes}
+              onPress={() => setInterval(String(item.minutes))}
+            >
+              {t(item.labelKey)}
+            </Button>
+          ))}
+        </View>
+      ) : (
+        <>
+          {schedule === "weekly" && (
+            <>
+              <Text style={[s.small, { marginBottom: 10 }]}>{t("agent.reminderWeekday")}</Text>
+              <View style={[s.row, { gap: 6, flexWrap: "wrap", marginBottom: 16 }]}>
+                {WEEKDAYS.map((item) => (
+                  <Button
+                    small
+                    primary={weekday === item.value}
+                    key={item.value}
+                    onPress={() => setWeekday(item.value)}
+                  >
+                    {t(item.labelKey)}
+                  </Button>
+                ))}
+              </View>
+            </>
+          )}
+          <Field
+            label={t("agent.reminderTime")}
+            value={timeOfDay}
+            onChangeText={setTimeOfDay}
+            autoCapitalize="none"
+            placeholder="15:30"
+          />
+        </>
+      )}
+      <View
+        style={[
+          s.row,
+          {
+            gap: 8,
+            padding: 11,
+            marginBottom: 14,
+            borderRadius: 8,
+            backgroundColor: colors.surface,
+          },
+        ]}
+      >
+        <Bell size={16} color={colors.muted} />
+        <Text style={s.small}>{t("agent.reminderChannelInApp")}</Text>
       </View>
       <Text style={[s.small, { marginBottom: 14 }]}>
         {sample ? t("agent.samplePageNote") : t("agent.monitorServerNote")}
@@ -1746,11 +2102,14 @@ function MonitorForm({ onDone }: { onDone: () => void }) {
         primary
         busy={busy}
         disabled={
-          !title.trim() || (!sample && !url.trim()) || (condition !== "change" && !value.trim())
+          !title.trim() ||
+          (!sample && !url.trim()) ||
+          (condition !== "change" && !value.trim()) ||
+          (schedule !== "interval" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(timeOfDay))
         }
         onPress={() => void save()}
       >
-        {t("agent.startTracking")}
+        {monitor ? t("agent.saveChanges") : t("agent.startTracking")}
       </Button>
     </Card>
   );
@@ -1767,7 +2126,15 @@ function monitorConditionText(monitor: Monitor, t: ReturnType<typeof useTranslat
  * 盯盘卡片：图标 + 标题 + 条件 + 调度 + 开关 + 编辑/停止。
  * 开关直接暂停/恢复；停止需二次确认，停止后从列表移除（服务端暂无 DELETE）。
  */
-function MonitorRow({ monitor, onOpen }: { monitor: Monitor; onOpen: () => void }) {
+function MonitorRow({
+  monitor,
+  onOpen,
+  onEdit,
+}: {
+  monitor: Monitor;
+  onOpen: () => void;
+  onEdit: () => void;
+}) {
   const { t } = useTranslation();
   const { mutate } = useAgentWorkspace();
   const [busy, setBusy] = useState(false);
@@ -1806,30 +2173,59 @@ function MonitorRow({ monitor, onOpen }: { monitor: Monitor; onOpen: () => void 
   }
 
   return (
-    <Card style={{ gap: 8, borderRadius: 11, padding: 14 }}>
+    <Card style={{ gap: 10, borderRadius: 11, padding: 16 }}>
       <View style={[s.row, { gap: 12, alignItems: "flex-start" }]}>
-        <View style={[s.glyph, { backgroundColor: colors.surface }]}>
-          <Clock3 size={17} color={colors.muted} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("agent.openTrackingLabel", { title: monitor.title })}
+          onPress={onOpen}
+          style={({ pressed }) => [
+            s.row,
+            { flex: 1, minWidth: 0, gap: 12, alignItems: "flex-start" },
+            pressed && { opacity: 0.82 },
+          ]}
+        >
+          <View style={[s.glyph, { width: 40, height: 40, backgroundColor: colors.surface }]}>
+            {monitor.schedule === "daily" || monitor.schedule === "weekly" ? (
+              <CalendarDays size={18} color={colors.muted} />
+            ) : monitor.condition === "contains" ? (
+              <Bell size={18} color={colors.muted} />
+            ) : (
+              <Clock3 size={18} color={colors.muted} />
+            )}
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+            <Text numberOfLines={2} style={s.heading}>
+              {monitor.title}
+            </Text>
+            <Text numberOfLines={2} style={s.small}>
+              {monitor.description?.trim() || monitorConditionText(monitor, t)}
+            </Text>
+            <Text numberOfLines={1} style={[s.small, s.metric]}>
+              {monitorScheduleText(monitor, t)} · {t("agent.reminderChannelInAppShort")}
+            </Text>
+          </View>
+        </Pressable>
+        <View style={[s.row, { gap: 4 }]}>
+          <Toggle
+            label={t("agent.openTrackingLabel", { title: monitor.title })}
+            value={active}
+            disabled={busy}
+            onValueChange={(next) => void toggle(next)}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("agent.editReminderLabel", { title: monitor.title })}
+            hitSlop={8}
+            onPress={onEdit}
+            style={({ pressed }) => [
+              { width: 36, height: 44, alignItems: "center", justifyContent: "center" },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Pencil size={16} color={colors.muted} />
+          </Pressable>
         </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-          <Text numberOfLines={2} style={s.heading}>
-            {monitor.title}
-          </Text>
-          <Text numberOfLines={1} style={s.small}>
-            {monitorConditionText(monitor, t)}
-          </Text>
-          <Text numberOfLines={1} style={[s.small, s.metric]}>
-            {active
-              ? t("agent.checkingEvery", { minutes: monitor.intervalMinutes })
-              : statusLabel(monitor.status)}
-          </Text>
-        </View>
-        <Toggle
-          label={t("agent.openTrackingLabel", { title: monitor.title })}
-          value={active}
-          disabled={busy}
-          onValueChange={(next) => void toggle(next)}
-        />
       </View>
       <View style={[s.between, { paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.line }]}>
         <Text numberOfLines={1} style={[s.small, { flex: 1, marginRight: 8 }]}>
@@ -1837,7 +2233,7 @@ function MonitorRow({ monitor, onOpen }: { monitor: Monitor; onOpen: () => void 
         </Text>
         <View style={[s.row, { gap: 12 }]}>
           <Pressable accessibilityRole="button" hitSlop={8} onPress={onOpen}>
-            <Text style={[s.small, { color: colors.link }]}>{t("agent.edit")}</Text>
+            <Text style={[s.small, { color: colors.link }]}>{t("agent.viewDetails")}</Text>
           </Pressable>
           {confirming ? (
             <>
@@ -1905,15 +2301,9 @@ function MonitorCard({ monitor, onOpenTask }: { monitor: Monitor; onOpenTask?: (
       <Text selectable style={s.small}>
         {monitor.url.startsWith("sample:") ? t("agent.builtInAvailabilityPage") : monitor.url}
       </Text>
-      <Text style={s.text}>
-        {monitor.condition === "change"
-          ? t("agent.watchForPageChange")
-          : monitor.condition === "contains"
-            ? t("agent.watchForText", { value: monitor.value })
-            : t("agent.priceBelow", { value: monitor.value })}
-      </Text>
+      <Text style={s.text}>{monitor.description?.trim() || monitorConditionText(monitor, t)}</Text>
       <Text style={[s.small, s.metric]}>
-        {t("agent.monitorInterval", { minutes: monitor.intervalMinutes, checks: monitor.checks })}
+        {monitorScheduleText(monitor, t)} · {t("agent.reminderChannelInAppShort")}
       </Text>
       <Text style={s.small}>
         {t("agent.monitorLastCheck", { time: stamp(monitor.lastCheckedAt) })}

@@ -95,7 +95,13 @@ const details = {
 
   // 文件详情。
   "details.fileSubtitle": "{pages} 页 · {size} KB · {source}",
+  "details.fileSubtitleByType": "{type} · {size} KB · {source}",
   "details.htmlSubtitle": "网页 · {size} KB · {source}",
+  "details.officePreviewUnavailable":
+    "此格式支持上传、下载和投入分析，但当前不在应用内解析 Office 排版。",
+  "details.officePreviewHint": "你可以下载原文件，或用上方操作将其附加到邮件。",
+  "details.textPreviewTruncated":
+    "文件较大，这里只显示前 200,000 个字符。下载原文件可查看全部内容。",
   "details.openDownload": "打开 / 下载",
   "details.saveOrShare": "保存或分享",
   "details.attachToEmail": "附加到邮件",

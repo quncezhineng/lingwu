@@ -3,9 +3,13 @@ import { z } from "zod";
 const reminderSchema = z.object({
   id: z.string(),
   title: z.string(),
+  description: z.string().optional(),
   condition: z.enum(["change", "contains", "price_below"]),
   value: z.string().default(""),
   intervalMinutes: z.number(),
+  schedule: z.enum(["interval", "daily", "weekly"]).optional(),
+  timeOfDay: z.string().nullable().optional(),
+  weekday: z.number().min(1).max(7).nullable().optional(),
   nextCheckAt: z.string(),
   lastCheckedAt: z.string().nullable().default(null),
 });

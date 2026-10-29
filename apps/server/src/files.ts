@@ -10,20 +10,151 @@ import { AppError } from "./errors.ts";
 
 const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-type FileFormat = "pdf" | "html";
+type FileFormat =
+  | "pdf"
+  | "html"
+  | "md"
+  | "png"
+  | "jpg"
+  | "gif"
+  | "webp"
+  | "docx"
+  | "doc"
+  | "xlsx"
+  | "xls"
+  | "csv"
+  | "pptx"
+  | "ppt"
+  | "txt"
+  | "json";
+
+type FileValidation = "pdf" | "utf8" | "png" | "jpeg" | "gif" | "webp" | "zip" | "ole";
+
+interface FileFormatDefinition {
+  extension: FileFormat;
+  mimeType: string;
+  validation: FileValidation;
+}
 
 interface FileMetadata {
-  mimeType: "application/pdf" | "text/html";
+  mimeType: string;
   extension: FileFormat;
   pageCount: number;
   fields?: Artifact["fields"];
 }
 
+const FILE_FORMATS: Record<string, FileFormatDefinition> = {
+  pdf: { extension: "pdf", mimeType: "application/pdf", validation: "pdf" },
+  html: { extension: "html", mimeType: "text/html", validation: "utf8" },
+  htm: { extension: "html", mimeType: "text/html", validation: "utf8" },
+  md: { extension: "md", mimeType: "text/markdown", validation: "utf8" },
+  markdown: { extension: "md", mimeType: "text/markdown", validation: "utf8" },
+  png: { extension: "png", mimeType: "image/png", validation: "png" },
+  jpg: { extension: "jpg", mimeType: "image/jpeg", validation: "jpeg" },
+  jpeg: { extension: "jpg", mimeType: "image/jpeg", validation: "jpeg" },
+  gif: { extension: "gif", mimeType: "image/gif", validation: "gif" },
+  webp: { extension: "webp", mimeType: "image/webp", validation: "webp" },
+  doc: { extension: "doc", mimeType: "application/msword", validation: "ole" },
+  docx: {
+    extension: "docx",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    validation: "zip",
+  },
+  xls: { extension: "xls", mimeType: "application/vnd.ms-excel", validation: "ole" },
+  xlsx: {
+    extension: "xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    validation: "zip",
+  },
+  csv: { extension: "csv", mimeType: "text/csv", validation: "utf8" },
+  ppt: { extension: "ppt", mimeType: "application/vnd.ms-powerpoint", validation: "ole" },
+  pptx: {
+    extension: "pptx",
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    validation: "zip",
+  },
+  txt: { extension: "txt", mimeType: "text/plain", validation: "utf8" },
+  json: { extension: "json", mimeType: "application/json", validation: "utf8" },
+};
+
+function startsWith(bytes: Uint8Array, signature: readonly number[]): boolean {
+  return signature.every((value, index) => bytes[index] === value);
+}
+
+function assertFormat(definition: FileFormatDefinition, bytes: Uint8Array): void {
+  const valid = (() => {
+    switch (definition.validation) {
+      case "pdf":
+        return startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]);
+      case "png":
+        return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      case "jpeg":
+        return startsWith(bytes, [0xff, 0xd8, 0xff]);
+      case "gif":
+        return (
+          Buffer.from(bytes.subarray(0, 6)).toString("ascii") === "GIF87a" ||
+          Buffer.from(bytes.subarray(0, 6)).toString("ascii") === "GIF89a"
+        );
+      case "webp":
+        return (
+          Buffer.from(bytes.subarray(0, 4)).toString("ascii") === "RIFF" &&
+          Buffer.from(bytes.subarray(8, 12)).toString("ascii") === "WEBP"
+        );
+      case "zip":
+        return (
+          startsWith(bytes, [0x50, 0x4b, 0x03, 0x04]) ||
+          startsWith(bytes, [0x50, 0x4b, 0x05, 0x06]) ||
+          startsWith(bytes, [0x50, 0x4b, 0x07, 0x08])
+        );
+      case "ole":
+        return startsWith(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+      case "utf8":
+        try {
+          new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+          return true;
+        } catch {
+          return false;
+        }
+    }
+  })();
+  if (valid) return;
+  if (definition.validation === "utf8") {
+    throw new AppError(
+      definition.extension === "html"
+        ? "HTML files must be UTF-8 text"
+        : "Text-based files must be UTF-8 text",
+      422,
+    );
+  }
+  if (["png", "jpeg", "gif", "webp"].includes(definition.validation))
+    throw new AppError("The file content does not match its image format", 422);
+  if (["zip", "ole"].includes(definition.validation))
+    throw new AppError("The file content does not match its Office format", 422);
+  throw new AppError("The file content does not match its format", 422);
+}
+
 function formatFor(name: string, bytes: Uint8Array): FileFormat | null {
   const extension = name.toLowerCase().split(".").pop();
-  if (extension === "html" || extension === "htm") return "html";
-  if (extension === "pdf" || Buffer.from(bytes.subarray(0, 5)).toString() === "%PDF-") return "pdf";
+  const definition = extension ? FILE_FORMATS[extension] : undefined;
+  if (definition) {
+    assertFormat(definition, bytes);
+    return definition.extension;
+  }
+  // A PDF uploaded with a misleading name can still be opened safely because the
+  // server stores it with the canonical .pdf extension.
+  if (startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) return "pdf";
   return null;
+}
+
+function definitionFor(format: FileFormat): FileFormatDefinition {
+  return (
+    Object.values(FILE_FORMATS).find((definition) => definition.extension === format) ??
+    FILE_FORMATS.pdf
+  );
+}
+
+function definitionForMime(mimeType: string): FileFormatDefinition | undefined {
+  return Object.values(FILE_FORMATS).find((definition) => definition.mimeType === mimeType);
 }
 
 async function inspectFile(name: string, bytes: Uint8Array): Promise<FileMetadata> {
@@ -38,15 +169,9 @@ async function inspectFile(name: string, bytes: Uint8Array): Promise<FileMetadat
       fields: metadata.fields,
     };
   }
-  if (format === "html") {
-    try {
-      new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch {
-      throw new AppError("HTML files must be UTF-8 text", 422);
-    }
-    return { mimeType: "text/html", extension: "html", pageCount: 0 };
-  }
-  throw new AppError("Choose an HTML or PDF file", 415);
+  if (!format) throw new AppError("Choose a supported document or image file", 415);
+  const definition = definitionFor(format);
+  return { mimeType: definition.mimeType, extension: definition.extension, pageCount: 0 };
 }
 
 export function sanitizeFileName(name: string): string {
@@ -160,7 +285,11 @@ export class Files {
   }
   async bytes(owner: string, id: string) {
     const file = await this.get(owner, id);
-    return readFile(this.pathFor(id, file.mimeType === "text/html" ? "html" : "pdf"));
+    const extension =
+      definitionForMime(file.mimeType)?.extension ??
+      FILE_FORMATS[file.name.toLowerCase().split(".").pop() ?? ""]?.extension ??
+      "pdf";
+    return readFile(this.pathFor(id, extension));
   }
   async fill(
     owner: string,

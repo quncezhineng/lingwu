@@ -89,3 +89,38 @@ test("the conversation recalls only its owner's matching memories", async (t) =>
   });
   assert.match(requests[0]?.body ?? "", /recall_memory/);
 });
+
+test("preferences confirmed in chat persist with a category", async (t) => {
+  await modelFixture(t, (index) =>
+    index === 0
+      ? {
+          name: "remember_fact",
+          arguments: { text: "Prefers low-volatility funds", category: "风险偏好" },
+        }
+      : undefined,
+  );
+  const f = await browserFixture(t, () => {
+    throw new Error("Remembering a preference must not use the browser");
+  });
+  const config = { ...f.config, agentBackend: "model" as const, model: "openai/fixture" };
+  const server = await createApp(f.db, config);
+  t.after(() => server.agent.stop());
+
+  const conversation = new ConversationAgent(config, server.agent, "local-user");
+  const input: RunAgentInput = {
+    threadId: "remember-preference-chat",
+    runId: randomUUID(),
+    messages: [
+      { id: randomUUID(), role: "user", content: "Remember that I prefer low volatility." },
+    ],
+    tools: [],
+    context: [],
+    state: {},
+  };
+  await lastValueFrom(conversation.run(input).pipe(toArray()));
+
+  const [saved] = await f.db.list<AgentMemory>("local-user", "memories");
+  assert.equal(saved?.text, "Prefers low-volatility funds");
+  assert.equal(saved?.category, "风险偏好");
+  assert.equal(saved?.source, "User confirmed in chat");
+});

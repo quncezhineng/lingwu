@@ -100,7 +100,14 @@ const details = {
 
   // File detail.
   "details.fileSubtitle": "{pages} pages · {size} KB · {source}",
+  "details.fileSubtitleByType": "{type} · {size} KB · {source}",
   "details.htmlSubtitle": "Web page · {size} KB · {source}",
+  "details.officePreviewUnavailable":
+    "This format supports upload, download, and analysis, but its Office layout is not rendered in the app.",
+  "details.officePreviewHint":
+    "Download the original file or use the actions above to attach it to an email.",
+  "details.textPreviewTruncated":
+    "This file is large, so only the first 200,000 characters are shown. Download the original to view everything.",
   "details.openDownload": "Open / download",
   "details.saveOrShare": "Save or share",
   "details.attachToEmail": "Attach to email",

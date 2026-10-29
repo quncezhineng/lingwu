@@ -14,9 +14,17 @@ export function reminderList(
       .map((monitor) => ({
         id: monitor.id,
         title: monitor.title,
+        ...(monitor.description ? { description: monitor.description } : {}),
         condition: monitor.condition,
         value: monitor.value,
         intervalMinutes: monitor.intervalMinutes,
+        ...(monitor.schedule && monitor.schedule !== "interval"
+          ? {
+              schedule: monitor.schedule,
+              timeOfDay: monitor.timeOfDay ?? null,
+              weekday: monitor.weekday ?? null,
+            }
+          : {}),
         nextCheckAt: monitor.nextCheckAt,
         lastCheckedAt: monitor.lastCheckedAt ?? null,
       })),

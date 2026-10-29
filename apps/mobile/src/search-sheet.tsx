@@ -181,8 +181,8 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
         id: monitor.id,
         kind: "monitor" as const,
         title: monitor.title,
-        detail: monitor.lastValue || monitor.value || monitor.url,
-        keywords: `${monitor.url} ${monitor.status} ${monitor.lastValue ?? ""}`,
+        detail: monitor.description || monitor.lastValue || monitor.value || monitor.url,
+        keywords: `${monitor.description ?? ""} ${monitor.url} ${monitor.status} ${monitor.lastValue ?? ""}`,
         updatedAt: monitor.lastCheckedAt || monitor.nextCheckAt,
       })),
     ];

@@ -421,20 +421,10 @@ export function WorkbenchScreen() {
   const name =
     shortName(workspace.profile.name) || shortName(workspace.profile.email) || t("workbench.there");
   const agentName = localizeAgentName(data?.identity.name);
-  // 进行中的任务优先，其次按更新时间倒序（与 Demo 的任务区排序一致）。
-  const rank = (status: AgentTask["status"]) =>
-    status === "running" || status === "queued"
-      ? 0
-      : status === "waiting_approval" || status === "waiting_input"
-        ? 1
-        : 2;
-  const tasks = [...(data?.tasks ?? [])].sort(
-    (a, b) => rank(a.status) - rank(b.status) || b.updatedAt.localeCompare(a.updatedAt),
+  // “动态”与任务活动页保持同一口径：所有状态统一按最近更新时间排序。
+  const latestTasks = [...(data?.tasks ?? [])].sort((a, b) =>
+    b.updatedAt.localeCompare(a.updatedAt),
   );
-  const activeTasks = tasks.filter(
-    (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
-  );
-  const visibleTasks = activeTasks.length ? activeTasks : tasks;
   // 今日领悟：最多 3 条真实研究产物，按时间倒序做 1/3 轮播。
   const insights = latestWorkbenchInsights(data?.artifacts ?? []);
   const insightPosition = Math.min(insightIndex, Math.max(0, insights.length - 1));
@@ -719,18 +709,14 @@ export function WorkbenchScreen() {
 
           <View>
             <SectionHeading
-              title={
-                activeTasks.length
-                  ? t("workbench.whatAgentDoing", { name: agentName })
-                  : t("workbench.recentAnalyses")
-              }
-              count={visibleTasks.length}
-              action={t("workbench.allTasks")}
+              title={t("workbench.latestActivity")}
+              count={latestTasks.length}
+              action={t("workbench.allActivity")}
               onPress={() => navigate("activity")}
               style={{ marginBottom: 2 }}
             />
-            {visibleTasks.length ? (
-              visibleTasks.slice(0, 3).map((task) => <TaskRow key={task.id} task={task} />)
+            {latestTasks.length ? (
+              latestTasks.slice(0, 3).map((task) => <TaskRow key={task.id} task={task} />)
             ) : (
               <View
                 style={[
@@ -744,9 +730,9 @@ export function WorkbenchScreen() {
                 ]}
               >
                 <ListChecks size={24} color={colors.faint} />
-                <Text style={s.heading}>{t("workbench.noTasksTitle")}</Text>
+                <Text style={s.heading}>{t("workbench.noActivityTitle")}</Text>
                 <Text style={[s.small, { textAlign: "center" }]}>
-                  {t("workbench.noTasksDetail")}
+                  {t("workbench.noActivityDetail")}
                 </Text>
               </View>
             )}

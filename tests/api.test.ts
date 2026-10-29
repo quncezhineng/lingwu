@@ -214,14 +214,66 @@ test("HTML files round-trip through Files and the content route with sandbox hea
   await assert.rejects(agent.files.fill(owner, file.id, {}), /Only PDF files can be filled/);
 });
 
-test("file import rejects unsupported formats and invalid HTML text", async () => {
+test("Markdown, images and Office files round-trip through Files", async () => {
+  const owner = "expanded-files";
+  const markdown = "# Research notes\n\n- Revenue\n- Cash flow\n";
+  const markdownFile = await agent.files.import(
+    owner,
+    "research-notes.md",
+    Buffer.from(markdown),
+    "test",
+  );
+  assert.equal(markdownFile.mimeType, "text/markdown");
+  assert.equal(markdownFile.pageCount, 0);
+  assert.equal(Buffer.from(await agent.files.bytes(owner, markdownFile.id)).toString(), markdown);
+  const markdownResponse = await app.request(markdownFile.url);
+  assert.match(markdownResponse.headers.get("content-type") ?? "", /^text\/markdown/);
+  assert.match(markdownResponse.headers.get("content-disposition") ?? "", /^inline/);
+
+  const pngBytes = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+  ]);
+  const pngFile = await agent.files.import(owner, "chart.png", pngBytes, "test");
+  assert.equal(pngFile.mimeType, "image/png");
+  const pngResponse = await app.request(pngFile.url);
+  assert.equal(pngResponse.headers.get("content-type"), "image/png");
+  assert.match(pngResponse.headers.get("content-disposition") ?? "", /^inline/);
+  assert.deepEqual(Buffer.from(await pngResponse.arrayBuffer()), pngBytes);
+
+  const zipSignature = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
+  const officeFiles = await Promise.all([
+    agent.files.import(owner, "memo.docx", zipSignature, "test"),
+    agent.files.import(owner, "model.xlsx", zipSignature, "test"),
+    agent.files.import(owner, "deck.pptx", zipSignature, "test"),
+  ]);
+  assert.deepEqual(
+    officeFiles.map((file) => file.mimeType),
+    [
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ],
+  );
+  const officeResponse = await app.request(officeFiles[0].url);
+  assert.match(officeResponse.headers.get("content-disposition") ?? "", /^attachment/);
+});
+
+test("file import rejects unsupported formats and content that does not match its extension", async () => {
   await assert.rejects(
-    agent.files.import("file-validation", "notes.txt", Buffer.from("not a document"), "test"),
-    /Choose an HTML or PDF file/,
+    agent.files.import("file-validation", "archive.zip", Buffer.from("not a document"), "test"),
+    /Choose a supported document or image file/,
   );
   await assert.rejects(
     agent.files.import("file-validation", "broken.html", new Uint8Array([0xff, 0xfe]), "test"),
     /HTML files must be UTF-8 text/,
+  );
+  await assert.rejects(
+    agent.files.import("file-validation", "fake.png", Buffer.from("not a png"), "test"),
+    /does not match its image format/,
+  );
+  await assert.rejects(
+    agent.files.import("file-validation", "fake.docx", Buffer.from("not office"), "test"),
+    /does not match its Office format/,
   );
 });
 

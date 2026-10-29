@@ -10,6 +10,7 @@ import {
   type AgentNotification,
   createTaskSchema,
   goalInputSchema,
+  MEMORY_CATEGORIES,
   type Monitor,
   monitorInputSchema,
 } from "../../../../packages/domain/src/agent.ts";
@@ -444,12 +445,16 @@ export class ConversationAgent extends AbstractAgent {
       defineTool({
         name: "remember_fact",
         description: "Remember a preference explicitly supplied or confirmed by the user",
-        parameters: z.object({ text: z.string().min(1).max(2000) }),
-        execute: async ({ text }) => {
+        parameters: z.object({
+          text: z.string().min(1).max(2000),
+          category: z.enum(MEMORY_CATEGORIES).optional(),
+        }),
+        execute: async ({ text, category }) => {
           const value = {
             id: createHash("sha256").update(key("memory", text)).digest("hex"),
             text,
             source: "User confirmed in chat",
+            category: category ?? "关注领域",
             createdAt: new Date().toISOString(),
           };
           await this.service.db.insertIfAbsent(this.owner, "memories", value);

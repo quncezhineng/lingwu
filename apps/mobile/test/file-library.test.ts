@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact } from "../../../packages/domain/src/agent.ts";
-import { buildFileLibrary, markdownExcerpt } from "../src/file-library.ts";
+import {
+  buildFileLibrary,
+  fileSourceBucket,
+  filterFileLibrary,
+  markdownExcerpt,
+} from "../src/file-library.ts";
 
 function file(id: string, createdAt: string): Artifact {
   return {
@@ -54,4 +59,67 @@ test("research card excerpts remove Markdown syntax and stay bounded", () => {
     60,
   );
   assert.equal(excerpt, "结论 已完成，详见 报告。 文件名 report_2026_09.html");
+});
+
+test("uploads are separated from analysis-generated files", () => {
+  assert.equal(fileSourceBucket({ source: "Uploaded by you" }), "upload");
+  assert.equal(fileSourceBucket({ source: " upload " }), "upload");
+  assert.equal(fileSourceBucket({ source: "analysis" }), "analysis");
+  assert.equal(fileSourceBucket({ source: "mail" }), "analysis");
+});
+
+test("file filters combine source, format and a case-insensitive name query", () => {
+  const uploadedPdf = {
+    ...file("annual-report", "2026-10-26T08:00:00.000Z"),
+    name: "Annual Report.pdf",
+    source: "Uploaded by you",
+  };
+  const generatedHtml = {
+    ...file("market-notes", "2026-10-27T08:00:00.000Z"),
+    name: "Market Notes.html",
+    mimeType: "text/html",
+    source: "analysis",
+  };
+  const generatedPdf = {
+    ...file("earnings", "2026-10-28T08:00:00.000Z"),
+    name: "Earnings.pdf",
+    source: "analysis",
+  };
+  const uploadedMarkdown = {
+    ...file("research-notes", "2026-10-28T09:00:00.000Z"),
+    name: "Research Notes.md",
+    mimeType: "text/markdown",
+    source: "Uploaded by you",
+  };
+  const generatedWord = {
+    ...file("board-pack", "2026-10-28T10:00:00.000Z"),
+    name: "Board Pack.docx",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    source: "analysis",
+  };
+  const files = [uploadedPdf, generatedHtml, generatedPdf, uploadedMarkdown, generatedWord];
+
+  assert.deepEqual(
+    filterFileLibrary(files, { source: "analysis", format: "all", query: "" }).map(
+      (item) => item.id,
+    ),
+    ["market-notes", "earnings", "board-pack"],
+  );
+  assert.deepEqual(
+    filterFileLibrary(files, { source: "all", format: "pdf", query: "REPORT" }).map(
+      (item) => item.id,
+    ),
+    ["annual-report"],
+  );
+  assert.deepEqual(filterFileLibrary(files, { source: "upload", format: "html", query: "" }), []);
+  assert.deepEqual(
+    filterFileLibrary(files, { source: "upload", format: "markdown", query: "notes" }).map(
+      (item) => item.id,
+    ),
+    ["research-notes"],
+  );
+  assert.deepEqual(
+    filterFileLibrary(files, { source: "all", format: "word", query: "" }).map((item) => item.id),
+    ["board-pack"],
+  );
 });

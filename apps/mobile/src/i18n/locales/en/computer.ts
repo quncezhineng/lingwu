@@ -87,7 +87,7 @@ const computer = {
   "computer.browsersNote":
     "Browsing sessions keep their own logins and downloads. Open one to take over, then return to your conversation.",
   "computer.documents": "Documents",
-  "computer.documentsDetail": "PDFs saved from mail, browser downloads, and your uploads.",
+  "computer.documentsDetail": "Files saved from mail, browser downloads, and your uploads.",
   "computer.pdfPages": "{count} pages · PDF",
   "computer.importDocument": "Import a document",
   "computer.refreshComputer": "Refresh computer",
