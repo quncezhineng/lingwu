@@ -599,7 +599,6 @@ export function WorkbenchScreen() {
               assistantText={t("workbench.depthAnalysis")}
               onOpenAssistant={() => open({ type: "personality" })}
               sendLabel={t("workbench.sendAnalysis")}
-              style={{ minHeight: 162 }}
             />
 
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>

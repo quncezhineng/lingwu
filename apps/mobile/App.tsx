@@ -41,7 +41,7 @@ import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
 import { GlobalSearchSheet } from "./src/search-sheet";
 import { ACCOUNT_NAV, BrandMark, ChatsColumn, MOBILE_NAV, Rail } from "./src/shell";
-import { breakpoints } from "./src/theme";
+import { breakpoints, layout } from "./src/theme";
 import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
 import { Toast, type ToastState } from "./src/toast";
 import {
@@ -56,7 +56,6 @@ import {
   Mascot,
   radius,
   s,
-  shadow,
   space,
   typography,
 } from "./src/ui";
@@ -107,6 +106,7 @@ export default function App() {
  */
 function Root() {
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
   const [token, setToken] = useState(() => readStorage(SESSION_KEY) ?? "");
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [accessKey, setAccessKey] = useState("");
@@ -187,6 +187,7 @@ function Root() {
     };
   }, [connect]);
   const accountMode = authMode === "supabase";
+  const wideAuth = width >= 900;
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
@@ -204,80 +205,216 @@ function Root() {
             backgroundColor: colors.canvas,
             justifyContent: "center",
             alignItems: "center",
-            padding: 24,
+            paddingHorizontal: wideAuth ? space.page : 24,
+            paddingVertical: 28,
           }}
         >
-          <View style={{ width: "100%", maxWidth: 420, gap: 22, alignItems: "center" }}>
-            <Mascot size={72} />
-            <Text style={{ ...typography.display, color: colors.text }}>
-              {t("app.welcomeTitle")}
-            </Text>
-            <Text style={[s.muted, { textAlign: "center" }]}>{t("app.welcomeSubtitle")}</Text>
-            {authMode === null ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : (
-              <Card style={{ width: "100%" }}>
-                <ErrorNotice error={error} />
-                {accountMode ? (
-                  <>
-                    <Field
-                      label={t("app.emailLabel")}
-                      value={email}
-                      onChangeText={setEmail}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="email-address"
-                      placeholder={t("app.emailPlaceholder")}
+          <View
+            style={{
+              width: "100%",
+              maxWidth: wideAuth ? 1020 : 440,
+              flexDirection: wideAuth ? "row" : "column",
+              alignItems: "stretch",
+              justifyContent: "center",
+              gap: wideAuth ? 64 : 22,
+            }}
+          >
+            {wideAuth && (
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  paddingVertical: 28,
+                  paddingRight: 44,
+                  borderRightWidth: 1,
+                  borderRightColor: colors.line,
+                  justifyContent: "space-between",
+                  gap: 54,
+                }}
+              >
+                <View style={[s.row, { gap: 10 }]}>
+                  <BrandMark size={32} />
+                  <Text
+                    style={{
+                      fontSize: 22,
+                      lineHeight: 30,
+                      fontWeight: "600",
+                      color: colors.text,
+                      letterSpacing: 2.4,
+                      fontFamily: fonts.serif,
+                    }}
+                  >
+                    {t("common.agentName")}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontStyle: "italic",
+                      color: colors.faint,
+                      fontFamily: fonts.serif,
+                    }}
+                  >
+                    lingwu
+                  </Text>
+                </View>
+                <View style={{ gap: 18 }}>
+                  <View style={[s.row, { gap: 8 }]}>
+                    <View
+                      style={{
+                        width: 18,
+                        height: 1,
+                        backgroundColor: colors.primary,
+                      }}
                     />
-                    <Button busy={sendingCode} onPress={() => void sendCode()}>
-                      {t("app.sendCode")}
-                    </Button>
-                    {codeSent && (
-                      <Text style={[s.small, { textAlign: "center" }]}>
-                        {t("app.sendCodeSent")}
-                      </Text>
-                    )}
-                    <Field
-                      label={t("app.codeLabel")}
-                      value={code}
-                      onChangeText={setCode}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="number-pad"
-                      placeholder={t("app.codePlaceholder")}
-                    />
-                    <Button
-                      primary
-                      busy={busy}
-                      disabled={!code}
-                      onPress={() => void submitAccount()}
+                    <Text style={[typography.eyebrow, { color: colors.primaryStrong }]}>
+                      PERSONAL INVESTMENT INTELLIGENCE
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      ...typography.display,
+                      color: colors.heading,
+                      maxWidth: 520,
+                    }}
+                  >
+                    {t("app.welcomeTitle")}
+                  </Text>
+                  <Text style={[s.muted, { maxWidth: 500 }]}>{t("app.welcomeSubtitle")}</Text>
+                </View>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                  {[
+                    t("workbench.depthAnalysis"),
+                    t("workbench.myWatchlist"),
+                    t("app.personalInvestmentSpace"),
+                  ].map((item) => (
+                    <View
+                      key={item}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 7,
+                        borderWidth: 1,
+                        borderColor: colors.line,
+                        borderRadius: radius.control,
+                        backgroundColor: colors.paper,
+                      }}
                     >
-                      {t("app.signIn")}
-                    </Button>
-                  </>
+                      <Text style={[s.small, { color: colors.muted }]}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+            <View
+              style={{
+                width: wideAuth ? 390 : "100%",
+                maxWidth: 440,
+                alignSelf: wideAuth ? "center" : "auto",
+                gap: 22,
+                alignItems: "stretch",
+              }}
+            >
+              {!wideAuth && (
+                <View style={[s.row, { justifyContent: "center", gap: 9, marginBottom: 2 }]}>
+                  <BrandMark size={29} />
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      fontWeight: "600",
+                      letterSpacing: 2.2,
+                      color: colors.text,
+                      fontFamily: fonts.serif,
+                    }}
+                  >
+                    {t("common.agentName")}
+                  </Text>
+                </View>
+              )}
+              <Card style={{ padding: 22, borderRadius: radius.panel }}>
+                <View style={{ alignItems: "center", gap: 8, marginBottom: 20 }}>
+                  <Mascot size={wideAuth ? 52 : 60} />
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      lineHeight: 26,
+                      fontWeight: "600",
+                      color: colors.text,
+                      textAlign: "center",
+                      fontFamily: fonts.serif,
+                    }}
+                  >
+                    {t(accountMode ? "app.signIn" : "app.openWorkspace")}
+                  </Text>
+                  <Text style={[s.small, { textAlign: "center", maxWidth: 300 }]}>
+                    {t("app.welcomeSubtitle")}
+                  </Text>
+                </View>
+                {authMode === null ? (
+                  <ActivityIndicator color={colors.primary} />
                 ) : (
                   <>
-                    <Field
-                      label={t("app.accessKeyLabel")}
-                      value={accessKey}
-                      onChangeText={setAccessKey}
-                      secureTextEntry
-                      placeholder={t("app.accessKeyPlaceholder")}
-                    />
-                    <Button
-                      primary
-                      busy={busy}
-                      onPress={() => void connect(accessKey || undefined)}
-                    >
-                      {t("app.openWorkspace")}
-                    </Button>
-                    <Text style={[s.small, { marginTop: 15 }]}>
-                      {t("app.localWorkspaceHint", { url: API_URL })}
-                    </Text>
+                    <ErrorNotice error={error} />
+                    {accountMode ? (
+                      <>
+                        <Field
+                          label={t("app.emailLabel")}
+                          value={email}
+                          onChangeText={setEmail}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          keyboardType="email-address"
+                          placeholder={t("app.emailPlaceholder")}
+                        />
+                        <Button busy={sendingCode} onPress={() => void sendCode()}>
+                          {t("app.sendCode")}
+                        </Button>
+                        {codeSent && (
+                          <Text style={[s.small, { textAlign: "center", marginTop: 10 }]}>
+                            {t("app.sendCodeSent")}
+                          </Text>
+                        )}
+                        <Field
+                          label={t("app.codeLabel")}
+                          value={code}
+                          onChangeText={setCode}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          keyboardType="number-pad"
+                          placeholder={t("app.codePlaceholder")}
+                        />
+                        <Button
+                          primary
+                          busy={busy}
+                          disabled={!code}
+                          onPress={() => void submitAccount()}
+                        >
+                          {t("app.signIn")}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Field
+                          label={t("app.accessKeyLabel")}
+                          value={accessKey}
+                          onChangeText={setAccessKey}
+                          secureTextEntry
+                          placeholder={t("app.accessKeyPlaceholder")}
+                        />
+                        <Button
+                          primary
+                          busy={busy}
+                          onPress={() => void connect(accessKey || undefined)}
+                        >
+                          {t("app.openWorkspace")}
+                        </Button>
+                        <Text style={[s.small, { marginTop: 15, textAlign: "center" }]}>
+                          {t("app.localWorkspaceHint", { url: API_URL })}
+                        </Text>
+                      </>
+                    )}
                   </>
                 )}
               </Card>
-            )}
+            </View>
           </View>
         </SafeAreaView>
       )}
@@ -467,7 +604,7 @@ function WorkspaceShell({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [searchOpen, threadsOpen, detail, close, navigate]);
   // 工作台采用宽幅编辑画布，右侧信息轨由页面内部负责。
-  const contentMax = desktop ? 1340 : 760;
+  const contentMax = desktop ? layout.contentMax : 760;
   const pending =
     (data?.notifications.filter((n) => !n.read).length || 0) +
     workspace.actions.filter((a) => a.status === "awaiting_review").length;
@@ -527,14 +664,12 @@ function WorkspaceShell({
               {!desktop && (
                 <View
                   style={{
-                    height: 82,
-                    paddingTop: 8,
+                    height: layout.topBarMobile,
+                    paddingTop: 4,
                     marginHorizontal: 18,
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.line,
                   }}
                 >
-                  <View style={{ position: "absolute", left: 0, top: 8 }}>
+                  <View style={{ position: "absolute", left: 0, top: 4 }}>
                     <IconButton
                       icon={Menu}
                       label={t("app.openConversations")}
@@ -546,7 +681,7 @@ function WorkspaceShell({
                     style={{
                       alignItems: "center",
                       justifyContent: "center",
-                      height: 58,
+                      height: 56,
                       gap: 2,
                     }}
                   >
@@ -572,7 +707,7 @@ function WorkspaceShell({
                     style={{
                       position: "absolute",
                       right: 0,
-                      top: 8,
+                      top: 4,
                       flexDirection: "row",
                       alignItems: "center",
                       gap: 4,
@@ -602,8 +737,8 @@ function WorkspaceShell({
                     <LanguageSwitcher compact />
                   </View>
                   {section === "chat" && (
-                    <View style={{ position: "absolute", right: 78, top: 12 }}>
-                      <ComputerEntry />
+                    <View style={{ position: "absolute", right: 90, top: 8 }}>
+                      <ComputerEntry compact />
                     </View>
                   )}
                 </View>
@@ -611,21 +746,19 @@ function WorkspaceShell({
               {desktop && (
                 <View
                   style={{
-                    height: 64,
+                    height: layout.topBarDesktop,
                     flexDirection: "row",
                     alignItems: "center",
-                    paddingHorizontal: 42,
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.line,
+                    paddingHorizontal: 38,
                     backgroundColor: colors.canvas,
                   }}
                 >
                   <View style={[s.row, { gap: 10, flex: 1 }]}>
-                    <Text style={{ fontSize: 12, color: colors.faint }}>
+                    <Text style={{ fontSize: 11, color: colors.faint }}>
                       {t("app.personalInvestmentSpace")}
                     </Text>
-                    <Text style={{ fontSize: 12, color: colors.lineStrong }}>/</Text>
-                    <Text style={{ fontSize: 12, color: colors.muted }}>
+                    <Text style={{ fontSize: 11, color: colors.lineStrong }}>/</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "500" }}>
                       {section === "chat"
                         ? t("app.navChat")
                         : section === "watchlist" || section === "portfolio"
@@ -638,6 +771,33 @@ function WorkspaceShell({
                     </Text>
                   </View>
                   <View style={[s.row, { gap: 8 }]}>
+                    <View
+                      style={[
+                        s.row,
+                        {
+                          gap: 6,
+                          marginRight: 7,
+                          paddingHorizontal: 8,
+                          height: 24,
+                          borderRadius: radius.full,
+                          borderWidth: 1,
+                          borderColor: colors.line,
+                          backgroundColor: colors.paper,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: radius.full,
+                          backgroundColor: colors.success,
+                        }}
+                      />
+                      <Text style={{ fontSize: 9, color: colors.faint }}>
+                        {t("workbench.synced")}
+                      </Text>
+                    </View>
                     <IconButton
                       icon={Search}
                       label={t("search.title")}
@@ -739,24 +899,20 @@ function WorkspaceShell({
               {!desktop && (
                 <View
                   style={{
-                    paddingHorizontal: 22,
-                    paddingTop: 10,
+                    paddingHorizontal: 10,
+                    paddingTop: 5,
                     paddingBottom: 7,
                     alignItems: "center",
+                    borderTopWidth: 1,
+                    borderTopColor: colors.line,
+                    backgroundColor: colors.paper,
                   }}
                 >
                   <View
                     style={{
                       flexDirection: "row",
                       width: "100%",
-                      // 五个主入口，标签文字帮助移动端快速定位。
-                      maxWidth: 430,
-                      padding: 5,
-                      backgroundColor: colors.paper,
-                      borderRadius: radius.composer,
-                      ...shadow.card,
-                      borderWidth: 1,
-                      borderColor: colors.line,
+                      maxWidth: 560,
                     }}
                   >
                     {nav.map((item) => {
@@ -771,27 +927,40 @@ function WorkspaceShell({
                           accessibilityLabel={t(item.labelKey)}
                           accessibilityState={{ selected: active }}
                           onPress={() => navigate(item.id)}
-                          style={{
+                          style={({ pressed }) => ({
+                            position: "relative",
                             flex: 1,
-                            height: 50,
+                            minHeight: layout.bottomNav - 12,
                             alignItems: "center",
                             justifyContent: "center",
-                            gap: 3,
-                            backgroundColor: active ? colors.sky : "transparent",
-                            borderRadius: radius.card,
-                          }}
+                            gap: 4,
+                            backgroundColor: pressed ? colors.surface : "transparent",
+                          })}
                         >
+                          {active && (
+                            <View
+                              pointerEvents="none"
+                              style={{
+                                position: "absolute",
+                                top: -1,
+                                width: 18,
+                                height: 2,
+                                borderRadius: radius.full,
+                                backgroundColor: colors.primary,
+                              }}
+                            />
+                          )}
                           <item.icon
-                            size={19}
+                            size={20}
                             strokeWidth={active ? iconStroke.nav : iconStroke.tab}
-                            color={active ? colors.primary : colors.muted}
+                            color={active ? colors.primary : colors.faint}
                           />
                           <Text
                             numberOfLines={1}
                             style={{
                               fontSize: typography.eyebrow.fontSize,
                               fontWeight: active ? "600" : "500",
-                              color: active ? colors.primaryStrong : colors.muted,
+                              color: active ? colors.primaryStrong : colors.faint,
                             }}
                           >
                             {t(item.labelKey)}

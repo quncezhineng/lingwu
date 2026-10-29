@@ -100,6 +100,74 @@ test("an orphaned main thread is rebuilt with a fresh id when the platform repor
   });
 });
 
+test("an empty uninitialized main thread adopts the newest readable history", async (t) => {
+  await db.put("local-user", "conversation-settings", {
+    id: "main",
+    threadId: "empty-main",
+    existing: false,
+  });
+  t.mock.method(
+    CopilotKitIntelligence.prototype,
+    "getOrCreateThread",
+    async (input: Parameters<CopilotKitIntelligence["getOrCreateThread"]>[0]) => ({
+      thread: { id: input.threadId },
+      created: false,
+    }),
+  );
+  t.mock.method(
+    CopilotKitIntelligence.prototype,
+    "getThreadMessages",
+    async (input: Parameters<CopilotKitIntelligence["getThreadMessages"]>[0]) => ({
+      messages:
+        input.threadId === "history-main"
+          ? [{ id: "user-1", role: "user", content: "Restore this research" }]
+          : [],
+    }),
+  );
+  t.mock.method(CopilotKitIntelligence.prototype, "listThreads", async () => ({
+    threads: [
+      { id: "empty-main", archived: false, updatedAt: "2026-10-29T15:04:51.164Z" },
+      { id: "history-main", archived: false, updatedAt: "2026-10-28T04:23:55.360Z" },
+    ],
+    joinCode: "test",
+    nextCursor: null,
+  }));
+  const response = await (await app.request("/api/main-thread", { headers: headers() })).json();
+  assert.deepEqual(response, { threadId: "history-main", existing: true });
+  assert.deepEqual(await db.get("local-user", "conversation-settings", "main"), {
+    id: "main",
+    threadId: "history-main",
+    existing: true,
+    initialized: true,
+  });
+});
+
+test("a newly created main thread is not replaced by a side-chat history", async (t) => {
+  t.mock.method(
+    CopilotKitIntelligence.prototype,
+    "getOrCreateThread",
+    async (input: Parameters<CopilotKitIntelligence["getOrCreateThread"]>[0]) => ({
+      thread: { id: input.threadId },
+      created: true,
+    }),
+  );
+  const getThreadMessages = t.mock.method(
+    CopilotKitIntelligence.prototype,
+    "getThreadMessages",
+    async () => ({ messages: [] }),
+  );
+  const listThreads = t.mock.method(CopilotKitIntelligence.prototype, "listThreads", async () => ({
+    threads: [],
+    joinCode: "test",
+    nextCursor: null,
+  }));
+  const current = await db.get<{ threadId: string }>("local-user", "conversation-settings", "main");
+  const response = await (await app.request("/api/main-thread", { headers: headers() })).json();
+  assert.equal(response.threadId, current?.threadId);
+  assert.equal(getThreadMessages.mock.callCount(), 0);
+  assert.equal(listThreads.mock.callCount(), 0);
+});
+
 test("Rich Threads lists through CopilotKit, scopes by authenticated owner and preserves pagination", async (t) => {
   const calls: Parameters<CopilotKitIntelligence["listThreads"]>[0][] = [];
   t.mock.method(

@@ -451,14 +451,82 @@ export async function createApp(
       threadId: randomUUID(),
       existing: false,
     });
-    const main = await db.get<{ threadId: string }>(owner, "conversation-settings", "main");
+    const main = await db.get<{
+      id: string;
+      threadId: string;
+      existing?: boolean;
+      initialized?: boolean;
+    }>(owner, "conversation-settings", "main");
     if (!main) throw new AppError("Main conversation could not be loaded", 503);
     try {
-      await intelligence.getOrCreateThread({
+      const current = await intelligence.getOrCreateThread({
         threadId: main.threadId,
         userId: owner,
         agentId: "default",
       });
+      if (!current.created && main.initialized !== true) {
+        const streamStatus = await conversationStream.status(owner, main.threadId);
+        if (!streamStatus.active) {
+          try {
+            const currentMessages = await intelligence.getThreadMessages({
+              threadId: main.threadId,
+              userId: owner,
+            });
+            if (currentMessages.messages.length === 0) {
+              const { threads } = await intelligence.listThreads({
+                userId: owner,
+                agentId: "default",
+                limit: 20,
+              });
+              const candidates = threads
+                .filter((thread) => thread.id !== main.threadId && !thread.archived)
+                .sort(
+                  (left, right) =>
+                    Date.parse(right.updatedAt ?? "") - Date.parse(left.updatedAt ?? ""),
+                )
+                .slice(0, 3);
+              for (const candidate of candidates) {
+                try {
+                  const history = await intelligence.getThreadMessages({
+                    threadId: candidate.id,
+                    userId: owner,
+                  });
+                  if (history.messages.length === 0) continue;
+                  await db.put(owner, "conversation-settings", {
+                    ...main,
+                    threadId: candidate.id,
+                    existing: true,
+                    initialized: true,
+                  });
+                  console.info({
+                    timestamp: new Date().toISOString(),
+                    context: {
+                      phase: "main-thread history recovery",
+                      from: main.threadId,
+                      to: candidate.id,
+                      messages: history.messages.length,
+                    },
+                  });
+                  return c.json({ threadId: candidate.id, existing: true });
+                } catch {
+                  // A single inaccessible thread must not block the remaining candidates.
+                }
+              }
+            }
+          } catch (error) {
+            // Keep initialization pending so a transient provider failure can retry later.
+            console.error({
+              timestamp: new Date().toISOString(),
+              context: { phase: "main-thread history check" },
+              error: error instanceof Error ? error.name : "History check failed",
+            });
+          }
+        }
+        await db.put(owner, "conversation-settings", {
+          ...main,
+          initialized: true,
+        });
+      }
     } catch (error) {
       // getOrCreateThread 只在异常时抛错：线程不存在时会走创建成功路径。
       // 若平台返回 404/409，说明该 threadId 在云端存在但当前 userId 查不到

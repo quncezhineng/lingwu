@@ -2,7 +2,16 @@ import { useThreads } from "@copilotkit/react-native/headless";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useTranslation } from "./i18n";
-import { Archive, CalendarDays, FileText, MessageCircle, Monitor, Plus, Settings2 } from "./icons";
+import {
+  Archive,
+  CalendarDays,
+  FileText,
+  Heart,
+  MessageCircle,
+  Monitor,
+  Plus,
+  Settings2,
+} from "./icons";
 import { Button, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -124,7 +133,7 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
-  function go(section: "calendar" | "files" | "apps") {
+  function go(section: "calendar" | "files" | "preferences" | "apps") {
     onClose();
     navigate(section);
   }
@@ -330,6 +339,7 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
         />
         <LinkRow icon={CalendarDays} title={t("threads.calendar")} onPress={() => go("calendar")} />
         <LinkRow icon={FileText} title={t("threads.files")} onPress={() => go("files")} />
+        <LinkRow icon={Heart} title={t("app.navPreferences")} onPress={() => go("preferences")} />
         <LinkRow icon={Settings2} title={t("threads.appsAndSettings")} onPress={() => go("apps")} />
       </View>
     </Sheet>

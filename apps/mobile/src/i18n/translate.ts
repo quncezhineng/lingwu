@@ -128,6 +128,10 @@ const RUNTIME_LABEL_KEYS: Record<string, string> = {
   "Plan the work": "agent.run.plan.planWork",
   "Use connected tools": "agent.run.plan.useTools",
   "Return a result": "agent.run.plan.returnResult",
+  "Load market data": "research.stepLoadQuote",
+  "Gather news and peer quotes": "research.stepGather",
+  "Estimate a valuation range": "research.stepValuation",
+  "Write the report": "research.stepWrite",
   // 工具步骤标题（model.ts 里每个工具调用写入的固定描述）
   "Make a concrete plan for the delegated outcome": "agent.run.tool.setPlan",
   "Read the authorized workspace sources": "agent.run.tool.readWorkspace",
@@ -160,6 +164,7 @@ const RUNTIME_LABEL_KEYS: Record<string, string> = {
   "Watch paused after repeated failures": "agent.run.event.watchPaused",
   "Check failed; retry scheduled": "agent.run.event.checkFailedRetry",
   "Pause for a fact or decision that is missing": "agent.run.event.pauseForFact",
+  "Stopped by you.": "agent.run.event.stoppedByUser",
   "The agent reached the end of this run without confirming completion. Give it a follow-up instruction to continue.":
     "agent.run.event.runEndedWithoutCompletion",
 };

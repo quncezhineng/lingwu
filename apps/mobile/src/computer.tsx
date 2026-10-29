@@ -9,10 +9,10 @@ import { LinuxWorkspace } from "./computer-workspace";
 import { fileKind, fileTypeName } from "./file-kind";
 import { useTranslation } from "./i18n";
 import { FileText, FolderOpen, Globe2, Monitor, Plus, RefreshCw, Terminal } from "./icons";
-import { Button, Card, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";
+import { Button, Card, colors, ErrorNotice, Field, LinkRow, radius, Sheet, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
-export function ComputerEntry() {
+export function ComputerEntry({ compact = false }: { compact?: boolean }) {
   const { workspace, open } = useWorkspace();
   const { t } = useTranslation();
   const available = workspace.connections.some(
@@ -25,27 +25,40 @@ export function ComputerEntry() {
       accessibilityRole="button"
       accessibilityLabel={t("computer.entryAccessibilityLabel", { status })}
       onPress={() => open({ type: "computer" })}
-      style={[
+      style={({ pressed }) => [
         s.row,
-        {
-          alignSelf: "center",
-          gap: 6,
-          paddingHorizontal: 12,
-          paddingVertical: 7,
-          borderRadius: 999,
-          backgroundColor: colors.tertiary,
-        },
+        compact
+          ? {
+              width: 38,
+              height: 38,
+              justifyContent: "center",
+              borderRadius: radius.control,
+              backgroundColor: pressed ? colors.overlay1 : "transparent",
+            }
+          : {
+              alignSelf: "center",
+              gap: 6,
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              borderRadius: radius.full,
+              backgroundColor: pressed ? colors.surface : colors.tertiary,
+            },
       ]}
     >
-      <Monitor size={13} color={colors.muted} />
-      <Text style={{ fontSize: 12, color: colors.muted }}>
-        {t("computer.entryStatus", { status })}
-      </Text>
+      <Monitor size={compact ? 18 : 13} color={colors.muted} />
+      {!compact && (
+        <Text style={{ fontSize: 12, color: colors.muted }}>
+          {t("computer.entryStatus", { status })}
+        </Text>
+      )}
       <View
         style={{
           width: 5,
           height: 5,
           borderRadius: 4,
+          position: compact ? "absolute" : "relative",
+          right: compact ? 7 : undefined,
+          top: compact ? 7 : undefined,
           backgroundColor: available ? colors.success : colors.disabled,
         }}
       />

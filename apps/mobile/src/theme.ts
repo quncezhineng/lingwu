@@ -1,21 +1,18 @@
 /**
  * 灵悟设计令牌（唯一来源）。
  *
- * 视觉方向来自 Demo 的「冷静的投研工作台」：暖灰画布、白色纸面、1px 细描边，
- * 蓝色只用于操作与选中，红涨绿跌独立于品牌色，几乎不用阴影与大圆角。
- *
- * 取值口径：以 Demo 的 CSS 实测值为准（见 `shared/UIUX-视觉Delta清单-Demo-to-lingwu.md`
- * §3 的 10 处校正），不采信早期文档转述；对比度按 WCAG AA 修正，不复制 Demo 自身的
- * 3 处不达标色（muted / done 徽标 / 副标题）。
+ * 设计语言来自「冷静的投研工作台」：暖灰画布、白色纸面、1px 细描边，
+ * 品牌蓝只用于操作、选中和数据强调；红涨绿跌保持独立语义。
+ * 版式采用 Noto Sans SC 承担界面与数据，Noto Serif SC 只承担问候、洞察与
+ * 长阅读标题，形成“研究刊物 + 工具界面”的双声部。
  *
  * 约束：
  * - 本文件是仓库里唯一允许出现十六进制色值的 App 模块（产物 HTML 模板、图表色板、
  *   服务品牌色在下方登记后同样视为令牌）；
  * - 其余模块只从这里取色、间距、圆角、字阶、阴影、图标线宽；
  * - `colors.primary` 只用于图标描边、选中/聚焦描边、圆点、进度条与浅底，
- *   蓝色文字一律用 `primaryStrong`（5.98:1）或 `primaryAction`（4.79:1）。
- *
- * 本模块不依赖任何业务模块，是可被 `ui.tsx`、`icons/` 共同引用的叶子模块。
+ *   蓝色文字一律用 `primaryStrong` 或 `primaryAction`；
+ * - 卡片靠描边和留白建立层级，阴影只给输入框、弹层和浮导航。
  */
 import type { TextStyle, ViewStyle } from "react-native";
 import { Platform } from "react-native";
@@ -23,8 +20,10 @@ import { Platform } from "react-native";
 /** 基础色板。 */
 export const colors = {
   canvas: "#F8F8F8", // 页面画布
+  sidebar: "#F4F4F4", // 桌面导航底色，与画布形成一层极浅的空间分区
   paper: "#FFFFFF", // 卡片、输入框与浮层纸面
   surface: "#F4F4F4",
+  surfaceRaised: "#FAFAFA",
   surfaceSoft: "#F6F6F6", // 折叠面板 / 收起态浅灰底
   tertiary: "#EEEEEE",
   text: "#303030",
@@ -36,6 +35,7 @@ export const colors = {
   faint: "#6F6F6F", // 次要信息文本，4.73:1 达 AA（Demo #8A8A8A 仅 3.25:1）
   disabled: "#B0B0B0", // 仅可用于禁用控件本身，不得用于「看起来像次要信息」的文本
   line: "#E6E6E6",
+  lineSoft: "#EFEFEF",
   lineStrong: "#D6D6D6",
   /** 选中 / 悬停描边（Demo --accent-line）。 */
   accentLine: "#D9E5FA",
@@ -47,6 +47,7 @@ export const colors = {
   primaryStrong: "#245FC4",
   primaryAction: "#2F6FD8",
   sky: "#EDF3FF",
+  skyStrong: "#EAF1FF",
   green: "rgba(33,125,98,0.10)",
   success: "#217D62",
   orange: "rgba(211,126,35,0.11)",
@@ -331,6 +332,22 @@ export const breakpoints = {
 export const layout = {
   sidebar: 232,
   chats: 248,
+  /** 桌面顶栏与移动顶栏高度。 */
+  topBarDesktop: 76,
+  topBarMobile: 72,
+  /** 页面内容上限与阅读列上限。 */
+  contentMax: 1340,
+  conversationMax: 920,
+  readingMax: 760,
+  /** 移动端底栏。 */
+  bottomNav: 64,
+} as const;
+
+/** 交互节奏：RN 只消费毫秒值，CSS / Web 端可换算为 duration。 */
+export const motion = {
+  fast: 120,
+  base: 180,
+  slow: 300,
 } as const;
 
 /**

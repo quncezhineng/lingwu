@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -76,21 +76,21 @@ export const s = StyleSheet.create({
     fontFamily: fonts.sans,
   },
   field: { gap: space.xs, marginBottom: space.md },
-  /** 按钮：control 圆角 + 1px 描边，默认高度 38（small 32），触控可达 44。 */
+  /** 按钮：control 圆角 + 1px 描边，默认高度 40（small 32），触控可达 44。 */
   button: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: space.xs,
     paddingHorizontal: space.md,
-    minHeight: 38,
+    minHeight: 40,
     paddingVertical: space.xs,
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: "transparent",
   },
   primary: { backgroundColor: colors.primaryAction, borderColor: colors.primaryAction },
-  secondary: { backgroundColor: colors.surface, borderColor: colors.line },
+  secondary: { backgroundColor: colors.paper, borderColor: colors.lineStrong },
   dangerSurface: { backgroundColor: colors.errorSoft, borderColor: colors.errorSoft },
   buttonText: { fontSize: 14, fontWeight: "600", fontFamily: fonts.sans },
   chip: {
@@ -113,10 +113,10 @@ export const s = StyleSheet.create({
   iconBox: {
     width: space.touch,
     height: space.touch,
-    borderRadius: radius.card,
+    borderRadius: radius.control,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
   },
   /** 任务行 / 列表图标底座：36×39 / r9（Delta C5）。 */
   glyph: {
@@ -194,10 +194,11 @@ export function Button({
       style={({ pressed }) => [
         s.button,
         primary ? s.primary : danger ? s.dangerSurface : s.secondary,
+        primary && pressed && { backgroundColor: colors.primaryStrong },
         small && { minHeight: 32, paddingVertical: 6, paddingHorizontal: 13 },
         style,
         {
-          opacity: disabled ? 0.4 : busy && !quietBusy ? 0.75 : pressed ? 0.85 : 1,
+          opacity: disabled ? 0.4 : busy && !quietBusy ? 0.75 : pressed ? 0.9 : 1,
         },
       ]}
     >
@@ -259,15 +260,39 @@ export function Chip({ children, tint }: { children: ReactNode; tint?: string })
   );
 }
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
+  const [focused, setFocused] = useState(false);
   return (
     <View style={s.field}>
-      <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>{label}</Text>
+      <Text
+        style={[
+          s.small,
+          {
+            fontWeight: "600",
+            color: focused ? colors.primaryStrong : colors.text,
+            letterSpacing: 0.2,
+          },
+        ]}
+      >
+        {label}
+      </Text>
       <TextInput
         placeholderTextColor={colors.faint}
         accessibilityLabel={label}
         {...props}
+        onFocus={(event) => {
+          setFocused(true);
+          props.onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          props.onBlur?.(event);
+        }}
         style={[
           s.input,
+          focused && {
+            borderColor: colors.primary,
+            backgroundColor: colors.sky,
+          },
           props.multiline && { minHeight: 120, textAlignVertical: "top" },
           props.style,
         ]}

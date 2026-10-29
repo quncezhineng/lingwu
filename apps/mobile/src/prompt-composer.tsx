@@ -83,10 +83,10 @@ export function PromptComposer({
       style={[
         {
           backgroundColor: colors.paper,
-          borderRadius: radius.composer,
+          borderRadius: dense ? radius.panel : radius.composer,
           borderWidth: 1,
-          borderColor: focused ? colors.primary : colors.line,
-          padding: dense ? 10 : 16,
+          borderColor: focused ? colors.primary : colors.lineStrong,
+          padding: dense ? 8 : 10,
           ...shadow.composer,
         },
         style,
@@ -180,7 +180,7 @@ export function PromptComposer({
               style={{
                 width: 1,
                 height: 15,
-                backgroundColor: colors.line,
+                backgroundColor: colors.lineSoft,
                 marginHorizontal: 3,
               }}
             />
@@ -232,12 +232,14 @@ export function PromptComposer({
           hitSlop={4}
           onPress={action}
           style={({ pressed }) => ({
-            width: 38,
-            height: 38,
+            width: dense ? 36 : 38,
+            height: dense ? 36 : 38,
             borderRadius: radius.full,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: busy || canSubmit ? colors.primary : colors.tertiary,
+            borderWidth: busy || canSubmit ? 0 : 1,
+            borderColor: colors.line,
+            backgroundColor: busy || canSubmit ? colors.primaryAction : colors.surfaceRaised,
             opacity: pressed ? 0.82 : 1,
             transform: [{ scale: pressed ? 0.96 : 1 }],
           })}

@@ -25,6 +25,11 @@ const agent = {
   "agent.viewFile": "View file",
   "agent.providedFields": "Provided the requested fields.",
   "agent.taskTitle": "Task",
+  "agent.taskTechnicalError": "A technical error stopped this task",
+  "agent.taskTechnicalErrorDetail":
+    "The task did not finish. Retry it, or expand the technical details to troubleshoot.",
+  "agent.showErrorDetails": "Show technical details",
+  "agent.hideErrorDetails": "Hide technical details",
   "agent.loadingSavedProgress": "Loading saved progress…",
   "agent.milestoneTrackingNote": "Milestone: {title}. Completion is tracked manually in Goals.",
   "agent.milestoneUnavailable":
@@ -492,6 +497,7 @@ const agent = {
   "agent.run.event.watchPaused": "Watch paused after repeated failures",
   "agent.run.event.checkFailedRetry": "Check failed; retry scheduled",
   "agent.run.event.pauseForFact": "Pause for a fact or decision that is missing",
+  "agent.run.event.stoppedByUser": "You stopped this task.",
   "agent.run.event.runEndedWithoutCompletion":
     "The agent reached the end of this run without confirming completion. Give it a follow-up instruction to continue.",
 } satisfies Dictionary;

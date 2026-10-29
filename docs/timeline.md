@@ -5,6 +5,22 @@
 
 ## 变更记录
 
+### 2026-10-30 · 桌面宽屏下输入框不再贴住浏览器底部
+
+对话页（`ChatScreen`）桌面宽屏时，输入框组件紧贴浏览器最下方,缺少呼吸间距。
+
+**修改**（`apps/mobile/src/chat.tsx`）
+
+- 在对话页 `PromptComposer` 的 style 中,宽屏（`wide`）时追加 `marginBottom: 18`,使输入框与页面底部留出间距;窄屏保持原样（仍由底部 tab 栏承载间距）。
+
+### 2026-10-30 · 减小输入框底部按钮工具栏与下框线之间的间距
+
+对话页 / 工作台输入框（`PromptComposer`）中，按钮工具栏行紧贴容器底部，但容器四边统一使用 `padding`（dense 11 / 普通 16），导致工具栏行距离输入框下边框线留白偏大。
+
+**修改**（`apps/mobile/src/prompt-composer.tsx`）
+
+- 将统一 `padding` 拆分为 `paddingTop` / `paddingHorizontal`（保持原值）与 `paddingBottom`（dense 11→8、普通 16→10），顶部与左右不受影响，仅收紧下框线处的留白。
+
 ### 2026-10-29 · 消除 Biome lint 告警（useLiteralKeys / noNonNullAssertion / 无用变量）
 
 对内联 lint 输出中暴露的残余告警做最小化清理：

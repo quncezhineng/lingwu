@@ -512,7 +512,8 @@ function CategoryRail({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingVertical: 1 }}
+        style={{ flexGrow: 0, flexShrink: 0 }}
+        contentContainerStyle={{ alignItems: "center", gap: 8, paddingVertical: 1 }}
       >
         {options.map((option) => {
           const active = category === option.id;
@@ -523,7 +524,8 @@ function CategoryRail({
               accessibilityState={{ selected: active }}
               onPress={() => onChange(option.id)}
               style={({ pressed }) => ({
-                minHeight: 34,
+                height: 34,
+                alignSelf: "center",
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 7,

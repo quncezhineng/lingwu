@@ -16,8 +16,13 @@ const chat = {
   "chat.saveError": "无法保存对话：{detail}",
   "chat.retryLoadingConversation": "重试加载对话",
   "chat.emptyTitle": "你的个人投研智能体，随时待命。",
+  "chat.emptyTitleLead": "你的个人投研智能体，",
+  "chat.emptyTitleTail": "随时待命。",
+  "chat.emptyEyebrow": "研究助手 · 随时开始",
   "chat.emptySubtitle":
     "告诉我你想研究什么。我可以搜集信息、分析行情、跟踪标的，还能用电脑帮你查阅研报与公告。",
+  "chat.emptyFootnote": "研究过程可追溯，资料与结论只保存在你的工作区",
+  "chat.suggestionHeading": "你可以这样开始",
   "chat.suggestionHackerNews": "分析一只股票的近期走势",
   "chat.suggestionSummarize": "梳理一份财报的核心信息",
   "chat.suggestionDeepDive": "深度研究一只股票的基本面与估值",

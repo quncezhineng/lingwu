@@ -36,6 +36,11 @@ import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
 import { displayUserMessage, promptWithAttachments } from "./chat-content";
 import { BrowserThreadCard } from "./computer";
 import { ConversationHeader, type ConversationHeaderState } from "./conversation-header";
+import {
+  mergePersistedThreadMessages,
+  readableToolCalls,
+  threadHistoryPath,
+} from "./conversation-history";
 import { ConversationQueue, type QueuedMessage } from "./conversation-queue";
 import {
   ConversationTurnError,
@@ -50,7 +55,19 @@ import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { type TranslationKey, useTranslation } from "./i18n";
 import { localizeAgentName, statusLabel } from "./i18n/translate";
-import { ArrowDown, FileText, FolderOpen, Lightbulb, RotateCcw, Upload, X } from "./icons";
+import {
+  ArrowDown,
+  ArrowUpRight,
+  FileText,
+  FolderOpen,
+  Lightbulb,
+  ListChecks,
+  RotateCcw,
+  Sparkles,
+  Target,
+  Upload,
+  X,
+} from "./icons";
 import { InsightCard } from "./insight-card";
 import { confirmedJevSelection, displayJevUserMessage, latestJevPanelId } from "./jev-actions";
 import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
@@ -61,11 +78,11 @@ import { QuestionCard, taskHasQuestion } from "./question-card";
 import { QuoteToolCard } from "./quote-tool-card";
 import { ReminderToolCard } from "./reminder-tool-card";
 import { SearchToolCard } from "./search-tool-card";
-import { breakpoints } from "./theme";
+import { breakpoints, typography } from "./theme";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
 import { type Selection, useLingWuThread } from "./threads";
 import { parseToolArguments, ToolStep, type ToolStepStatus } from "./tool-step";
-import { Button, Card, colors, dateLabel, Empty, ErrorNotice, s, shadow } from "./ui";
+import { Button, Card, colors, dateLabel, Empty, ErrorNotice, fonts, s, shadow } from "./ui";
 import { useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
@@ -125,8 +142,7 @@ type ThreadApproval = { action: ActionProposal; task: AgentTask };
 /** Reads the task created by a delegate_task tool call so its approvals can sit in the same turn. */
 function delegatedTaskIds(message: Message, messages: Message[]): Set<string> {
   const ids = new Set<string>();
-  const toolCalls = "toolCalls" in message ? message.toolCalls || [] : [];
-  for (const call of toolCalls) {
+  for (const call of readableToolCalls(message)) {
     if (call.function.name !== "delegate_task") continue;
     const toolMessage = messages.find(
       (candidate): candidate is ToolMessage =>
@@ -513,9 +529,10 @@ export function ChatScreen({
       try {
         if (richThreads) {
           if (selection.existing) {
-            // Replaying history re-emits past RUN_ERROR events; only connection failures block loading.
-            // connectAgent returns once the thread is idle, so it also waits for a reply still
-            // running from before a reload. Sending earlier fails with a thread lock.
+            // Replaying history re-emits past RUN_ERROR events, so connection failures are
+            // handled separately from transcript loading. connectAgent returns once the
+            // thread is idle and also waits for a reply still running before reload.
+            let connectionFailure: unknown;
             replaying.current += 1;
             setSyncing(true);
             try {
@@ -525,9 +542,53 @@ export function ChatScreen({
                 (onError) => copilotkit.subscribe({ onError }),
                 [replayedRunError],
               );
+            } catch (error) {
+              connectionFailure = error;
             } finally {
               replaying.current -= 1;
               if (active) setSyncing(false);
+            }
+            let persisted: Message[] = [];
+            let historyFailure: unknown;
+            try {
+              // Replay covers the latest run; the thread API is the complete
+              // transcript, including older turns and their tool messages.
+              const { messages } = await api.request<{ messages: Message[] }>(
+                threadHistoryPath(threadId),
+              );
+              persisted = messages;
+            } catch (error) {
+              historyFailure = error;
+            }
+            if (!agent.messages.length && !persisted.length && threadId === mainId) {
+              // Main chats created before Rich Threads kept their transcript in
+              // the legacy conversation record. Restore it when the cloud
+              // thread is empty; side chats never use this fallback.
+              try {
+                const { messages } = await api.request<{ messages: Message[] }>(
+                  "/api/conversation",
+                );
+                persisted = messages;
+              } catch (error) {
+                historyFailure ??= error;
+              }
+            }
+            if (!agent.messages.length && !persisted.length) {
+              const failure = historyFailure ?? connectionFailure;
+              if (failure) throw failure;
+            }
+            if (active && persisted.length) {
+              agent.setMessages(mergePersistedThreadMessages(persisted, agent.messages));
+            }
+            if (connectionFailure) {
+              setHistoryError(
+                t("chat.historyLoadError", {
+                  detail:
+                    connectionFailure instanceof Error
+                      ? connectionFailure.message
+                      : String(connectionFailure),
+                }),
+              );
             }
           }
         } else {
@@ -552,7 +613,18 @@ export function ChatScreen({
       replay.unsubscribe();
       if (richThreads) void agent.detachActiveRun().catch(() => {});
     };
-  }, [agent, agentId, api, copilotkit, isReady, historyAttempt, richThreads, selection.existing]);
+  }, [
+    agent,
+    agentId,
+    api,
+    copilotkit,
+    isReady,
+    historyAttempt,
+    mainId,
+    richThreads,
+    selection.existing,
+    threadId,
+  ]);
   const saveHistory = useCallback(async () => {
     if (!richThreads) await api.request("/api/conversation", { messages: agent.messages }, "PUT");
     setSaveError("");
@@ -831,11 +903,47 @@ export function ChatScreen({
     return live.text.length > content.length ? live.text : content;
   };
   const latestDesktop = messages
-    .flatMap((m) => ("toolCalls" in m ? m.toolCalls || [] : []))
+    .flatMap((m) => readableToolCalls(m))
     .filter((call) => call.function.name === "use_desktop")
     .at(-1)?.id;
   const replying = busy || agent.isRunning;
   const renderedCount = visible.length + extraDrafts.length;
+  const wideEmpty = windowWidth >= 1180;
+  const emptySuggestions = [
+    {
+      icon: Target,
+      text: t("chat.suggestionHackerNews"),
+      action: () => enqueue(t("chat.suggestionHackerNews")),
+    },
+    {
+      icon: FileText,
+      text: t("chat.suggestionSummarize"),
+      action: () => enqueue(t("chat.suggestionSummarize")),
+    },
+    {
+      icon: Sparkles,
+      text: t("chat.suggestionDeepDive"),
+      action: () => enqueue(t("chat.suggestionDeepDive")),
+    },
+    {
+      icon: Lightbulb,
+      text: t("chat.suggestionBriefing"),
+      action: () => enqueue(t("chat.suggestionBriefing")),
+    },
+    {
+      icon: ListChecks,
+      text: t("chat.suggestionPeerCompare"),
+      action: () => enqueue(t("chat.suggestionPeerCompare")),
+    },
+    {
+      icon: Target,
+      text: t("chat.suggestionWatchWebsite"),
+      action: () => {
+        enqueue(t("chat.suggestionWatchWebsite"));
+        navigate("goals");
+      },
+    },
+  ] as const;
   const latestVisible = visible[visible.length - 1];
   const latestVisibleText = latestVisible ? messageText(latestVisible) : "";
   const showingStreamText =
@@ -914,14 +1022,16 @@ export function ChatScreen({
         >
           <Text>{streamAnnouncement}</Text>
         </View>
-        <ConversationHeader
-          title={threadName}
-          status={headerStatus}
-          state={headerState}
-          onOpenFiles={() => setFilesOpen((open) => !open)}
-          filesOpen={filesOpen}
-          filesLabel={t("chat.openArtifacts")}
-        />
+        <View style={{ width: "100%", maxWidth: 900, alignSelf: "center" }}>
+          <ConversationHeader
+            title={threadName}
+            status={headerStatus}
+            state={headerState}
+            onOpenFiles={() => setFilesOpen((open) => !open)}
+            filesOpen={filesOpen}
+            filesLabel={t("chat.openArtifacts")}
+          />
+        </View>
         <ScrollView
           ref={list}
           showsVerticalScrollIndicator={false}
@@ -953,59 +1063,127 @@ export function ChatScreen({
                 flexGrow: 1,
                 flexShrink: 0,
                 justifyContent: "center",
-                alignItems: "center",
-                paddingVertical: 34,
-                gap: 15,
+                paddingVertical: wideEmpty ? 42 : 30,
               }}
             >
-              <Text
+              <View
                 style={{
-                  fontSize: 28,
-                  letterSpacing: 0.5,
-                  color: colors.text,
-                  textAlign: "center",
-                  maxWidth: 350,
+                  width: "100%",
+                  maxWidth: 980,
+                  alignSelf: "center",
+                  flexDirection: wideEmpty ? "row" : "column",
+                  alignItems: "stretch",
+                  gap: wideEmpty ? 54 : 26,
                 }}
               >
-                {t("chat.emptyTitle")}
-              </Text>
-              <Text style={[s.muted, { maxWidth: 320, textAlign: "center", lineHeight: 23 }]}>
-                {t("chat.emptySubtitle")}
-              </Text>
-              <View style={{ width: "100%", maxWidth: 360, marginTop: 14, gap: 8 }}>
-                {[
-                  {
-                    text: t("chat.suggestionHackerNews"),
-                    action: () => enqueue(t("chat.suggestionHackerNews")),
-                  },
-                  {
-                    text: t("chat.suggestionSummarize"),
-                    action: () => enqueue(t("chat.suggestionSummarize")),
-                  },
-                  {
-                    text: t("chat.suggestionDeepDive"),
-                    action: () => enqueue(t("chat.suggestionDeepDive")),
-                  },
-                  {
-                    text: t("chat.suggestionBriefing"),
-                    action: () => enqueue(t("chat.suggestionBriefing")),
-                  },
-                  {
-                    text: t("chat.suggestionPeerCompare"),
-                    action: () => enqueue(t("chat.suggestionPeerCompare")),
-                  },
-                  {
-                    text: t("chat.suggestionWatchWebsite"),
-                    action: () => {
-                      enqueue(t("chat.suggestionWatchWebsite"));
-                      navigate("goals");
-                    },
-                  },
-                ].map((item) => (
-                  <Button key={item.text} onPress={item.action}>
-                    {item.text}
-                  </Button>
-                ))}
+                <View style={{ flex: 1, minWidth: 0, justifyContent: "center", gap: 16 }}>
+                  <View style={[s.row, { gap: 8 }]}>
+                    <View
+                      style={{
+                        width: 20,
+                        height: 1,
+                        backgroundColor: colors.primary,
+                      }}
+                    />
+                    <Text style={[typography.eyebrow, { color: colors.primaryStrong }]}>
+                      {t("chat.emptyEyebrow")}
+                    </Text>
+                  </View>
+                  <Text
+                    accessibilityLabel={t("chat.emptyTitle")}
+                    style={{
+                      maxWidth: 560,
+                      color: colors.heading,
+                      fontSize: wideEmpty ? 40 : 31,
+                      lineHeight: wideEmpty ? 54 : 43,
+                      fontWeight: "500",
+                      letterSpacing: 0.2,
+                      fontFamily: fonts.serif,
+                    }}
+                  >
+                    {t("chat.emptyTitleLead")}
+                    {"\n"}
+                    <Text style={{ color: colors.faint }}>{t("chat.emptyTitleTail")}</Text>
+                  </Text>
+                  <Text
+                    style={[
+                      s.muted,
+                      {
+                        maxWidth: 540,
+                        fontSize: 13,
+                        lineHeight: 22,
+                      },
+                    ]}
+                  >
+                    {t("chat.emptySubtitle")}
+                  </Text>
+                  <View style={[s.row, { gap: 7, marginTop: 4 }]}>
+                    <Sparkles size={13} color={colors.faint} />
+                    <Text style={[s.small, { color: colors.faint }]}>
+                      {t("chat.emptyFootnote")}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={{
+                    width: wideEmpty ? 360 : "100%",
+                    paddingLeft: wideEmpty ? 28 : 0,
+                    paddingTop: wideEmpty ? 0 : 18,
+                    borderLeftWidth: wideEmpty ? 1 : 0,
+                    borderLeftColor: colors.line,
+                    borderTopWidth: wideEmpty ? 0 : 1,
+                    borderTopColor: colors.line,
+                  }}
+                >
+                  <View style={[s.between, { paddingBottom: 8 }]}>
+                    <Text style={[typography.eyebrow, { color: colors.faint }]}>
+                      {t("chat.suggestionHeading")}
+                    </Text>
+                    <Text style={{ fontSize: 9, color: colors.lineStrong }}>01—06</Text>
+                  </View>
+                  {emptySuggestions.map((item, index) => (
+                    <Pressable
+                      key={item.text}
+                      accessibilityRole="button"
+                      onPress={item.action}
+                      style={({ pressed }) => ({
+                        minHeight: 47,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 11,
+                        paddingVertical: 10,
+                        borderTopWidth: 1,
+                        borderTopColor: colors.lineSoft,
+                        backgroundColor: pressed ? colors.surfaceRaised : "transparent",
+                      })}
+                    >
+                      <Text
+                        style={[
+                          s.metric,
+                          {
+                            width: 20,
+                            fontSize: 10,
+                            color: colors.faint,
+                          },
+                        ]}
+                      >
+                        {String(index + 1).padStart(2, "0")}
+                      </Text>
+                      <item.icon size={14} strokeWidth={1.65} color={colors.muted} />
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontSize: 12,
+                          lineHeight: 18,
+                          color: colors.text,
+                        }}
+                      >
+                        {item.text}
+                      </Text>
+                      <ArrowUpRight size={13} color={colors.faint} />
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             </View>
           ) : (
@@ -1023,7 +1201,7 @@ export function ChatScreen({
               const attachments = parsedUser?.attachments ?? [];
               const draft = user ? undefined : stream.state.drafts[message.id];
               const streaming = !!draft && !draft.done;
-              const toolCalls = "toolCalls" in message ? message.toolCalls || [] : [];
+              const toolCalls = readableToolCalls(message);
               const approvals = approvalsByMessage.get(message.id) || [];
               return (
                 <View
@@ -1509,6 +1687,13 @@ export function ChatScreen({
             stopLabel={t("chat.stopReply")}
             busy={replying}
             submitDisabled={!loaded || !isReady}
+            style={{
+              width: "100%",
+              maxWidth: 900,
+              alignSelf: "center",
+              // 桌面宽屏下输入框不贴浏览器底部,留出呼吸间距
+              ...(wide ? { marginBottom: 18 } : null),
+            }}
           />
         </KeyboardAvoidingView>
       </View>

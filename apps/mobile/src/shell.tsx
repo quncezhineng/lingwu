@@ -48,7 +48,7 @@ import {
 import { relativeDate } from "./relative-date";
 import { layout } from "./theme";
 import { useLingWuThread } from "./threads";
-import { Button, colors, ErrorNotice, fonts, Mascot, s, shadow } from "./ui";
+import { Button, colors, ErrorNotice, fonts, Mascot, radius, s, shadow } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 侧栏中的导航项：都对应一个页面，点击切换到对应 section。 */
@@ -118,8 +118,8 @@ function SidebarNavItem({
         gap: 12,
         paddingHorizontal: 12,
         paddingVertical: 9,
-        borderRadius: 7,
-        backgroundColor: active ? colors.sky : pressed ? colors.overlay1 : "transparent",
+        borderRadius: 8,
+        backgroundColor: active ? colors.skyStrong : pressed ? colors.overlay1 : "transparent",
       })}
     >
       <Icon
@@ -248,20 +248,21 @@ export function Rail({ name }: { name: string }) {
         zIndex: 20,
         borderRightWidth: 1,
         borderRightColor: colors.line,
-        backgroundColor: colors.surface,
+        backgroundColor: colors.sidebar,
         paddingHorizontal: 20,
         paddingTop: 22,
         paddingBottom: 18,
       }}
     >
       <View style={[s.row, { gap: 10, paddingHorizontal: 2 }]}>
-        <BrandMark size={27} />
+        <BrandMark size={29} />
         <Text
           style={{
-            fontSize: 21,
-            lineHeight: 27,
+            fontSize: 22,
+            lineHeight: 29,
             fontWeight: "600",
             color: colors.text,
+            letterSpacing: 2.4,
             fontFamily: fonts.serif,
           }}
         >
@@ -274,13 +275,13 @@ export function Rail({ name }: { name: string }) {
         accessibilityLabel={t("app.newAnalysis")}
         onPress={() => navigate("chat")}
         style={({ pressed }) => ({
-          marginTop: 26,
-          minHeight: 43,
+          marginTop: 28,
+          minHeight: 44,
           flexDirection: "row",
           alignItems: "center",
           gap: 9,
           paddingHorizontal: 13,
-          borderRadius: 9,
+          borderRadius: radius.control,
           borderWidth: 1,
           borderColor: colors.lineStrong,
           backgroundColor: pressed ? colors.overlay1 : colors.paper,
@@ -336,7 +337,7 @@ export function Rail({ name }: { name: string }) {
             marginHorizontal: -4,
             paddingHorizontal: 8,
             paddingVertical: 8,
-            borderRadius: 9,
+            borderRadius: radius.control,
             backgroundColor: pressed ? colors.overlay1 : "transparent",
           })}
         >
@@ -385,9 +386,13 @@ export function Rail({ name }: { name: string }) {
               alignItems: "center",
               gap: 9,
               paddingHorizontal: 10,
-              borderRadius: 9,
+              borderRadius: radius.control,
               backgroundColor:
-                section === ACCOUNT_NAV.id ? colors.sky : pressed ? colors.overlay1 : "transparent",
+                section === ACCOUNT_NAV.id
+                  ? colors.skyStrong
+                  : pressed
+                    ? colors.overlay1
+                    : "transparent",
             })}
           >
             <SidebarAccountAvatar avatarUrl={accountAvatarUrl} name={accountLabel} />
@@ -416,7 +421,7 @@ export function Rail({ name }: { name: string }) {
               height: 38,
               alignItems: "center",
               justifyContent: "center",
-              borderRadius: 9,
+              borderRadius: radius.control,
               backgroundColor: pressed ? colors.overlay1 : "transparent",
             })}
           >

@@ -162,6 +162,24 @@ function SegmentedChips<T extends string>({
 function OverviewCard({ group, desktop }: { group: CurrencyGroup; desktop: boolean }) {
   const { t } = useTranslation();
   const pnlDirection = directionOf(group.pnl);
+  const summaryMetrics = [
+    {
+      label: t("portfolio.metricsMarketValue"),
+      value: formatMoney(group.marketValue, group.currency),
+      color: colors.text,
+    },
+    {
+      label: t("portfolio.metricsCost"),
+      value: formatMoney(group.cost, group.currency),
+      color: colors.text,
+    },
+    {
+      label: t("portfolio.metricsPnl"),
+      value: formatMoney(group.pnl, group.currency),
+      detail: group.pnlPct === undefined ? "—" : formatPercent(group.pnlPct),
+      color: marketDirectionColor(pnlDirection),
+    },
+  ];
   return (
     <Card style={{ flex: desktop ? 1 : undefined, gap: 10 }}>
       <View style={[s.between]}>
@@ -173,41 +191,43 @@ function OverviewCard({ group, desktop }: { group: CurrencyGroup; desktop: boole
         </View>
         <Text style={s.small}>{t("portfolio.holdingsCount", { count: group.totalCount })}</Text>
       </View>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-        {[
-          {
-            label: t("portfolio.metricsMarketValue"),
-            value: formatMoney(group.marketValue, group.currency),
-          },
-          { label: t("portfolio.metricsCost"), value: formatMoney(group.cost, group.currency) },
-        ].map((metric) => (
-          <View key={metric.label} style={{ flex: 1, minWidth: 120, gap: 2 }}>
-            <Text style={s.small}>{metric.label}</Text>
-            <Text style={[s.metric, { fontSize: 20, fontWeight: "600", color: colors.text }]}>
-              {metric.value}
-            </Text>
-          </View>
-        ))}
-        <View style={{ flex: 1, minWidth: 120, gap: 2 }}>
-          <Text style={s.small}>{t("portfolio.metricsPnl")}</Text>
-          <Text
-            style={[
-              s.metric,
-              { fontSize: 20, fontWeight: "600", color: marketDirectionColor(pnlDirection) },
-            ]}
-          >
-            {formatMoney(group.pnl, group.currency)}
-          </Text>
-          <Text
-            style={[
-              s.metric,
-              { fontSize: 12, fontWeight: "600", color: marketDirectionColor(pnlDirection) },
-            ]}
-          >
-            {group.pnlPct === undefined ? "—" : formatPercent(group.pnlPct)}
-          </Text>
+      {desktop ? (
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          {summaryMetrics.map((metric) => (
+            <View key={metric.label} style={{ flex: 1, minWidth: 120, gap: 2 }}>
+              <Text style={s.small}>{metric.label}</Text>
+              <Text style={[s.metric, { fontSize: 20, fontWeight: "600", color: metric.color }]}>
+                {metric.value}
+              </Text>
+              {!!metric.detail && (
+                <Text style={[s.metric, { fontSize: 12, fontWeight: "600", color: metric.color }]}>
+                  {metric.detail}
+                </Text>
+              )}
+            </View>
+          ))}
         </View>
-      </View>
+      ) : (
+        <View style={{ gap: 7 }}>
+          {summaryMetrics.map((metric) => (
+            <View key={metric.label} style={[s.between, { minHeight: 24, gap: 12 }]}>
+              <Text style={s.small}>{metric.label}</Text>
+              <View style={[s.row, { flexShrink: 1, justifyContent: "flex-end", gap: 8 }]}>
+                <Text style={[s.metric, { fontSize: 17, fontWeight: "600", color: metric.color }]}>
+                  {metric.value}
+                </Text>
+                {!!metric.detail && (
+                  <Text
+                    style={[s.metric, { fontSize: 11, fontWeight: "600", color: metric.color }]}
+                  >
+                    {metric.detail}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
       <Text
         style={[s.small, group.pricedCount < group.totalCount && { color: colors.alertVolumeText }]}
       >

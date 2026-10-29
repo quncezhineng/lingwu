@@ -13,7 +13,7 @@ const agent = {
   "agent.filterAll": "全部",
   "agent.filterInProgress": "分析中",
   "agent.filterWaiting": "待确认",
-  "agent.filterFinished": "已完成",
+  "agent.filterFinished": "已结束",
   "agent.filterPaused": "已暂停",
   "agent.activityEmptyTitle": "还没有新的动态",
   "agent.activityEmptyFiltered": "这个分类下暂时没有动态",
@@ -24,6 +24,10 @@ const agent = {
   "agent.viewFile": "查看文件",
   "agent.providedFields": "已提供所请求的字段。",
   "agent.taskTitle": "任务",
+  "agent.taskTechnicalError": "任务执行遇到技术错误",
+  "agent.taskTechnicalErrorDetail": "任务未完成。你可以重试，或展开技术信息用于排查。",
+  "agent.showErrorDetails": "查看技术详情",
+  "agent.hideErrorDetails": "收起技术详情",
   "agent.loadingSavedProgress": "正在加载已保存的进度…",
   "agent.milestoneTrackingNote": "里程碑：{title}。完成情况需在「目标」中手动追踪。",
   "agent.milestoneUnavailable": "关联的里程碑已不可用。该任务及其结果仍然可以访问。",
@@ -450,6 +454,7 @@ const agent = {
   "agent.run.event.watchPaused": "多次失败后监控已暂停",
   "agent.run.event.checkFailedRetry": "检查失败，已安排重试",
   "agent.run.event.pauseForFact": "暂停以等待缺失的事实或决策",
+  "agent.run.event.stoppedByUser": "你已停止这项任务。",
   "agent.run.event.runEndedWithoutCompletion":
     "智能体在本次运行结束时未确认完成。请给它一条后续指令以继续。",
 } satisfies Dictionary;

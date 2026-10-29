@@ -17,8 +17,13 @@ const chat = {
   "chat.saveError": "Conversation could not be saved: {detail}",
   "chat.retryLoadingConversation": "Retry loading conversation",
   "chat.emptyTitle": "Your personal investment research agent, at the ready.",
+  "chat.emptyTitleLead": "Your personal investment research agent",
+  "chat.emptyTitleTail": "research agent, at the ready.",
+  "chat.emptyEyebrow": "Research assistant · Ready when you are",
   "chat.emptySubtitle":
     "Tell me what you want to research. I can gather sources, analyze markets, track targets, and use my computer to read reports and filings.",
+  "chat.emptyFootnote": "Every step stays traceable, and your materials remain in your workspace",
+  "chat.suggestionHeading": "Start with a question",
   "chat.suggestionHackerNews": "Analyze a stock's recent trend",
   "chat.suggestionSummarize": "Summarize the key points of an earnings report",
   "chat.suggestionDeepDive": "Deep-dive a stock's fundamentals and valuation",

@@ -6,12 +6,10 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   type TextStyle,
   useWindowDimensions,
   View,
-  type ViewStyle,
 } from "react-native";
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import type { Artifact, BrowserSession } from "../../../packages/domain/src";
@@ -101,6 +99,16 @@ function errorText(e: unknown) {
 }
 function activeTask(task: AgentTask) {
   return !["succeeded", "failed", "cancelled"].includes(task.status);
+}
+function isStructuredTaskError(value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^[[{]/.test(trimmed)) return false;
+  try {
+    JSON.parse(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // 来源摘要的 Markdown 渲染：卡片本身空间很小，正文沿用 s.small 规格（11/17），
@@ -197,9 +205,13 @@ export function TaskCard({
   const done = task.plan.filter((step) => step.status === "succeeded").length;
   const next = task.plan.find((step) => ["running", "waiting"].includes(step.status));
   const waiting = ["waiting_input", "waiting_approval"].includes(task.status);
+  const localizedError = runtimeLabel(task.error);
+  const errorSummary = isStructuredTaskError(task.error)
+    ? t("agent.taskTechnicalError")
+    : localizedError;
   const summary =
     runtimeLabel(task.question) ||
-    task.error ||
+    errorSummary ||
     resultSummary(runtimeLabel(task.result || next?.title || ""));
   return (
     <Pressable
@@ -241,7 +253,7 @@ export function TaskCard({
               <Text numberOfLines={1} style={[s.small, s.metric, { flex: 1 }]}>
                 {task.plan.length
                   ? t("agent.planStepsProgress", { done, total: task.plan.length })
-                  : (task.question ?? task.error ?? "")}
+                  : runtimeLabel(task.question) || errorSummary}
               </Text>
               {/* 移动端把徽标放进 meta 行，避免把标题挤成孤字 */}
               {narrow && (
@@ -347,35 +359,13 @@ export function AgentActivityScreen() {
   return (
     <View style={{ gap: 20 }}>
       <AgentStatus />
-      {/* 唯一一套筛选：五个状态 Tab + 计数；窄屏横向滚动，不折成两行 */}
-      <View style={{ position: "relative" }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingRight: 24, paddingBottom: 2 }}
-        >
-          {TASK_FILTERS.map(({ id, labelKey }) => (
-            <Button key={id} small primary={filter === id} onPress={() => setFilter(id)}>
-              {`${t(labelKey)} · ${counts[id]}`}
-            </Button>
-          ))}
-        </ScrollView>
-        {/* H4：右缘 24px 渐隐，提示还有未展示的 Tab（仅 Web，RN 原生无 gradient 样式） */}
-        {Platform.OS === "web" && (
-          <View
-            pointerEvents="none"
-            style={
-              {
-                position: "absolute",
-                right: 0,
-                top: 0,
-                bottom: 2,
-                width: 24,
-                backgroundImage: `linear-gradient(to right, rgba(248,248,248,0), ${colors.canvas})`,
-              } as unknown as ViewStyle
-            }
-          />
-        )}
+      {/* 五个状态筛选在窄屏自然换行，避免横向滚动隐藏“已暂停”等选项。 */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {TASK_FILTERS.map(({ id, labelKey }) => (
+          <Button key={id} small primary={filter === id} onPress={() => setFilter(id)}>
+            {`${t(labelKey)} · ${counts[id]}`}
+          </Button>
+        ))}
       </View>
       {tasks.map((task) => (
         <TaskCard key={task.id} task={task} />
@@ -472,8 +462,11 @@ export function TaskDetail({ taskId }: { taskId: string }) {
   const [answer, setAnswer] = useState("");
   const [fieldJson, setFieldJson] = useState("");
   const [showFieldJson, setShowFieldJson] = useState(false);
+  const [showTaskErrorDetail, setShowTaskErrorDetail] = useState(false);
   const [fields, setFields] = useState<Record<string, string | boolean>>({});
   const task = data?.tasks.find((item) => item.id === taskId) || detail?.task;
+  const localizedTaskError = runtimeLabel(task?.error);
+  const structuredTaskError = isStructuredTaskError(task?.error);
   const milestone = data?.goals
     .find((goal) => goal.id === task?.goalId)
     ?.milestones.find((item) => item.id === task?.milestoneId);
@@ -715,7 +708,31 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               />
             </Card>
           )}
-          <ErrorNotice error={task.error ?? undefined} />
+          {!!task.error &&
+            (structuredTaskError ? (
+              <Card
+                style={{
+                  gap: 10,
+                  borderColor: colors.errorSoft,
+                  backgroundColor: colors.errorSoft,
+                }}
+              >
+                <Text style={[s.heading, { color: colors.danger }]}>
+                  {t("agent.taskTechnicalError")}
+                </Text>
+                <Text style={s.small}>{t("agent.taskTechnicalErrorDetail")}</Text>
+                <Button small onPress={() => setShowTaskErrorDetail((current) => !current)}>
+                  {t(showTaskErrorDetail ? "agent.hideErrorDetails" : "agent.showErrorDetails")}
+                </Button>
+                {showTaskErrorDetail && (
+                  <Text selectable style={[s.small, { lineHeight: 18 }]}>
+                    {task.error}
+                  </Text>
+                )}
+              </Card>
+            ) : (
+              <ErrorNotice error={localizedTaskError} />
+            ))}
           {detail?.browsers?.map((browser) => (
             <Card key={browser.id} style={{ gap: 10 }}>
               <Text style={s.heading}>{browser.title || t("agent.agentBrowser")}</Text>
@@ -790,7 +807,9 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               </Text>
               <Text style={s.text}>{runtimeLabel(event.title)}</Text>
               <Text selectable style={s.muted}>
-                {event.detail}
+                {isStructuredTaskError(event.detail)
+                  ? t("agent.taskTechnicalError")
+                  : runtimeLabel(event.detail)}
               </Text>
             </View>
           ))}
