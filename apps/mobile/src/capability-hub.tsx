@@ -1,11 +1,20 @@
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
   ArrowUpRight,
   Brain,
   CalendarDays,
+  Check,
   ChevronRight,
   Cpu,
   FileText,
@@ -13,21 +22,20 @@ import {
   Globe2,
   type IconComponent,
   Link2,
-  ListChecks,
   Mail,
   Search,
   Sparkles,
   Target,
   X,
 } from "./icons";
-import { ConnectionsScreen } from "./screens";
 import { StatusBadge } from "./status-badge";
-import { breakpoints } from "./theme";
-import { appBrands, colors, Empty, fonts, Sheet, s, serviceBrands, statusColors } from "./ui";
+import { breakpoints, radius } from "./theme";
+import { appBrands, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
 import { useWorkspace } from "./workspace";
 
 type HubTab = "marketplace" | "mine";
 type CapabilityType = "plugins" | "skills" | "connectors" | "workspace";
+type ConfigSheet = "model" | "openbot";
 type CategoryId =
   | "all"
   | "research"
@@ -81,6 +89,46 @@ const TYPE_LABELS: Record<CapabilityType, TranslationKey> = {
   workspace: "agent.hubCategoryWorkspace",
 };
 
+const HUB_TAB_LABELS: Record<CapabilityType, Record<HubTab, TranslationKey>> = {
+  plugins: {
+    marketplace: "agent.hubPluginMarketplace",
+    mine: "agent.hubMyPlugins",
+  },
+  skills: {
+    marketplace: "agent.hubSkillMarketplace",
+    mine: "agent.hubMySkills",
+  },
+  connectors: {
+    marketplace: "agent.hubConnectorMarketplace",
+    mine: "agent.hubMyConnectors",
+  },
+  workspace: {
+    marketplace: "agent.hubMarketplace",
+    mine: "agent.hubMine",
+  },
+};
+
+const HUB_SEARCH_LABELS: Record<CapabilityType, TranslationKey> = {
+  plugins: "agent.hubSearchPlugins",
+  skills: "agent.hubSearchSkills",
+  connectors: "agent.hubSearchConnectors",
+  workspace: "agent.hubSearchCapabilities",
+};
+
+const HUB_COUNT_LABELS: Record<CapabilityType, TranslationKey> = {
+  plugins: "agent.hubPluginCount",
+  skills: "agent.hubSkillCount",
+  connectors: "agent.hubConnectorCount",
+  workspace: "agent.hubCapabilityCount",
+};
+
+const HUB_EMPTY_TITLE_LABELS: Record<CapabilityType, TranslationKey> = {
+  plugins: "agent.hubPluginNoMatchTitle",
+  skills: "agent.hubSkillNoMatchTitle",
+  connectors: "agent.hubConnectorNoMatchTitle",
+  workspace: "agent.hubNoMatchTitle",
+};
+
 const STATE_KEYS: Record<CapabilityState, TranslationKey> = {
   ready: "agent.hubStateReady",
   connected: "agent.hubStateConnected",
@@ -113,34 +161,28 @@ function ShortcutCard({
       onPress={item.onPress}
       style={({ pressed }) => [
         {
-          minHeight: 82,
-          paddingHorizontal: 12,
-          paddingVertical: 12,
-          gap: 7,
-          borderRadius: 7,
+          minHeight: 90,
+          paddingHorizontal: 14,
+          paddingVertical: 13,
+          gap: 9,
+          borderRadius: radius.card,
           borderWidth: 1,
           borderColor: active ? colors.accentLine : colors.line,
-          backgroundColor: active ? colors.sky : pressed ? colors.surface : colors.canvas,
+          backgroundColor: active ? colors.sky : pressed ? colors.surfaceSoft : colors.paper,
           flex: compact ? undefined : 1,
           width: compact ? 176 : undefined,
-        },
-        active && {
-          shadowColor: colors.primary,
-          shadowOpacity: 0.08,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 2 },
         },
       ]}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <View
           style={{
-            width: 25,
-            height: 25,
-            borderRadius: 5,
+            width: 30,
+            height: 30,
+            borderRadius: radius.control,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: active ? colors.paper : colors.surface,
+            backgroundColor: active ? colors.paper : colors.surfaceSoft,
           }}
         >
           <item.icon size={17} color={active ? colors.primary : colors.text} />
@@ -179,8 +221,8 @@ function ShortcutCard({
         numberOfLines={1}
         style={{
           color: colors.faint,
-          fontSize: 10,
-          lineHeight: 15,
+          fontSize: 11,
+          lineHeight: 17,
           fontFamily: fonts.sans,
         }}
       >
@@ -204,18 +246,18 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
         paddingTop: 16,
         paddingHorizontal: 16,
         paddingBottom: 12,
-        borderRadius: 5,
+        borderRadius: radius.card,
         borderWidth: 1,
         borderColor: pressed ? colors.lineStrong : colors.line,
-        backgroundColor: pressed ? colors.surface : colors.paper,
+        backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
       })}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <View
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 4,
+            width: 34,
+            height: 34,
+            borderRadius: radius.field,
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: item.iconSurface,
@@ -275,7 +317,7 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
           {item.source}
         </Text>
         <StatusBadge
-          tone={item.state === "connected" || item.state === "ready" ? "done" : "paused"}
+          tone={item.state === "available" ? "paused" : "running"}
           label={t(STATE_KEYS[item.state])}
         />
       </View>
@@ -287,11 +329,13 @@ function CategoryRail({
   category,
   counts,
   onChange,
+  options,
   horizontal,
 }: {
   category: CategoryId;
   counts: Record<CategoryId, number>;
   onChange: (next: CategoryId) => void;
+  options: typeof CATEGORY_OPTIONS;
   horizontal?: boolean;
 }) {
   const { t } = useTranslation();
@@ -303,7 +347,7 @@ function CategoryRail({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: 8, paddingVertical: 1 }}
       >
-        {CATEGORY_OPTIONS.map((option) => {
+        {options.map((option) => {
           const active = category === option.id;
           return (
             <Pressable
@@ -317,15 +361,15 @@ function CategoryRail({
                 alignItems: "center",
                 gap: 7,
                 paddingHorizontal: 11,
-                borderRadius: 7,
+                borderRadius: radius.control,
                 borderWidth: 1,
-                borderColor: active ? colors.lineStrong : colors.line,
-                backgroundColor: active ? colors.tertiary : pressed ? colors.surface : colors.paper,
+                borderColor: active ? colors.accentLine : colors.line,
+                backgroundColor: active ? colors.sky : pressed ? colors.surfaceSoft : colors.paper,
               })}
             >
               <Text
                 style={{
-                  color: colors.text,
+                  color: active ? colors.primaryStrong : colors.text,
                   fontSize: 12,
                   lineHeight: 17,
                   fontWeight: active ? "600" : "400",
@@ -336,7 +380,7 @@ function CategoryRail({
               </Text>
               <Text
                 style={{
-                  color: active ? colors.muted : colors.faint,
+                  color: active ? colors.primary : colors.faint,
                   fontSize: 10,
                   lineHeight: 15,
                   fontFamily: fonts.sans,
@@ -353,7 +397,7 @@ function CategoryRail({
 
   return (
     <View style={{ width: 200, gap: 2 }}>
-      {CATEGORY_OPTIONS.map((option) => {
+      {options.map((option) => {
         const active = category === option.id;
         return (
           <Pressable
@@ -362,24 +406,20 @@ function CategoryRail({
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.id)}
             style={({ pressed }) => ({
-              minHeight: 28,
+              minHeight: 32,
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "space-between",
               paddingHorizontal: 8,
               paddingVertical: 4,
-              borderRadius: 4,
-              backgroundColor: active
-                ? statusColors.surface
-                : pressed
-                  ? colors.surface
-                  : "transparent",
+              borderRadius: radius.control,
+              backgroundColor: active ? colors.sky : pressed ? colors.surfaceSoft : "transparent",
             })}
           >
             <Text
               numberOfLines={1}
               style={{
-                color: active ? colors.text : colors.muted,
+                color: active ? colors.primaryStrong : colors.muted,
                 fontSize: 13,
                 lineHeight: 18,
                 fontWeight: active ? "500" : "400",
@@ -390,7 +430,7 @@ function CategoryRail({
             </Text>
             <Text
               style={{
-                color: active ? colors.muted : colors.faint,
+                color: active ? colors.primary : colors.faint,
                 fontSize: 11,
                 lineHeight: 16,
                 fontFamily: fonts.sans,
@@ -408,13 +448,16 @@ function CategoryRail({
 export function CapabilityHubScreen() {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
-  const { navigate, ask, workspace } = useWorkspace();
+  const { navigate, ask, workspace, api, refresh, notify, open } = useWorkspace();
   const [tab, setTab] = useState<HubTab>("marketplace");
   const [category, setCategory] = useState<CategoryId>("all");
-  const [typeFilter, setTypeFilter] = useState<CapabilityType>();
+  const [typeFilter, setTypeFilter] = useState<CapabilityType>("plugins");
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [configSheet, setConfigSheet] = useState<ConfigSheet>();
+  const [configBusy, setConfigBusy] = useState(false);
+  const [configError, setConfigError] = useState("");
+  const [googleConnectingId, setGoogleConnectingId] = useState<"gmail" | "calendar">();
 
   const desktop = width >= breakpoints.desktop;
   const railWidth = desktop ? 232 : 0;
@@ -436,53 +479,50 @@ export function CapabilityHubScreen() {
   );
   // 与连接器面板同一口径：选中模型即视为已连接（不再看 modelOptions 是否可切换）
   const modelConnected = Boolean(workspace.runtime.model);
-  const openConnections = () => setConnectionsOpen(true);
+  const modelOptions = workspace.runtime.modelOptions ?? [];
   const builtInSource = t("agent.hubSourceLingwu");
   const workspaceSource = t("agent.hubSourceWorkspace");
 
+  async function openGoogleConnector(id: "gmail" | "calendar") {
+    if (googleConnectingId) return;
+    if (googleConnected) {
+      navigate(id === "gmail" ? "mail" : "calendar");
+      return;
+    }
+    setGoogleConnectingId(id);
+    try {
+      const result = await api.request<{ url: string | null }>("/api/google/connect", {
+        capability: "read",
+      });
+      if (result.url) {
+        await Linking.openURL(result.url);
+        notify(t("screens.connectionsNotifyFinish"));
+      } else {
+        await refresh();
+        notify(t("screens.connectionsNotifyLocalReady"));
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGoogleConnectingId(undefined);
+    }
+  }
+
+  async function switchModel(model: string) {
+    setConfigBusy(true);
+    setConfigError("");
+    try {
+      await api.request("/api/model", { model });
+      await refresh();
+      notify(t("screens.connectionsModelSwitched", { model: shortModel(model) }));
+    } catch (error) {
+      setConfigError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setConfigBusy(false);
+    }
+  }
+
   const items: CatalogItem[] = [
-    {
-      id: "deep-research",
-      type: "plugins",
-      tags: ["research", "analysis"],
-      title: t("agent.pluginDeepResearch"),
-      detail: t("agent.pluginDeepResearchDetail"),
-      icon: Sparkles,
-      iconColor: colors.primary,
-      iconSurface: colors.sky,
-      source: builtInSource,
-      state: "ready",
-      installed: true,
-      onPress: () => ask(t("agent.pluginDeepResearchPrompt")),
-    },
-    {
-      id: "daily-review",
-      type: "plugins",
-      tags: ["research", "monitoring"],
-      title: t("agent.pluginDailyReview"),
-      detail: t("agent.pluginDailyReviewDetail"),
-      icon: ListChecks,
-      iconColor: appBrands.dailyReview.fg,
-      iconSurface: appBrands.dailyReview.surface,
-      source: builtInSource,
-      state: "ready",
-      installed: true,
-      onPress: () => navigate("today"),
-    },
-    {
-      id: "portfolio-review",
-      type: "plugins",
-      tags: ["analysis", "monitoring"],
-      title: t("agent.pluginPortfolioReview"),
-      detail: t("agent.pluginPortfolioReviewDetail"),
-      icon: Target,
-      iconColor: appBrands.portfolioReview.fg,
-      iconSurface: appBrands.portfolioReview.surface,
-      source: builtInSource,
-      state: "ready",
-      installed: true,
-      onPress: () => navigate("portfolio"),
-    },
     {
       id: "earnings",
       type: "skills",
@@ -541,7 +581,7 @@ export function CapabilityHubScreen() {
     },
     {
       id: "mail",
-      type: "workspace",
+      type: "plugins",
       tags: ["workspace", "connections"],
       title: t("app.titleMail"),
       detail: t("agent.shortcutMailDetail"),
@@ -555,7 +595,7 @@ export function CapabilityHubScreen() {
     },
     {
       id: "calendar-workspace",
-      type: "workspace",
+      type: "plugins",
       tags: ["workspace", "connections"],
       title: t("app.titleCalendar"),
       detail: t("agent.shortcutCalendarDetail"),
@@ -569,7 +609,7 @@ export function CapabilityHubScreen() {
     },
     {
       id: "model",
-      type: "connectors",
+      type: "plugins",
       tags: ["connections"],
       title: t("screens.connectionsModelLabel"),
       detail: t("agent.hubModelDetail"),
@@ -579,7 +619,7 @@ export function CapabilityHubScreen() {
       source: builtInSource,
       state: modelConnected ? "connected" : "available",
       installed: modelConnected,
-      onPress: openConnections,
+      onPress: () => setConfigSheet("model"),
     },
     {
       id: "gmail",
@@ -590,10 +630,10 @@ export function CapabilityHubScreen() {
       icon: Mail,
       iconColor: serviceBrands.gmail.fg,
       iconSurface: serviceBrands.gmail.surface,
-      source: "Google",
+      source: "@Google",
       state: googleConnected ? "connected" : "available",
       installed: googleConnected,
-      onPress: openConnections,
+      onPress: () => void openGoogleConnector("gmail"),
     },
     {
       id: "calendar",
@@ -604,10 +644,10 @@ export function CapabilityHubScreen() {
       icon: CalendarDays,
       iconColor: serviceBrands.googleCalendar.fg,
       iconSurface: serviceBrands.googleCalendar.surface,
-      source: "Google",
+      source: "@Google",
       state: googleConnected ? "connected" : "available",
       installed: googleConnected,
-      onPress: openConnections,
+      onPress: () => void openGoogleConnector("calendar"),
     },
     {
       id: "browser",
@@ -621,7 +661,7 @@ export function CapabilityHubScreen() {
       source: builtInSource,
       state: browserConnected ? "connected" : "available",
       installed: browserConnected,
-      onPress: openConnections,
+      onPress: () => open({ type: "computer" }),
     },
     {
       id: "openbot",
@@ -632,10 +672,10 @@ export function CapabilityHubScreen() {
       icon: Sparkles,
       iconColor: serviceBrands.openbot.fg,
       iconSurface: serviceBrands.openbot.surface,
-      source: "OpenBot",
+      source: "@OpenBot",
       state: workspace.runtime.openbotConfigured ? "connected" : "available",
       installed: workspace.runtime.openbotConfigured,
-      onPress: openConnections,
+      onPress: () => setConfigSheet("openbot"),
     },
   ];
 
@@ -643,7 +683,7 @@ export function CapabilityHubScreen() {
     setTab("marketplace");
     setCategory("all");
     setQuery("");
-    setTypeFilter((current) => (current === next ? undefined : next));
+    setTypeFilter(next);
   };
 
   const shortcuts: Shortcut[] = [
@@ -678,10 +718,15 @@ export function CapabilityHubScreen() {
   ];
 
   const tabItems = items.filter((item) => tab === "marketplace" || item.installed);
-  const scopedItems = typeFilter ? tabItems.filter((item) => item.type === typeFilter) : tabItems;
+  const scopedItems = tabItems.filter((item) => item.type === typeFilter);
   const cardsForCategory = (item: CatalogItem, nextCategory: CategoryId) =>
     nextCategory === "all" || item.tags.includes(nextCategory as CatalogTag);
-  const counts = CATEGORY_OPTIONS.reduce(
+  const categoryOptions = CATEGORY_OPTIONS.filter(
+    (option) =>
+      option.id === "all" ||
+      scopedItems.some((item) => item.tags.includes(option.id as CatalogTag)),
+  );
+  const counts = categoryOptions.reduce(
     (result, option) => {
       result[option.id] = scopedItems.filter((item) => cardsForCategory(item, option.id)).length;
       return result;
@@ -708,19 +753,19 @@ export function CapabilityHubScreen() {
   });
   const visibleRows = chunk(visibleItems, gridColumns);
   const activeCategoryLabel =
-    CATEGORY_OPTIONS.find((option) => option.id === category)?.labelKey ?? "agent.hubAllCategories";
+    categoryOptions.find((option) => option.id === category)?.labelKey ?? "agent.hubAllCategories";
 
   const searchField = (
     <View
       style={{
-        minHeight: 34,
+        minHeight: 40,
         flexDirection: "row",
         alignItems: "center",
-        gap: 7,
-        paddingHorizontal: 9,
-        borderRadius: 4,
+        gap: 8,
+        paddingHorizontal: 11,
+        borderRadius: radius.field,
         borderWidth: 1,
-        borderColor: searchFocused ? colors.lineStrong : colors.line,
+        borderColor: searchFocused ? colors.primary : colors.line,
         backgroundColor: colors.paper,
       }}
     >
@@ -730,9 +775,9 @@ export function CapabilityHubScreen() {
         onChangeText={setQuery}
         onFocus={() => setSearchFocused(true)}
         onBlur={() => setSearchFocused(false)}
-        placeholder={t("agent.hubSearchCapabilities")}
+        placeholder={t(HUB_SEARCH_LABELS[typeFilter])}
         placeholderTextColor={colors.faint}
-        accessibilityLabel={t("agent.hubSearchCapabilities")}
+        accessibilityLabel={t(HUB_SEARCH_LABELS[typeFilter])}
         style={{
           flex: 1,
           minWidth: 0,
@@ -768,7 +813,7 @@ export function CapabilityHubScreen() {
             <ShortcutCard
               key={shortcut.id}
               item={shortcut}
-              active={typeFilter !== undefined && shortcut.id === typeFilter}
+              active={shortcut.id === typeFilter}
               compact
             />
           ))}
@@ -781,7 +826,7 @@ export function CapabilityHubScreen() {
                 <ShortcutCard
                   key={shortcut.id}
                   item={shortcut}
-                  active={typeFilter !== undefined && shortcut.id === typeFilter}
+                  active={shortcut.id === typeFilter}
                 />
               ))}
               {FILLER_KEYS.slice(0, shortcutColumns - row.length).map((key) => (
@@ -804,8 +849,8 @@ export function CapabilityHubScreen() {
         >
           {(
             [
-              ["marketplace", "agent.hubMarketplace"],
-              ["mine", "agent.hubMine"],
+              ["marketplace", HUB_TAB_LABELS[typeFilter].marketplace],
+              ["mine", HUB_TAB_LABELS[typeFilter].mine],
             ] as const
           ).map(([id, labelKey]) => {
             const active = tab === id;
@@ -814,12 +859,15 @@ export function CapabilityHubScreen() {
                 key={id}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
-                onPress={() => setTab(id)}
+                onPress={() => {
+                  setTab(id);
+                  setCategory("all");
+                }}
                 style={{ justifyContent: "center", minHeight: 40 }}
               >
                 <Text
                   style={{
-                    color: active ? colors.text : colors.muted,
+                    color: active ? colors.primaryStrong : colors.muted,
                     fontSize: 14,
                     lineHeight: 20,
                     fontWeight: active ? "600" : "400",
@@ -836,7 +884,7 @@ export function CapabilityHubScreen() {
                       bottom: -1,
                       left: 0,
                       height: 2,
-                      backgroundColor: colors.text,
+                      backgroundColor: colors.primary,
                     }}
                   />
                 )}
@@ -852,11 +900,22 @@ export function CapabilityHubScreen() {
             {useCategoryRail && (
               <View style={{ width: 200, gap: 10 }}>
                 {searchField}
-                <CategoryRail category={category} counts={counts} onChange={setCategory} />
+                <CategoryRail
+                  category={category}
+                  counts={counts}
+                  onChange={setCategory}
+                  options={categoryOptions}
+                />
               </View>
             )}
             {!useCategoryRail && (
-              <CategoryRail category={category} counts={counts} onChange={setCategory} horizontal />
+              <CategoryRail
+                category={category}
+                counts={counts}
+                onChange={setCategory}
+                options={categoryOptions}
+                horizontal
+              />
             )}
 
             <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
@@ -880,7 +939,7 @@ export function CapabilityHubScreen() {
                     fontFamily: fonts.sans,
                   }}
                 >
-                  {t("agent.hubCapabilityCount", { count: visibleItems.length })}
+                  {t(HUB_COUNT_LABELS[typeFilter], { count: visibleItems.length })}
                 </Text>
               </View>
 
@@ -908,13 +967,13 @@ export function CapabilityHubScreen() {
                     justifyContent: "center",
                     borderWidth: 1,
                     borderColor: colors.line,
-                    borderRadius: 5,
+                    borderRadius: radius.card,
                     backgroundColor: colors.paper,
                   }}
                 >
                   <Empty
                     icon={Search}
-                    title={t("agent.hubNoMatchTitle")}
+                    title={t(HUB_EMPTY_TITLE_LABELS[typeFilter])}
                     detail={t("agent.hubNoMatchDetail")}
                   />
                 </View>
@@ -924,16 +983,75 @@ export function CapabilityHubScreen() {
         </View>
       </View>
 
-      {connectionsOpen && (
+      {configSheet && (
         <Sheet
-          title={t("agent.connectorsHeading")}
-          subtitle={t("agent.hubConnectorsSheetSubtitle")}
-          onClose={() => setConnectionsOpen(false)}
-          wide
+          title={configSheet === "model" ? t("screens.connectionsModelLabel") : "OpenBot"}
+          subtitle={
+            configSheet === "model"
+              ? t("screens.connectionsModelSubtitle")
+              : t("screens.connectionsOpenBotSubtitle")
+          }
+          onClose={() => {
+            setConfigSheet(undefined);
+            setConfigError("");
+          }}
         >
-          <ConnectionsScreen />
+          {configSheet === "model" ? (
+            <View style={{ gap: 18 }}>
+              {modelOptions.length ? (
+                modelOptions.map((choice) => (
+                  <View key={choice.provider} style={{ gap: 8 }}>
+                    <Text style={s.small}>{choice.label}</Text>
+                    <View style={[s.row, { gap: 7, flexWrap: "wrap" }]}>
+                      {choice.models.map((model) => {
+                        const current = model === workspace.runtime.model;
+                        return (
+                          <Pressable
+                            key={model}
+                            accessibilityRole="button"
+                            accessibilityState={{
+                              selected: current,
+                              disabled: configBusy || current,
+                            }}
+                            disabled={configBusy || current}
+                            onPress={() => void switchModel(model)}
+                            style={[s.row, { gap: 4, opacity: configBusy ? 0.5 : 1 }]}
+                          >
+                            <Chip tint={current ? colors.sky : undefined}>{shortModel(model)}</Chip>
+                            {current && <Check size={13} color={colors.primary} />}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={s.muted}>{t("screens.connectionsModelEmpty")}</Text>
+              )}
+              {!!configError && (
+                <Text style={{ color: colors.danger, fontSize: 12, lineHeight: 18 }}>
+                  {configError}
+                </Text>
+              )}
+              <View style={[s.between, { gap: 15, paddingTop: 12 }]}>
+                <Text style={s.muted}>{t("screens.connectionsModelCurrent")}</Text>
+                <Text style={[s.text, { fontSize: 12 }]}>
+                  {workspace.runtime.model ?? t("screens.connectionsNotConnected")}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={{ gap: 14 }}>
+              <Text style={s.text}>{t("screens.connectionsOpenBotNotice")}</Text>
+              <Text style={s.muted}>{t("screens.connectionsOpenBotDetail")}</Text>
+            </View>
+          )}
         </Sheet>
       )}
     </View>
   );
+}
+
+function shortModel(spec: string) {
+  return spec.split("/").slice(1).join("/") || spec;
 }

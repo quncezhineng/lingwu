@@ -205,7 +205,7 @@ const screens = {
   "screens.connectionsModelSwitched": "Now using {model}",
   "screens.connectionsRefresh": "Refresh connections",
   "screens.connectionsOpenBotNotice":
-    "The OpenBot adapter is available in this open-source project. A live OpenBot backend has not been configured.",
+    "The OpenBot adapter is available in this project. A live OpenBot backend has not been configured.",
   "screens.connectionsOpenBotDetail":
     "Your current computer uses LingWu’s persistent Chromium worker. OpenBot integration will expand the execution backend while keeping this interface.",
 } satisfies Dictionary;

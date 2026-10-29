@@ -673,7 +673,6 @@ function WorkspaceShell({
                   <ScrollView
                     key={section}
                     showsVerticalScrollIndicator={false}
-                    style={section === "apps" ? { backgroundColor: colors.paper } : undefined}
                     contentContainerStyle={{
                       paddingHorizontal: desktop ? space.page : space.pageMobile,
                       paddingTop: desktop ? 20 : 16,

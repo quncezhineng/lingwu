@@ -200,7 +200,7 @@ const screens = {
   "screens.connectionsModelSwitched": "已切换到 {model}",
   "screens.connectionsRefresh": "刷新连接",
   "screens.connectionsOpenBotNotice":
-    "这个开源项目中已经提供了 OpenBot 适配器，但尚未配置可用的 OpenBot 后端。",
+    "本项目已经提供了 OpenBot 适配器，但尚未配置可用的 OpenBot 后端。",
   "screens.connectionsOpenBotDetail":
     "你当前使用的电脑运行在灵悟的持久化 Chromium 工作进程上。接入 OpenBot 将扩展执行后端，同时保留当前界面。",
 } satisfies Dictionary;
