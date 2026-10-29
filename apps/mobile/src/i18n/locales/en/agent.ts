@@ -262,7 +262,7 @@ const agent = {
   "agent.hubPluginsDetail": "Explore and install research workflows",
   "agent.hubSkillsDetail": "Enable specialist research actions",
   "agent.hubConnectorsShortDetail": "External tools and services",
-  "agent.hubKnowledgeTitle": "Knowledge base",
+  "agent.hubKnowledgeTitle": "Materials",
   "agent.hubKnowledgeDetail": "Research files, filings and notes",
   "agent.hubSearchCapabilities": "Search capabilities",
   "agent.hubAllCategories": "All categories",

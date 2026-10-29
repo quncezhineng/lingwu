@@ -1,7 +1,7 @@
 /**
  * 应用外壳。
  *
- * 桌面端是 232px 文本侧栏 + 主工作区，信息架构对齐 v7 Demo：
+ * 桌面端是 232px 文本侧栏 + 主工作区，信息架构对齐 Demo：
  * 工作台、对话、自选、分析任务、灵感、资料、盯盘、投资偏好和应用。
  * 进入对话时额外显示会话列表栏，保留完整的历史会话管理与切换能力。
  */
@@ -35,6 +35,7 @@ import {
   ListChecks,
   MessageCircle,
   MoreHorizontal,
+  PanelsTopLeft,
   Pencil,
   Plus,
   Search,
@@ -56,7 +57,7 @@ export type NavItem = { id: Section; labelKey: TranslationKey; icon: IconCompone
 
 /** 桌面侧栏的主要页面。 */
 export const SECTION_NAV: NavItem[] = [
-  { id: "today", labelKey: "app.navToday", icon: Sparkles },
+  { id: "today", labelKey: "app.navToday", icon: PanelsTopLeft },
   { id: "chat", labelKey: "app.navChat", icon: MessageCircle },
   { id: "watchlist", labelKey: "app.navWatchlist", icon: Target },
   { id: "activity", labelKey: "app.navActivity", icon: ListChecks },
@@ -176,13 +177,15 @@ function SidebarAccountAvatar({ avatarUrl, name }: { avatarUrl?: string; name: s
   return (
     <View
       style={{
-        width: 24,
-        height: 24,
+        width: 28,
+        height: 28,
         borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
-        backgroundColor: colors.sky,
+        borderWidth: 1,
+        borderColor: colors.line,
+        backgroundColor: colors.paper,
       }}
     >
       {avatarUrl ? (
@@ -190,7 +193,7 @@ function SidebarAccountAvatar({ avatarUrl, name }: { avatarUrl?: string; name: s
           source={{ uri: avatarUrl }}
           resizeMode="cover"
           accessible={false}
-          style={{ width: 24, height: 24 }}
+          style={{ width: 28, height: 28 }}
         />
       ) : (
         <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primaryStrong }}>
@@ -232,6 +235,14 @@ export function Rail({ name }: { name: string }) {
   const activeCount = (data?.tasks ?? []).filter(
     (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
   ).length;
+  const activeMonitorCount = (data?.monitors ?? []).filter(
+    (monitor) => monitor.status === "active",
+  ).length;
+  const accountLabel = workspace.profile.name.trim() || t(ACCOUNT_NAV.labelKey);
+  const monitorStatus =
+    activeMonitorCount > 0
+      ? t("app.activeMonitors", { count: activeMonitorCount })
+      : t("app.noActiveMonitors");
 
   return (
     <View
@@ -376,29 +387,39 @@ export function Rail({ name }: { name: string }) {
         >
           <View
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
+              width: 30,
+              height: 30,
+              borderRadius: 15,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: colors.primary,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: colors.paper,
             }}
           >
-            <Mascot size={27} variant={data?.identity.avatar} />
+            <Mascot size={24} variant={data?.identity.avatar} background={colors.paper} />
           </View>
           <View style={{ flex: 1, gap: 1 }}>
             <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
               {t("app.agentWatching", { name })}
             </Text>
-            <Text style={{ fontSize: 10, color: colors.muted }}>
-              {t("app.activeAnalyses", { count: activeCount })}
-            </Text>
+            <View style={[s.row, { gap: 5 }]}>
+              <View
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: 3,
+                  backgroundColor: activeMonitorCount > 0 ? colors.primary : colors.disabled,
+                }}
+              />
+              <Text style={{ fontSize: 10, color: colors.muted }}>{monitorStatus}</Text>
+            </View>
           </View>
         </Pressable>
         <View style={[s.row, { gap: 6, paddingHorizontal: 2, paddingBottom: 4 }]}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t(ACCOUNT_NAV.labelKey)}
+            accessibilityLabel={accountLabel}
             accessibilityState={{ selected: section === ACCOUNT_NAV.id }}
             onPress={() => navigate(ACCOUNT_NAV.id)}
             style={({ pressed }) => ({
@@ -414,7 +435,7 @@ export function Rail({ name }: { name: string }) {
                 section === ACCOUNT_NAV.id ? colors.sky : pressed ? colors.overlay1 : "transparent",
             })}
           >
-            <SidebarAccountAvatar avatarUrl={accountAvatarUrl} name={workspace.profile.name} />
+            <SidebarAccountAvatar avatarUrl={accountAvatarUrl} name={accountLabel} />
             <View style={{ flex: 1 }}>
               <Text
                 numberOfLines={1}
@@ -424,7 +445,7 @@ export function Rail({ name }: { name: string }) {
                   color: section === ACCOUNT_NAV.id ? colors.primaryStrong : colors.text,
                 }}
               >
-                {t(ACCOUNT_NAV.labelKey)}
+                {accountLabel}
               </Text>
               <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
                 {t("app.personalSpace")}

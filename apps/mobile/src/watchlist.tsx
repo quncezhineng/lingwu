@@ -25,6 +25,7 @@ import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
   Activity,
   Check,
+  ChevronRight,
   CircleDollarSign,
   FileText,
   MoreHorizontal,
@@ -137,6 +138,56 @@ function SkeletonCard({ shimmer }: { shimmer: Animated.Value }) {
         {bar("18%", 11)}
       </View>
     </Card>
+  );
+}
+
+function PortfolioLinkCard() {
+  const { t } = useTranslation();
+  const { navigate } = useWorkspace();
+  const { width } = useWindowDimensions();
+
+  return (
+    <View style={{ gap: 10 }}>
+      <Text style={s.heading}>{t("markets.watchlistPortfolioHeading")}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("markets.watchlistOpenPortfolio")}
+        onPress={() => navigate("portfolio")}
+        style={({ pressed }) => [
+          s.card,
+          {
+            flexDirection: width >= 680 ? "row" : "column",
+            alignItems: width >= 680 ? "center" : "flex-start",
+            gap: 14,
+            padding: 18,
+            backgroundColor: pressed ? colors.surface : colors.paper,
+          },
+        ]}
+      >
+        <View
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 999,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.sky,
+          }}
+        >
+          <CircleDollarSign size={18} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={s.heading}>{t("app.titlePortfolio")}</Text>
+          <Text style={s.small}>{t("markets.watchlistPortfolioDetail")}</Text>
+        </View>
+        <View style={[s.row, { gap: 3 }]}>
+          <Text style={{ fontSize: 11, color: colors.muted }}>
+            {t("markets.watchlistOpenPortfolio")}
+          </Text>
+          <ChevronRight size={13} color={colors.faint} />
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
@@ -950,7 +1001,7 @@ function WatchlistSheet({
 }
 
 export function WatchlistScreen() {
-  const { api, navigate, notify, open, ask } = useWorkspace();
+  const { api, notify, open, ask } = useWorkspace();
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const state = useWatchlistState();
@@ -1048,6 +1099,7 @@ export function WatchlistScreen() {
   if (state.status === "loading" && !state.lists.length) {
     return (
       <View style={{ gap: 12 }}>
+        <PortfolioLinkCard />
         {[0, 1, 2, 3, 4].map((index) => (
           <SkeletonCard key={index} shimmer={shimmer} />
         ))}
@@ -1058,6 +1110,7 @@ export function WatchlistScreen() {
   if (!state.lists.length) {
     return (
       <View style={{ gap: 16 }}>
+        <PortfolioLinkCard />
         <ErrorNotice error={state.degraded ? t("markets.watchlistLoadError") : undefined} />
         <Empty
           icon={Target}
@@ -1128,14 +1181,6 @@ export function WatchlistScreen() {
         </View>
         <Button
           small
-          icon={CircleDollarSign}
-          style={{ minHeight: 44 }}
-          onPress={() => navigate("portfolio")}
-        >
-          {t("app.titlePortfolio")}
-        </Button>
-        <Button
-          small
           primary
           icon={Plus}
           style={{ minHeight: 44 }}
@@ -1149,6 +1194,8 @@ export function WatchlistScreen() {
           onPress={() => setMenuOpen(true)}
         />
       </View>
+
+      <PortfolioLinkCard />
 
       {state.status === "ready" && state.source === "mock" && (
         <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>

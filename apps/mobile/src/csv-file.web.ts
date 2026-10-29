@@ -29,10 +29,10 @@ export function pickCsvFile(): Promise<PickedCsv | undefined> {
   });
 }
 
-/** 触发浏览器下载（模板 / 错误行）。 */
-export function saveTextFile(name: string, text: string) {
+/** 触发浏览器下载（模板、错误行或导出的简报）。 */
+export function saveTextFile(name: string, text: string, mimeType = "text/csv;charset=utf-8") {
   if (typeof document === "undefined") return;
-  const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([text], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

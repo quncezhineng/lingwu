@@ -7,10 +7,7 @@ import { useTranslation } from "./i18n";
 import {
   Archive,
   ArrowLeft,
-  Bell,
   CalendarClock,
-  FileText,
-  Heart,
   type IconComponent,
   IdCard,
   LogOut,
@@ -19,7 +16,6 @@ import {
   Monitor,
   RotateCcw,
   Search,
-  Shapes,
   ShieldCheck,
   Trash2,
   UserRound,
@@ -256,7 +252,7 @@ function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
  */
 export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
   const { t } = useTranslation();
-  const { api, navigate } = useWorkspace();
+  const { api } = useWorkspace();
   const { enabled: richThreads } = useLingWuThread();
   const [view, setView] = useState<"overview" | "archived">("overview");
   const [profile, setProfile] = useState<AccountProfile>();
@@ -322,36 +318,6 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
         <Text style={{ fontSize: 18, fontWeight: "600", color: colors.text }}>{nickname}</Text>
         <Text style={s.muted}>{bio}</Text>
       </Card>
-      {/* I3：移动端二次入口——紧跟头像卡，保证首屏可见 */}
-      <View style={{ gap: 10 }}>
-        <Text style={s.heading}>{t("app.moreHeading")}</Text>
-        <Card style={{ paddingVertical: 4 }}>
-          <LinkRow
-            icon={FileText}
-            title={t("app.titleFiles")}
-            detail={t("app.destFilesDetail")}
-            onPress={() => navigate("files")}
-          />
-          <LinkRow
-            icon={Heart}
-            title={t("app.titlePreferences")}
-            detail={t("app.destPreferencesDetail")}
-            onPress={() => navigate("preferences")}
-          />
-          <LinkRow
-            icon={Shapes}
-            title={t("app.titleApps")}
-            detail={t("app.destAppsDetail")}
-            onPress={() => navigate("apps")}
-          />
-          <LinkRow
-            icon={Bell}
-            title={t("app.titleGoals")}
-            detail={t("app.destGoalsDetail")}
-            onPress={() => navigate("goals")}
-          />
-        </Card>
-      </View>
       <View style={{ gap: 10 }}>
         <Text style={s.heading}>{t("app.profileDetails")}</Text>
         <Card style={{ paddingVertical: 4 }}>

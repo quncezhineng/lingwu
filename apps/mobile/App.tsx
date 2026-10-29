@@ -17,6 +17,7 @@ import { AccountScreen } from "./src/account";
 import { AgentActivityScreen, AgentStatus, GoalsScreen, IdeasScreen } from "./src/agent-ui";
 import { AgentWorkspaceProvider, useAgentWorkspace } from "./src/agent-workspace";
 import {
+  type AccountProfile,
   API_URL,
   type AuthMode,
   authConfig,
@@ -294,8 +295,19 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   const [error, setError] = useState("");
   const [prompt, setPrompt] = useState<{ id: number; text: string }>();
   const refresh = useCallback(async () => {
-    const snapshot = await api.request<Workspace>("/api/workspace");
-    setWorkspace(snapshot);
+    const [snapshot, account] = await Promise.all([
+      api.request<Workspace>("/api/workspace"),
+      api.request<AccountProfile>("/api/auth/me").catch(() => undefined),
+    ]);
+    const accountName =
+      account?.displayName?.trim() || account?.email?.split("@")[0]?.trim() || undefined;
+    setWorkspace({
+      ...snapshot,
+      profile: {
+        name: accountName || snapshot.profile.name,
+        email: account?.email?.trim() || snapshot.profile.email,
+      },
+    });
     setError("");
   }, [api]);
   /** 统一处理刷新失败：令牌过期/无效（401）时退回登录页，其余错误提示重试。 */

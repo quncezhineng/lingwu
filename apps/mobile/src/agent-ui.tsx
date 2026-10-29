@@ -1356,7 +1356,7 @@ export function GoalsScreen() {
       </View>
       <View style={{ height: 1, backgroundColor: colors.line }} />
       <View style={{ gap: 8 }}>
-        {/* I5：页面 H1 已叫「盯盘与提醒」，目标分区不再重复同名标题 */}
+        {/* I5：页面 H1 已叫「盯盘与目标」，目标分区不再重复同名标题 */}
         {data?.goals.map((item) => (
           <Pressable
             key={item.id}

@@ -17,7 +17,7 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
+  type TextInput,
   type TextStyle,
   useWindowDimensions,
   View,
@@ -47,13 +47,14 @@ import {
 import { type ConversationDraft, useConversationStream, verifyDrafts } from "./conversation-stream";
 import { DesktopToolCard } from "./desktop-tool-card";
 import { type TranslationKey, useTranslation } from "./i18n";
-import { statusLabel } from "./i18n/translate";
-import { ArrowDown, ArrowUp, FileText, Lightbulb, Plus, RotateCcw, Square, X } from "./icons";
+import { localizeAgentName, statusLabel } from "./i18n/translate";
+import { ArrowDown, FileText, FolderOpen, Lightbulb, RotateCcw, Upload, X } from "./icons";
 import { InsightCard } from "./insight-card";
 import { confirmedJevSelection, displayJevUserMessage, latestJevPanelId } from "./jev-actions";
 import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
 import { MemoryRecallCard } from "./memory-recall-card";
+import { PromptComposer } from "./prompt-composer";
 import { QuestionCard, taskHasQuestion } from "./question-card";
 import { QuoteToolCard } from "./quote-tool-card";
 import { ReminderToolCard } from "./reminder-tool-card";
@@ -66,11 +67,6 @@ import { Button, Card, CheckRow, colors, dateLabel, Empty, ErrorNotice, s, shado
 import { useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
-// The composer pill shows focus with its border, so the browser's ring inside it is noise.
-// Chrome draws `outline-style: auto` at any width, so only `none` removes it; React Native's
-// types omit that value, but react-native-web passes it through.
-const noFocusRing =
-  Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : undefined;
 
 // 用户消息气泡（品牌色底、反白文字）上的 Markdown 渲染：标题/加粗/链接跟随 onPrimary 白色系，
 // 行内代码与代码块保留浅蓝底做区隔，保证品牌底色气泡内的可读性。
@@ -443,8 +439,6 @@ export function ChatScreen({
   const [draft, setDraft] = useState("");
   // 最近一次提交的文本：停止生成时回填到输入框，避免用户重写。
   const lastSent = useRef("");
-  const [focused, setFocused] = useState(false);
-  const [inputHeight, setInputHeight] = useState(44);
   const composerInput = useRef<TextInput>(null);
 
   // ⌘J（App 层派发）聚焦输入框；仅 Web 生效。
@@ -719,7 +713,6 @@ export function ChatScreen({
           : ""),
     );
     setDraft("");
-    setInputHeight(44);
     setAttachments([]);
     setPicking(false);
   }
@@ -1470,141 +1463,87 @@ export function ChatScreen({
               </Button>
             </Card>
           )}
-          <View
-            style={{
-              backgroundColor: colors.paper,
-              borderRadius: 17,
-              borderWidth: 1,
-              borderColor: focused ? colors.primary : colors.line,
-              padding: 8,
-            }}
-          >
-            {attachments.length > 0 && (
-              <View style={[s.row, { gap: 6, flexWrap: "wrap", padding: 9 }]}>
-                {w.files
-                  .filter((f) => attachments.includes(f.id))
-                  .map((f) => (
-                    <Pressable
-                      key={f.id}
-                      accessibilityRole="button"
-                      accessibilityLabel={t("chat.removeAttachment", { name: f.name })}
-                      onPress={() => setAttachments((ids) => ids.filter((id) => id !== f.id))}
-                      style={({ pressed }) => [
-                        s.row,
-                        {
-                          gap: 7,
-                          maxWidth: "100%",
-                          backgroundColor: pressed ? colors.overlay1 : colors.paper,
-                          borderWidth: 1,
-                          borderColor: colors.line,
-                          borderRadius: 10,
-                          paddingHorizontal: 10,
-                          paddingVertical: 7,
-                        },
-                      ]}
-                    >
-                      <FileText size={14} color={colors.primary} />
-                      <Text
-                        numberOfLines={1}
-                        style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
+          <PromptComposer
+            inputRef={composerInput}
+            value={draft}
+            onChangeText={setDraft}
+            onSubmit={replying ? () => void stop() : send}
+            placeholder={
+              !isReady
+                ? t("chat.connecting")
+                : !loaded
+                  ? historyError
+                    ? t("chat.conversationUnavailable")
+                    : t("chat.loadingConversation")
+                  : t("chat.messagePlaceholder")
+            }
+            accessibilityLabel={t("chat.messageLingWu")}
+            inputMinHeight={44}
+            inputMaxHeight={140}
+            dense
+            tools={[
+              {
+                key: "attach",
+                icon: Upload,
+                label: t("chat.attachDocument"),
+                active: picking,
+                onPress: () => setPicking(!picking),
+              },
+              {
+                key: "files",
+                icon: FolderOpen,
+                label: t("app.navFiles"),
+                onPress: () => navigate("files"),
+              },
+            ]}
+            attachments={
+              attachments.length > 0 ? (
+                <View style={[s.row, { gap: 6, flexWrap: "wrap", padding: 4, paddingBottom: 8 }]}>
+                  {w.files
+                    .filter((f) => attachments.includes(f.id))
+                    .map((f) => (
+                      <Pressable
+                        key={f.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={t("chat.removeAttachment", { name: f.name })}
+                        onPress={() => setAttachments((ids) => ids.filter((id) => id !== f.id))}
+                        style={({ pressed }) => [
+                          s.row,
+                          {
+                            gap: 7,
+                            maxWidth: "100%",
+                            backgroundColor: pressed ? colors.overlay1 : colors.surface,
+                            borderWidth: 1,
+                            borderColor: colors.line,
+                            borderRadius: 10,
+                            paddingHorizontal: 10,
+                            paddingVertical: 7,
+                          },
+                        ]}
                       >
-                        {f.name}
-                      </Text>
-                      <X size={13} color={colors.muted} />
-                    </Pressable>
-                  ))}
-              </View>
-            )}
-            <View style={[s.row, { gap: 7, alignItems: "flex-end" }]}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("chat.attachDocument")}
-                accessibilityState={{ expanded: picking }}
-                onPress={() => setPicking(!picking)}
-                style={({ pressed }) => ({
-                  width: 44,
-                  height: 44,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 999,
-                  backgroundColor: picking || pressed ? colors.overlay1 : "transparent",
-                })}
-              >
-                <Plus size={22} color={colors.text} />
-              </Pressable>
-              <TextInput
-                ref={composerInput}
-                accessibilityLabel={t("chat.messageLingWu")}
-                value={draft}
-                onChangeText={setDraft}
-                onContentSizeChange={(event) =>
-                  setInputHeight(Math.max(44, Math.min(140, event.nativeEvent.contentSize.height)))
-                }
-                placeholder={
-                  !isReady
-                    ? t("chat.connecting")
-                    : !loaded
-                      ? historyError
-                        ? t("chat.conversationUnavailable")
-                        : t("chat.loadingConversation")
-                      : t("chat.messagePlaceholder")
-                }
-                placeholderTextColor={colors.faint}
-                selectionColor={colors.primary}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                style={{
-                  flex: 1,
-                  color: colors.text,
-                  height: inputHeight,
-                  minHeight: 44,
-                  maxHeight: 140,
-                  fontSize: 17,
-                  lineHeight: 24,
-                  paddingHorizontal: 2,
-                  paddingTop: 10,
-                  paddingBottom: 10,
-                  ...noFocusRing,
-                }}
-                multiline
-                editable
-                onKeyPress={
-                  Platform.OS === "web"
-                    ? (event) => {
-                        if (
-                          event.nativeEvent.key === "Enter" &&
-                          !("shiftKey" in event.nativeEvent && event.nativeEvent.shiftKey)
-                        ) {
-                          event.preventDefault();
-                          send();
-                        }
-                      }
-                    : undefined
-                }
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={replying ? t("chat.stopReply") : t("chat.sendMessage")}
-                disabled={!replying && (!draft.trim() || !loaded || !isReady)}
-                onPress={replying ? () => void stop() : send}
-                style={({ pressed }) => ({
-                  width: 44,
-                  height: 44,
-                  borderRadius: 999,
-                  backgroundColor: replying || draft.trim() ? colors.primary : colors.tertiary,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transform: [{ scale: pressed ? 0.94 : 1 }],
-                })}
-              >
-                {replying ? (
-                  <Square size={18} fill={colors.onPrimary} strokeWidth={0} />
-                ) : (
-                  <ArrowUp size={25} color={draft.trim() ? colors.onPrimary : colors.disabled} />
-                )}
-              </Pressable>
-            </View>
-          </View>
+                        <FileText size={14} color={colors.primary} />
+                        <Text
+                          numberOfLines={1}
+                          style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
+                        >
+                          {f.name}
+                        </Text>
+                        <X size={13} color={colors.muted} />
+                      </Pressable>
+                    ))}
+                </View>
+              ) : undefined
+            }
+            assistantLabel={t("app.agentSettingsLabel", {
+              name: localizeAgentName(agentWorkspace?.identity.name),
+            })}
+            assistantText={t("workbench.depthAnalysis")}
+            onOpenAssistant={() => open({ type: "personality" })}
+            sendLabel={t("chat.sendMessage")}
+            stopLabel={t("chat.stopReply")}
+            busy={replying}
+            submitDisabled={!loaded || !isReady}
+          />
         </KeyboardAvoidingView>
       </View>
       {filesOpen && (

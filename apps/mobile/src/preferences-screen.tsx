@@ -3,20 +3,9 @@ import { Pressable, Text, TextInput, useWindowDimensions, View } from "react-nat
 import type { AgentMemory } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
 import { activeLocaleTag, useTranslation } from "./i18n";
-import {
-  Check,
-  ChevronRight,
-  CircleDollarSign,
-  Heart,
-  Pencil,
-  Plus,
-  ShieldCheck,
-  Trash2,
-  X,
-} from "./icons";
+import { Check, Heart, Pencil, Plus, ShieldCheck, Trash2, X } from "./icons";
 import { breakpoints } from "./theme";
 import { Button, Card, colors, ErrorNotice, Field, fonts, s } from "./ui";
-import { useWorkspace } from "./workspace";
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -179,7 +168,6 @@ function MemoryCard({
 
 export function PreferencesScreen() {
   const { data, mutate, error: workspaceError } = useAgentWorkspace();
-  const { navigate } = useWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [newMemory, setNewMemory] = useState("");
@@ -283,48 +271,6 @@ export function PreferencesScreen() {
         <Button primary icon={Plus} onPress={() => setAdding((value) => !value)}>
           {t("preferences.addPreference")}
         </Button>
-      </View>
-
-      <View style={{ gap: 10 }}>
-        <Text style={s.heading}>{t("preferences.portfolioHeading")}</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("preferences.openPortfolio")}
-          onPress={() => navigate("portfolio")}
-          style={({ pressed }) => [
-            s.card,
-            {
-              flexDirection: width >= 680 ? "row" : "column",
-              alignItems: width >= 680 ? "center" : "flex-start",
-              gap: 14,
-              padding: 18,
-              backgroundColor: pressed ? colors.surface : colors.paper,
-            },
-          ]}
-        >
-          <View
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 999,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: colors.sky,
-            }}
-          >
-            <CircleDollarSign size={18} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={s.heading}>{t("app.titlePortfolio")}</Text>
-            <Text style={s.small}>{t("preferences.portfolioDetail")}</Text>
-          </View>
-          <View style={[s.row, { gap: 3 }]}>
-            <Text style={{ fontSize: 11, color: colors.muted }}>
-              {t("preferences.openPortfolio")}
-            </Text>
-            <ChevronRight size={13} color={colors.faint} />
-          </View>
-        </Pressable>
       </View>
 
       {adding && (

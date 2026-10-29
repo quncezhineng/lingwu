@@ -24,11 +24,11 @@ export async function pickCsvFile(): Promise<PickedCsv | undefined> {
   return { name: asset.name, text: await readFileAsText(asset.uri) };
 }
 
-/** 原生端分享 CSV（模板 / 错误行）。 */
-export async function saveTextFile(name: string, text: string) {
+/** 原生端分享文本文件（模板、错误行或导出的简报）。 */
+export async function saveTextFile(name: string, text: string, mimeType = "text/csv") {
   const target = `${FileSystem.cacheDirectory}${name}`;
   await FileSystem.writeAsStringAsync(target, text);
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(target, { mimeType: "text/csv" });
+    await Sharing.shareAsync(target, { mimeType });
   }
 }

@@ -240,7 +240,7 @@ const agent = {
   "agent.hubPluginsDetail": "探索与安装研究流程",
   "agent.hubSkillsDetail": "启用专业研究动作",
   "agent.hubConnectorsShortDetail": "连接外部工具与服务",
-  "agent.hubKnowledgeTitle": "知识库",
+  "agent.hubKnowledgeTitle": "资料库",
   "agent.hubKnowledgeDetail": "研报、公告与研究笔记",
   "agent.hubSearchCapabilities": "搜索能力",
   "agent.hubAllCategories": "全部分类",

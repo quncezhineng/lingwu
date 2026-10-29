@@ -5,7 +5,7 @@
  * 图标（`project.ts`），渲染统一交给 react-native-svg，从而在 iOS / Android / Web
  * 三端得到一致的线宽与端点表现。
  *
- * 使用约定（与 Demo-v7 图标规范一致）：
+ * 使用约定（与 Demo 图标规范一致）：
  * - `strokeWidth`：常规 1.65、底栏 1.7、导航 1.9；不传则取常规值。
  * - `color`：描边色；`fill` 缺省为 `none`（纯描边），传入时为填充态。
  * - `size`：默认 24，实际按调用点传入。

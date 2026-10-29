@@ -34,6 +34,7 @@ export function InsightCard({
   revisit,
   meta,
   onPress,
+  actionLabel,
   onSimplify,
   onDisagree,
   onToggleSave,
@@ -57,6 +58,8 @@ export function InsightCard({
   /** 底部元信息：来源、作者、时间等。 */
   meta?: string;
   onPress?: () => void;
+  /** Optional text action shown in the footer when there are no inline actions. */
+  actionLabel?: string;
   /** 底部动作：讲浅一点 / 我有不同看法。 */
   onSimplify?: () => void;
   onDisagree?: () => void;
@@ -185,7 +188,12 @@ export function InsightCard({
             />
           </Pressable>
         ) : (
-          !!onPress && <ArrowUpRight size={14} color={colors.faint} />
+          !!onPress &&
+          (actionLabel ? (
+            <Text style={[typography.caption, { color: colors.link }]}>{actionLabel}</Text>
+          ) : (
+            <ArrowUpRight size={14} color={colors.faint} />
+          ))
         )}
       </View>
     </View>

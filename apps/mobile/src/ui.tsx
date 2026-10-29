@@ -560,7 +560,16 @@ const AVATAR_SOURCES: Record<string, ImageSourcePropType> = {
  * `variant` matches a photo avatar (avatar1~avatar6) a circular photo is
  * rendered instead of the color-tinted capybara.
  */
-export function Mascot({ size = 42, variant }: { size?: number; variant?: string }) {
+export function Mascot({
+  size = 42,
+  variant,
+  background,
+}: {
+  size?: number;
+  variant?: string;
+  /** Override the fallback orb color without changing the persisted avatar variant. */
+  background?: string;
+}) {
   const { t } = useTranslation();
   const source = variant ? AVATAR_SOURCES[variant] : undefined;
   if (source) {
@@ -577,11 +586,13 @@ export function Mascot({ size = 42, variant }: { size?: number; variant?: string
   // 兜底涂装：默认（无 variant）或旧版 sky/sand/lilac 仍渲染水豚。
   // sand/lilac 是历史头像遗留值，保持原样以兼容已存数据；默认底色跟随品牌浅蓝。
   const palette =
+    background ??
     {
       sky: colors.sky,
       sand: colors.avatarSand,
       lilac: colors.avatarLilac,
-    }[variant ?? "sky"] ?? colors.sky;
+    }[variant ?? "sky"] ??
+    colors.sky;
   return (
     <View accessibilityLabel={t("ui.capybaraLabel")} style={{ width: size, height: size }}>
       <View

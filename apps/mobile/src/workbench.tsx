@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Pressable,
   Text,
-  TextInput,
+  type TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -11,6 +12,7 @@ import Svg, { Polyline } from "react-native-svg";
 import type { AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
 import { MarketBriefingCard } from "./briefing-card";
+import { greetingKeyForHour, userLocalHour } from "./greeting";
 import { activeLocaleTag, localizeAgentName, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
 import {
@@ -32,13 +34,13 @@ import {
 } from "./icons";
 import { InsightCard } from "./insight-card";
 import { activeWatchlist, loadWatchlists, useWatchlistState } from "./market";
+import { PromptComposer } from "./prompt-composer";
 import { availabilityFromQuote, useQuotes } from "./quotes";
 import { StatusBadge, statusToneColors, taskStatusTone } from "./status-badge";
 import { breakpoints } from "./theme";
 import {
   Button,
   colors,
-  fonts,
   IconButton,
   marketDirectionColor,
   radius,
@@ -49,12 +51,6 @@ import {
 } from "./ui";
 
 import { useWorkspace } from "./workspace";
-
-function greetingKey(hour: number) {
-  if (hour < 11) return "workbench.greetingMorning" as const;
-  if (hour < 18) return "workbench.greetingAfternoon" as const;
-  return "workbench.greetingEvening" as const;
-}
 
 function shortName(value: string | undefined) {
   if (!value?.trim()) return "";
@@ -401,7 +397,19 @@ export function WorkbenchScreen() {
   // 1024 宽时主列约 380–400，问候（31 号）与 180 简报卡会撞行 → 主列不足 520 时上下分行。
   const narrow = width < 1180;
   const [insightIndex, setInsightIndex] = useState(0);
-  const now = new Date();
+  const [now, setNow] = useState(() => new Date());
+  // 问候语跟随设备时区，并在跨过中午/傍晚时自动更新，无需刷新页面。
+  useEffect(() => {
+    const updateNow = () => setNow(new Date());
+    const timer = setInterval(updateNow, 30_000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") updateNow();
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, []);
   const name =
     shortName(workspace.profile.name) || shortName(workspace.profile.email) || t("workbench.there");
   const agentName = localizeAgentName(data?.identity.name);
@@ -490,7 +498,7 @@ export function WorkbenchScreen() {
                     color: colors.heading,
                   }}
                 >
-                  {t(greetingKey(now.getHours()), { name })}
+                  {t(greetingKeyForHour(userLocalHour(now)), { name })}
                 </Text>
               </View>
               <Pressable
@@ -534,120 +542,33 @@ export function WorkbenchScreen() {
               </Pressable>
             </View>
 
-            <View
-              style={{
-                minHeight: 162,
-                borderWidth: 1,
-                borderColor: colors.line,
-                borderRadius: radius.composer,
-                backgroundColor: colors.paper,
-                padding: 18,
-                justifyContent: "space-between",
-              }}
-            >
-              <TextInput
-                ref={composerRef}
-                value={draft}
-                onChangeText={setDraft}
-                onSubmitEditing={submit}
-                multiline
-                placeholder={t("workbench.askPlaceholder")}
-                placeholderTextColor={colors.faint}
-                accessibilityLabel={t("workbench.askPlaceholder")}
-                style={{
-                  minHeight: 68,
-                  maxHeight: 150,
-                  padding: 0,
-                  color: colors.text,
-                  fontSize: 15,
-                  lineHeight: 24,
-                  textAlignVertical: "top",
-                  fontFamily: fonts.sans,
-                }}
-              />
-              <View style={[s.between, { marginTop: 12 }]}>
-                <View style={[s.row, { gap: 8 }]}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("workbench.attachMaterial")}
-                    hitSlop={7}
-                    onPress={() => navigate("chat")}
-                    style={({ pressed }) => ({
-                      width: 30,
-                      height: 30,
-                      borderRadius: radius.control,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: pressed ? colors.overlay1 : "transparent",
-                    })}
-                  >
-                    <Upload size={16} strokeWidth={1.7} color={colors.muted} />
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("app.navFiles")}
-                    hitSlop={7}
-                    onPress={() => navigate("files")}
-                    style={({ pressed }) => ({
-                      width: 30,
-                      height: 30,
-                      borderRadius: radius.control,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: pressed ? colors.overlay1 : "transparent",
-                    })}
-                  >
-                    <FolderOpen size={16} strokeWidth={1.7} color={colors.muted} />
-                  </Pressable>
-                  <View
-                    style={[
-                      s.row,
-                      {
-                        gap: 5,
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: radius.control,
-                        backgroundColor: colors.sky,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: radius.full,
-                        backgroundColor: colors.primary,
-                      }}
-                    />
-                    <Text style={{ fontSize: 10, color: colors.primaryAction }}>
-                      {t("workbench.depthAnalysis")}
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t("workbench.sendAnalysis")}
-                  hitSlop={4}
-                  disabled={!draft.trim()}
-                  onPress={submit}
-                  style={({ pressed }) => ({
-                    width: 36,
-                    height: 36,
-                    borderRadius: radius.full,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: draft.trim() ? colors.primary : colors.tertiary,
-                    opacity: pressed ? 0.8 : 1,
-                  })}
-                >
-                  <ArrowUpRight
-                    size={17}
-                    strokeWidth={1.9}
-                    color={draft.trim() ? colors.onPrimary : colors.faint}
-                  />
-                </Pressable>
-              </View>
-            </View>
+            <PromptComposer
+              inputRef={composerRef}
+              value={draft}
+              onChangeText={setDraft}
+              onSubmit={submit}
+              placeholder={t("workbench.askPlaceholder")}
+              accessibilityLabel={t("workbench.askPlaceholder")}
+              tools={[
+                {
+                  key: "upload",
+                  icon: Upload,
+                  label: t("workbench.attachMaterial"),
+                  onPress: () => navigate("chat"),
+                },
+                {
+                  key: "files",
+                  icon: FolderOpen,
+                  label: t("app.navFiles"),
+                  onPress: () => navigate("files"),
+                },
+              ]}
+              assistantLabel={t("app.agentSettingsLabel", { name: agentName })}
+              assistantText={t("workbench.depthAnalysis")}
+              onOpenAssistant={() => open({ type: "personality" })}
+              sendLabel={t("workbench.sendAnalysis")}
+              style={{ minHeight: 162 }}
+            />
 
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {quickPrompts.map((item) => (
@@ -801,7 +722,7 @@ export function WorkbenchScreen() {
 
       {briefingOpen && (
         <Sheet title={t("workbench.briefing")} onClose={() => setBriefingOpen(false)}>
-          <MarketBriefingCard />
+          <MarketBriefingCard plain onRequestClose={() => setBriefingOpen(false)} />
         </Sheet>
       )}
     </>
