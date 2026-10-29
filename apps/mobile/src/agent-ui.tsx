@@ -60,7 +60,7 @@ import { PageHeader } from "./page-header";
 import { PlanCard } from "./plan-card";
 import { ActivityScreen } from "./screens";
 import { StatusBadge, taskStatusTone } from "./status-badge";
-import { breakpoints } from "./theme";
+import { breakpoints, radius } from "./theme";
 import { Toggle } from "./toggle";
 import {
   Button,
@@ -1167,11 +1167,39 @@ export function IdeasScreen() {
       ))}
       {!ideas.length && (
         <>
-          <Empty
-            icon={Lightbulb}
-            title={t("agent.ideasEmptyTitle")}
-            detail={t("agent.ideasEmptyDetail")}
-          />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 13,
+              borderWidth: 1,
+              borderColor: colors.line,
+              borderRadius: radius.card,
+              backgroundColor: colors.paper,
+            }}
+          >
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                flexShrink: 0,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: radius.control,
+                backgroundColor: colors.sky,
+              }}
+            >
+              <Lightbulb size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={[s.heading, { fontSize: 15, lineHeight: 21 }]}>
+                {t("agent.ideasEmptyTitle")}
+              </Text>
+              <Text style={s.muted}>{t("agent.ideasEmptyDetail")}</Text>
+            </View>
+          </View>
           <View style={{ gap: 0 }}>
             <Text style={[s.small, { marginBottom: 6 }]}>{t("agent.ideaSuggestions")}</Text>
             {IDEA_SUGGESTIONS.map((suggestion) => (

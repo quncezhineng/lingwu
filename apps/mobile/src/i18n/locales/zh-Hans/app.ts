@@ -206,7 +206,7 @@ const app = {
   "preferences.categoryRisk": "风险偏好",
   "preferences.categoryFocus": "关注领域",
   "preferences.categoryHabit": "分析习惯",
-  "preferences.whatToRemember": "希望记住什么",
+  "preferences.whatToRemember": "希望灵悟记住什么？",
   "preferences.placeholder": "例如：投资周期 3 年以上，重点关注组合回撤。",
   "preferences.characterCount": "{count}/4000",
   "preferences.memoryHeading": "灵悟记住的内容",

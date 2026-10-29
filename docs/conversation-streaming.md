@@ -7,7 +7,7 @@ CopilotKit runtime, mirrored into an app-owned replayable SSE ledger, consumed b
 client, and reconciled with persisted thread messages.
 
 The upstream reference is the read-only project at
-`/Users/luffy/Code/Bayes/EconSwarm/LingWu`. The technical name is **REA MCP**. The embedded
+`/Users/luffy/Code/Bayes/LingWu`. The technical name is **REA MCP**. The embedded
 `mcp__rea__*` tools were not registered in this Codex runtime, so direct calls returned
 `unsupported call`. REA 6.3.0's own stdio MCP server was therefore started directly; it advertised
 139 tools, including `analyze_javascript_application`, `inspect_analysis_view`, and

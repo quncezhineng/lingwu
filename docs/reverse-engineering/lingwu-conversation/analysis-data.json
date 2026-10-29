@@ -3,7 +3,7 @@
   "generatedAt": "2026-10-17",
   "generatedFor": "LingWu conversation module reverse engineering",
   "target": {
-    "repository": "/Users/luffy/Code/Bayes/EconSwarm/LingWu",
+    "repository": "/Users/luffy/Code/Bayes/LingWu",
     "access": "read-only",
     "stack": {
       "server": "Python FastAPI, asyncio",

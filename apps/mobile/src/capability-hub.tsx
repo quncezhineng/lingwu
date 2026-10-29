@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
+  Activity,
   ArrowUpRight,
   Brain,
   CalendarDays,
@@ -28,9 +29,10 @@ import {
   Target,
   X,
 } from "./icons";
+import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
 import { StatusBadge } from "./status-badge";
 import { breakpoints, radius } from "./theme";
-import { appBrands, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
+import { appBrands, Button, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
 import { useWorkspace } from "./workspace";
 
 type HubTab = "marketplace" | "mine";
@@ -59,6 +61,7 @@ type CatalogItem = {
   source: string;
   state: CapabilityState;
   installed: boolean;
+  searchText?: string;
   onPress: () => void;
 };
 
@@ -135,6 +138,53 @@ const STATE_KEYS: Record<CapabilityState, TranslationKey> = {
   available: "agent.hubStateAvailable",
   open: "agent.hubStateOpen",
 };
+
+const SKILL_CATEGORY_LABELS: Record<SkillCategory, TranslationKey> = {
+  research: "agent.hubCategoryResearch",
+  analysis: "agent.hubCategoryAnalysis",
+  writing: "agent.hubCategoryWriting",
+  monitoring: "agent.hubCategoryMonitoring",
+  workspace: "agent.hubCategoryWorkspace",
+};
+
+const SKILL_CATEGORY_APPEARANCE: Record<
+  SkillCategory,
+  {
+    icon: IconComponent;
+    color: string;
+    surface: string;
+  }
+> = {
+  research: {
+    icon: Brain,
+    color: appBrands.report.fg,
+    surface: appBrands.report.surface,
+  },
+  analysis: {
+    icon: Activity,
+    color: appBrands.portfolioReview.fg,
+    surface: appBrands.portfolioReview.surface,
+  },
+  writing: {
+    icon: FileText,
+    color: appBrands.earnings.fg,
+    surface: appBrands.earnings.surface,
+  },
+  monitoring: {
+    icon: Target,
+    color: appBrands.monitoring.fg,
+    surface: appBrands.monitoring.surface,
+  },
+  workspace: {
+    icon: FolderOpen,
+    color: appBrands.notes.fg,
+    surface: appBrands.notes.surface,
+  },
+};
+
+function skillCategory(skill: SkillCatalogEntry): SkillCategory {
+  return skill.categories[0] ?? "analysis";
+}
 
 function chunk<T>(items: T[], size: number) {
   const rows: T[][] = [];
@@ -317,11 +367,95 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
           {item.source}
         </Text>
         <StatusBadge
-          tone={item.state === "available" ? "paused" : "running"}
+          tone={item.state === "available" ? "paused" : "done"}
           label={t(STATE_KEYS[item.state])}
+          style={item.state === "available" ? undefined : { backgroundColor: colors.sky }}
         />
       </View>
     </Pressable>
+  );
+}
+
+function SkillDetailSheet({
+  skill,
+  onClose,
+  onUse,
+}: {
+  skill: SkillCatalogEntry;
+  onClose: () => void;
+  onUse: () => void;
+}) {
+  const { t, locale } = useTranslation();
+  const appearance = SKILL_CATEGORY_APPEARANCE[skillCategory(skill)];
+  const primaryTitle = locale === "zh-Hans" ? skill.titleZh : skill.titleEn;
+  const secondaryTitle = locale === "zh-Hans" ? skill.titleEn : skill.titleZh;
+
+  return (
+    <Sheet title={primaryTitle} subtitle={secondaryTitle} onClose={onClose} narrow>
+      <View style={{ gap: 18 }}>
+        <View style={[s.row, { gap: 11 }]}>
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: radius.field,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: appearance.surface,
+            }}
+          >
+            <appearance.icon size={21} color={appearance.color} />
+          </View>
+          <View style={{ flex: 1, gap: 7 }}>
+            <Text style={s.label}>{t("agent.skillDetailCategory")}</Text>
+            <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>
+              {skill.categories.map((category) => (
+                <Chip key={category} tint={colors.sky}>
+                  {t(SKILL_CATEGORY_LABELS[category])}
+                </Chip>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View style={{ gap: 7 }}>
+          <Text style={s.label}>{t("agent.skillDetailChinese")}</Text>
+          <Text selectable style={s.text}>
+            {skill.descriptionZh}
+          </Text>
+        </View>
+
+        <View style={{ height: 1, backgroundColor: colors.line }} />
+
+        <View style={{ gap: 7 }}>
+          <Text style={s.label}>{t("agent.skillDetailEnglish")}</Text>
+          <Text selectable style={s.text}>
+            {skill.descriptionEn}
+          </Text>
+        </View>
+
+        <View
+          style={{
+            gap: 5,
+            padding: 12,
+            borderRadius: radius.field,
+            backgroundColor: colors.surfaceSoft,
+          }}
+        >
+          <Text style={s.label}>{t("agent.skillDetailSource")}</Text>
+          <Text selectable style={s.small}>
+            {skill.sourceFolder}
+          </Text>
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <Text style={s.small}>{t("agent.skillDetailUseHint")}</Text>
+          <Button primary icon={Sparkles} onPress={onUse}>
+            {t("agent.skillDetailUse")}
+          </Button>
+        </View>
+      </View>
+    </Sheet>
   );
 }
 
@@ -446,7 +580,7 @@ function CategoryRail({
 }
 
 export function CapabilityHubScreen() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const { navigate, ask, workspace, api, refresh, notify, open } = useWorkspace();
   const [tab, setTab] = useState<HubTab>("marketplace");
@@ -458,6 +592,7 @@ export function CapabilityHubScreen() {
   const [configBusy, setConfigBusy] = useState(false);
   const [configError, setConfigError] = useState("");
   const [googleConnectingId, setGoogleConnectingId] = useState<"gmail" | "calendar">();
+  const [selectedSkillId, setSelectedSkillId] = useState<string>();
 
   const desktop = width >= breakpoints.desktop;
   const railWidth = desktop ? 232 : 0;
@@ -482,6 +617,34 @@ export function CapabilityHubScreen() {
   const modelOptions = workspace.runtime.modelOptions ?? [];
   const builtInSource = t("agent.hubSourceLingwu");
   const workspaceSource = t("agent.hubSourceWorkspace");
+  const skillSource = t("agent.hubSourceLingwu");
+  const skillItems: CatalogItem[] = skillCatalog.map((skill) => {
+    const appearance = SKILL_CATEGORY_APPEARANCE[skillCategory(skill)];
+    return {
+      id: `skill:${skill.id}`,
+      type: "skills",
+      tags: [...skill.categories],
+      title: locale === "zh-Hans" ? skill.titleZh : skill.titleEn,
+      detail: locale === "zh-Hans" ? skill.descriptionZh : skill.descriptionEn,
+      icon: appearance.icon,
+      iconColor: appearance.color,
+      iconSurface: appearance.surface,
+      source: skillSource,
+      state: "ready",
+      installed: true,
+      searchText: [
+        skill.id,
+        skill.titleZh,
+        skill.titleEn,
+        skill.descriptionZh,
+        skill.descriptionEn,
+      ].join(" "),
+      onPress: () => setSelectedSkillId(skill.id),
+    };
+  });
+  const selectedSkill = selectedSkillId
+    ? skillCatalog.find((skill) => skill.id === selectedSkillId)
+    : undefined;
 
   async function openGoogleConnector(id: "gmail" | "calendar") {
     if (googleConnectingId) return;
@@ -522,63 +685,17 @@ export function CapabilityHubScreen() {
     }
   }
 
+  function startSelectedSkill(skill: SkillCatalogEntry) {
+    ask(
+      locale === "zh-Hans"
+        ? `请使用「${skill.titleZh}」技能处理当前任务。\n\n技能说明：${skill.descriptionZh}\n\n开始前请先询问我缺少的必要信息。`
+        : `Use the "${skill.titleEn}" skill for this task.\n\nSkill description: ${skill.descriptionEn}\n\nAsk for any missing inputs before starting.`,
+    );
+    setSelectedSkillId(undefined);
+  }
+
   const items: CatalogItem[] = [
-    {
-      id: "earnings",
-      type: "skills",
-      tags: ["analysis", "research"],
-      title: t("agent.skillEarnings"),
-      detail: t("agent.skillEarningsDetail"),
-      icon: FileText,
-      iconColor: appBrands.earnings.fg,
-      iconSurface: appBrands.earnings.surface,
-      source: builtInSource,
-      state: "ready",
-      installed: true,
-      onPress: () => ask(t("agent.skillEarningsPrompt")),
-    },
-    {
-      id: "report",
-      type: "skills",
-      tags: ["writing", "research"],
-      title: t("agent.skillReport"),
-      detail: t("agent.skillReportDetail"),
-      icon: Brain,
-      iconColor: appBrands.report.fg,
-      iconSurface: appBrands.report.surface,
-      source: builtInSource,
-      state: "ready",
-      installed: true,
-      onPress: () => ask(t("agent.skillReportPrompt")),
-    },
-    {
-      id: "notes",
-      type: "skills",
-      tags: ["writing", "workspace"],
-      title: t("agent.skillNotes"),
-      detail: t("agent.skillNotesDetail"),
-      icon: FileText,
-      iconColor: appBrands.notes.fg,
-      iconSurface: appBrands.notes.surface,
-      source: builtInSource,
-      state: "ready",
-      installed: true,
-      onPress: () => navigate("notes"),
-    },
-    {
-      id: "monitoring",
-      type: "skills",
-      tags: ["monitoring"],
-      title: t("agent.skillMonitoring"),
-      detail: t("agent.skillMonitoringDetail"),
-      icon: Target,
-      iconColor: appBrands.monitoring.fg,
-      iconSurface: appBrands.monitoring.surface,
-      source: builtInSource,
-      state: "ready",
-      installed: true,
-      onPress: () => navigate("goals"),
-    },
+    ...skillItems,
     {
       id: "mail",
       type: "plugins",
@@ -741,6 +858,7 @@ export function CapabilityHubScreen() {
       item.title,
       item.detail,
       item.source,
+      item.searchText ?? "",
       t(TYPE_LABELS[item.type]),
       ...item.tags.map((tag) => {
         const option = CATEGORY_OPTIONS.find((candidate) => candidate.id === tag);
@@ -1047,6 +1165,14 @@ export function CapabilityHubScreen() {
             </View>
           )}
         </Sheet>
+      )}
+
+      {selectedSkill && (
+        <SkillDetailSheet
+          skill={selectedSkill}
+          onClose={() => setSelectedSkillId(undefined)}
+          onUse={() => startSelectedSkill(selectedSkill)}
+        />
       )}
     </View>
   );
