@@ -31,6 +31,8 @@ export interface QuoteView {
   marketState?: "pre" | "regular" | "post" | "closed";
   /** 近 12 个采样点的迷你走势；后端未提供时为 undefined（前端不合成）。 */
   sparkline?: number[];
+  /** 基金净值等需要显示四位小数时由数据源显式提供。 */
+  precision?: number;
 }
 
 export type QuoteAvailability =
@@ -114,6 +116,7 @@ export function parseBatchQuotes(payload: unknown): Record<string, QuoteAvailabi
         stale: item.stale === true,
         marketState: marketStateOf(item.market_state ?? item.marketState),
         sparkline: numArray(item.sparkline ?? item.points),
+        precision: num(item.precision),
       },
     };
   }
@@ -217,6 +220,7 @@ export function parseToolQuotes(payload: unknown): InlineQuoteView[] {
             asOf: str(item.asOf) ?? str(item.as_of),
             stale: item.stale === true,
             marketState: marketStateOf(item.market_state ?? item.marketState),
+            precision: num(item.precision),
           },
         },
       },
@@ -276,6 +280,8 @@ export function availabilityFromQuote(quote?: Quote, unavailable = false): Quote
       volumeRatio: quote.volumeRatio,
       currency: quote.currency,
       stale: quote.stale,
+      sparkline: quote.sparkline,
+      precision: quote.precision,
     },
   };
 }

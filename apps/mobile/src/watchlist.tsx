@@ -25,19 +25,23 @@ import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
   Activity,
   Check,
-  ChevronRight,
   CircleDollarSign,
   FileText,
   MoreHorizontal,
   Plus,
   RefreshCw,
   Search,
+  Shapes,
+  ShieldCheck,
+  Sparkles,
   Target,
+  Trash2,
   X,
 } from "./icons";
 import {
   activeWatchlist,
   addSymbols,
+  catalogSymbols,
   createWatchlist,
   deleteWatchlist,
   loadWatchlists,
@@ -50,15 +54,10 @@ import {
   selectWatchlist,
   updateWatchlist,
   useWatchlistState,
+  type Watchlist,
   type WatchlistSymbol,
 } from "./market";
-import {
-  currencySymbol,
-  defaultCurrency,
-  directionOf,
-  formatPercent,
-  formatPrice,
-} from "./market-format";
+import { defaultCurrency, directionOf, formatPercent, formatPrice } from "./market-format";
 import { QuoteCard } from "./quote-card";
 import { availabilityFromQuote, type QuoteAvailability, useQuotes } from "./quotes";
 import { breakpoints, layout, space } from "./theme";
@@ -76,12 +75,14 @@ import {
 } from "./ui";
 import { useWorkspace } from "./workspace";
 
-const MARKET_FILTERS: ReadonlyArray<{ id: MarketKind | "all"; labelKey: TranslationKey }> = [
+type WatchlistFilter = "all" | "CN" | "HK" | "US" | "FUND";
+
+const MARKET_FILTERS: ReadonlyArray<{ id: WatchlistFilter; labelKey: TranslationKey }> = [
   { id: "all", labelKey: "markets.marketAll" },
-  { id: "US", labelKey: "markets.marketUS" },
   { id: "CN", labelKey: "markets.marketCN" },
   { id: "HK", labelKey: "markets.marketHK" },
-  { id: "ETF", labelKey: "markets.marketETF" },
+  { id: "US", labelKey: "markets.marketUS" },
+  { id: "FUND", labelKey: "markets.marketFund" },
 ];
 
 const MARKET_LABEL = {
@@ -89,7 +90,32 @@ const MARKET_LABEL = {
   CN: "markets.marketCN",
   HK: "markets.marketHK",
   ETF: "markets.marketETF",
+  FUND: "markets.marketFund",
 } as const satisfies Record<MarketKind, TranslationKey>;
+
+function matchesWatchFilter(market: MarketKind, filter: WatchlistFilter) {
+  if (filter === "all") return true;
+  if (filter === "FUND") return market === "ETF" || market === "FUND";
+  return market === filter;
+}
+
+function marketAndAssetLabel(
+  symbol: SymbolMeta,
+  t: (key: TranslationKey) => string,
+): { market: string; asset: string } {
+  if (symbol.market === "FUND") {
+    return { market: t("markets.marketFund"), asset: t("markets.assetFund") };
+  }
+  if (symbol.market === "ETF") {
+    const region: MarketKind = /\.(SS|SZ)$/i.test(symbol.code)
+      ? "CN"
+      : /\.HK$/i.test(symbol.code)
+        ? "HK"
+        : "US";
+    return { market: t(MARKET_LABEL[region]), asset: t("markets.assetETF") };
+  }
+  return { market: t(MARKET_LABEL[symbol.market]), asset: t("markets.assetStock") };
+}
 
 /** 骨架屏的呼吸动画；尊重「减少动态效果」偏好。 */
 function useShimmer() {
@@ -138,56 +164,6 @@ function SkeletonCard({ shimmer }: { shimmer: Animated.Value }) {
         {bar("18%", 11)}
       </View>
     </Card>
-  );
-}
-
-function PortfolioLinkCard() {
-  const { t } = useTranslation();
-  const { navigate } = useWorkspace();
-  const { width } = useWindowDimensions();
-
-  return (
-    <View style={{ gap: 10 }}>
-      <Text style={s.heading}>{t("markets.watchlistPortfolioHeading")}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("markets.watchlistOpenPortfolio")}
-        onPress={() => navigate("portfolio")}
-        style={({ pressed }) => [
-          s.card,
-          {
-            flexDirection: width >= 680 ? "row" : "column",
-            alignItems: width >= 680 ? "center" : "flex-start",
-            gap: 14,
-            padding: 18,
-            backgroundColor: pressed ? colors.surface : colors.paper,
-          },
-        ]}
-      >
-        <View
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 999,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: colors.sky,
-          }}
-        >
-          <CircleDollarSign size={18} color={colors.primary} />
-        </View>
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={s.heading}>{t("app.titlePortfolio")}</Text>
-          <Text style={s.small}>{t("markets.watchlistPortfolioDetail")}</Text>
-        </View>
-        <View style={[s.row, { gap: 3 }]}>
-          <Text style={{ fontSize: 11, color: colors.muted }}>
-            {t("markets.watchlistOpenPortfolio")}
-          </Text>
-          <ChevronRight size={13} color={colors.faint} />
-        </View>
-      </Pressable>
-    </View>
   );
 }
 
@@ -376,12 +352,12 @@ function Sparkline({
 }
 
 /**
- * 表格列宽（1000 宽时内容区约 684）：
- * 名称 ≥132 + 88 + 96 + 76 + (90) + 111 + gap 10 + 左右 padding 12 → 667（含走势列）以内。
- * 走势列在可见行全部无数据时整列隐藏，行内有数据时才逐行展示。
+ * 六列表格列宽（1000 宽时内容区约 684）：
+ * 名称 ≥132 + 市场 76 + 价格 84 + 涨跌 66 + 走势 72 + 操作 88
+ * + 5 × 8 gap + 左右 padding 24 → 606，不挤压主信息。
  */
 const TABLE_NAME_MIN = 132;
-const TABLE_GAP = 10;
+const TABLE_GAP = 8;
 const TABLE_PAD = 12;
 
 function tableQuote(item: WatchlistSymbol, quotes: Record<string, QuoteAvailability>) {
@@ -390,7 +366,7 @@ function tableQuote(item: WatchlistSymbol, quotes: Record<string, QuoteAvailabil
   return availability.status === "ready" ? availability.quote : item.quote;
 }
 
-/** 桌面六列表格：名称/代码 · 现价 · 涨跌额 · 涨跌幅 · 走势 · 操作。 */
+/** 桌面六列表格：名称/代码 · 市场/类型 · 最新价/净值 · 涨跌幅 · 近月走势 · 操作。 */
 function WatchTable({
   items,
   quotes,
@@ -406,7 +382,6 @@ function WatchTable({
 }) {
   const { t } = useTranslation();
   const rows = items.map((item) => ({ item, quote: tableQuote(item, quotes) }));
-  const showTrend = rows.some(({ quote }) => !!quote?.sparkline);
   const header = (label: string, style?: TextStyle) => (
     <Text style={[{ fontSize: 11, lineHeight: 17, color: colors.muted }, style]}>{label}</Text>
   );
@@ -421,19 +396,19 @@ function WatchTable({
       }}
     >
       <View style={[s.row, headerRow]}>
-        {header(t("markets.tableName"), { flex: 1.75, minWidth: TABLE_NAME_MIN })}
-        {header(t("markets.tablePrice"), { width: 88, textAlign: "right" })}
-        {header(t("markets.tableChange"), { width: 96, textAlign: "right" })}
-        {header(t("markets.tableChangePercent"), { width: 76, textAlign: "right" })}
-        {showTrend && header(t("markets.tableTrend"), { width: 90, textAlign: "center" })}
-        {header(t("markets.tableActions"), { width: 111, textAlign: "right" })}
+        {header(t("markets.tableName"), { flex: 1.7, minWidth: TABLE_NAME_MIN })}
+        {header(t("markets.tableMarketType"), { width: 76 })}
+        {header(t("markets.tableLatestValue"), { width: 84, textAlign: "right" })}
+        {header(t("markets.tableChangePercent"), { width: 66, textAlign: "right" })}
+        {header(t("markets.tableTrend"), { width: 72, textAlign: "center" })}
+        {header(t("markets.tableActions"), { width: 88, textAlign: "right" })}
       </View>
       {rows.map(({ item, quote }, index) => {
         const currency = quote?.currency ?? defaultCurrency(item.symbol.market);
-        const change = quote?.change;
         const changePercent = quote?.changePercent;
         const direction = directionOf(changePercent ?? 0);
         const color = changePercent === undefined ? colors.muted : marketDirectionColor(direction);
+        const labels = marketAndAssetLabel(item.symbol, t);
         return (
           <View
             key={item.symbol.code}
@@ -449,11 +424,18 @@ function WatchTable({
               onPress={() => onOpen(item)}
               style={({ pressed }) => [
                 s.row,
-                { flex: 1, minWidth: 0, gap: TABLE_GAP, paddingVertical: 14 },
+                { flex: 1.7, minWidth: TABLE_NAME_MIN, gap: 10, paddingVertical: 12 },
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <View style={{ flex: 1.75, minWidth: TABLE_NAME_MIN, gap: 2 }}>
+              <View style={[s.glyph, { width: 32, height: 36 }]}>
+                {item.symbol.market === "ETF" || item.symbol.market === "FUND" ? (
+                  <Shapes size={16} color={colors.primary} />
+                ) : (
+                  <Activity size={16} color={colors.muted} />
+                )}
+              </View>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                 <Text
                   numberOfLines={1}
                   style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
@@ -461,53 +443,68 @@ function WatchTable({
                   {item.symbol.name}
                 </Text>
                 <Text numberOfLines={1} style={{ fontSize: 11, color: colors.faint }}>
-                  {item.symbol.code} · {item.symbol.market}
+                  {item.symbol.code}
                 </Text>
               </View>
-              <Text
-                numberOfLines={1}
-                style={[
-                  s.metric,
-                  { width: 88, textAlign: "right", fontSize: 14, color: colors.text },
-                ]}
-              >
-                {quote ? formatPrice(quote.price, currency) : "—"}
-              </Text>
-              <Text
-                numberOfLines={1}
-                style={[s.metric, { width: 96, textAlign: "right", fontSize: 13, color }]}
-              >
-                {change === undefined
-                  ? "—"
-                  : `${change > 0 ? "+" : change < 0 ? "−" : ""}${currencySymbol(currency)}${Math.abs(change).toFixed(2)}`}
-              </Text>
-              <Text
-                numberOfLines={1}
-                style={[s.metric, { width: 76, textAlign: "right", fontSize: 13, color }]}
-              >
-                {changePercent === undefined ? "—" : formatPercent(changePercent)}
-              </Text>
-              {showTrend && (
-                <View style={{ width: 90, alignItems: "center" }}>
-                  <Sparkline points={quote?.sparkline} />
-                  {!quote?.sparkline && (
-                    <Text style={{ fontSize: 10, color: colors.faint }}>
-                      {t("markets.trendUnavailable")}
-                    </Text>
-                  )}
-                </View>
-              )}
             </Pressable>
-            <View style={[s.row, { width: 111, justifyContent: "flex-end", gap: 12 }]}>
-              <Pressable accessibilityRole="button" hitSlop={6} onPress={() => onAnalyze(item)}>
+            <View style={{ width: 76, gap: 2 }}>
+              <Text numberOfLines={1} style={{ fontSize: 11, color: colors.text }}>
+                {labels.market}
+              </Text>
+              <Text numberOfLines={1} style={{ fontSize: 10, color: colors.faint }}>
+                {labels.asset}
+              </Text>
+            </View>
+            <View style={{ width: 84, alignItems: "flex-end", gap: 2 }}>
+              <Text
+                numberOfLines={1}
+                style={[s.metric, { fontSize: 13, color: colors.text, textAlign: "right" }]}
+              >
+                {quote
+                  ? formatPrice(
+                      quote.price,
+                      currency,
+                      quote.precision ?? (item.symbol.market === "FUND" ? 4 : 2),
+                    )
+                  : "—"}
+              </Text>
+              <Text style={{ fontSize: 9, color: colors.faint }}>{quote ? currency : ""}</Text>
+            </View>
+            <Text
+              numberOfLines={1}
+              style={[s.metric, { width: 66, textAlign: "right", fontSize: 12, color }]}
+            >
+              {changePercent === undefined ? "—" : formatPercent(changePercent)}
+            </Text>
+            <View style={{ width: 72, alignItems: "center" }}>
+              <Sparkline points={quote?.sparkline} width={68} height={22} />
+              {!quote?.sparkline && (
+                <Text style={{ fontSize: 10, color: colors.faint }}>
+                  {t("markets.trendUnavailable")}
+                </Text>
+              )}
+            </View>
+            <View style={[s.row, { width: 88, justifyContent: "flex-end", gap: 8 }]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("markets.watchlistAnalyze")}
+                hitSlop={8}
+                onPress={() => onAnalyze(item)}
+                style={[s.row, { gap: 3, minHeight: 32 }]}
+              >
+                <Sparkles size={12} color={colors.link} />
                 <Text style={{ fontSize: 11, color: colors.link }}>
                   {t("markets.watchlistAnalyze")}
                 </Text>
               </Pressable>
-              <Pressable accessibilityRole="button" hitSlop={6} onPress={() => onRemove(item)}>
-                <Text style={{ fontSize: 11, color: colors.muted }}>
-                  {t("markets.watchlistRemove")}
-                </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("markets.watchlistRemove")}
+                hitSlop={8}
+                onPress={() => onRemove(item)}
+                style={{ width: 28, minHeight: 32, alignItems: "center", justifyContent: "center" }}
+              >
+                <Trash2 size={13} color={colors.faint} />
               </Pressable>
             </View>
           </View>
@@ -738,14 +735,190 @@ function SymbolSearch({
   );
 }
 
+/** 当前列表的即时筛选搜索；添加标的使用独立的弹窗搜索。 */
+function FilterSearch({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const { t } = useTranslation();
+  const [focused, setFocused] = useState(false);
+  return (
+    <View
+      style={[
+        s.row,
+        {
+          gap: 8,
+          borderWidth: 1,
+          borderColor: focused ? colors.primary : colors.line,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          minHeight: 44,
+          backgroundColor: colors.paper,
+          minWidth: 240,
+        },
+      ]}
+    >
+      <Search size={16} color={colors.faint} />
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={t("markets.watchlistSearchPlaceholder")}
+        placeholderTextColor={colors.faint}
+        accessibilityLabel={t("markets.watchlistSearchPlaceholder")}
+        style={[
+          { flex: 1, fontSize: 13, color: colors.text, paddingVertical: 8 },
+          Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null,
+        ]}
+      />
+      {value ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("ui.closeDetails")}
+          onPress={() => onChange("")}
+          style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }}
+        >
+          <X size={14} color={colors.faint} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** 添加自选弹窗：搜索、市场筛选、结果列表，始终添加到当前列表。 */
+function AddSymbolSheet({
+  api,
+  list,
+  onAdd,
+  onClose,
+}: {
+  api: LingWuApi;
+  list: Watchlist;
+  onAdd: (symbol: SymbolMeta) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<WatchlistFilter>("all");
+  const [results, setResults] = useState<SymbolMeta[]>(() => catalogSymbols());
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setResults(catalogSymbols());
+      return;
+    }
+    const timer = setTimeout(() => {
+      void searchSymbols(api, trimmed, 20).then((matches) => {
+        // 真实目录无结果时补上内置目录，保证基金和离线示例仍可添加。
+        const local = catalogSymbols().filter(
+          (item) =>
+            item.code.toLowerCase().includes(trimmed.toLowerCase()) ||
+            item.name.toLowerCase().includes(trimmed.toLowerCase()),
+        );
+        const merged = [...matches];
+        for (const item of local) {
+          if (!merged.some((match) => match.code === item.code)) merged.push(item);
+        }
+        setResults(merged);
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [api, query]);
+
+  const visible = results.filter((item) => matchesWatchFilter(item.market, filter));
+  const counts = MARKET_FILTERS.reduce<Record<WatchlistFilter, number>>(
+    (tally, item) => {
+      tally[item.id] = results.filter((symbol) =>
+        matchesWatchFilter(symbol.market, item.id),
+      ).length;
+      return tally;
+    },
+    { all: 0, CN: 0, HK: 0, US: 0, FUND: 0 },
+  );
+
+  return (
+    <Sheet
+      title={t("markets.watchlistAddTitle")}
+      subtitle={t("markets.watchlistAddTo", { name: list.name })}
+      onClose={onClose}
+    >
+      <View style={{ gap: 14 }}>
+        <FilterSearch value={query} onChange={setQuery} />
+        <SegmentedTabs counts={counts} active={filter} onChange={setFilter} />
+        <View style={{ gap: 0, borderWidth: 1, borderColor: colors.line, borderRadius: 10 }}>
+          {visible.length ? (
+            visible.map((symbol, index) => {
+              const added = list.symbols.some((item) => item.symbol.code === symbol.code);
+              const labels = marketAndAssetLabel(symbol, t);
+              return (
+                <View
+                  key={symbol.code}
+                  style={[
+                    s.row,
+                    {
+                      gap: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      borderTopWidth: index ? 1 : 0,
+                      borderTopColor: colors.line,
+                    },
+                  ]}
+                >
+                  <View style={[s.glyph, { width: 34, height: 36 }]}>
+                    {symbol.market === "ETF" || symbol.market === "FUND" ? (
+                      <Shapes size={16} color={colors.primary} />
+                    ) : (
+                      <Activity size={16} color={colors.muted} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
+                    >
+                      {symbol.name}
+                    </Text>
+                    <Text numberOfLines={1} style={{ fontSize: 11, color: colors.faint }}>
+                      {symbol.code} · {labels.market} · {labels.asset}
+                    </Text>
+                  </View>
+                  <Button
+                    small
+                    primary={!added}
+                    disabled={added}
+                    onPress={() => onAdd(symbol)}
+                    style={{ minHeight: 36 }}
+                  >
+                    {added ? t("markets.watchlistAdded") : t("markets.watchlistAdd")}
+                  </Button>
+                </View>
+              );
+            })
+          ) : (
+            <View style={{ alignItems: "center", gap: 6, padding: 28 }}>
+              <Search size={22} color={colors.faint} />
+              <Text style={[s.text, { fontWeight: "600" }]}>{t("markets.watchlistAddEmpty")}</Text>
+              <Text style={[s.small, { textAlign: "center" }]}>
+                {t("markets.watchlistAddEmptyDetail")}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Button primary onPress={onClose}>
+          {t("markets.watchlistAddDone")}
+        </Button>
+      </View>
+    </Sheet>
+  );
+}
+
 function SegmentedTabs({
   counts,
   active,
   onChange,
 }: {
-  counts: Record<string, number>;
-  active: string;
-  onChange: (id: string) => void;
+  counts: Record<WatchlistFilter, number>;
+  active: WatchlistFilter;
+  onChange: (id: WatchlistFilter) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -753,8 +926,7 @@ function SegmentedTabs({
       style={[
         s.row,
         {
-          gap: 8,
-          paddingBottom: 12,
+          gap: 24,
           borderBottomWidth: 1,
           borderBottomColor: colors.line,
           flexWrap: "wrap",
@@ -773,13 +945,11 @@ function SegmentedTabs({
             style={({ pressed }) => [
               s.row,
               {
-                gap: 5,
-                paddingHorizontal: 12,
+                gap: 6,
+                paddingHorizontal: 1,
                 minHeight: 44,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: selected ? colors.primary : colors.line,
-                backgroundColor: selected ? colors.sky : colors.surface,
+                borderBottomWidth: 2,
+                borderBottomColor: selected ? colors.primary : "transparent",
                 opacity: pressed ? 0.75 : 1,
               },
             ]}
@@ -788,12 +958,12 @@ function SegmentedTabs({
               style={{
                 fontSize: 12,
                 fontWeight: "600",
-                color: selected ? colors.primary : colors.muted,
+                color: selected ? colors.primaryStrong : colors.muted,
               }}
             >
               {t(filter.labelKey)}
             </Text>
-            <Text style={{ fontSize: 11, color: selected ? colors.primary : colors.faint }}>
+            <Text style={{ fontSize: 10, color: selected ? colors.primary : colors.faint }}>
               {count}
             </Text>
           </Pressable>
@@ -844,16 +1014,19 @@ function ConfirmDialog({
 
 /** 列表操作菜单（⋯）：编辑 / 删除。 */
 function ListMenu({
+  onNew,
   onEdit,
   onDelete,
   onClose,
 }: {
+  onNew: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const rows: Array<{ label: string; danger?: boolean; onPress: () => void }> = [
+    { label: t("markets.watchlistNew"), onPress: onNew },
     { label: t("markets.watchlistEditAction"), onPress: onEdit },
     { label: t("markets.watchlistDeleteAction"), danger: true, onPress: onDelete },
   ];
@@ -1005,10 +1178,9 @@ export function WatchlistScreen() {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const state = useWatchlistState();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SymbolMeta[]>([]);
-  const [marketFilter, setMarketFilter] = useState<string>("all");
-  const [sheet, setSheet] = useState<"create" | "edit" | null>(null);
+  const [filterQuery, setFilterQuery] = useState("");
+  const [marketFilter, setMarketFilter] = useState<WatchlistFilter>("all");
+  const [sheet, setSheet] = useState<"create" | "edit" | "add" | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [menuFor, setMenuFor] = useState<WatchlistSymbol | null>(null);
@@ -1023,18 +1195,6 @@ export function WatchlistScreen() {
     const timer = setInterval(() => refreshWatchlists(api, locale), 60_000);
     return () => clearInterval(timer);
   }, [api, locale]);
-
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      setResults([]);
-      return;
-    }
-    const timer = setTimeout(() => {
-      void searchSymbols(api, trimmed).then(setResults);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [query]);
 
   const list = activeWatchlist();
   const quoteSymbols = useMemo(
@@ -1084,22 +1244,36 @@ export function WatchlistScreen() {
 
   const counts = useMemo(() => {
     const symbols = list?.symbols ?? [];
-    const tally: Record<string, number> = { all: symbols.length, US: 0, CN: 0, HK: 0, ETF: 0 };
-    for (const item of symbols) tally[item.symbol.market] = (tally[item.symbol.market] ?? 0) + 1;
+    const tally: Record<WatchlistFilter, number> = {
+      all: symbols.length,
+      US: 0,
+      CN: 0,
+      HK: 0,
+      FUND: 0,
+    };
+    for (const item of symbols) {
+      const market = item.symbol.market;
+      if (market === "US" || market === "CN" || market === "HK") tally[market] += 1;
+      if (market === "ETF" || market === "FUND") tally.FUND += 1;
+    }
     return tally;
   }, [list]);
 
   const visibleSymbols = useMemo(() => {
     const symbols = list?.symbols ?? [];
-    return marketFilter === "all"
-      ? symbols
-      : symbols.filter((item) => item.symbol.market === marketFilter);
-  }, [list, marketFilter]);
+    const needle = filterQuery.trim().toLowerCase();
+    return symbols.filter(
+      (item) =>
+        matchesWatchFilter(item.symbol.market, marketFilter) &&
+        (!needle ||
+          item.symbol.name.toLowerCase().includes(needle) ||
+          item.symbol.code.toLowerCase().includes(needle)),
+    );
+  }, [filterQuery, list, marketFilter]);
 
   if (state.status === "loading" && !state.lists.length) {
     return (
       <View style={{ gap: 12 }}>
-        <PortfolioLinkCard />
         {[0, 1, 2, 3, 4].map((index) => (
           <SkeletonCard key={index} shimmer={shimmer} />
         ))}
@@ -1110,7 +1284,6 @@ export function WatchlistScreen() {
   if (!state.lists.length) {
     return (
       <View style={{ gap: 16 }}>
-        <PortfolioLinkCard />
         <ErrorNotice error={state.degraded ? t("markets.watchlistLoadError") : undefined} />
         <Empty
           icon={Target}
@@ -1138,7 +1311,7 @@ export function WatchlistScreen() {
 
   return (
     <View style={{ gap: 16 }}>
-      {/* 列表切换 + 新建 + 更多 */}
+      {/* 列表切换 + 添加 + 更多 */}
       <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
         <View style={[s.row, { gap: 8, flex: 1, flexWrap: "wrap" }]}>
           {state.lists.map((item) => {
@@ -1179,14 +1352,8 @@ export function WatchlistScreen() {
             );
           })}
         </View>
-        <Button
-          small
-          primary
-          icon={Plus}
-          style={{ minHeight: 44 }}
-          onPress={() => setSheet("create")}
-        >
-          {t("markets.watchlistNew")}
+        <Button small primary icon={Plus} style={{ minHeight: 44 }} onPress={() => setSheet("add")}>
+          {t("markets.watchlistAddAction")}
         </Button>
         <IconButton
           icon={MoreHorizontal}
@@ -1195,32 +1362,47 @@ export function WatchlistScreen() {
         />
       </View>
 
-      <PortfolioLinkCard />
+      <View style={[s.between, { gap: 12, flexWrap: "wrap" }]}>
+        <Text style={s.small}>
+          {t("markets.watchlistCaptionedCount", { count: list?.symbols.length ?? 0 })}
+        </Text>
+        <View style={[s.row, { gap: 6 }]}>
+          {state.source === "mock" ? (
+            <View style={[s.chip, { paddingVertical: 2 }]}>
+              <Text style={s.chipText}>{t("markets.watchlistSample")}</Text>
+            </View>
+          ) : null}
+          <Text style={s.small}>
+            {t(
+              state.source === "mock"
+                ? "markets.watchlistSampleCaption"
+                : "markets.watchlistLiveCaption",
+            )}
+          </Text>
+        </View>
+      </View>
+
+      <View
+        style={{
+          flexDirection: width >= 760 ? "row" : "column",
+          alignItems: width >= 760 ? "flex-end" : "stretch",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <SegmentedTabs counts={counts} active={marketFilter} onChange={setMarketFilter} />
+        </View>
+        <View style={{ width: width >= 760 ? 280 : "100%", paddingBottom: 12 }}>
+          <FilterSearch value={filterQuery} onChange={setFilterQuery} />
+        </View>
+      </View>
 
       {state.status === "ready" && state.source === "mock" && (
         <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>
-          <View style={[s.chip, { backgroundColor: colors.surface }]}>
-            <Text style={s.chipText}>{t("markets.watchlistSample")}</Text>
-          </View>
           <Text style={[s.small, { flexShrink: 1 }]}>{t("markets.watchlistSampleHint")}</Text>
         </View>
       )}
-
-      <SymbolSearch
-        value={query}
-        onChange={setQuery}
-        results={results}
-        placeholder={t("markets.watchlistSearchPlaceholder")}
-        emptyLabel={t("markets.watchlistSearchEmpty")}
-        hint={t("markets.watchlistSearchHint")}
-        isAdded={(code) => !!list?.symbols.some((item) => item.symbol.code === code)}
-        onAdd={(symbol) => {
-          if (list) addSymbols(api, list.id, [symbol]);
-          setQuery("");
-        }}
-      />
-
-      <SegmentedTabs counts={counts} active={marketFilter} onChange={setMarketFilter} />
 
       {!!state.degraded && (
         <View style={{ gap: 8 }}>
@@ -1264,28 +1446,51 @@ export function WatchlistScreen() {
             ))}
           </View>
         )
+      ) : list?.symbols.length ? (
+        <Empty
+          icon={Search}
+          title={t("markets.watchlistFilterEmptyTitle")}
+          detail={t("markets.watchlistFilterEmptyDetail")}
+        >
+          <Button icon={Plus} onPress={() => setSheet("add")}>
+            {t("markets.watchlistAddAction")}
+          </Button>
+        </Empty>
       ) : (
         <Empty
           icon={CircleDollarSign}
           title={t("markets.watchlistEmptyListTitle")}
           detail={t("markets.watchlistEmptyListDetail")}
         >
-          <Button icon={Search} onPress={() => setSheet("edit")}>
+          <Button icon={Plus} onPress={() => setSheet("add")}>
             {t("markets.watchlistAddSymbol")}
           </Button>
         </Empty>
       )}
 
-      <View style={[s.row, { gap: 6, justifyContent: "flex-end" }]}>
-        <RefreshCw size={11} color={colors.faint} />
-        <Text style={s.small}>
-          {t("markets.watchlistUpdated", {
-            time: new Date(list?.updatedAt ?? new Date().toISOString()).toLocaleTimeString(
-              activeLocaleTag(),
-              { hour: "numeric", minute: "2-digit" },
-            ),
-          })}
-        </Text>
+      <View
+        style={{
+          flexDirection: width >= 720 ? "row" : "column",
+          alignItems: width >= 720 ? "center" : "flex-start",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <View style={[s.row, { gap: 6, flexShrink: 1 }]}>
+          <ShieldCheck size={12} color={colors.faint} />
+          <Text style={[s.small, { flexShrink: 1 }]}>{t("markets.watchlistSaved")}</Text>
+        </View>
+        <View style={[s.row, { gap: 6 }]}>
+          <RefreshCw size={11} color={colors.faint} />
+          <Text style={s.small}>
+            {t("markets.watchlistUpdated", {
+              time: new Date(list?.updatedAt ?? new Date().toISOString()).toLocaleTimeString(
+                activeLocaleTag(),
+                { hour: "numeric", minute: "2-digit" },
+              ),
+            })}
+          </Text>
+        </View>
       </View>
       <DisclaimerNote style={{ marginTop: 0, textAlign: "right" }} />
 
@@ -1298,6 +1503,14 @@ export function WatchlistScreen() {
             createWatchlist(api, { name, symbols });
             setSheet(null);
           }}
+        />
+      )}
+      {sheet === "add" && list && (
+        <AddSymbolSheet
+          api={api}
+          list={list}
+          onAdd={(symbol) => addSymbols(api, list.id, [symbol])}
+          onClose={() => setSheet(null)}
         />
       )}
       {sheet === "edit" && list && (
@@ -1323,6 +1536,7 @@ export function WatchlistScreen() {
       )}
       {menuOpen && list && (
         <ListMenu
+          onNew={() => setSheet("create")}
           onClose={() => setMenuOpen(false)}
           onEdit={() => setSheet("edit")}
           onDelete={() => setConfirmDelete(true)}

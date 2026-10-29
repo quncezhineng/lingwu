@@ -37,7 +37,6 @@ import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
 import { Bell, Menu, Search } from "./src/icons";
 import { PageHeader } from "./src/page-header";
-import { PortfolioScreen } from "./src/portfolio-screen";
 import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
 import { GlobalSearchSheet } from "./src/search-sheet";
@@ -61,7 +60,7 @@ import {
   space,
   typography,
 } from "./src/ui";
-import { WatchlistScreen } from "./src/watchlist";
+import { WatchlistHubScreen } from "./src/watchlist-hub";
 import { WorkbenchScreen } from "./src/workbench";
 import { type Detail, useWorkspace, WorkspaceContext } from "./src/workspace";
 
@@ -293,7 +292,11 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   const [detail, setDetail] = useState<Detail>();
   const [toast, setToast] = useState<ToastState>();
   const [error, setError] = useState("");
-  const [prompt, setPrompt] = useState<{ id: number; text: string }>();
+  const [prompt, setPrompt] = useState<{
+    id: number;
+    text: string;
+    attachmentIds?: readonly string[];
+  }>();
   const refresh = useCallback(async () => {
     const [snapshot, account] = await Promise.all([
       api.request<Workspace>("/api/workspace"),
@@ -348,8 +351,8 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
     void api.request("/api/auth/signout", {}).catch(() => undefined);
     onSignOut();
   }, [api, onSignOut]);
-  const ask = useCallback((text: string) => {
-    setPrompt({ id: Date.now(), text });
+  const ask = useCallback((text: string, attachmentIds?: readonly string[]) => {
+    setPrompt({ id: Date.now(), text, attachmentIds });
     setSection("chat");
   }, []);
   if (!workspace)
@@ -411,7 +414,7 @@ function WorkspaceShell({
   toast?: ToastState;
   clearToast: () => void;
   error: string;
-  prompt?: { id: number; text: string };
+  prompt?: { id: number; text: string; attachmentIds?: readonly string[] };
   onSignOut: () => void;
 }) {
   const { workspace, section, navigate, open, close } = useWorkspace();
@@ -487,25 +490,23 @@ function WorkspaceShell({
   const Screen =
     section === "today"
       ? WorkbenchScreen
-      : section === "watchlist"
-        ? WatchlistScreen
-        : section === "portfolio"
-          ? PortfolioScreen
-          : section === "mail"
-            ? MailScreen
-            : section === "calendar"
-              ? CalendarScreen
-              : section === "browser"
-                ? BrowserScreen
-                : section === "activity"
-                  ? AgentActivityScreen
-                  : section === "ideas"
-                    ? IdeasScreen
-                    : section === "goals"
-                      ? GoalsScreen
-                      : section === "preferences"
-                        ? PreferencesScreen
-                        : CapabilityHubScreen;
+      : section === "watchlist" || section === "portfolio"
+        ? WatchlistHubScreen
+        : section === "mail"
+          ? MailScreen
+          : section === "calendar"
+            ? CalendarScreen
+            : section === "browser"
+              ? BrowserScreen
+              : section === "activity"
+                ? AgentActivityScreen
+                : section === "ideas"
+                  ? IdeasScreen
+                  : section === "goals"
+                    ? GoalsScreen
+                    : section === "preferences"
+                      ? PreferencesScreen
+                      : CapabilityHubScreen;
   return (
     <>
       <WorkspaceTools />
@@ -626,9 +627,9 @@ function WorkspaceShell({
                     <Text style={{ fontSize: 12, color: colors.lineStrong }}>/</Text>
                     <Text style={{ fontSize: 12, color: colors.muted }}>
                       {section === "chat"
-                        ? t("app.newAnalysis")
-                        : section === "portfolio"
-                          ? `${t("app.navPreferences")} / ${t("app.titlePortfolio")}`
+                        ? t("app.navChat")
+                        : section === "watchlist" || section === "portfolio"
+                          ? t("app.navWatchlist")
                           : section === "notes"
                             ? `${t("app.navFiles")} / ${t("app.titleNotes")}`
                             : title
@@ -688,22 +689,6 @@ function WorkspaceShell({
                           title={title ? t(title.titleKey) : ""}
                           description={title ? t(title.subtitleKey) : undefined}
                           compact={!desktop}
-                          actions={
-                            section === "portfolio" ? (
-                              <Button
-                                small
-                                onPress={() =>
-                                  navigate(section === "portfolio" ? "preferences" : "files")
-                                }
-                              >
-                                {t(
-                                  section === "portfolio"
-                                    ? "preferences.backToPreferences"
-                                    : "app.backToFiles",
-                                )}
-                              </Button>
-                            ) : undefined
-                          }
                         />
                       )}
                     <ErrorNotice error={error} />
@@ -777,7 +762,9 @@ function WorkspaceShell({
                   >
                     {nav.map((item) => {
                       const active =
-                        section === item.id || (item.id === "activity" && section === "ideas");
+                        section === item.id ||
+                        (item.id === "watchlist" && section === "portfolio") ||
+                        (item.id === "activity" && section === "ideas");
                       return (
                         <Pressable
                           key={item.id}

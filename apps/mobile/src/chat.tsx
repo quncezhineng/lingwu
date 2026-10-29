@@ -33,7 +33,7 @@ import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { BackgroundUpdates } from "./background-updates";
 import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
-import { displayUserMessage } from "./chat-content";
+import { displayUserMessage, promptWithAttachments } from "./chat-content";
 import { BrowserThreadCard } from "./computer";
 import { ConversationHeader, type ConversationHeaderState } from "./conversation-header";
 import { ConversationQueue, type QueuedMessage } from "./conversation-queue";
@@ -46,6 +46,8 @@ import {
 } from "./conversation-run";
 import { type ConversationDraft, useConversationStream, verifyDrafts } from "./conversation-stream";
 import { DesktopToolCard } from "./desktop-tool-card";
+import { ComposerAttachments, FilePickerSheet } from "./file-picker";
+import { pickAndUploadFile } from "./file-upload";
 import { type TranslationKey, useTranslation } from "./i18n";
 import { localizeAgentName, statusLabel } from "./i18n/translate";
 import { ArrowDown, FileText, FolderOpen, Lightbulb, RotateCcw, Upload, X } from "./icons";
@@ -63,7 +65,7 @@ import { breakpoints } from "./theme";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
 import { type Selection, useLingWuThread } from "./threads";
 import { parseToolArguments, ToolStep, type ToolStepStatus } from "./tool-step";
-import { Button, Card, CheckRow, colors, dateLabel, Empty, ErrorNotice, s, shadow } from "./ui";
+import { Button, Card, colors, dateLabel, Empty, ErrorNotice, s, shadow } from "./ui";
 import { useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
@@ -410,11 +412,11 @@ export function ChatScreen({
   thread,
   active = true,
 }: {
-  prompt?: { id: number; text: string };
+  prompt?: { id: number; text: string; attachmentIds?: readonly string[] };
   thread?: Selection;
   active?: boolean;
 }) {
-  const { api, workspace: w, refresh, navigate, open } = useWorkspace();
+  const { api, workspace: w, refresh, navigate, open, notify } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
   // 宽屏（>= breakpoints.desktop，与 App 外壳的 desktop 判断一致）时文件产物面板停靠为右侧栏；
   // 窄屏回退为覆盖式弹层，避免把对话列压缩到无法阅读。
@@ -455,6 +457,8 @@ export function ChatScreen({
   // Replayed messages show before connectAgent returns; new turns wait until it does.
   const [syncing, setSyncing] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [pickerSelection, setPickerSelection] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
   // 对话页顶部「文件产物」按钮控制的右边栏是否展开。
   const [filesOpen, setFilesOpen] = useState(false);
@@ -671,9 +675,11 @@ export function ChatScreen({
     if (!busy && !agent.isRunning && outbox.pending.length) flush();
   }, [busy, agent.isRunning, outbox.pending.length, flush]);
   useEffect(() => {
-    if (active && prompt && isReady && loaded && claimPrompt(prompt.id) && prompt.text.trim())
-      enqueue(prompt.text);
-  }, [active, prompt, isReady, loaded, enqueue, claimPrompt]);
+    if (!active || !prompt || !isReady || !loaded || !claimPrompt(prompt.id) || !prompt.text.trim())
+      return;
+    const files = w.files.filter((file) => prompt.attachmentIds?.includes(file.id));
+    enqueue(promptWithAttachments(prompt.text, files));
+  }, [active, prompt, isReady, loaded, enqueue, claimPrompt, w.files]);
   useEffect(() => {
     const subscription = copilotkit.subscribe({
       onError: (event) => {
@@ -697,6 +703,31 @@ export function ChatScreen({
       if (!draft.trim() && lastSent.current) setDraft(lastSent.current);
     }
   }
+  async function uploadMaterial() {
+    if (uploading) return;
+    setUploading(true);
+    try {
+      const file = await pickAndUploadFile(api);
+      if (!file) return;
+      await refresh();
+      setAttachments((ids) => (ids.includes(file.id) ? ids : [...ids, file.id]));
+      setPickerSelection((ids) => (ids.includes(file.id) ? ids : [...ids, file.id]));
+      setPicking(false);
+      notify(t("chat.uploadMaterialDone", { name: file.name }));
+    } catch (e) {
+      notify(
+        t("chat.uploadMaterialFailed", {
+          detail: e instanceof Error ? e.message : String(e),
+        }),
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+  function openFilePicker() {
+    setPickerSelection(attachments);
+    setPicking(true);
+  }
   function send() {
     const text = draft.trim();
     if (!text || !isReady || !loaded) return;
@@ -706,12 +737,7 @@ export function ChatScreen({
     setShowResults(false);
     lastSent.current = text;
     const files = w.files.filter((f) => attachments.includes(f.id));
-    enqueue(
-      text +
-        (files.length
-          ? `\n\nAttached documents: ${files.map((f) => `${f.name} (artifact ID: ${f.id})`).join(", ")}`
-          : ""),
-    );
+    enqueue(promptWithAttachments(text, files));
     setDraft("");
     setAttachments([]);
     setPicking(false);
@@ -1431,38 +1457,6 @@ export function ChatScreen({
               )}
             </View>
           )}
-          {picking && (
-            <Card style={{ marginBottom: 12, padding: 16 }}>
-              <Text style={s.heading}>{t("chat.addDocument")}</Text>
-              <ScrollView style={{ maxHeight: 230 }} keyboardShouldPersistTaps="handled">
-                {w.files.length ? (
-                  w.files.map((f) => (
-                    <CheckRow
-                      key={f.id}
-                      checked={attachments.includes(f.id)}
-                      label={f.name}
-                      onPress={() =>
-                        setAttachments(
-                          attachments.includes(f.id)
-                            ? attachments.filter((id) => id !== f.id)
-                            : [...attachments, f.id],
-                        )
-                      }
-                    />
-                  ))
-                ) : (
-                  <Text style={s.muted}>{t("chat.importPdfHint")}</Text>
-                )}
-              </ScrollView>
-              <Button
-                small
-                onPress={() => setPicking(false)}
-                style={{ alignSelf: "flex-end", marginTop: 8 }}
-              >
-                {t("chat.done")}
-              </Button>
-            </Card>
-          )}
           <PromptComposer
             inputRef={composerInput}
             value={draft}
@@ -1485,54 +1479,26 @@ export function ChatScreen({
               {
                 key: "attach",
                 icon: Upload,
-                label: t("chat.attachDocument"),
-                active: picking,
-                onPress: () => setPicking(!picking),
+                label: t("chat.uploadMaterial"),
+                active: uploading,
+                onPress: () => void uploadMaterial(),
               },
               {
                 key: "files",
                 icon: FolderOpen,
-                label: t("app.navFiles"),
-                onPress: () => navigate("files"),
+                label: t("chat.filePickerTool"),
+                active: picking,
+                onPress: openFilePicker,
               },
             ]}
             attachments={
-              attachments.length > 0 ? (
-                <View style={[s.row, { gap: 6, flexWrap: "wrap", padding: 4, paddingBottom: 8 }]}>
-                  {w.files
-                    .filter((f) => attachments.includes(f.id))
-                    .map((f) => (
-                      <Pressable
-                        key={f.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={t("chat.removeAttachment", { name: f.name })}
-                        onPress={() => setAttachments((ids) => ids.filter((id) => id !== f.id))}
-                        style={({ pressed }) => [
-                          s.row,
-                          {
-                            gap: 7,
-                            maxWidth: "100%",
-                            backgroundColor: pressed ? colors.overlay1 : colors.surface,
-                            borderWidth: 1,
-                            borderColor: colors.line,
-                            borderRadius: 10,
-                            paddingHorizontal: 10,
-                            paddingVertical: 7,
-                          },
-                        ]}
-                      >
-                        <FileText size={14} color={colors.primary} />
-                        <Text
-                          numberOfLines={1}
-                          style={{ flexShrink: 1, fontSize: 12, color: colors.text }}
-                        >
-                          {f.name}
-                        </Text>
-                        <X size={13} color={colors.muted} />
-                      </Pressable>
-                    ))}
-                </View>
-              ) : undefined
+              <ComposerAttachments
+                files={w.files}
+                selectedIds={attachments}
+                onRemove={(id) =>
+                  setAttachments((ids) => ids.filter((candidate) => candidate !== id))
+                }
+              />
             }
             assistantLabel={t("app.agentSettingsLabel", {
               name: localizeAgentName(agentWorkspace?.identity.name),
@@ -1546,6 +1512,28 @@ export function ChatScreen({
           />
         </KeyboardAvoidingView>
       </View>
+      {picking && (
+        <FilePickerSheet
+          files={w.files}
+          selectedIds={pickerSelection}
+          onToggle={(id) =>
+            setPickerSelection((ids) =>
+              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+            )
+          }
+          onConfirm={() => {
+            setAttachments(pickerSelection);
+            setDraft((current) => (current.trim() ? current : t("chat.filePickerDefaultPrompt")));
+            setPicking(false);
+          }}
+          onClose={() => setPicking(false)}
+          onUpload={uploadMaterial}
+          onBrowse={() => {
+            setPicking(false);
+            navigate("files");
+          }}
+        />
+      )}
       {filesOpen && (
         <ThreadArtifactsPanel
           mode={wide ? "docked" : "overlay"}

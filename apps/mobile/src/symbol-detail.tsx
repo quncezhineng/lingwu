@@ -82,6 +82,7 @@ const _MARKET_CHIP: Record<SymbolMeta["market"], TranslationKey> = {
   CN: "markets.marketCN",
   HK: "markets.marketHK",
   ETF: "markets.marketETF",
+  FUND: "markets.marketFund",
 };
 
 const REASON_KEYS: Record<string, TranslationKey> = {

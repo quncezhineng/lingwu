@@ -310,7 +310,7 @@ export function Rail({ name }: { name: string }) {
               label={t(item.labelKey)}
               active={
                 section === item.id ||
-                (item.id === "preferences" && section === "portfolio") ||
+                (item.id === "watchlist" && section === "portfolio") ||
                 (item.id === "files" && section === "notes")
               }
               badge={item.id === "activity" && activeCount ? activeCount : undefined}

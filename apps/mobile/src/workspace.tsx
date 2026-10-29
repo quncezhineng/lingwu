@@ -43,7 +43,7 @@ export interface WorkspaceContextValue {
   open: (detail: Detail) => void;
   close: () => void;
   notify: (message: string, action?: { label: string; onPress: () => void }) => void;
-  ask: (prompt: string) => void;
+  ask: (prompt: string, attachmentIds?: readonly string[]) => void;
 }
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 export function useWorkspace() {

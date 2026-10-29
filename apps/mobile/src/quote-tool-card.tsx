@@ -33,7 +33,8 @@ export function QuoteToolCard({ result, loading }: { result: unknown; loading: b
           item.market === "US" ||
           item.market === "CN" ||
           item.market === "HK" ||
-          item.market === "ETF"
+          item.market === "ETF" ||
+          item.market === "FUND"
             ? item.market
             : meta.market;
         return (

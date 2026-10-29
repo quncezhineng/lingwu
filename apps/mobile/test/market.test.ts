@@ -57,6 +57,14 @@ test("观察列表响应：代码数组解析为带名称的标的，未取价�
   assert.equal(list?.symbols[0]?.quote, undefined);
 });
 
+test("观察列表响应：基金代码按内置目录归入基金分组", () => {
+  const lists = parseWatchlists({
+    watchlists: [{ id: "wl-fund", name: "基金观察", symbols: ["005827"] }],
+  });
+  assert.equal(lists?.[0]?.symbols[0]?.symbol.name, "易方达蓝筹精选混合");
+  assert.equal(lists?.[0]?.symbols[0]?.symbol.market, "FUND");
+});
+
 test("观察列表响应结构不符时返回 undefined（触发 mock 兜底）", () => {
   assert.equal(parseWatchlists({ nope: true }), undefined);
   assert.equal(parseWatchlists(null), undefined);
@@ -253,6 +261,14 @@ test("标的搜索：优先真实接口，type=ETF 归入 ETF 分组", async () 
     ["AAPL", "AAPU"],
   );
   assert.equal(matches[1]?.market, "ETF");
+});
+
+test("标的搜索：type=FUND 归入基金分组", async () => {
+  const api = fakeApi(() => ({
+    matches: [{ symbol: "005827", name: "易方达蓝筹精选混合", type: "FUND" }],
+  }));
+  const matches = await searchSymbols(api, "005827");
+  assert.equal(matches[0]?.market, "FUND");
 });
 
 test("标的搜索：接口失败时回落到内置目录", async () => {

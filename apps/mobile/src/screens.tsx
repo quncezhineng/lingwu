@@ -1,30 +1,22 @@
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   Linking,
-  Platform,
   Pressable,
   Text,
   TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
-import type {
-  Artifact,
-  BrowserSession,
-  CalendarEvent,
-  EmailDraft,
-} from "../../../packages/domain/src";
+import type { BrowserSession, CalendarEvent, EmailDraft } from "../../../packages/domain/src";
 import { useAgentWorkspace } from "./agent-workspace";
-import { API_URL } from "./api";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
 import { fileKind } from "./file-kind";
 import { buildFileLibrary, fileSourceLabel } from "./file-library";
+import { pickAndUploadFile } from "./file-upload";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel } from "./i18n/translate";
 import {
@@ -1070,33 +1062,8 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
     setError("");
     setBusy(true);
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "text/html"],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled) return;
-      const file = result.assets[0];
-      let artifact: Artifact;
-      if (Platform.OS === "web") {
-        const form = new FormData();
-        if (!file.file)
-          throw new Error("The selected file could not be read. Please choose it again.");
-        form.append("file", file.file, file.name);
-        artifact = await api.request<Artifact>("/api/files", form);
-      } else {
-        const result = await FileSystem.uploadAsync(`${API_URL}/api/files`, file.uri, {
-          httpMethod: "POST",
-          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-          fieldName: "file",
-          mimeType:
-            file.mimeType || (/\.html?$/i.test(file.name) ? "text/html" : "application/pdf"),
-          headers: { Authorization: `Bearer ${api.token}` },
-        });
-        const payload = JSON.parse(result.body);
-        if (result.status < 200 || result.status >= 300)
-          throw new Error(payload.error || "Could not import this file.");
-        artifact = payload;
-      }
+      const artifact = await pickAndUploadFile(api);
+      if (!artifact) return;
       await refresh();
       open({ type: "file", file: artifact });
     } catch (e) {

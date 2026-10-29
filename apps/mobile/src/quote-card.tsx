@@ -40,8 +40,8 @@ function errorLabel(reason: QuoteError | undefined, t: (key: TranslationKey) => 
   return reason ? t(ERROR_KEYS[reason]) : t("quotes.unavailable");
 }
 
-function formatPriceSmart(value: number, currency: string) {
-  const digits = value < 1 ? 4 : 2;
+function formatPriceSmart(value: number, currency: string, precision?: number) {
+  const digits = precision ?? (value < 1 ? 4 : 2);
   const text = new Intl.NumberFormat(undefined, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
@@ -100,7 +100,7 @@ export function QuoteCard({
   narrow,
   style,
 }: {
-  symbol: { code: string; name: string; market: "US" | "CN" | "HK" | "ETF" };
+  symbol: { code: string; name: string; market: "US" | "CN" | "HK" | "ETF" | "FUND" };
   availability: QuoteAvailability;
   size: "compact" | "standard";
   onPress?: () => void;
@@ -129,8 +129,12 @@ export function QuoteCard({
   const currency =
     availability.status === "ready"
       ? (availability.quote.currency ??
-        (symbol.market === "CN" ? "CNY" : symbol.market === "HK" ? "HKD" : "USD"))
-      : symbol.market === "CN"
+        (symbol.market === "CN" || symbol.market === "FUND"
+          ? "CNY"
+          : symbol.market === "HK"
+            ? "HKD"
+            : "USD"))
+      : symbol.market === "CN" || symbol.market === "FUND"
         ? "CNY"
         : symbol.market === "HK"
           ? "HKD"
@@ -230,7 +234,7 @@ export function QuoteCard({
     const dayDirection = directionOf(quote.changePercent ?? 0);
     const dayColor = marketDirectionColor(dayDirection);
     const arrow = dayDirection === "up" ? "▲" : dayDirection === "down" ? "▼" : "—";
-    const priceText = formatPriceSmart(quote.price, currency);
+    const priceText = formatPriceSmart(quote.price, currency, quote.precision);
     const changeText =
       quote.change === undefined
         ? undefined

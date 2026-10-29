@@ -18,7 +18,7 @@
 import { useSyncExternalStore } from "react";
 import type { LingWuApi } from "./api";
 
-export type MarketKind = "US" | "CN" | "HK" | "ETF";
+export type MarketKind = "US" | "CN" | "HK" | "ETF" | "FUND";
 
 export interface SymbolMeta {
   code: string;
@@ -37,6 +37,8 @@ export interface Quote {
   stale?: boolean;
   /** 近 12 个采样点的迷你走势；缺省表示无数据，前端不合成。 */
   sparkline?: number[];
+  /** 基金净值需要更高精度；普通证券默认两位小数。 */
+  precision?: number;
 }
 
 export type AlertKind = "price_break" | "change_threshold" | "volume_spike" | "news";
@@ -127,6 +129,7 @@ const CATALOG: SymbolMeta[] = [
   { code: "SPY", name: "SPDR S&P 500 ETF", market: "ETF" },
   { code: "QQQ", name: "Invesco QQQ Trust", market: "ETF" },
   { code: "510300.SS", name: "沪深300ETF", market: "ETF" },
+  { code: "005827", name: "易方达蓝筹精选混合", market: "FUND" },
 ];
 
 const SEED_QUOTES: Record<string, Quote> = {
@@ -228,6 +231,14 @@ const SEED_QUOTES: Record<string, Quote> = {
     weekChangePercent: 1.12,
     volumeRatio: 1.25,
   },
+  "005827": {
+    price: 2.3412,
+    change: -0.0082,
+    changePercent: -0.35,
+    weekChangePercent: -0.92,
+    volumeRatio: 0.7,
+    precision: 4,
+  },
 };
 
 const SEED_ALERTS: Record<string, SymbolAlert[]> = {
@@ -268,7 +279,12 @@ function hashSeed(code: string) {
 
 function syntheticQuote(symbol: SymbolMeta): Quote {
   const seed = hashSeed(symbol.code);
-  const price = Number((20 + (seed % 48000) / 100).toFixed(2));
+  const precision = symbol.market === "FUND" ? 4 : 2;
+  const price = Number(
+    (symbol.market === "FUND" ? 0.8 + (seed % 500) / 100 : 20 + (seed % 48000) / 100).toFixed(
+      precision,
+    ),
+  );
   const changePercent = Number((((seed % 900) - 400) / 100).toFixed(2));
   return {
     price,
@@ -276,6 +292,7 @@ function syntheticQuote(symbol: SymbolMeta): Quote {
     changePercent,
     weekChangePercent: Number((changePercent * 1.7).toFixed(2)),
     volumeRatio: Number((0.7 + (seed % 220) / 100).toFixed(1)),
+    ...(precision === 4 ? { precision } : {}),
   };
 }
 
@@ -305,6 +322,11 @@ function guessMarket(code: string): MarketKind {
   return "US";
 }
 
+/** 内置标的目录：用于添加自选的初始列表和离线搜索。 */
+export function catalogSymbols(limit = 40): SymbolMeta[] {
+  return CATALOG.slice(0, limit).map((item) => ({ ...item }));
+}
+
 export function todayISO(): string {
   const now = new Date();
   return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}-${`${now.getDate()}`.padStart(2, "0")}`;
@@ -320,7 +342,7 @@ function mockWatchlists(locale: string): Watchlist[] {
     const symbol = catalogEntry(code);
     return symbol ? { symbol, quote: quoteFor(symbol), alerts: alertsFor(code) } : undefined;
   };
-  const first = ["AAPL", "600519.SS", "TSLA", "NVDA"]
+  const first = ["AAPL", "600519.SS", "TSLA", "NVDA", "005827"]
     .map(build)
     .filter(Boolean) as WatchlistSymbol[];
   const second = ["SPY", "QQQ", "510300.SS"].map(build).filter(Boolean) as WatchlistSymbol[];
@@ -667,7 +689,7 @@ export function addSymbols(api: LingWuApi, id: string, symbols: SymbolMeta[]) {
         .request(`/api/watchlists/${encodeURIComponent(id)}/symbols`, {
           code: symbol.code,
           name: symbol.name,
-          ...(symbol.market === "ETF" ? {} : { market: symbol.market }),
+          ...(symbol.market === "ETF" || symbol.market === "FUND" ? {} : { market: symbol.market }),
         })
         .then(() => loadSummary(api, id))
         .catch(() => undefined);
@@ -847,7 +869,7 @@ function str(value: unknown): string | undefined {
 }
 
 function marketOf(value: unknown, code: string): MarketKind {
-  if (value === "US" || value === "CN" || value === "HK") return value;
+  if (value === "US" || value === "CN" || value === "HK" || value === "FUND") return value;
   const known = catalogEntry(code);
   return known?.market ?? guessMarket(code);
 }
@@ -859,7 +881,11 @@ function parseSymbolMatch(value: unknown): SymbolMeta | undefined {
   const known = catalogEntry(code);
   const type = (str(value.type) ?? "").toUpperCase();
   const market: MarketKind =
-    type === "ETF" || known?.market === "ETF" ? "ETF" : marketOf(value.market, code);
+    type === "ETF" || known?.market === "ETF"
+      ? "ETF"
+      : type === "FUND" || known?.market === "FUND"
+        ? "FUND"
+        : marketOf(value.market, code);
   return {
     code: normalizeCode(code),
     name: str(value.name) ?? str(value.longname) ?? known?.name ?? code,
@@ -956,8 +982,11 @@ export function mergeSummary(list: Watchlist, summary: Summary): Watchlist {
       const symbol: SymbolMeta = {
         code: item.symbol.code,
         name: remote.name ?? item.symbol.name,
-        // ETF 是前端的分组维度，后端只返回 US/CN/HK：保留本地判定。
-        market: item.symbol.market === "ETF" ? "ETF" : remote.market,
+        // ETF / 基金是前端的分组维度，后端只返回 US/CN/HK：保留本地判定。
+        market:
+          item.symbol.market === "ETF" || item.symbol.market === "FUND"
+            ? item.symbol.market
+            : remote.market,
       };
       const alerts =
         remote.changePercent !== undefined && Math.abs(remote.changePercent) >= 2

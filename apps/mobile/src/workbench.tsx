@@ -12,6 +12,8 @@ import Svg, { Polyline } from "react-native-svg";
 import type { AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
 import { MarketBriefingCard } from "./briefing-card";
+import { ComposerAttachments, FilePickerSheet } from "./file-picker";
+import { pickAndUploadFile } from "./file-upload";
 import { greetingKeyForHour, userLocalHour } from "./greeting";
 import { activeLocaleTag, localizeAgentName, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
@@ -386,11 +388,15 @@ function TaskRow({ task }: { task: AgentTask }) {
 }
 
 export function WorkbenchScreen() {
-  const { workspace, ask, navigate, open } = useWorkspace();
+  const { api, workspace, refresh, ask, navigate, open, notify } = useWorkspace();
   const { data } = useAgentWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [pickerSelection, setPickerSelection] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [briefingOpen, setBriefingOpen] = useState(false);
   const composerRef = useRef<TextInput>(null);
   const sideBySide = width >= breakpoints.desktop;
@@ -450,12 +456,42 @@ export function WorkbenchScreen() {
     weekday: "long",
   });
 
-  const submit = () => {
-    const prompt = draft.trim();
+  const submitPrompt = (text: string) => {
+    const prompt = text.trim();
     if (!prompt) return;
     setDraft("");
-    ask(prompt);
+    ask(prompt, attachments);
+    setAttachments([]);
+    setPicking(false);
   };
+  const submit = () => submitPrompt(draft);
+
+  async function uploadMaterial() {
+    if (uploading) return;
+    setUploading(true);
+    try {
+      const file = await pickAndUploadFile(api);
+      if (!file) return;
+      await refresh();
+      setAttachments((ids) => (ids.includes(file.id) ? ids : [...ids, file.id]));
+      setPickerSelection((ids) => (ids.includes(file.id) ? ids : [...ids, file.id]));
+      setPicking(false);
+      notify(t("chat.uploadMaterialDone", { name: file.name }));
+    } catch (e) {
+      notify(
+        t("chat.uploadMaterialFailed", {
+          detail: e instanceof Error ? e.message : String(e),
+        }),
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function openFilePicker() {
+    setPickerSelection(attachments);
+    setPicking(true);
+  }
 
   const quickPrompts = [
     { icon: Target, label: t("workbench.analyzeStock"), prompt: t("workbench.analyzeStockPrompt") },
@@ -553,16 +589,27 @@ export function WorkbenchScreen() {
                 {
                   key: "upload",
                   icon: Upload,
-                  label: t("workbench.attachMaterial"),
-                  onPress: () => navigate("chat"),
+                  label: t("chat.uploadMaterial"),
+                  active: uploading,
+                  onPress: () => void uploadMaterial(),
                 },
                 {
                   key: "files",
                   icon: FolderOpen,
-                  label: t("app.navFiles"),
-                  onPress: () => navigate("files"),
+                  label: t("chat.filePickerTool"),
+                  active: picking,
+                  onPress: openFilePicker,
                 },
               ]}
+              attachments={
+                <ComposerAttachments
+                  files={workspace.files}
+                  selectedIds={attachments}
+                  onRemove={(id) =>
+                    setAttachments((ids) => ids.filter((candidate) => candidate !== id))
+                  }
+                />
+              }
               assistantLabel={t("app.agentSettingsLabel", { name: agentName })}
               assistantText={t("workbench.depthAnalysis")}
               onOpenAssistant={() => open({ type: "personality" })}
@@ -576,7 +623,7 @@ export function WorkbenchScreen() {
                   key={item.label}
                   accessibilityRole="button"
                   hitSlop={6}
-                  onPress={() => ask(item.prompt)}
+                  onPress={() => submitPrompt(item.prompt)}
                   style={({ pressed }) => ({
                     minHeight: 32,
                     flexDirection: "row",
@@ -724,6 +771,28 @@ export function WorkbenchScreen() {
         <Sheet title={t("workbench.briefing")} onClose={() => setBriefingOpen(false)}>
           <MarketBriefingCard plain onRequestClose={() => setBriefingOpen(false)} />
         </Sheet>
+      )}
+      {picking && (
+        <FilePickerSheet
+          files={workspace.files}
+          selectedIds={pickerSelection}
+          onToggle={(id) =>
+            setPickerSelection((ids) =>
+              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+            )
+          }
+          onConfirm={() => {
+            setAttachments(pickerSelection);
+            setDraft((current) => (current.trim() ? current : t("chat.filePickerDefaultPrompt")));
+            setPicking(false);
+          }}
+          onClose={() => setPicking(false)}
+          onUpload={uploadMaterial}
+          onBrowse={() => {
+            setPicking(false);
+            navigate("files");
+          }}
+        />
       )}
     </>
   );

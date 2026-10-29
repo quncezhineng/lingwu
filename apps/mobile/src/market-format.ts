@@ -10,7 +10,7 @@ import type { MarketKind } from "./market";
 export type Direction = "up" | "down" | "flat";
 
 export function defaultCurrency(market: MarketKind) {
-  if (market === "CN") return "CNY";
+  if (market === "CN" || market === "FUND") return "CNY";
   if (market === "HK") return "HKD";
   return "USD";
 }
@@ -21,10 +21,10 @@ export function currencySymbol(currency: string) {
   return "$";
 }
 
-export function formatPrice(value: number, currency: string) {
+export function formatPrice(value: number, currency: string, precision = 2) {
   const text = new Intl.NumberFormat(activeLocaleTag(), {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: precision,
+    maximumFractionDigits: precision,
   }).format(value);
   return `${currencySymbol(currency)}${text}`;
 }

@@ -38,7 +38,7 @@ const app = {
   "app.openingWorkspace": "Opening your workspace…",
   "app.navToday": "Workbench",
   "app.navChat": "Chat",
-  "app.navWatchlist": "My watchlist",
+  "app.navWatchlist": "Watchlist & portfolios",
   "app.navWatchlistShort": "Watchlist",
   "app.navActivity": "Analysis tasks",
   "app.navIdeas": "Ideas",
@@ -56,7 +56,8 @@ const app = {
   "app.subtitlePortfolio": "Holdings, P/L and allocation.",
   "app.titleNotes": "Notes",
   "app.subtitleNotes": "Investment notes and thesis tracking.",
-  "app.subtitleWatchlist": "Quotes, alerts and daily moves for the targets you follow.",
+  "app.subtitleWatchlist":
+    "Keep the stocks and funds you follow together, ready to track and research.",
   "app.titleActivity": "Analysis tasks",
   "app.subtitleActivity": "Follow every plan, evidence trail, decision and result.",
   "app.titleIdeas": "Ideas",

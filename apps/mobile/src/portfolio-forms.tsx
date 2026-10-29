@@ -252,7 +252,15 @@ export function HoldingFormSheet({
                     accessibilityRole="button"
                     onPress={() => {
                       setSymbol(result);
-                      setCurrency(marketCurrency(result.market === "ETF" ? "US" : result.market));
+                      setCurrency(
+                        marketCurrency(
+                          result.market === "FUND"
+                            ? "CN"
+                            : result.market === "ETF"
+                              ? "US"
+                              : result.market,
+                        ),
+                      );
                       setQuery("");
                     }}
                     style={({ pressed }) => [

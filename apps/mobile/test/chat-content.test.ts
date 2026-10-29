@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { displayUserMessage, findReferencedFile, markFileMentions } from "../src/chat-content.ts";
+import {
+  displayUserMessage,
+  findReferencedFile,
+  markFileMentions,
+  promptWithAttachments,
+} from "../src/chat-content.ts";
 
 test("attachment metadata is hidden from the user bubble and returned as chips", () => {
   const content =
@@ -26,6 +31,17 @@ test("a malformed attachment tail never leaks transport metadata into the bubble
     text: "Read this",
     attachments: [],
   });
+});
+
+test("selected files are appended as stable artifact references", () => {
+  assert.equal(
+    promptWithAttachments("Compare the filing", [
+      { id: "file-1", name: "annual-report.pdf" },
+      { id: "file-2", name: "notes.html" },
+    ]),
+    "Compare the filing\n\nAttached documents: annual-report.pdf (artifact ID: file-1), notes.html (artifact ID: file-2)",
+  );
+  assert.equal(promptWithAttachments("No files", []), "No files");
 });
 
 test("inline code and relative links resolve to thread files", () => {

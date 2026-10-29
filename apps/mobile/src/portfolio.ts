@@ -633,8 +633,10 @@ export async function addHolding(
     portfolioId: input.portfolioId,
     symbolCode: input.symbolCode,
     name: input.name ?? meta.name,
-    market: meta.market === "ETF" ? "US" : meta.market,
-    currency: input.currency ?? marketCurrency(meta.market === "ETF" ? "US" : meta.market),
+    market: meta.market === "FUND" ? "CN" : meta.market === "ETF" ? "US" : meta.market,
+    currency:
+      input.currency ??
+      marketCurrency(meta.market === "FUND" ? "CN" : meta.market === "ETF" ? "US" : meta.market),
     quantity: input.quantity,
     avgCost: input.avgCost,
     sector: input.sector,
@@ -772,7 +774,11 @@ export function commitMockImport(
         symbolCode: row.symbol,
         name: row.name ?? metaFor(row.symbol).name,
         market:
-          metaFor(row.symbol).market === "ETF" ? "US" : (metaFor(row.symbol).market as MarketKind),
+          metaFor(row.symbol).market === "FUND"
+            ? "CN"
+            : metaFor(row.symbol).market === "ETF"
+              ? "US"
+              : (metaFor(row.symbol).market as MarketKind),
         currency: row.currency,
         quantity: row.quantity,
         avgCost: row.avgCost,

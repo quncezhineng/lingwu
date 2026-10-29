@@ -31,6 +31,17 @@ export function displayUserMessage(content: string): DisplayUserMessage {
   return { text, attachments };
 }
 
+/** Appends the stable artifact references the agent uses to load selected files. */
+export function promptWithAttachments(
+  text: string,
+  files: readonly Pick<Artifact, "id" | "name">[],
+): string {
+  if (!files.length) return text;
+  return `${text.trimEnd()}\n\nAttached documents: ${files
+    .map((file) => `${file.name} (artifact ID: ${file.id})`)
+    .join(", ")}`;
+}
+
 function decodeReference(value: string) {
   try {
     return decodeURIComponent(value);
