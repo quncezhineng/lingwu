@@ -18,7 +18,6 @@ import { greetingKeyForHour, userLocalHour } from "./greeting";
 import { activeLocaleTag, localizeAgentName, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
 import {
-  ArrowUpRight,
   Bell,
   Check,
   ChevronLeft,
@@ -35,9 +34,11 @@ import {
   Upload,
 } from "./icons";
 import { InsightCard } from "./insight-card";
+import { latestWorkbenchInsights, moveInsightIndex, workbenchInsightView } from "./insight-view";
 import { activeWatchlist, loadWatchlists, useWatchlistState } from "./market";
 import { PromptComposer } from "./prompt-composer";
 import { availabilityFromQuote, useQuotes } from "./quotes";
+import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { StatusBadge, statusToneColors, taskStatusTone } from "./status-badge";
 import { breakpoints } from "./theme";
 import {
@@ -403,6 +404,7 @@ export function WorkbenchScreen() {
   // 1024 宽时主列约 380–400，问候（31 号）与 180 简报卡会撞行 → 主列不足 520 时上下分行。
   const narrow = width < 1180;
   const [insightIndex, setInsightIndex] = useState(0);
+  const savedInsightIds = useSavedInsightIds();
   const [now, setNow] = useState(() => new Date());
   // 问候语跟随设备时区，并在跨过中午/傍晚时自动更新，无需刷新页面。
   useEffect(() => {
@@ -433,28 +435,21 @@ export function WorkbenchScreen() {
     (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
   );
   const visibleTasks = activeTasks.length ? activeTasks : tasks;
-  // 今日领悟：最多 3 条，按时间倒序做 1/3 轮播。
-  const insights = [...(data?.artifacts ?? [])]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 3);
-  const insight = insights[Math.min(insightIndex, Math.max(0, insights.length - 1))];
-  // 三段内容只在 artifact.data 明确提供时渲染，不做推断或造数据（PM A6 裁决）。
-  const insightData = (insight?.data ?? {}) as Record<string, unknown>;
-  const insightField = (...keys: string[]) => {
-    for (const key of keys) {
-      const value = insightData[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-    return undefined;
-  };
-  const insightBasis = insightField("basis", "evidence", "evidenceSummary");
-  const insightLimits = insightField("limits", "caveats", "unknowns");
-  const insightRevisit = insightField("revisit", "reviewAt", "revisitAt");
+  // 今日领悟：最多 3 条真实研究产物，按时间倒序做 1/3 轮播。
+  const insights = latestWorkbenchInsights(data?.artifacts ?? []);
+  const insightPosition = Math.min(insightIndex, Math.max(0, insights.length - 1));
+  const insight = insights[insightPosition];
+  const insightView = insight ? workbenchInsightView(insight) : undefined;
+  const insightSymbol = [insightView?.symbolName, insightView?.code].filter(Boolean).join(" · ");
   const dateLine = now.toLocaleDateString(activeLocaleTag(), {
     month: "long",
     day: "numeric",
     weekday: "long",
   });
+
+  useEffect(() => {
+    setInsightIndex((current) => Math.min(current, Math.max(0, insights.length - 1)));
+  }, [insights.length]);
 
   const submitPrompt = (text: string) => {
     const prompt = text.trim();
@@ -646,7 +641,7 @@ export function WorkbenchScreen() {
           <View style={{ gap: 10 }}>
             <SectionHeading
               title={t("workbench.todayInsight")}
-              count={insights.length ? `${insightIndex + 1} / ${insights.length}` : undefined}
+              count={insights.length ? `${insightPosition + 1} / ${insights.length}` : undefined}
               actions={
                 <View style={[s.row, { gap: 2 }]}>
                   {insights.length > 1 && (
@@ -655,29 +650,21 @@ export function WorkbenchScreen() {
                         size={28}
                         icon={ChevronLeft}
                         label={t("ui.previous")}
+                        disabled={insightPosition === 0}
                         onPress={() =>
-                          setInsightIndex(
-                            (value) => (value - 1 + insights.length) % insights.length,
-                          )
+                          setInsightIndex((value) => moveInsightIndex(value, -1, insights.length))
                         }
                       />
                       <IconButton
                         size={28}
                         icon={ChevronRight}
                         label={t("ui.next")}
-                        onPress={() => setInsightIndex((value) => (value + 1) % insights.length)}
+                        disabled={insightPosition >= insights.length - 1}
+                        onPress={() =>
+                          setInsightIndex((value) => moveInsightIndex(value, 1, insights.length))
+                        }
                       />
                     </>
-                  )}
-                  {!!insight && (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => open({ type: "artifact", artifact: insight })}
-                      style={[s.row, { gap: 3, paddingHorizontal: 4, paddingVertical: 4 }]}
-                    >
-                      <Text style={[s.small, { color: colors.link }]}>{t("workbench.expand")}</Text>
-                      <ArrowUpRight size={13} color={colors.link} />
-                    </Pressable>
                   )}
                 </View>
               }
@@ -685,32 +672,46 @@ export function WorkbenchScreen() {
             />
             <InsightCard
               eyebrow={`${t("workbench.insightCard")} · ${
-                insight ? statusLabel(insight.kind) : t("workbench.researchNote")
+                insight && insightView
+                  ? insightView.category || statusLabel(insight.kind)
+                  : t("workbench.researchNote")
               }`}
-              title={insight?.summary || insight?.title || t("workbench.insightEmptyTitle")}
-              basis={insightBasis}
-              limits={insightLimits}
-              revisit={insightRevisit}
+              title={insightView?.title || t("workbench.insightEmptyTitle")}
+              basis={insightView?.basis}
+              limits={insightView?.limits}
+              revisit={insightView?.revisit}
               showSections={false}
-              onSimplify={
-                insight
-                  ? () => ask(t("workbench.insightSimplifyPrompt", { title: insight.title }))
-                  : undefined
-              }
-              onDisagree={
-                insight
-                  ? () => ask(t("workbench.insightDisagreePrompt", { title: insight.title }))
-                  : undefined
-              }
               meta={
                 insight
-                  ? `${localizeAgentName(data?.identity.name)} · ${insight.title}`
+                  ? insightSymbol || t("workbench.insightRelatedAnalysis")
                   : t("workbench.insightEmptyDetail")
               }
-              accessibilityLabel={insight ? t("workbench.expand") : t("workbench.askPlaceholder")}
+              saved={!!insight && savedInsightIds.includes(insight.id)}
+              savePlacement="header"
+              onToggleSave={
+                insight
+                  ? () => {
+                      const wasSaved = savedInsightIds.includes(insight.id);
+                      toggleSavedInsight(insight.id);
+                      notify(
+                        t(
+                          wasSaved
+                            ? "workbench.insightUnsavedNotice"
+                            : "workbench.insightSavedNotice",
+                        ),
+                      );
+                    }
+                  : undefined
+              }
+              actionLabel={insight ? t("workbench.expand") : undefined}
+              accessibilityLabel={
+                insight
+                  ? `${t("workbench.expand")}：${insightView?.title}`
+                  : t("workbench.askPlaceholder")
+              }
               onPress={() =>
                 insight
-                  ? open({ type: "artifact", artifact: insight })
+                  ? open({ type: "insight", artifact: insight })
                   : composerRef.current?.focus()
               }
             />

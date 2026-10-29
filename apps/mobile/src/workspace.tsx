@@ -19,11 +19,19 @@ export type Detail =
   | { type: "event"; event?: CalendarEvent; draft?: EventDraft; neighbors?: CalendarEvent[] }
   | { type: "file"; file: Artifact }
   | { type: "artifact"; artifact: AgentArtifact }
+  | { type: "insight"; artifact: AgentArtifact }
   | {
       type: "symbol";
       symbol: SymbolMeta;
       quote?: Quote;
       watchlist?: { id: string; name: string };
+      focus?: "alerts";
+    }
+  | {
+      type: "watchlist-symbol";
+      symbol: SymbolMeta;
+      quote?: Quote;
+      watchlist: { id: string; name: string };
     }
   | { type: "browser"; browser: BrowserSession }
   | { type: "review"; action: ActionProposal }

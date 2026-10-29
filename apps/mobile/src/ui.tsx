@@ -215,17 +215,22 @@ export function IconButton({
   label,
   onPress,
   size = 38,
+  disabled = false,
 }: {
   icon: IconComponent;
   label: string;
   onPress: () => void;
   /** Touch target; pass 44 for dense table rows that need a larger hit area. */
   size?: number;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={disabled ? undefined : 4}
       onPress={onPress}
       style={({ pressed }) => [
         {
@@ -235,6 +240,7 @@ export function IconButton({
           justifyContent: "center",
           borderRadius: radius.card,
           backgroundColor: pressed ? colors.overlay1 : "transparent",
+          opacity: disabled ? 0.28 : 1,
         },
       ]}
     >
@@ -304,6 +310,7 @@ export function Sheet({
   children,
   onClose,
   wide,
+  narrow,
   fullscreen,
   dismissOnBackdrop = true,
 }: {
@@ -312,6 +319,8 @@ export function Sheet({
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  /** 紧凑阅读浮层：用于单张领悟卡等短内容，避免桌面端出现过宽留白。 */
+  narrow?: boolean;
   /** 全屏模式：弹窗铺满整个网页/屏幕（如研究产物详情），优先级最高。 */
   fullscreen?: boolean;
   /** 点击弹窗外的深色背板区域时是否关闭弹窗，默认开启。 */
@@ -347,6 +356,7 @@ export function Sheet({
           style={[
             s.sheet,
             wide && { maxWidth: 1050 },
+            narrow && { maxWidth: 560 },
             compact &&
               !fullscreen && {
                 borderBottomLeftRadius: 0,

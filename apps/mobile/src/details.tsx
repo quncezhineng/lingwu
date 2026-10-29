@@ -1,7 +1,16 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Linking, Platform, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import {
   type ActionProposal,
   type Artifact,
@@ -30,6 +39,8 @@ import {
   Bot,
   CalendarDays,
   Check,
+  ChevronDown,
+  ChevronUp,
   CircleUserRound,
   Clock3,
   Download,
@@ -39,16 +50,30 @@ import {
   Globe2,
   Heart,
   Mail as MailIcon,
+  Pencil,
+  Plus,
   Reply,
   RotateCw,
   Save,
   Send,
   Shapes,
   ShieldCheck,
+  Sparkles,
+  Star,
   Trash2,
   X,
 } from "./icons";
+import { workbenchInsightView } from "./insight-view";
+import {
+  activeWatchlist,
+  addSymbols,
+  normalizeCode,
+  searchSymbols,
+  useWatchlistState,
+} from "./market";
+import { NoteEditorSheet } from "./note-ui";
 import PdfReader from "./PdfReader";
+import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { SymbolDetailSheet } from "./symbol-detail";
 import {
   Button,
@@ -61,12 +86,15 @@ import {
   ErrorNotice,
   Field,
   LinkRow,
+  radius,
   resultSummary,
   SectionHeading,
   Sheet,
   s,
   timeLabel,
+  typography,
 } from "./ui";
+import { WatchlistSymbolSheet } from "./watchlist-symbol";
 import { type Detail, useWorkspace } from "./workspace";
 export function Details({ detail }: { detail: Detail }) {
   const { t } = useTranslation();
@@ -90,9 +118,23 @@ export function Details({ detail }: { detail: Detail }) {
     return <EventEditor event={detail.event} draft={detail.draft} neighbors={detail.neighbors} />;
   if (detail.type === "file") return <FileDetail file={detail.file} />;
   if (detail.type === "artifact") return <ArtifactDetail artifact={detail.artifact} />;
+  if (detail.type === "insight") return <InsightDetail artifact={detail.artifact} />;
   if (detail.type === "symbol")
     return (
-      <SymbolDetailSheet symbol={detail.symbol} quote={detail.quote} watchlist={detail.watchlist} />
+      <SymbolDetailSheet
+        symbol={detail.symbol}
+        quote={detail.quote}
+        watchlist={detail.watchlist}
+        initialAlertForm={detail.focus === "alerts"}
+      />
+    );
+  if (detail.type === "watchlist-symbol")
+    return (
+      <WatchlistSymbolSheet
+        symbol={detail.symbol}
+        quote={detail.quote}
+        watchlist={detail.watchlist}
+      />
     );
   if (detail.type === "review") return <ReviewDetail initial={detail.action} />;
   if (detail.type === "browser") return <BrowserDetail initial={detail.browser} />;
@@ -1020,30 +1062,370 @@ function FileDetail({ file: f }: { file: Artifact }) {
     </Sheet>
   );
 }
+
+/**
+ * 今日领悟专用阅读浮层。
+ *
+ * 与通用研究产物详情不同，这里先呈现可快速阅读的结论、依据和行动，
+ * 完整 HTML 报告仍从对话、资料库或搜索结果进入 `ArtifactDetail`。
+ */
+function InsightDetail({ artifact }: { artifact: AgentArtifact }) {
+  const { api, ask, close, navigate, notify, open } = useWorkspace();
+  const { t } = useTranslation();
+  useWatchlistState();
+  const savedInsightIds = useSavedInsightIds();
+  const view = workbenchInsightView(artifact);
+  const saved = savedInsightIds.includes(artifact.id);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [plainOpen, setPlainOpen] = useState(false);
+  const [disagreeOpen, setDisagreeOpen] = useState(false);
+  const [disagreement, setDisagreement] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [addingSymbol, setAddingSymbol] = useState(false);
+  const [symbolError, setSymbolError] = useState("");
+  const watchlist = activeWatchlist();
+  const code = view.code ? normalizeCode(view.code) : "";
+  const watched = code
+    ? watchlist?.symbols.find((item) => item.symbol.code === code)?.symbol
+    : undefined;
+  const evidence = [
+    { label: t("ui.insightBasis"), value: view.basis },
+    { label: t("ui.insightLimits"), value: view.limits },
+    { label: t("ui.insightRevisit"), value: view.revisit },
+  ].filter((item) => !!item.value);
+  const noteContent = [
+    view.takeaway,
+    view.basis ? `${t("ui.insightBasis")}: ${view.basis}` : undefined,
+    view.limits ? `${t("ui.insightLimits")}: ${view.limits}` : undefined,
+    view.revisit ? `${t("ui.insightRevisit")}: ${view.revisit}` : undefined,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const explainSimply = () => {
+    if (view.plain) {
+      setPlainOpen((current) => !current);
+      return;
+    }
+    ask(t("workbench.insightSimplifyPrompt", { title: view.title }));
+    close();
+  };
+
+  const addToWatchlist = async () => {
+    if (!watchlist || !code || addingSymbol) return;
+    setAddingSymbol(true);
+    setSymbolError("");
+    try {
+      const matches = await searchSymbols(api, code, 20);
+      const exact = matches.find((item) => {
+        const candidate = normalizeCode(item.code);
+        return candidate === code || (!code.includes(".") && candidate.split(".")[0] === code);
+      });
+      if (!exact) {
+        setSymbolError(t("workbench.insightSymbolNotFound"));
+        return;
+      }
+      addSymbols(api, watchlist.id, [exact]);
+      notify(t("workbench.insightAddedWatchlist", { name: exact.name }));
+    } catch (error) {
+      setSymbolError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAddingSymbol(false);
+    }
+  };
+
+  return (
+    <>
+      <Sheet title={t("workbench.insightCard")} onClose={close} narrow>
+        <View style={{ gap: 18 }}>
+          <View style={[s.between, { gap: 12, alignItems: "flex-start" }]}>
+            <Text style={s.label}>{view.category || statusLabel(artifact.kind)}</Text>
+            <Text style={[s.small, s.metric, { textAlign: "right" }]}>
+              {dateLabel(artifact.createdAt)} · {statusLabel(artifact.kind)}
+            </Text>
+          </View>
+
+          <Text
+            selectable
+            style={[
+              typography.insightTitle,
+              { fontSize: 22, lineHeight: 34, color: colors.heading },
+            ]}
+          >
+            {view.title}
+          </Text>
+
+          {!!view.takeaway && (
+            <Text selectable style={[s.muted, { marginTop: -7 }]}>
+              {view.takeaway}
+            </Text>
+          )}
+
+          {(view.symbolName || view.code) && (
+            <Pressable
+              accessibilityRole={watched ? "button" : undefined}
+              disabled={!watched}
+              onPress={() => {
+                if (!watched || !watchlist) return;
+                open({
+                  type: "symbol",
+                  symbol: watched,
+                  watchlist: { id: watchlist.id, name: watchlist.name },
+                });
+              }}
+              style={({ pressed }) => ({
+                minHeight: 34,
+                alignSelf: "flex-start",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                paddingHorizontal: 10,
+                borderRadius: radius.control,
+                borderWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: pressed && watched ? colors.surface : colors.paper,
+              })}
+            >
+              <Text style={{ fontSize: 12, color: colors.text }}>
+                {[view.symbolName, view.code].filter(Boolean).join(" · ")}
+              </Text>
+              {!!watched && <ChevronDown size={13} color={colors.faint} />}
+            </Pressable>
+          )}
+
+          {evidence.length > 0 && (
+            <View style={{ borderTopWidth: 1, borderTopColor: colors.line }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: evidenceOpen }}
+                onPress={() => setEvidenceOpen((current) => !current)}
+                style={{
+                  minHeight: 48,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                }}
+              >
+                <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]}>
+                  {t("workbench.insightEvidenceHeading")}
+                </Text>
+                {evidenceOpen ? (
+                  <ChevronUp size={15} color={colors.faint} />
+                ) : (
+                  <ChevronDown size={15} color={colors.faint} />
+                )}
+              </Pressable>
+              {evidenceOpen && (
+                <View
+                  style={{
+                    gap: 13,
+                    padding: 13,
+                    borderRadius: radius.card,
+                    backgroundColor: colors.surfaceSoft,
+                  }}
+                >
+                  {evidence.map((item) => (
+                    <View key={item.label} style={{ gap: 4 }}>
+                      <Text style={s.label}>{item.label}</Text>
+                      <Text selectable style={s.muted}>
+                        {item.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={[s.row, { flexWrap: "wrap", gap: 20 }]}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={explainSimply}
+              style={[s.row, { minHeight: 32, gap: 5 }]}
+            >
+              <Sparkles size={13} color={colors.link} />
+              <Text style={[s.small, { color: colors.link }]}>
+                {t(plainOpen ? "ui.showLess" : "ui.insightSimplify")}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: disagreeOpen }}
+              onPress={() => setDisagreeOpen((current) => !current)}
+              style={[s.row, { minHeight: 32, gap: 5 }]}
+            >
+              <Edit3 size={13} color={colors.link} />
+              <Text style={[s.small, { color: colors.link }]}>{t("ui.insightDisagree")}</Text>
+            </Pressable>
+          </View>
+
+          {plainOpen && view.plain && (
+            <View
+              style={{
+                gap: 5,
+                padding: 13,
+                borderWidth: 1,
+                borderColor: colors.line,
+                borderRadius: radius.card,
+                backgroundColor: colors.surfaceSoft,
+              }}
+            >
+              <Text style={s.label}>{t("ui.insightSimplify")}</Text>
+              <Text selectable style={s.muted}>
+                {view.plain}
+              </Text>
+            </View>
+          )}
+
+          {disagreeOpen && (
+            <View style={[s.card, { gap: 10, backgroundColor: colors.surfaceSoft }]}>
+              <Text style={s.heading}>{t("workbench.insightDisagreeTitle")}</Text>
+              <TextInput
+                value={disagreement}
+                onChangeText={(value) => setDisagreement(value.slice(0, 1000))}
+                multiline
+                placeholder={t("workbench.insightDisagreePlaceholder")}
+                placeholderTextColor={colors.faint}
+                accessibilityLabel={t("workbench.insightDisagreeTitle")}
+                style={[s.input, { minHeight: 96, textAlignVertical: "top", paddingTop: 9 }]}
+              />
+              <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                <Button
+                  primary
+                  small
+                  disabled={!disagreement.trim()}
+                  onPress={() => {
+                    ask(
+                      `${t("workbench.insightDisagreePrompt", {
+                        title: view.title,
+                      })}\n\n${disagreement.trim()}`,
+                    );
+                    close();
+                  }}
+                >
+                  {t("workbench.insightDisagreeSubmit")}
+                </Button>
+                <Button small onPress={() => setDisagreeOpen(false)}>
+                  {t("workbench.insightCancel")}
+                </Button>
+              </View>
+            </View>
+          )}
+
+          <ErrorNotice error={symbolError} />
+
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 10,
+              paddingTop: 15,
+              borderTopWidth: 1,
+              borderTopColor: colors.line,
+            }}
+          >
+            <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+              <Button
+                small
+                icon={saved ? Check : Star}
+                style={{
+                  backgroundColor: saved ? colors.sky : colors.surface,
+                  borderColor: saved ? colors.accentLine : colors.line,
+                }}
+                onPress={() => {
+                  toggleSavedInsight(artifact.id);
+                  notify(
+                    t(saved ? "workbench.insightUnsavedNotice" : "workbench.insightSavedNotice"),
+                  );
+                }}
+              >
+                {t(saved ? "workbench.insightSavedLabel" : "ui.saveInsight")}
+              </Button>
+              {watchlist && code && watched && (
+                <Button
+                  small
+                  icon={ExternalLink}
+                  onPress={() => {
+                    close();
+                    navigate("watchlist");
+                  }}
+                >
+                  {t("workbench.insightViewWatchlist")}
+                </Button>
+              )}
+              {watchlist && code && !watched && (
+                <Button small icon={Plus} busy={addingSymbol} onPress={() => void addToWatchlist()}>
+                  {t("workbench.insightAddWatchlist")}
+                </Button>
+              )}
+              <Button
+                small
+                icon={ExternalLink}
+                onPress={() => open({ type: "artifact", artifact })}
+              >
+                {t("agent.artifactOpenDetail")}
+              </Button>
+            </View>
+            <Button primary small icon={Pencil} onPress={() => setNoteOpen(true)}>
+              {t("workbench.insightWriteNote")}
+            </Button>
+          </View>
+        </View>
+      </Sheet>
+      {noteOpen && (
+        <NoteEditorSheet
+          api={api}
+          defaultSymbol={code || undefined}
+          defaultTitle={view.title}
+          defaultContent={noteContent}
+          onClose={() => setNoteOpen(false)}
+          onSaved={() => {
+            setNoteOpen(false);
+            notify(t("workbench.insightNoteSaved"));
+          }}
+        />
+      )}
+    </>
+  );
+}
 /**
  * 研究产物详情：把 `AgentArtifact` 的标题/摘要/全部数据渲染成一张自包含
  * 的 HTML 网页。Web 端用 iframe(`srcDoc`) 展示、原生端用 WebView 展示，
  * 与「对话里只显示标题提示、点击弹出网页详情」的交互保持一致。
  */
 function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
-  const { close } = useWorkspace();
+  const { ask, close, notify } = useWorkspace();
   const { t } = useTranslation();
+  const savedInsightIds = useSavedInsightIds();
+  const [plainOpen, setPlainOpen] = useState(false);
   const html = useMemo(() => renderArtifactHtml(artifact), [artifact]);
   const hasHtmlPreview = useMemo(() => artifactHasHtmlPreview(artifact), [artifact]);
-  // 洞察三段只在 artifact.data 明确提供时展示（工作台卡面折叠，详情浮层里读全文）。
-  const data = (artifact.data ?? {}) as Record<string, unknown>;
-  const field = (...keys: string[]) => {
-    for (const key of keys) {
-      const value = data[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-    return undefined;
-  };
+  // 三段与浅释只在 artifact.data 明确提供时展示，不用模板内容补造结论。
+  const view = workbenchInsightView(artifact);
   const sections = [
-    { label: t("ui.insightBasis"), value: field("basis", "evidence", "evidenceSummary") },
-    { label: t("ui.insightLimits"), value: field("limits", "caveats", "unknowns") },
-    { label: t("ui.insightRevisit"), value: field("revisit", "reviewAt", "revisitAt") },
+    { label: t("ui.insightBasis"), value: view.basis },
+    { label: t("ui.insightLimits"), value: view.limits },
+    { label: t("ui.insightRevisit"), value: view.revisit },
   ].filter((item) => !!item.value);
+  const saved = savedInsightIds.includes(artifact.id);
+
+  const explainSimply = () => {
+    if (view.plain) {
+      setPlainOpen((current) => !current);
+      return;
+    }
+    ask(t("workbench.insightSimplifyPrompt", { title: view.title }));
+    close();
+  };
+
+  const disagree = () => {
+    ask(t("workbench.insightDisagreePrompt", { title: view.title }));
+    close();
+  };
+
   return (
     <Sheet
       title={artifact.title}
@@ -1051,6 +1433,40 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
       onClose={close}
       fullscreen
     >
+      <View style={[s.row, { flexWrap: "wrap", gap: 8, marginBottom: 16 }]}>
+        <Button
+          small
+          icon={Star}
+          onPress={() => {
+            toggleSavedInsight(artifact.id);
+            notify(t(saved ? "workbench.insightUnsavedNotice" : "workbench.insightSavedNotice"));
+          }}
+        >
+          {t(saved ? "ui.unsaveInsight" : "ui.saveInsight")}
+        </Button>
+        <Button small onPress={explainSimply}>
+          {t(plainOpen ? "ui.showLess" : "ui.insightSimplify")}
+        </Button>
+        <Button small onPress={disagree}>
+          {t("ui.insightDisagree")}
+        </Button>
+      </View>
+      {plainOpen && view.plain && (
+        <View
+          style={{
+            gap: 5,
+            marginBottom: 16,
+            padding: 13,
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: 8,
+            backgroundColor: colors.surfaceSoft,
+          }}
+        >
+          <Text style={s.label}>{t("ui.insightSimplify")}</Text>
+          <Text style={s.muted}>{view.plain}</Text>
+        </View>
+      )}
       {sections.length > 0 && (
         <View style={{ gap: 12, marginBottom: 16 }}>
           {sections.map((item) => (

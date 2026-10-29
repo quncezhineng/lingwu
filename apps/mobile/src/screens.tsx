@@ -41,8 +41,10 @@ import {
   Upload,
 } from "./icons";
 import { InsightCard } from "./insight-card";
+import { workbenchInsightView } from "./insight-view";
 import { NotesScreen } from "./notes-screen";
 import { PageHeader } from "./page-header";
+import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { StatusBadge, type StatusTone } from "./status-badge";
 import { breakpoints, layout, space } from "./theme";
 import {
@@ -1038,9 +1040,11 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
   const [section, setSection] = useState<LibrarySection>(initialSection);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // 收藏态占位：P2-6 契约接入前只在本次会话内生效，不写后端。
-  const [saved, setSaved] = useState<Set<string>>(() => new Set());
+  const savedInsightIds = useSavedInsightIds();
   const library = buildFileLibrary(w.files, agent?.artifacts || []);
+  const savedArtifacts = library.artifacts.filter((artifact) =>
+    savedInsightIds.includes(artifact.id),
+  );
   // 内容区宽度：桌面扣侧栏与页面 padding，决定资料卡栅格列数（避免单卡右侧大片留白）。
   const contentWidth =
     width >= breakpoints.desktop
@@ -1233,32 +1237,32 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
         ))}
 
       {section === "insights" &&
-        (library.artifacts.length ? (
+        (savedArtifacts.length ? (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, alignItems: "stretch" }}>
-            {library.artifacts.map((artifact) => (
-              <View
-                key={artifact.id}
-                style={{
-                  width: library.artifacts.length === 1 ? Math.min(contentWidth, 760) : cardWidth,
-                }}
-              >
-                <InsightCard
-                  eyebrow={`${t("screens.libraryInsights")} · ${statusLabel(artifact.kind)}`}
-                  title={artifact.summary || artifact.title}
-                  meta={`${artifact.title} · ${dateLabel(artifact.createdAt)}`}
-                  saved={saved.has(artifact.id)}
-                  onToggleSave={() =>
-                    setSaved((current) => {
-                      const next = new Set(current);
-                      if (next.has(artifact.id)) next.delete(artifact.id);
-                      else next.add(artifact.id);
-                      return next;
-                    })
-                  }
-                  onPress={() => open({ type: "artifact", artifact })}
-                />
-              </View>
-            ))}
+            {savedArtifacts.map((artifact) => {
+              const view = workbenchInsightView(artifact);
+              const symbol = [view.symbolName, view.code].filter(Boolean).join(" · ");
+              return (
+                <View
+                  key={artifact.id}
+                  style={{
+                    width: savedArtifacts.length === 1 ? Math.min(contentWidth, 760) : cardWidth,
+                  }}
+                >
+                  <InsightCard
+                    eyebrow={`${t("screens.libraryInsights")} · ${
+                      view.category || statusLabel(artifact.kind)
+                    }`}
+                    title={view.title}
+                    meta={symbol || `${artifact.title} · ${dateLabel(artifact.createdAt)}`}
+                    saved={true}
+                    savePlacement="header"
+                    onToggleSave={() => toggleSavedInsight(artifact.id)}
+                    onPress={() => open({ type: "artifact", artifact })}
+                  />
+                </View>
+              );
+            })}
           </View>
         ) : (
           <Card>

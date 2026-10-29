@@ -371,6 +371,8 @@ export function NoteEditorSheet({
   initial,
   defaultType = "RESEARCH",
   defaultSymbol,
+  defaultTitle = "",
+  defaultContent = "",
   onClose,
   onSaved,
 }: {
@@ -378,24 +380,29 @@ export function NoteEditorSheet({
   initial?: InvestmentNote;
   defaultType?: NoteType;
   defaultSymbol?: string;
+  defaultTitle?: string;
+  defaultContent?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
+  const initialTitle = initial?.title ?? defaultTitle.slice(0, 80);
+  const initialContent = initial?.content ?? defaultContent.slice(0, 2000);
+  const initialSymbolCode = initial?.symbolCode ?? defaultSymbol;
   const [type, setType] = useState<NoteType>(initial?.type ?? defaultType);
   const [symbol, setSymbol] = useState<SymbolMeta | undefined>(
     initial ? metaFor(initial.symbolCode) : defaultSymbol ? metaFor(defaultSymbol) : undefined,
   );
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [content, setContent] = useState(initial?.content ?? "");
+  const [title, setTitle] = useState(initialTitle);
+  const [content, setContent] = useState(initialContent);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const dirty =
-    content !== (initial?.content ?? "") ||
-    title !== (initial?.title ?? "") ||
-    (!initial && !!symbol);
+    content !== initialContent ||
+    title !== initialTitle ||
+    (!initial && symbol?.code !== initialSymbolCode);
   const contentError = !content.trim()
     ? t("notes.contentRequired")
     : type === "THESIS" && content.trim().length < 10

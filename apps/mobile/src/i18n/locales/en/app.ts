@@ -162,6 +162,23 @@ const app = {
   "workbench.expand": "Open",
   "workbench.insightCard": "Insight card",
   "workbench.researchNote": "Research note",
+  "workbench.insightRelatedAnalysis": "Related to this analysis",
+  "workbench.insightSavedNotice": "Saved to Files · Insight cards.",
+  "workbench.insightUnsavedNotice": "Removed from saved insights.",
+  "workbench.insightSavedLabel": "Saved",
+  "workbench.insightEvidenceHeading": "Evidence and open questions",
+  "workbench.insightViewWatchlist": "View watchlist",
+  "workbench.insightAddWatchlist": "Add to watchlist",
+  "workbench.insightAddedWatchlist": "Added {name} to your watchlist.",
+  "workbench.insightSymbolNotFound":
+    "The current data source could not resolve this symbol, so nothing was added.",
+  "workbench.insightWriteNote": "Save a note",
+  "workbench.insightNoteSaved": "Note saved.",
+  "workbench.insightDisagreeTitle": "Share your different view",
+  "workbench.insightDisagreePlaceholder":
+    "What do you think is wrong, and what evidence supports your view?",
+  "workbench.insightDisagreeSubmit": "Submit for analysis",
+  "workbench.insightCancel": "Cancel",
   "workbench.insightEmptyTitle": "Build the first explainable insight.",
   "workbench.insightEmptyDetail":
     "Completed research will settle here as a concise, source-backed note.",

@@ -556,10 +556,12 @@ export function SymbolDetailSheet({
   symbol,
   quote,
   watchlist,
+  initialAlertForm = false,
 }: {
   symbol: SymbolMeta;
   quote?: Quote;
   watchlist?: { id: string; name: string };
+  initialAlertForm?: boolean;
 }) {
   const { api, close, ask, navigate, notify, refresh } = useWorkspace();
   const { t } = useTranslation();
@@ -574,7 +576,17 @@ export function SymbolDetailSheet({
     threshold: string;
     interval: string;
     enabled: boolean;
-  } | null>(null);
+  } | null>(
+    initialAlertForm
+      ? {
+          mode: "create",
+          type: "PRICE_ABOVE",
+          threshold: "",
+          interval: "15",
+          enabled: true,
+        }
+      : null,
+  );
   const [formBusy, setFormBusy] = useState(false);
   const [report, setReport] = useState<ResearchReport>();
   const [reportError, setReportError] = useState("");
@@ -936,7 +948,25 @@ export function SymbolDetailSheet({
           ))}
         </Card>
       ) : (
-        <Text style={s.muted}>{t("research.noAlerts")}</Text>
+        <View style={{ gap: 8, alignItems: "flex-start" }}>
+          <Button
+            small
+            icon={Plus}
+            hitSlop={6}
+            onPress={() =>
+              setForm({
+                mode: "create",
+                type: "PRICE_ABOVE",
+                threshold: "",
+                interval: "15",
+                enabled: true,
+              })
+            }
+          >
+            {t("research.addAlert")}
+          </Button>
+          <Text style={s.muted}>{t("research.noAlerts")}</Text>
+        </View>
       )}
 
       {form && (

@@ -58,6 +58,7 @@ import {
   type WatchlistSymbol,
 } from "./market";
 import { defaultCurrency, directionOf, formatPercent, formatPrice } from "./market-format";
+import { type InvestmentNote, loadNotes, useNotesState } from "./notes";
 import { QuoteCard } from "./quote-card";
 import { availabilityFromQuote, type QuoteAvailability, useQuotes } from "./quotes";
 import { breakpoints, layout, space } from "./theme";
@@ -73,6 +74,7 @@ import {
   Sheet,
   s,
 } from "./ui";
+import { latestNoteForSymbol } from "./watchlist-symbol-view";
 import { useWorkspace } from "./workspace";
 
 type WatchlistFilter = "all" | "CN" | "HK" | "US" | "FUND";
@@ -243,6 +245,7 @@ const dotStyle = {
 
 function SymbolCard({
   item,
+  note,
   style,
   availability,
   onRetry,
@@ -250,6 +253,7 @@ function SymbolCard({
   onMore,
 }: {
   item: WatchlistSymbol;
+  note?: InvestmentNote;
   style?: ViewStyle;
   availability?: QuoteAvailability;
   onRetry?: () => void;
@@ -295,10 +299,19 @@ function SymbolCard({
         ) : undefined
       }
       footer={
-        alert ? (
-          <AlertBadge alert={alert} />
-        ) : unavailable && !quote ? (
-          <Text style={s.small}>{t("markets.quoteUnavailable")}</Text>
+        alert || note || (unavailable && !quote) ? (
+          <View style={{ gap: 6 }}>
+            {alert ? (
+              <AlertBadge alert={alert} />
+            ) : unavailable && !quote ? (
+              <Text style={s.small}>{t("markets.quoteUnavailable")}</Text>
+            ) : null}
+            {note ? (
+              <Text numberOfLines={1} style={s.small}>
+                {note.title || note.content}
+              </Text>
+            ) : null}
+          </View>
         ) : undefined
       }
     />
@@ -370,12 +383,14 @@ function tableQuote(item: WatchlistSymbol, quotes: Record<string, QuoteAvailabil
 function WatchTable({
   items,
   quotes,
+  notes,
   onOpen,
   onAnalyze,
   onRemove,
 }: {
   items: WatchlistSymbol[];
   quotes: Record<string, QuoteAvailability>;
+  notes: readonly InvestmentNote[];
   onOpen: (item: WatchlistSymbol) => void;
   onAnalyze: (item: WatchlistSymbol) => void;
   onRemove: (item: WatchlistSymbol) => void;
@@ -409,24 +424,22 @@ function WatchTable({
         const direction = directionOf(changePercent ?? 0);
         const color = changePercent === undefined ? colors.muted : marketDirectionColor(direction);
         const labels = marketAndAssetLabel(item.symbol, t);
+        const note = latestNoteForSymbol(notes, item.symbol.code);
         return (
-          <View
+          <Pressable
             key={item.symbol.code}
-            style={[
+            accessibilityRole="button"
+            accessibilityLabel={`${item.symbol.name} ${item.symbol.code}`}
+            onPress={() => onOpen(item)}
+            style={({ pressed }) => [
               s.row,
               rowStyle,
               index > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
+              pressed && { backgroundColor: colors.overlay1 },
             ]}
           >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${item.symbol.name} ${item.symbol.code}`}
-              onPress={() => onOpen(item)}
-              style={({ pressed }) => [
-                s.row,
-                { flex: 1.7, minWidth: TABLE_NAME_MIN, gap: 10, paddingVertical: 12 },
-                pressed && { opacity: 0.7 },
-              ]}
+            <View
+              style={[s.row, { flex: 1.7, minWidth: TABLE_NAME_MIN, gap: 10, paddingVertical: 12 }]}
             >
               <View style={[s.glyph, { width: 32, height: 36 }]}>
                 {item.symbol.market === "ETF" || item.symbol.market === "FUND" ? (
@@ -445,8 +458,13 @@ function WatchTable({
                 <Text numberOfLines={1} style={{ fontSize: 11, color: colors.faint }}>
                   {item.symbol.code}
                 </Text>
+                {!!note && (
+                  <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
+                    {note.title || note.content}
+                  </Text>
+                )}
               </View>
-            </Pressable>
+            </View>
             <View style={{ width: 76, gap: 2 }}>
               <Text numberOfLines={1} style={{ fontSize: 11, color: colors.text }}>
                 {labels.market}
@@ -489,7 +507,10 @@ function WatchTable({
                 accessibilityRole="button"
                 accessibilityLabel={t("markets.watchlistAnalyze")}
                 hitSlop={8}
-                onPress={() => onAnalyze(item)}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onAnalyze(item);
+                }}
                 style={[s.row, { gap: 3, minHeight: 32 }]}
               >
                 <Sparkles size={12} color={colors.link} />
@@ -501,13 +522,16 @@ function WatchTable({
                 accessibilityRole="button"
                 accessibilityLabel={t("markets.watchlistRemove")}
                 hitSlop={8}
-                onPress={() => onRemove(item)}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onRemove(item);
+                }}
                 style={{ width: 28, minHeight: 32, alignItems: "center", justifyContent: "center" }}
               >
                 <Trash2 size={13} color={colors.faint} />
               </Pressable>
             </View>
-          </View>
+          </Pressable>
         );
       })}
     </View>
@@ -1178,6 +1202,7 @@ export function WatchlistScreen() {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const state = useWatchlistState();
+  const notesState = useNotesState();
   const [filterQuery, setFilterQuery] = useState("");
   const [marketFilter, setMarketFilter] = useState<WatchlistFilter>("all");
   const [sheet, setSheet] = useState<"create" | "edit" | "add" | null>(null);
@@ -1189,6 +1214,10 @@ export function WatchlistScreen() {
   useEffect(() => {
     void loadWatchlists(api, locale);
   }, [api, locale]);
+
+  useEffect(() => {
+    void loadNotes(api);
+  }, [api]);
 
   // 行情刷新：60s 轮询（符合 P0「≤1 分钟」要求）。
   useEffect(() => {
@@ -1215,7 +1244,7 @@ export function WatchlistScreen() {
 
   const openSymbol = (item: WatchlistSymbol) =>
     open({
-      type: "symbol",
+      type: "watchlist-symbol",
       symbol: item.symbol,
       quote: item.quote,
       watchlist: { id: list?.id ?? "", name: list?.name ?? "" },
@@ -1418,6 +1447,7 @@ export function WatchlistScreen() {
           <WatchTable
             items={visibleSymbols}
             quotes={quotes}
+            notes={notesState.notes}
             onOpen={openSymbol}
             onAnalyze={analyzeSymbol}
             onRemove={removeItem}
@@ -1436,6 +1466,7 @@ export function WatchlistScreen() {
               >
                 <SymbolCard
                   item={item}
+                  note={latestNoteForSymbol(notesState.notes, item.symbol.code)}
                   availability={quotes[item.symbol.code]}
                   onRetry={retry}
                   style={{ width: "100%", flexGrow: 1 }}
