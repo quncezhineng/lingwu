@@ -30,7 +30,7 @@ import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { fileKind, fileTypeName } from "./file-kind";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
-import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
+import { localizeAgentName, runtimeLabel, statusLabel, tr } from "./i18n/translate";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -2437,10 +2437,10 @@ function normalizeAvatar(value?: string): string {
     : "avatar1";
 }
 export function AgentPersonalitySheet() {
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
   const { close } = useWorkspace();
   const { data, mutate } = useAgentWorkspace();
-  const [name, setName] = useState(data?.identity.name || t("common.agentName"));
+  const [name, setName] = useState(localizeAgentName(data?.identity.name));
   const [tone, setTone] = useState(data?.identity.tone || "warm");
   const [avatar, setAvatar] = useState(normalizeAvatar(data?.identity.avatar));
   const [showChatUpdates, setShowChatUpdates] = useState(data?.identity.showChatUpdates !== false);
@@ -2450,7 +2450,7 @@ export function AgentPersonalitySheet() {
   const [saved, setSaved] = useState(false);
   useEffect(() => {
     if (data?.identity) {
-      setName(data.identity.name);
+      setName(localizeAgentName(data.identity.name));
       setTone(data.identity.tone);
       setAvatar(normalizeAvatar(data.identity.avatar));
       setShowChatUpdates(data.identity.showChatUpdates !== false);
@@ -2460,6 +2460,7 @@ export function AgentPersonalitySheet() {
     data?.identity.tone,
     data?.identity.avatar,
     data?.identity.showChatUpdates,
+    locale,
   ]);
   // 保存成功后弹出「已保存」提示，短暂显示后自动关闭。
   useEffect(() => {

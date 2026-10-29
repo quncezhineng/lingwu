@@ -475,7 +475,7 @@ function WorkspaceShell({
     data?.tasks.find(
       (task) => task.status === "waiting_approval" || task.status === "waiting_input",
     ) || data?.tasks.find((task) => task.status === "running");
-  // 服务端默认名称是英文原名（LingWu），展示前统一本地化，简体中文下显示「灵悟」。
+  // 服务端保存英文默认名 Xiao Wu，展示前按语言本地化为「小悟」或「Xiao Wu」。
   const agentName = localizeAgentName(data?.identity.name);
   const status = activeTask
     ? activeTask.status === "waiting_approval"

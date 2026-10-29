@@ -5,6 +5,50 @@
 
 ## 变更记录
 
+### 2026-10-29 · 消除 Biome lint 告警（useLiteralKeys / noNonNullAssertion / 无用变量）
+
+对内联 lint 输出中暴露的残余告警做最小化清理：
+
+- `packages/integrations/src/market-data.ts`：AKShare 中文键访问由 `parsed["最新"]` 改为字面量键 `parsed.最新`（等价的标识符属性访问，消除 10 处 `lint/complexity/useLiteralKeys` 提示）。
+- `apps/server/src/engine/portfolio-risk.ts`：`sampleCovariance` 移除多余的 `!` 断言（tsconfig 未启用 `noUncheckedIndexedAccess`，索引访问即为 `number`），消除 2 处 `lint/style/noNonNullAssertion` 警告。
+- `tests/portfolio-risk.test.ts`：删除从未使用的 `compoundReturn` 帮助函数，消除 `lint/correctness/noUnusedVariables` 警告。
+
+**验证**
+
+- `pnpm lint`（biome check 377 个文件）：无任何告警。
+- `npx tsc --noEmit`：通过。
+- `tests/portfolio-risk.test.ts` + `tests/rich-threads.test.ts`：18 项全部通过 / 0 失败。
+
+### 2026-10-29 · 修复主对话线程（Rich Threads）孤儿数据导致的永久 502
+
+**现象**
+
+前端对话页顶部显示红色告警：
+
+```
+Main conversation is unavailable. Check the Rich Threads connection and try again.
+```
+
+**根因**
+
+- 本地 PGlite 曾两次损坏重建（`postgres.corrupt-*`），`conversation-settings/main` 保留的 threadId 与 CopilotKit 平台侧云端状态不一致，形成孤儿线程数据。
+- 复现链路（真实 API 探测）：`GET /api/threads/{threadId}?userId=` → **404**，触发 SDK `getOrCreateThread` 走创建流程；`POST /api/threads` → **409 `DATABASE_CONSTRAINT_VIOLATION`**（云端存在该 threadId 但按 userId 查不到）；SDK 捕获 409 后重试 GET → 仍 **404** → SDK 抛出带 `status: 404` 的 `PlatformRequestError`。
+- `apps/server/src/app.ts` 的 `/api/main-thread` 原先无条件 `catch {}` 转 **502**，导致主对话永久不可用。
+
+**修复**（`apps/server/src/app.ts` `/api/main-thread`）
+
+- 捕获错误时结构化判断 `error.status`（SDK 未导出 `PlatformRequestError` 类，按属性判断）。
+- 平台返回 **404/409**（孤儿/约束冲突）→ 为该 owner 生成新 threadId（`randomUUID()`）→ 用新 id 重新 `getOrCreateThread` → 成功则 `db.put` 更新 `conversation-settings/main` 并返回 `{ threadId, existing: false }`，主对话自愈重建。
+- 其余错误（无 `status` 的普通错误、5xx 平台故障）→ 保持原行为返回 502，不产生新 id，不改动 DB。
+- 补充 `console.error` 结构化日志（`phase`、`status`、`replacedThread`），便于后续排障。
+
+**验证**
+
+- `tests/rich-threads.test.ts`：8 项全部通过（新增 1 项：`an orphaned main thread is rebuilt with a fresh id when the platform reports 404/409`）。
+- 既有约束保持：普通 `Error` 抛错仍返回 502 且不创建新 id、DB 记录不变。
+- `pnpm test`：806 项全部通过 / 0 失败。
+- `npx tsc --noEmit`：通过。
+
 ### 2026-10-29 · 修复 lingwu-browser 磁盘写满导致启动崩溃（ENOSPC 自愈 + LRU 淘汰）
 
 **现象**

@@ -17,14 +17,16 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
+  CircleDollarSign,
   Cpu,
-  FileText,
   FolderOpen,
   Globe2,
+  Hand,
   type IconComponent,
   Link2,
   Mail,
   Search,
+  ShieldCheck,
   Sparkles,
   Target,
   X,
@@ -38,16 +40,17 @@ import { useWorkspace } from "./workspace";
 type HubTab = "marketplace" | "mine";
 type CapabilityType = "plugins" | "skills" | "connectors" | "workspace";
 type ConfigSheet = "model" | "openbot";
-type CategoryId =
-  | "all"
+type CapabilityCategoryId =
   | "research"
   | "analysis"
   | "writing"
   | "monitoring"
   | "connections"
   | "workspace";
+type CategoryId = "all" | CapabilityCategoryId | SkillCategory;
 type CatalogTag = Exclude<CategoryId, "all">;
 type CapabilityState = "ready" | "connected" | "available" | "open";
+type CategoryOption = { id: CategoryId; labelKey: TranslationKey };
 
 type CatalogItem = {
   id: string;
@@ -73,7 +76,7 @@ type Shortcut = {
   onPress: () => void;
 };
 
-const CATEGORY_OPTIONS: { id: CategoryId; labelKey: TranslationKey }[] = [
+const CAPABILITY_CATEGORY_OPTIONS: CategoryOption[] = [
   { id: "all", labelKey: "agent.hubCategoryAll" },
   { id: "research", labelKey: "agent.hubCategoryResearch" },
   { id: "analysis", labelKey: "agent.hubCategoryAnalysis" },
@@ -82,6 +85,24 @@ const CATEGORY_OPTIONS: { id: CategoryId; labelKey: TranslationKey }[] = [
   { id: "connections", labelKey: "agent.hubCategoryConnections" },
   { id: "workspace", labelKey: "agent.hubCategoryWorkspace" },
 ];
+
+const SKILL_CATEGORY_OPTIONS: CategoryOption[] = [
+  { id: "all", labelKey: "agent.hubCategoryAll" },
+  { id: "market-macro", labelKey: "agent.hubSkillCategoryMarketMacro" },
+  { id: "company-fundamentals", labelKey: "agent.hubSkillCategoryCompanyFundamentals" },
+  { id: "valuation-modeling", labelKey: "agent.hubSkillCategoryValuationModeling" },
+  { id: "portfolio-trading", labelKey: "agent.hubSkillCategoryPortfolioTrading" },
+  { id: "deals-private-capital", labelKey: "agent.hubSkillCategoryDealsPrivateCapital" },
+  { id: "wealth-risk", labelKey: "agent.hubSkillCategoryWealthRisk" },
+  { id: "research-tools", labelKey: "agent.hubSkillCategoryResearchTools" },
+];
+
+const CATEGORY_OPTIONS_BY_TYPE: Record<CapabilityType, CategoryOption[]> = {
+  plugins: CAPABILITY_CATEGORY_OPTIONS,
+  skills: SKILL_CATEGORY_OPTIONS,
+  connectors: CAPABILITY_CATEGORY_OPTIONS,
+  workspace: CAPABILITY_CATEGORY_OPTIONS,
+};
 
 const FILLER_KEYS = ["a", "b", "c", "d", "e", "f"] as const;
 
@@ -140,11 +161,13 @@ const STATE_KEYS: Record<CapabilityState, TranslationKey> = {
 };
 
 const SKILL_CATEGORY_LABELS: Record<SkillCategory, TranslationKey> = {
-  research: "agent.hubCategoryResearch",
-  analysis: "agent.hubCategoryAnalysis",
-  writing: "agent.hubCategoryWriting",
-  monitoring: "agent.hubCategoryMonitoring",
-  workspace: "agent.hubCategoryWorkspace",
+  "market-macro": "agent.hubSkillCategoryMarketMacro",
+  "company-fundamentals": "agent.hubSkillCategoryCompanyFundamentals",
+  "valuation-modeling": "agent.hubSkillCategoryValuationModeling",
+  "portfolio-trading": "agent.hubSkillCategoryPortfolioTrading",
+  "deals-private-capital": "agent.hubSkillCategoryDealsPrivateCapital",
+  "wealth-risk": "agent.hubSkillCategoryWealthRisk",
+  "research-tools": "agent.hubSkillCategoryResearchTools",
 };
 
 const SKILL_CATEGORY_APPEARANCE: Record<
@@ -155,35 +178,45 @@ const SKILL_CATEGORY_APPEARANCE: Record<
     surface: string;
   }
 > = {
-  research: {
-    icon: Brain,
+  "market-macro": {
+    icon: Activity,
     color: appBrands.report.fg,
     surface: appBrands.report.surface,
   },
-  analysis: {
-    icon: Activity,
+  "company-fundamentals": {
+    icon: Brain,
     color: appBrands.portfolioReview.fg,
     surface: appBrands.portfolioReview.surface,
   },
-  writing: {
-    icon: FileText,
+  "valuation-modeling": {
+    icon: CircleDollarSign,
     color: appBrands.earnings.fg,
     surface: appBrands.earnings.surface,
   },
-  monitoring: {
+  "portfolio-trading": {
     icon: Target,
     color: appBrands.monitoring.fg,
     surface: appBrands.monitoring.surface,
   },
-  workspace: {
-    icon: FolderOpen,
+  "deals-private-capital": {
+    icon: Hand,
+    color: appBrands.dailyReview.fg,
+    surface: appBrands.dailyReview.surface,
+  },
+  "wealth-risk": {
+    icon: ShieldCheck,
     color: appBrands.notes.fg,
     surface: appBrands.notes.surface,
+  },
+  "research-tools": {
+    icon: Sparkles,
+    color: colors.primaryStrong,
+    surface: colors.sky,
   },
 };
 
 function skillCategory(skill: SkillCatalogEntry): SkillCategory {
-  return skill.categories[0] ?? "analysis";
+  return skill.categories[0] ?? "company-fundamentals";
 }
 
 function chunk<T>(items: T[], size: number) {
@@ -469,7 +502,7 @@ function CategoryRail({
   category: CategoryId;
   counts: Record<CategoryId, number>;
   onChange: (next: CategoryId) => void;
-  options: typeof CATEGORY_OPTIONS;
+  options: CategoryOption[];
   horizontal?: boolean;
 }) {
   const { t } = useTranslation();
@@ -838,7 +871,8 @@ export function CapabilityHubScreen() {
   const scopedItems = tabItems.filter((item) => item.type === typeFilter);
   const cardsForCategory = (item: CatalogItem, nextCategory: CategoryId) =>
     nextCategory === "all" || item.tags.includes(nextCategory as CatalogTag);
-  const categoryOptions = CATEGORY_OPTIONS.filter(
+  const baseCategoryOptions = CATEGORY_OPTIONS_BY_TYPE[typeFilter];
+  const categoryOptions = baseCategoryOptions.filter(
     (option) =>
       option.id === "all" ||
       scopedItems.some((item) => item.tags.includes(option.id as CatalogTag)),
@@ -861,7 +895,7 @@ export function CapabilityHubScreen() {
       item.searchText ?? "",
       t(TYPE_LABELS[item.type]),
       ...item.tags.map((tag) => {
-        const option = CATEGORY_OPTIONS.find((candidate) => candidate.id === tag);
+        const option = baseCategoryOptions.find((candidate) => candidate.id === tag);
         return option ? t(option.labelKey) : "";
       }),
     ]

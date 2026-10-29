@@ -70,6 +70,36 @@ test("a failed main-thread connection remains an error and does not create anoth
   assert.deepEqual(await db.get("local-user", "conversation-settings", "main"), before);
 });
 
+test("an orphaned main thread is rebuilt with a fresh id when the platform reports 404/409", async (t) => {
+  const before = await db.get<{ id: string; threadId: string; existing: boolean }>(
+    "local-user",
+    "conversation-settings",
+    "main",
+  );
+  assert.ok(before?.threadId);
+  const calls: string[] = [];
+  t.mock.method(
+    CopilotKitIntelligence.prototype,
+    "getOrCreateThread",
+    async (input: Parameters<CopilotKitIntelligence["getOrCreateThread"]>[0]) => {
+      calls.push(input.threadId);
+      if (input.threadId === before.threadId) {
+        throw Object.assign(new Error("Orphaned thread on the platform"), { status: 404 });
+      }
+      return { id: input.threadId };
+    },
+  );
+  const response = await (await app.request("/api/main-thread", { headers: headers() })).json();
+  assert.notEqual(response.threadId, before.threadId);
+  assert.equal(response.existing, false);
+  assert.equal(calls.at(-1), response.threadId);
+  assert.deepEqual(await db.get("local-user", "conversation-settings", "main"), {
+    id: "main",
+    threadId: response.threadId,
+    existing: false,
+  });
+});
+
 test("Rich Threads lists through CopilotKit, scopes by authenticated owner and preserves pagination", async (t) => {
   const calls: Parameters<CopilotKitIntelligence["listThreads"]>[0][] = [];
   t.mock.method(

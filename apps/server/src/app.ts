@@ -459,7 +459,44 @@ export async function createApp(
         userId: owner,
         agentId: "default",
       });
-    } catch {
+    } catch (error) {
+      // getOrCreateThread 只在异常时抛错：线程不存在时会走创建成功路径。
+      // 若平台返回 404/409，说明该 threadId 在云端存在但当前 userId 查不到
+      // （孤儿/约束冲突数据），此时为该 owner 重建新主线程 id，避免永久 502；
+      // 其余情况（平台故障或普通错误）保持原行为返回 502，不产生新 id。
+      const status =
+        error && typeof error === "object" ? (error as { status?: unknown }).status : undefined;
+      if (status === 404 || status === 409) {
+        const replacement = randomUUID();
+        try {
+          await intelligence.getOrCreateThread({
+            threadId: replacement,
+            userId: owner,
+            agentId: "default",
+          });
+          await db.put(owner, "conversation-settings", {
+            id: "main",
+            threadId: replacement,
+            existing: false,
+          });
+          return c.json({ threadId: replacement, existing: false });
+        } catch (rebuildError) {
+          console.error({
+            timestamp: new Date().toISOString(),
+            context: { phase: "main-thread rebuild", replacedThread: main.threadId },
+            error: rebuildError instanceof Error ? rebuildError.name : "Thread rebuild failed",
+          });
+        }
+      } else {
+        console.error({
+          timestamp: new Date().toISOString(),
+          context: {
+            phase: "main-thread connect",
+            ...(typeof status === "number" ? { status } : {}),
+          },
+          error: error instanceof Error ? error.name : "Main thread unavailable",
+        });
+      }
       throw new AppError(
         "Main conversation is unavailable. Check the Rich Threads connection and try again.",
         502,

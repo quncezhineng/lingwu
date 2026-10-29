@@ -6,6 +6,7 @@ import type { Dictionary } from "../../types";
  */
 const common = {
   "common.agentName": "灵悟",
+  "common.assistantName": "小悟",
   "common.language": "语言",
   "common.changeLanguage": "切换语言",
   "common.currentLanguage": "当前语言：{language}",

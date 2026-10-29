@@ -171,15 +171,23 @@ export function runtimeLabel(value?: string | null): string {
   return key ? tr(key) : value;
 }
 
+/** 新旧版本使用过的默认智能体名称；这些值需要随界面语言自动本地化。 */
+const DEFAULT_AGENT_NAME_ALIASES = new Set([
+  translate(FALLBACK_LOCALE, "common.assistantName"),
+  translate("zh-Hans", "common.assistantName"),
+  "LingWu",
+  "灵悟",
+  "灵儿",
+]);
+
 /**
- * 统一智能体名称的展示：服务端默认返回英文原名（LingWu），
- * 在简体中文下必须显示为「灵悟」。用户自定义过的名称（与英文原名不同）
- * 原样返回，避免覆盖用户数据。
+ * 统一智能体名称的展示：默认值在中文显示「小悟」、英文显示「Xiao Wu」。
+ * 用户自定义名称原样返回，避免覆盖用户数据。
  */
 export function localizeAgentName(name?: string | null): string {
-  const localized = tr("common.agentName");
+  const localized = tr("common.assistantName");
   if (!name) return localized;
-  return name === translate(FALLBACK_LOCALE, "common.agentName") ? localized : name;
+  return DEFAULT_AGENT_NAME_ALIASES.has(name.trim()) ? localized : name;
 }
 
 /**

@@ -501,23 +501,23 @@ export class AkshareProvider implements MarketDataProvider {
     } catch {
       throw new MarketDataError("parse", "AKShare helper returned malformed JSON");
     }
-    const price = Number(parsed["最新"]);
-    const previousClose = Number(parsed["昨收"]);
+    const price = Number(parsed.最新);
+    const previousClose = Number(parsed.昨收);
     if (!Number.isFinite(price) || !Number.isFinite(previousClose))
       throw new MarketDataError("parse", `AKShare has no quote for ${symbol}`);
     const change = price - previousClose;
     return {
       symbol: symbol.toUpperCase(),
-      name: typeof parsed["名称"] === "string" ? (parsed["名称"] as string) : undefined,
+      name: typeof parsed.名称 === "string" ? (parsed.名称 as string) : undefined,
       market: "CN",
       currency: "CNY",
       price,
       previousClose,
       change,
       changePercent: previousClose === 0 ? 0 : (change / previousClose) * 100,
-      dayHigh: Number.isFinite(Number(parsed["最高"])) ? Number(parsed["最高"]) : undefined,
-      dayLow: Number.isFinite(Number(parsed["最低"])) ? Number(parsed["最低"]) : undefined,
-      volume: Number.isFinite(Number(parsed["总手"])) ? Number(parsed["总手"]) : undefined,
+      dayHigh: Number.isFinite(Number(parsed.最高)) ? Number(parsed.最高) : undefined,
+      dayLow: Number.isFinite(Number(parsed.最低)) ? Number(parsed.最低) : undefined,
+      volume: Number.isFinite(Number(parsed.总手)) ? Number(parsed.总手) : undefined,
       asOf: new Date().toISOString(),
       source: "akshare",
     };

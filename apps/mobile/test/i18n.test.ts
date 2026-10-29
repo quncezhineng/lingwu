@@ -65,6 +65,8 @@ test("英文语言包不包含中文（防止误把中文写进英文包）", ()
 test("专有名词 LingWu 在简体中文中统一译为「灵悟」", () => {
   assert.equal(en["common.agentName"], "LingWu");
   assert.equal(zhHans["common.agentName"], "灵悟");
+  assert.equal(en["common.assistantName"], "Xiao Wu");
+  assert.equal(zhHans["common.assistantName"], "小悟");
   // 英文里只要出现 LingWu，简体中文对应位置就必须出现「灵悟」。
   const sources = Object.entries(en).filter(([, value]) => value.includes("LingWu"));
   assert.ok(sources.length >= 5, "应至少覆盖欢迎语、本地工作区提示、水豚无障碍文案等处");
@@ -126,15 +128,22 @@ test("statusLabel 命中语言包并跟随语言切换，未登记值退回通�
   }
 });
 
-test("localizeAgentName 把服务端英文原名统一显示为当前语言译名", () => {
+test("localizeAgentName 让默认智能体名称跟随当前语言", () => {
   const original = getActiveLocale();
   try {
     setActiveLocale("zh-Hans");
-    assert.equal(localizeAgentName("LingWu"), "灵悟");
-    assert.equal(localizeAgentName(undefined), "灵悟");
+    assert.equal(localizeAgentName("Xiao Wu"), "小悟");
+    assert.equal(localizeAgentName("小悟"), "小悟");
+    assert.equal(localizeAgentName("LingWu"), "小悟");
+    assert.equal(localizeAgentName("灵儿"), "小悟");
+    assert.equal(localizeAgentName(undefined), "小悟");
     assert.equal(localizeAgentName("小明"), "小明");
     setActiveLocale("en");
-    assert.equal(localizeAgentName("LingWu"), "LingWu");
+    assert.equal(localizeAgentName("Xiao Wu"), "Xiao Wu");
+    assert.equal(localizeAgentName("小悟"), "Xiao Wu");
+    assert.equal(localizeAgentName("LingWu"), "Xiao Wu");
+    assert.equal(localizeAgentName(undefined), "Xiao Wu");
+    assert.equal(localizeAgentName("Ming"), "Ming");
   } finally {
     setActiveLocale(original);
   }

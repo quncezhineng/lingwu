@@ -53,9 +53,6 @@ test("weightedReturns blends holdings by weight", () => {
   assert.ok(Math.abs((blended[1]?.ret ?? 0) + 0.04) < 1e-12);
 });
 
-const compoundReturn = (values: number[]) =>
-  (values.reduce((product, value) => product * (1 + value), 1) - 1) * 100;
-
 test("beta is 2 when portfolio returns are twice the benchmark", () => {
   const metrics = computeRiskMetrics({
     currency: "USD",

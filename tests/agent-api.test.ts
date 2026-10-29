@@ -17,6 +17,7 @@ import type {
   Monitor,
   RunEvent,
 } from "../packages/domain/src/agent.ts";
+import { defaultAgentName } from "../packages/domain/src/agent.ts";
 
 let db: Store, server: Awaited<ReturnType<typeof createApp>>, directory: string, token: string;
 let config: Config;
@@ -81,7 +82,7 @@ test("agent API requires a session and reports the actual worker state", async (
   );
   const workspace = await read<AgentWorkspace>("");
   assert.equal(workspace.worker.running, false);
-  assert.equal(workspace.identity.name, "LingWu");
+  assert.equal(workspace.identity.name, defaultAgentName);
   assert.equal(workspace.identity.tone, "warm");
 });
 

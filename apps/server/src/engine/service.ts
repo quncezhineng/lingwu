@@ -8,6 +8,7 @@ import {
   type AgentTask,
   type AgentWorkspace,
   createTaskSchema,
+  defaultAgentName,
   type Evidence,
   type Goal,
   goalInputSchema,
@@ -229,7 +230,7 @@ export class AgentService {
   async ensure(owner: string) {
     await this.db.insertIfAbsent(owner, "agent-settings", {
       id: "identity",
-      name: "LingWu",
+      name: defaultAgentName,
       tone: "warm",
     });
   }
@@ -255,7 +256,7 @@ export class AgentService {
       memories,
       artifacts,
       notifications,
-      identity: identity ?? { name: "LingWu", tone: "warm" },
+      identity: identity ?? { name: defaultAgentName, tone: "warm" },
       worker: {
         running:
           this.worker.running ||

@@ -138,6 +138,7 @@ export interface AgentIdentity {
   avatar?: "avatar1" | "avatar2" | "avatar3" | "avatar4" | "avatar5" | "avatar6";
   showChatUpdates?: boolean;
 }
+export const defaultAgentName = "Xiao Wu";
 export interface AgentWorkspace {
   tasks: AgentTask[];
   goals: Goal[];

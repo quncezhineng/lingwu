@@ -103,7 +103,7 @@ export function sampleCovariance(a: number[], b: number[]): number {
   const meanA = mean(a);
   const meanB = mean(b);
   let sum = 0;
-  for (let i = 0; i < a.length; i++) sum += (a[i]! - meanA) * (b[i]! - meanB);
+  for (let i = 0; i < a.length; i++) sum += (a[i] - meanA) * (b[i] - meanB);
   return sum / (a.length - 1);
 }
 
