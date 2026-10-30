@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
@@ -34,7 +35,6 @@ import {
   X,
 } from "./icons";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
-import { StatusBadge } from "./status-badge";
 import { breakpoints, radius } from "./theme";
 import { appBrands, Button, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -324,6 +324,96 @@ function ShortcutCard({
   );
 }
 
+function ConnectedCapabilityBadge({ label }: { label: string }) {
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      style={{
+        minHeight: 30,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 9,
+        borderRadius: radius.control,
+        backgroundColor: colors.sky,
+      }}
+    >
+      <Check size={13} color={colors.primary} />
+      <Text
+        style={{
+          color: colors.primaryStrong,
+          fontSize: 11,
+          lineHeight: 16,
+          fontWeight: "500",
+          fontFamily: fonts.sans,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function CapabilityAction({
+  item,
+  tab,
+  installBusy,
+  onSetInstalled,
+}: {
+  item: CatalogItem;
+  tab: HubTab;
+  installBusy: boolean;
+  onSetInstalled: (installed: boolean) => void;
+}) {
+  const { t } = useTranslation();
+
+  if (item.installed) {
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+        <ConnectedCapabilityBadge label={t("agent.hubStateConnected")} />
+        {tab === "mine" && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("agent.hubRemove")}
+            accessibilityState={{ disabled: installBusy }}
+            disabled={installBusy}
+            hitSlop={8}
+            onPress={() => onSetInstalled(false)}
+            style={({ pressed }) => ({
+              width: 28,
+              height: 28,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: radius.field,
+              backgroundColor: pressed ? colors.surfaceSoft : "transparent",
+              opacity: installBusy ? 0.4 : 1,
+            })}
+          >
+            {installBusy ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Trash2 size={14} color={colors.muted} />
+            )}
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <Button
+      small
+      primary
+      icon={Plus}
+      busy={installBusy}
+      onPress={() => onSetInstalled(true)}
+      style={{ minHeight: 30, paddingVertical: 4, paddingHorizontal: 10 }}
+    >
+      {installBusy ? t("agent.hubInstalling") : t("agent.hubInstall")}
+    </Button>
+  );
+}
+
 function CapabilityCard({
   item,
   tab,
@@ -341,7 +431,7 @@ function CapabilityCard({
       style={{
         flex: 1,
         minWidth: 0,
-        minHeight: 205,
+        minHeight: 176,
         borderRadius: radius.card,
         borderWidth: 1,
         borderColor: colors.line,
@@ -407,6 +497,7 @@ function CapabilityCard({
           style={[
             s.between,
             {
+              gap: 8,
               paddingTop: 10,
               borderTopWidth: 1,
               borderTopColor: colors.line,
@@ -416,53 +507,23 @@ function CapabilityCard({
           <Text
             numberOfLines={1}
             style={{
-              maxWidth: "52%",
+              flex: 1,
+              minWidth: 0,
               color: colors.faint,
               fontSize: 11,
               lineHeight: 16,
               fontFamily: fonts.sans,
             }}
           >
-            {item.source}
+            {item.installed ? item.source : `${item.source} · ${t(STATE_KEYS[item.state])}`}
           </Text>
-          <StatusBadge
-            tone={item.state === "available" ? "paused" : "done"}
-            label={t(STATE_KEYS[item.state])}
-            style={item.state === "available" ? undefined : { backgroundColor: colors.sky }}
+          <CapabilityAction
+            item={item}
+            tab={tab}
+            installBusy={installBusy}
+            onSetInstalled={onSetInstalled}
           />
         </View>
-        {tab === "mine" ? (
-          <Button
-            small
-            icon={Trash2}
-            busy={installBusy}
-            onPress={() => onSetInstalled(false)}
-            style={{ width: "100%", marginTop: 10 }}
-          >
-            {t("agent.hubRemove")}
-          </Button>
-        ) : item.installed ? (
-          <Button
-            small
-            icon={Check}
-            disabled
-            onPress={() => undefined}
-            style={{ width: "100%", marginTop: 10 }}
-          >
-            {t("agent.hubInstalled")}
-          </Button>
-        ) : (
-          <Button
-            small
-            primary
-            icon={Plus}
-            busy={installBusy}
-            onPress={() => onSetInstalled(true)}
-            style={{ width: "100%", marginTop: 10 }}
-          >
-            {t("agent.hubInstall")}
-          </Button>
-        )}
       </View>
     </View>
   );
