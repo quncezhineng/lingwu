@@ -34,6 +34,7 @@ import { AssistantResponse } from "./assistant-response";
 import { BackgroundUpdates } from "./background-updates";
 import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
 import { displayUserMessage, promptWithAttachments } from "./chat-content";
+import { ComposerModelSelector } from "./composer-model-selector";
 import { BrowserThreadCard } from "./computer";
 import { ConversationHeader, type ConversationHeaderState } from "./conversation-header";
 import {
@@ -55,7 +56,7 @@ import { DesktopToolCard } from "./desktop-tool-card";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { type TranslationKey, useTranslation } from "./i18n";
-import { localizeAgentName, statusLabel } from "./i18n/translate";
+import { statusLabel } from "./i18n/translate";
 import {
   ArrowDown,
   ArrowUpRight,
@@ -87,6 +88,15 @@ import { Button, Card, colors, dateLabel, Empty, ErrorNotice, fonts, s, shadow }
 import { useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
+
+/** 对话标题与输入区等宽居中，消息列稍窄，左右各留出 5px。 */
+const conversationColumnStyle = {
+  width: "100%",
+  maxWidth: 965,
+  alignSelf: "center",
+} as const;
+
+const messageColumnStyle = { ...conversationColumnStyle, maxWidth: 955 } as const;
 
 // 用户消息气泡（品牌色底、反白文字）上的 Markdown 渲染：标题/加粗/链接跟随 onPrimary 白色系，
 // 行内代码与代码块保留浅蓝底做区隔，保证品牌底色气泡内的可读性。
@@ -1032,7 +1042,7 @@ export function ChatScreen({
         >
           <Text>{streamAnnouncement}</Text>
         </View>
-        <View style={{ width: "100%", maxWidth: 900, alignSelf: "center" }}>
+        <View style={conversationColumnStyle}>
           <ConversationHeader
             title={threadName}
             status={headerStatus}
@@ -1044,6 +1054,7 @@ export function ChatScreen({
         </View>
         <ScrollView
           ref={list}
+          style={messageColumnStyle}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ gap: 13, paddingTop: 15, paddingBottom: 20, flexGrow: 1 }}
           onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
@@ -1218,9 +1229,8 @@ export function ChatScreen({
                   key={message.id}
                   style={{
                     alignSelf: user ? "flex-end" : "flex-start",
-                    // 助手回复卡片占据更宽的内容列（原 720 在高分屏下留白过多）。
-                    maxWidth: user ? 560 : 860,
-                    width: toolCalls.length ? "95%" : undefined,
+                    maxWidth: user ? 560 : "100%",
+                    width: user ? undefined : "100%",
                     gap: 8,
                   }}
                 >
@@ -1371,10 +1381,7 @@ export function ChatScreen({
             })
           )}
           {extraDrafts.map((draft) => (
-            <View
-              key={`live-${draft.id}`}
-              style={{ alignSelf: "flex-start", maxWidth: "95%", width: "95%" }}
-            >
+            <View key={`live-${draft.id}`} style={{ alignSelf: "flex-start", width: "100%" }}>
               <View
                 style={{
                   paddingHorizontal: 16,
@@ -1550,23 +1557,12 @@ export function ChatScreen({
             </Button>
           )}
         </ScrollView>
-        {awayFromLatest && (
-          <Button
-            small
-            icon={ArrowDown}
-            style={{ alignSelf: "center", marginBottom: 10 }}
-            onPress={() => {
-              followLatest.current = true;
-              setAwayFromLatest(false);
-              list.current?.scrollToEnd({ animated: true });
-            }}
-          >
-            {t("chat.latestMessages")}
-          </Button>
-        )}
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={keyboardPadding > 0 ? { paddingBottom: keyboardPadding } : undefined}
+          style={[
+            conversationColumnStyle,
+            keyboardPadding > 0 && { paddingBottom: keyboardPadding },
+          ]}
         >
           <ErrorNotice error={saveError} />
           {!!saveError && (
@@ -1648,69 +1644,85 @@ export function ChatScreen({
               )}
             </View>
           )}
-          <PromptComposer
-            inputRef={composerInput}
-            value={draft}
-            onChangeText={setDraft}
-            onSubmit={replying ? () => void stop() : send}
-            placeholder={
-              !isReady
-                ? t("chat.connecting")
-                : !loaded
-                  ? historyError
-                    ? t("chat.conversationUnavailable")
-                    : t("chat.loadingConversation")
-                  : t("chat.messagePlaceholder")
-            }
-            accessibilityLabel={t("chat.messageLingWu")}
-            inputMinHeight={44}
-            inputMaxHeight={140}
-            dense
-            tools={[
-              {
-                key: "attach",
-                icon: Upload,
-                label: t("chat.uploadMaterial"),
-                active: uploading,
-                onPress: () => void uploadMaterial(),
-              },
-              {
-                key: "files",
-                icon: FolderOpen,
-                label: t("chat.filePickerTool"),
-                active: picking,
-                onPress: openFilePicker,
-              },
-            ]}
-            attachments={
-              <ComposerAttachments
-                files={w.files}
-                selectedIds={attachments}
-                onRemove={(id) =>
-                  setAttachments((ids) => ids.filter((candidate) => candidate !== id))
-                }
-              />
-            }
-            assistantLabel={t("app.agentSettingsLabel", {
-              name: localizeAgentName(
-                agentWorkspace?.identity.name,
-                agentWorkspace?.identity.nameCustomized,
-              ),
-            })}
-            assistantText={t("workbench.depthAnalysis")}
-            onOpenAssistant={() => open({ type: "personality" })}
-            sendLabel={t("chat.sendMessage")}
-            stopLabel={t("chat.stopReply")}
-            busy={replying}
-            submitDisabled={!loaded || !isReady}
-            style={{
-              width: "100%",
-              maxWidth: 900,
-              alignSelf: "center",
-              // 桌面宽屏下输入框不贴浏览器底部,留出呼吸间距
-              ...(wide ? { marginBottom: 18 } : null),
-            }}
-          />
+          <View style={conversationColumnStyle}>
+            {awayFromLatest && (
+              <View
+                pointerEvents="box-none"
+                style={{
+                  position: "absolute",
+                  bottom: "100%",
+                  left: 0,
+                  right: 0,
+                  paddingBottom: 10,
+                  alignItems: "center",
+                  zIndex: 2,
+                }}
+              >
+                <Button
+                  small
+                  icon={ArrowDown}
+                  style={{ backgroundColor: `${colors.paper}E6`, ...shadow.card }}
+                  onPress={() => {
+                    followLatest.current = true;
+                    setAwayFromLatest(false);
+                    list.current?.scrollToEnd({ animated: true });
+                  }}
+                >
+                  {t("chat.latestMessages")}
+                </Button>
+              </View>
+            )}
+            <PromptComposer
+              inputRef={composerInput}
+              value={draft}
+              onChangeText={setDraft}
+              onSubmit={replying ? () => void stop() : send}
+              placeholder={
+                !isReady
+                  ? t("chat.connecting")
+                  : !loaded
+                    ? historyError
+                      ? t("chat.conversationUnavailable")
+                      : t("chat.loadingConversation")
+                    : t("chat.messagePlaceholder")
+              }
+              accessibilityLabel={t("chat.messageLingWu")}
+              inputMinHeight={44}
+              inputMaxHeight={140}
+              dense
+              tools={[
+                {
+                  key: "attach",
+                  icon: Upload,
+                  label: t("chat.uploadMaterial"),
+                  active: uploading,
+                  onPress: () => void uploadMaterial(),
+                },
+                {
+                  key: "files",
+                  icon: FolderOpen,
+                  label: t("chat.filePickerTool"),
+                  active: picking,
+                  onPress: openFilePicker,
+                },
+              ]}
+              attachments={
+                <ComposerAttachments
+                  files={w.files}
+                  selectedIds={attachments}
+                  onRemove={(id) =>
+                    setAttachments((ids) => ids.filter((candidate) => candidate !== id))
+                  }
+                />
+              }
+              modelSelector={<ComposerModelSelector disabled={replying} />}
+              sendLabel={t("chat.sendMessage")}
+              stopLabel={t("chat.stopReply")}
+              busy={replying}
+              submitDisabled={!loaded || !isReady}
+              style={[conversationColumnStyle, wide && { marginBottom: 18 }]}
+            />
+          </View>
         </KeyboardAvoidingView>
       </View>
       {picking && (

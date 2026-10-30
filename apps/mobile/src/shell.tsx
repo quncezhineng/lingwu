@@ -1,16 +1,17 @@
 /**
  * 应用外壳。
  *
- * 桌面端是 232px 文本侧栏 + 主工作区，信息架构对齐 Demo：
+ * 桌面端是可折叠的文本/图标侧栏 + 主工作区，信息架构对齐 Demo：
  * 工作台、对话、自选、动态、灵感、盯盘、资料、投资偏好和应用。
  * 进入对话时额外显示会话列表栏，保留完整的历史会话管理与切换能力。
  */
 import { useThreads } from "@copilotkit/react-native/headless";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
   Pressable,
+  type PressableProps,
   ScrollView,
   Text,
   TextInput,
@@ -26,6 +27,8 @@ import {
   Archive,
   Bell,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CircleUserRound,
   FileText,
   Heart,
@@ -46,6 +49,7 @@ import {
   X,
 } from "./icons";
 import { relativeDate } from "./relative-date";
+import { toggleSidebar, useSidebarCollapsed } from "./sidebar-state";
 import { layout } from "./theme";
 import { useLingWuThread } from "./threads";
 import { Button, colors, ErrorNotice, fonts, Mascot, radius, s, shadow } from "./ui";
@@ -93,21 +97,52 @@ function errorText(e: unknown) {
   return e instanceof Error ? e.message : String(e);
 }
 
+const SidebarTooltipContext = createContext<{
+  show: (label: string, anchor: View) => void;
+  hide: () => void;
+}>({ show: () => {}, hide: () => {} });
+
+/** 提示由侧栏根节点绘制，避免导航滚动区裁切；键盘聚焦时同样可见。 */
+function SidebarButton({ tip, onPress, ...props }: PressableProps & { tip?: string }) {
+  const anchor = useRef<View>(null);
+  const tooltip = useContext(SidebarTooltipContext);
+  const show = () => {
+    if (tip && anchor.current) tooltip.show(tip, anchor.current);
+  };
+  return (
+    <Pressable
+      {...props}
+      ref={anchor}
+      onHoverIn={show}
+      onHoverOut={tooltip.hide}
+      onFocus={show}
+      onBlur={tooltip.hide}
+      onPress={(event) => {
+        tooltip.hide();
+        onPress?.(event);
+      }}
+    />
+  );
+}
+
 function SidebarNavItem({
   icon: Icon,
   label,
   active,
   badge,
+  collapsed,
   onPress,
 }: {
   icon: IconComponent;
   label: string;
   active: boolean;
   badge?: number;
+  collapsed: boolean;
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <SidebarButton
+      tip={collapsed ? label : undefined}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}
@@ -117,6 +152,7 @@ function SidebarNavItem({
         minHeight: 42,
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: collapsed ? "center" : "flex-start",
         gap: 12,
         paddingHorizontal: 12,
         paddingVertical: 9,
@@ -129,35 +165,42 @@ function SidebarNavItem({
         strokeWidth={active ? 1.9 : 1.7}
         color={active ? colors.primary : colors.muted}
       />
-      <Text
-        numberOfLines={1}
-        style={{
-          flex: 1,
-          fontSize: 14,
-          lineHeight: 20,
-          fontWeight: active ? "600" : "500",
-          color: active ? colors.primaryStrong : colors.text,
-          fontFamily: fonts.sans,
-        }}
-      >
-        {label}
-      </Text>
+      {!collapsed && (
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            fontSize: 14,
+            lineHeight: 20,
+            fontWeight: active ? "600" : "500",
+            color: active ? colors.primaryStrong : colors.text,
+            fontFamily: fonts.sans,
+          }}
+        >
+          {label}
+        </Text>
+      )}
       {!!badge && badge > 0 && (
         <View
           style={{
-            minWidth: 20,
-            height: 20,
+            ...(collapsed ? { position: "absolute", right: 3, top: 3 } : {}),
+            minWidth: collapsed ? 8 : 20,
+            height: collapsed ? 8 : 20,
             borderRadius: 10,
-            paddingHorizontal: 5,
+            paddingHorizontal: collapsed ? 0 : 5,
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: colors.primaryAction,
           }}
         >
-          <Text style={{ fontSize: 10, fontWeight: "700", color: colors.onPrimary }}>{badge}</Text>
+          {!collapsed && (
+            <Text style={{ fontSize: 10, fontWeight: "700", color: colors.onPrimary }}>
+              {badge}
+            </Text>
+          )}
         </View>
       )}
-    </Pressable>
+    </SidebarButton>
   );
 }
 
@@ -214,6 +257,33 @@ export function Rail({ name }: { name: string }) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const [accountAvatarUrl, setAccountAvatarUrl] = useState<string>();
+  const collapsed = useSidebarCollapsed();
+  const sidebarWidth = collapsed ? layout.sidebarCollapsed : SIDEBAR_WIDTH;
+  const rail = useRef<View>(null);
+  const tooltipRequest = useRef(0);
+  const [tooltip, setTooltip] = useState<{ label: string; top: number }>();
+  const { height } = useWindowDimensions();
+  const hideTooltip = () => {
+    tooltipRequest.current += 1;
+    setTooltip(undefined);
+  };
+  const showTooltip = (label: string, anchor: View) => {
+    const request = ++tooltipRequest.current;
+    rail.current?.measureInWindow((_railX, railY) => {
+      anchor.measureInWindow((_x, y, _width, anchorHeight) => {
+        if (request !== tooltipRequest.current) return;
+        setTooltip({
+          label,
+          top: Math.max(8, Math.min(y - railY + anchorHeight / 2 - 17, height - railY - 42)),
+        });
+      });
+    });
+  };
+
+  useEffect(() => {
+    tooltipRequest.current += 1;
+    setTooltip(undefined);
+  }, [collapsed, section, height]);
 
   useEffect(() => {
     let active = true;
@@ -243,195 +313,289 @@ export function Rail({ name }: { name: string }) {
       : t("app.noActiveMonitors");
 
   return (
-    <View
-      style={{
-        width: SIDEBAR_WIDTH,
-        flexShrink: 0,
-        zIndex: 20,
-        borderRightWidth: 1,
-        borderRightColor: colors.line,
-        backgroundColor: colors.sidebar,
-        paddingHorizontal: 20,
-        paddingTop: 22,
-        paddingBottom: 18,
-      }}
-    >
-      <View style={[s.row, { gap: 10, paddingHorizontal: 2 }]}>
-        <BrandMark size={29} />
-        <Text
-          style={{
-            fontSize: 22,
-            lineHeight: 29,
-            fontWeight: "600",
-            color: colors.text,
-            letterSpacing: 2.4,
-            fontFamily: fonts.serif,
-          }}
-        >
-          {t("common.agentName")}
-        </Text>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("app.newAnalysis")}
-        onPress={() => navigate("chat")}
-        style={({ pressed }) => ({
-          marginTop: 28,
-          minHeight: 44,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 9,
-          paddingHorizontal: 13,
-          borderRadius: radius.control,
-          borderWidth: 1,
-          borderColor: colors.lineStrong,
-          backgroundColor: pressed ? colors.overlay1 : colors.paper,
-        })}
-      >
-        <Plus size={16} strokeWidth={1.9} color={colors.text} />
-        <Text style={{ flex: 1, fontSize: 13, fontWeight: "600", color: colors.text }}>
-          {t("app.newAnalysis")}
-        </Text>
-        <Text style={{ fontSize: 11, color: colors.faint }}>⌘ J</Text>
-      </Pressable>
-
-      <ScrollView
-        style={{ flex: 1, marginHorizontal: -8, marginTop: 14 }}
-        contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={{ gap: 2 }}>
-          {SECTION_NAV.map((item) => (
-            <SidebarNavItem
-              key={item.id}
-              icon={item.icon}
-              label={t(item.labelKey)}
-              active={
-                section === item.id ||
-                (item.id === "watchlist" && section === "portfolio") ||
-                (item.id === "files" && section === "notes")
-              }
-              badge={item.id === "activity" && activeCount ? activeCount : undefined}
-              onPress={() => navigate(item.id)}
-            />
-          ))}
-        </View>
-      </ScrollView>
-
+    <SidebarTooltipContext.Provider value={{ show: showTooltip, hide: hideTooltip }}>
       <View
+        ref={rail}
         style={{
-          width: "100%",
-          gap: 10,
-          paddingTop: 12,
-          borderTopWidth: 1,
-          borderTopColor: colors.line,
+          width: sidebarWidth,
+          flexShrink: 0,
+          zIndex: 20,
+          borderRightWidth: 1,
+          borderRightColor: colors.line,
+          backgroundColor: colors.sidebar,
+          paddingHorizontal: collapsed ? 12 : 20,
+          paddingTop: 22,
+          paddingBottom: 18,
         }}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("app.agentSettingsLabel", { name })}
-          onPress={() => open({ type: "personality" })}
-          style={({ pressed }) => ({
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            marginHorizontal: -4,
-            paddingHorizontal: 8,
-            paddingVertical: 8,
-            borderRadius: radius.control,
-            backgroundColor: pressed ? colors.overlay1 : "transparent",
-          })}
-        >
-          <View
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 15,
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 1,
-              borderColor: colors.line,
-              backgroundColor: colors.paper,
-            }}
-          >
-            <Mascot size={24} variant={data?.identity.avatar} background={colors.paper} />
-          </View>
-          <View style={{ flex: 1, gap: 1 }}>
-            <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
-              {t("app.agentWatching", { name })}
-            </Text>
-            <View style={[s.row, { gap: 5 }]}>
-              <View
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: 3,
-                  backgroundColor: activeMonitorCount > 0 ? colors.primary : colors.disabled,
-                }}
-              />
-              <Text style={{ fontSize: 10, color: colors.muted }}>{monitorStatus}</Text>
-            </View>
-          </View>
-        </Pressable>
-        <View style={[s.row, { gap: 6, paddingHorizontal: 2, paddingBottom: 4 }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={accountLabel}
-            accessibilityState={{ selected: section === ACCOUNT_NAV.id }}
-            onPress={() => navigate(ACCOUNT_NAV.id)}
-            style={({ pressed }) => ({
-              flex: 1,
-              minWidth: 0,
-              minHeight: 38,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 9,
-              paddingHorizontal: 10,
-              borderRadius: radius.control,
-              backgroundColor:
-                section === ACCOUNT_NAV.id
-                  ? colors.skyStrong
-                  : pressed
-                    ? colors.overlay1
-                    : "transparent",
-            })}
-          >
-            <SidebarAccountAvatar avatarUrl={accountAvatarUrl} name={accountLabel} />
-            <View style={{ flex: 1 }}>
+        <View style={[s.row, { gap: 10, minHeight: 34, justifyContent: "center" }]}>
+          {!collapsed && (
+            <SidebarButton
+              tip={t("app.goHome")}
+              accessibilityRole="button"
+              accessibilityLabel={t("app.goHome")}
+              onPress={() => navigate("today")}
+              hitSlop={5}
+              style={({ pressed }) => ({
+                flex: 1,
+                minHeight: 34,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                borderRadius: radius.control,
+                backgroundColor: pressed ? colors.overlay1 : "transparent",
+              })}
+            >
+              <BrandMark size={29} />
               <Text
-                numberOfLines={1}
                 style={{
-                  fontSize: 12,
+                  flex: 1,
+                  fontSize: 22,
+                  lineHeight: 29,
                   fontWeight: "600",
-                  color: section === ACCOUNT_NAV.id ? colors.primaryStrong : colors.text,
+                  color: colors.text,
+                  letterSpacing: 2.4,
+                  fontFamily: fonts.serif,
                 }}
               >
-                {accountLabel}
+                {t("common.agentName")}
               </Text>
-              <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
-                {t("app.personalSpace")}
-              </Text>
-            </View>
-          </Pressable>
-          <Pressable
+            </SidebarButton>
+          )}
+          <SidebarButton
+            tip={t(collapsed ? "app.expandSidebar" : "app.collapseSidebar")}
             accessibilityRole="button"
-            accessibilityLabel={t("app.settingsLabel")}
-            onPress={() => open({ type: "settings" })}
+            accessibilityLabel={t(collapsed ? "app.expandSidebar" : "app.collapseSidebar")}
+            accessibilityState={{ expanded: !collapsed }}
+            onPress={toggleSidebar}
+            hitSlop={5}
             style={({ pressed }) => ({
-              width: 38,
-              height: 38,
+              width: 34,
+              height: 34,
               alignItems: "center",
               justifyContent: "center",
               borderRadius: radius.control,
               backgroundColor: pressed ? colors.overlay1 : "transparent",
             })}
           >
-            <Settings2 size={17} strokeWidth={1.7} color={colors.muted} />
-          </Pressable>
+            {collapsed ? (
+              <ChevronRight size={18} color={colors.muted} />
+            ) : (
+              <ChevronLeft size={18} color={colors.muted} />
+            )}
+          </SidebarButton>
         </View>
+
+        <SidebarButton
+          tip={collapsed ? t("app.newAnalysis") : undefined}
+          accessibilityRole="button"
+          accessibilityLabel={t("app.newAnalysis")}
+          onPress={() => navigate("chat")}
+          style={({ pressed }) => ({
+            marginTop: 28,
+            minHeight: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+            gap: 9,
+            paddingHorizontal: 13,
+            borderRadius: radius.control,
+            borderWidth: 1,
+            borderColor: colors.lineStrong,
+            backgroundColor: pressed ? colors.overlay1 : colors.paper,
+          })}
+        >
+          <Plus size={16} strokeWidth={1.9} color={colors.text} />
+          {!collapsed && (
+            <>
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: "600", color: colors.text }}>
+                {t("app.newAnalysis")}
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.faint }}>⌘ J</Text>
+            </>
+          )}
+        </SidebarButton>
+
+        <ScrollView
+          style={{ flex: 1, marginHorizontal: -8, marginTop: 14 }}
+          contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12 }}
+          showsVerticalScrollIndicator={false}
+          onScroll={hideTooltip}
+        >
+          <View style={{ gap: 2 }}>
+            {SECTION_NAV.map((item) => (
+              <SidebarNavItem
+                key={item.id}
+                icon={item.icon}
+                label={t(item.labelKey)}
+                collapsed={collapsed}
+                active={
+                  section === item.id ||
+                  (item.id === "watchlist" && section === "portfolio") ||
+                  (item.id === "files" && section === "notes")
+                }
+                badge={item.id === "activity" && activeCount ? activeCount : undefined}
+                onPress={() => navigate(item.id)}
+              />
+            ))}
+          </View>
+        </ScrollView>
+
+        <View
+          style={{
+            width: "100%",
+            gap: 10,
+            paddingTop: 12,
+            borderTopWidth: 1,
+            borderTopColor: colors.line,
+          }}
+        >
+          <SidebarButton
+            tip={collapsed ? t("app.agentSettingsLabel", { name }) : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={t("app.agentSettingsLabel", { name })}
+            onPress={() => open({ type: "personality" })}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: collapsed ? "center" : "flex-start",
+              gap: 10,
+              marginHorizontal: collapsed ? 0 : -4,
+              paddingHorizontal: collapsed ? 0 : 8,
+              paddingVertical: 8,
+              borderRadius: radius.control,
+              backgroundColor: pressed ? colors.overlay1 : "transparent",
+            })}
+          >
+            <View
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: colors.paper,
+              }}
+            >
+              <Mascot size={24} variant={data?.identity.avatar} background={colors.paper} />
+            </View>
+            {!collapsed && (
+              <View style={{ flex: 1, gap: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
+                  {t("app.agentWatching", { name })}
+                </Text>
+                <View style={[s.row, { gap: 5 }]}>
+                  <View
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: 3,
+                      backgroundColor: activeMonitorCount > 0 ? colors.primary : colors.disabled,
+                    }}
+                  />
+                  <Text style={{ fontSize: 10, color: colors.muted }}>{monitorStatus}</Text>
+                </View>
+              </View>
+            )}
+          </SidebarButton>
+          <View
+            style={{
+              flexDirection: collapsed ? "column" : "row",
+              alignItems: "center",
+              gap: 6,
+              paddingHorizontal: collapsed ? 0 : 2,
+              paddingBottom: 4,
+            }}
+          >
+            <SidebarButton
+              tip={collapsed ? `${t(ACCOUNT_NAV.labelKey)} · ${accountLabel}` : undefined}
+              accessibilityRole="button"
+              accessibilityLabel={accountLabel}
+              accessibilityState={{ selected: section === ACCOUNT_NAV.id }}
+              onPress={() => navigate(ACCOUNT_NAV.id)}
+              style={({ pressed }) => ({
+                ...(collapsed ? { width: "100%" as const } : { flex: 1 }),
+                minWidth: 0,
+                minHeight: 38,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: collapsed ? "center" : "flex-start",
+                gap: 9,
+                paddingHorizontal: collapsed ? 0 : 10,
+                borderRadius: radius.control,
+                backgroundColor:
+                  section === ACCOUNT_NAV.id
+                    ? colors.skyStrong
+                    : pressed
+                      ? colors.overlay1
+                      : "transparent",
+              })}
+            >
+              <SidebarAccountAvatar avatarUrl={accountAvatarUrl} name={accountLabel} />
+              {!collapsed && (
+                <View style={{ flex: 1 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "600",
+                      color: section === ACCOUNT_NAV.id ? colors.primaryStrong : colors.text,
+                    }}
+                  >
+                    {accountLabel}
+                  </Text>
+                  <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
+                    {t("app.personalSpace")}
+                  </Text>
+                </View>
+              )}
+            </SidebarButton>
+            <SidebarButton
+              tip={collapsed ? t("app.settingsLabel") : undefined}
+              accessibilityRole="button"
+              accessibilityLabel={t("app.settingsLabel")}
+              onPress={() => open({ type: "settings" })}
+              style={({ pressed }) => ({
+                width: 38,
+                height: 38,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: radius.control,
+                backgroundColor: pressed ? colors.overlay1 : "transparent",
+              })}
+            >
+              <Settings2 size={17} strokeWidth={1.7} color={colors.muted} />
+            </SidebarButton>
+          </View>
+        </View>
+        {tooltip && (
+          <View
+            role="tooltip"
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: sidebarWidth + 8,
+              top: tooltip.top,
+              maxWidth: 280,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 6,
+              backgroundColor: colors.text,
+              ...shadow.card,
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{ fontSize: 12, lineHeight: 18, color: colors.onPrimary }}
+            >
+              {tooltip.label}
+            </Text>
+          </View>
+        )}
       </View>
-    </View>
+    </SidebarTooltipContext.Provider>
   );
 }
 

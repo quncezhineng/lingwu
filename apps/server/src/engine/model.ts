@@ -18,12 +18,13 @@ export async function executeModelTask(
   ctx: TaskContext,
 ): Promise<Partial<AgentTask>> {
   const config = service.config;
+  const model = await service.workspace.models.resolve(owner);
   const browserConfigured = !!(config.workerUrl && config.workerToken);
-  if (!config.model)
+  if (!model.model)
     return {
       status: "waiting_input",
       question:
-        "A model is required for this open-ended task. Configure MODEL and its provider key on the server, then reply ‘continue’. The document, monitor and finance workflows can run without a model.",
+        "A model is required for this open-ended task. Configure your model connection in My settings, then reply ‘continue’. The document, monitor and finance workflows can run without a model.",
     };
   let task = initial;
   let outcome: Partial<AgentTask> | undefined;
@@ -324,7 +325,8 @@ export async function executeModelTask(
   // paused or cancelled during these reads must not start a model run.
   ctx.signal.throwIfAborted();
   const agent = tanstackAgent({
-    model: config.model,
+    model: model.model,
+    connection: model.connection,
     maxSteps: 16,
     tools,
     shouldContinue: () => outcome === undefined,

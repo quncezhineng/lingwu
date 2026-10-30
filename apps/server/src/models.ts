@@ -1,4 +1,5 @@
 import "./config.ts";
+import { deepseekDefaults } from "../../../packages/domain/src/model-settings.ts";
 import type { Config } from "./config.ts";
 
 export interface ModelProvider {
@@ -12,6 +13,12 @@ export interface ModelProvider {
    * starts failing is fixed by editing this one list rather than the app.
    */
   models: string[];
+  /** Providers enabled for user-owned credentials. Extend with a matching runtime adapter. */
+  personal?: {
+    protocol: "openai-chat-completions";
+    defaultBaseUrl: string;
+    modelLabels?: Record<string, string>;
+  };
 }
 
 export const modelProviders: ModelProvider[] = [
@@ -22,7 +29,12 @@ export const modelProviders: ModelProvider[] = [
     id: "deepseek",
     label: "DeepSeek",
     key: "DEEPSEEK_API_KEY",
-    models: ["deepseek-flash", "deepseek-v4-pro"],
+    models: [...deepseekDefaults.models],
+    personal: {
+      protocol: "openai-chat-completions",
+      defaultBaseUrl: deepseekDefaults.baseUrl,
+      modelLabels: { "deepseek-flash": "DeepSeek-Flash", "deepseek-v4-pro": "DeepSeek-V4-Pro" },
+    },
   },
   { id: "moonshot", label: "Moonshot", key: "MOONSHOT_API_KEY", models: ["kimi-latest"] },
 ];
@@ -57,10 +69,7 @@ export function isOfferedModel(config: Config, spec: string) {
   return modelChoices(config).some((choice) => choice.models.includes(spec));
 }
 
-/**
- * Chat, tasks and the health check all read `config.model` at call time, so applying a
- * choice retargets every path at once without restarting the server.
- */
+/** Restore the legacy deployment default at startup; new user choices use ModelSettingsService. */
 export function applyModel(config: Config, spec: string) {
   config.model = spec;
 }

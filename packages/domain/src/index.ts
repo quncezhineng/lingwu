@@ -202,6 +202,8 @@ export interface Workspace {
     richThreads?: boolean;
     /** The `provider/model-id` currently in use, when one is set. */
     model?: string;
+    modelSource?: "personal" | "server" | "none";
+    modelLabels?: Record<string, string>;
     /** Providers the app may switch to, each with its curated model IDs. Empty when switching does not apply. */
     modelOptions?: { provider: string; label: string; models: string[] }[];
   };

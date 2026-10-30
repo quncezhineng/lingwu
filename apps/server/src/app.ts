@@ -36,7 +36,7 @@ import { AppError } from "./errors.ts";
 import { Files } from "./files.ts";
 import { GoogleAuth } from "./google-auth.ts";
 import { getMarketDataHealth } from "./market-data-health.ts";
-import { applyModel, isOfferedModel, modelChoices } from "./models.ts";
+import { applyModel, isOfferedModel } from "./models.ts";
 import { resolveTaskNotifications } from "./notifications.ts";
 import { getPdfHealth } from "./pdf-health.ts";
 import { createRateLimitStore, rateLimit } from "./rate-limit.ts";
@@ -363,27 +363,35 @@ export async function createApp(
     return c.json(snapshot);
   });
   /** 可选模型目录：只列出服务端已配置密钥的厂商，密钥本身永不下发到 App。 */
-  app.get("/api/models", async (c) =>
-    c.json({
-      model: config.model ?? null,
-      options: config.agentBackend === "model" ? modelChoices(config) : [],
-    }),
+  app.get("/api/models", async (c) => {
+    const owner = c.get("owner");
+    return c.json({
+      model: (await workspace.models.resolve(owner)).model ?? null,
+      options: await workspace.models.choices(owner),
+    });
+  });
+  app.get("/api/model/settings", async (c) =>
+    c.json(await workspace.models.read(c.get("owner"), c.req.query("provider"))),
+  );
+  app.post("/api/model/settings/test", async (c) =>
+    c.json(await workspace.models.test(c.get("owner"), await c.req.json())),
+  );
+  app.put("/api/model/settings", async (c) =>
+    c.json(await workspace.models.save(c.get("owner"), await c.req.json())),
+  );
+  app.delete("/api/model/settings", async (c) =>
+    c.json(await workspace.models.remove(c.get("owner"), c.req.query("provider"))),
   );
   /**
    * 切换当前模型。
    *
-   * 对话、任务与健康检查都在调用时读取 config.model，因此这里改完立即全局生效，
-   * 无需重启服务；选择结果写入数据库，重启后由 createApp 自动恢复。
+   * 仅保存当前用户的选择。每次新对话/任务执行按 owner 解析，不修改共享进程配置。
    */
   app.post("/api/model", async (c) => {
     const body = z.object({ model: z.string().trim().min(1).max(200) }).parse(await c.req.json());
     if (config.agentBackend !== "model")
       throw new AppError("This deployment does not run a switchable model backend", 400);
-    if (!isOfferedModel(config, body.model))
-      throw new AppError(`${body.model} is not available on this server`, 400);
-    applyModel(config, body.model);
-    await db.put("system", "settings", { id: "model", model: body.model });
-    return c.json({ model: config.model });
+    return c.json(await workspace.models.select(c.get("owner"), body.model));
   });
   app.route("/api/agent", agentRoutes(agent));
   app.route("/api/watchlists", watchlistRoutes(agent));
@@ -687,7 +695,11 @@ export async function createApp(
     return c.json({ ok: true });
   });
   app.all("/api/copilotkit/*", async (c) => {
-    if (!agentConfigured(config))
+    const configured =
+      config.agentBackend === "model"
+        ? (await workspace.models.resolve(c.get("owner"))).configured
+        : agentConfigured(config);
+    if (!configured)
       throw new AppError(
         "Configure a model and provider API key, or a valid AG-UI endpoint, to start chat",
         503,

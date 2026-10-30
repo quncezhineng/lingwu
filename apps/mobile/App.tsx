@@ -746,9 +746,24 @@ function WorkspaceShell({
                   }}
                 >
                   <View style={[s.row, { gap: 10, flex: 1 }]}>
-                    <Text style={{ fontSize: 11, color: colors.faint }}>
-                      {t("app.personalInvestmentSpace")}
-                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("app.goHome")}
+                      onPress={() => navigate("today")}
+                      hitSlop={6}
+                      style={({ pressed }) => ({
+                        minHeight: 32,
+                        justifyContent: "center",
+                        paddingHorizontal: 4,
+                        marginHorizontal: -4,
+                        borderRadius: radius.control,
+                        backgroundColor: pressed ? colors.overlay1 : "transparent",
+                      })}
+                    >
+                      <Text style={{ fontSize: 11, color: colors.muted }}>
+                        {t("common.agentName")}
+                      </Text>
+                    </Pressable>
                     <Text style={{ fontSize: 11, color: colors.lineStrong }}>/</Text>
                     <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "500" }}>
                       {section === "chat"

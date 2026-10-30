@@ -41,6 +41,8 @@ export interface Config {
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
   model?: string;
+  /** Shared provider endpoint. Users only supply their own credential and model choice. */
+  deepseekBaseUrl?: string;
   jevMode?: "off" | "sample" | "live";
   typesafeApiKey?: string;
   jevModel?: string;
@@ -176,6 +178,7 @@ export function readConfig(): Config {
     supabaseAnonKey,
     supabaseServiceRoleKey,
     model: process.env.MODEL,
+    deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL?.trim(),
     jevMode,
     typesafeApiKey,
     jevModel: process.env.JEV_MODEL?.trim() || defaultJevModel,

@@ -331,6 +331,7 @@ export const breakpoints = {
 /** 壳层固定宽度（侧栏、会话列表），页面计算内容宽度时复用。 */
 export const layout = {
   sidebar: 232,
+  sidebarCollapsed: 72,
   chats: 248,
   /** 桌面顶栏与移动顶栏高度。 */
   topBarDesktop: 76,

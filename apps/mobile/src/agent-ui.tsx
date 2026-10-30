@@ -2553,6 +2553,7 @@ export function AgentPersonalitySheet() {
             />
             <Text style={s.small}>{t("agent.activityFullRecord")}</Text>
             <Button
+              primary
               busy={busy}
               quietBusy
               disabled={!name.trim()}

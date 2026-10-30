@@ -61,6 +61,7 @@ beforeEach(async () => {
   // A fresh config and no saved choice keep a decision made in one test out of the next.
   await server.agent.stop();
   await db.remove("system", "settings", "model");
+  await db.remove("local-user", "settings", "model");
   config = baseConfig();
   server = await createApp(db, config);
 });
@@ -97,7 +98,7 @@ test("switching a model applies immediately and reaches the workspace snapshot",
   const response = await request("/api/model", { model: "deepseek/deepseek-v4-pro" });
   assert.equal(response.status, 200, await response.clone().text());
   assert.equal((await response.json()).model, "deepseek/deepseek-v4-pro");
-  assert.equal(config.model, "deepseek/deepseek-v4-pro");
+  assert.equal(config.model, undefined, "a user's selection does not mutate deployment defaults");
 
   const snapshot = await (await request("/api/workspace")).json();
   assert.equal(snapshot.runtime.model, "deepseek/deepseek-v4-pro");
@@ -172,7 +173,11 @@ test("a choice made in the app is restored on the next start", async () => {
 
     const restarted = { ...baseConfig(), dataDir: isolated };
     const second = await createApp(store, restarted);
-    assert.equal(restarted.model, "deepseek/deepseek-v4-pro");
+    assert.equal(restarted.model, undefined);
+    const selected = await (
+      await second.app.request("/api/models", { headers: await tokenFor(second) })
+    ).json();
+    assert.equal(selected.model, "deepseek/deepseek-v4-pro");
     await second.agent.stop();
   } finally {
     await store.close();

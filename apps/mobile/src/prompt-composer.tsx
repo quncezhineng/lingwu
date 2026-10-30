@@ -3,13 +3,12 @@ import {
   Platform,
   Pressable,
   type StyleProp,
-  Text,
   TextInput,
   type TextStyle,
   View,
   type ViewStyle,
 } from "react-native";
-import { ArrowUp, ChevronDown, type IconComponent, Square } from "./icons";
+import { ArrowUp, type IconComponent, Square } from "./icons";
 import { colors, fonts, radius, shadow } from "./ui";
 
 const noFocusRing =
@@ -34,9 +33,7 @@ export function PromptComposer({
   inputMaxHeight = 150,
   tools = [],
   attachments,
-  assistantLabel,
-  assistantText,
-  onOpenAssistant,
+  modelSelector,
   sendLabel,
   stopLabel,
   busy = false,
@@ -54,9 +51,7 @@ export function PromptComposer({
   inputMaxHeight?: number;
   tools?: ComposerTool[];
   attachments?: ReactNode;
-  assistantLabel?: string;
-  assistantText?: string;
-  onOpenAssistant?: () => void;
+  modelSelector?: ReactNode;
   sendLabel: string;
   stopLabel?: string;
   busy?: boolean;
@@ -185,44 +180,7 @@ export function PromptComposer({
               }}
             />
           )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={assistantLabel ?? assistantText}
-            disabled={!onOpenAssistant}
-            onPress={onOpenAssistant}
-            style={({ pressed }) => ({
-              minHeight: 34,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              paddingHorizontal: 7,
-              borderRadius: radius.control,
-              backgroundColor: pressed ? colors.overlay1 : "transparent",
-            })}
-          >
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: radius.full,
-                backgroundColor: colors.primary,
-              }}
-            />
-            <Text
-              numberOfLines={1}
-              style={{
-                maxWidth: 120,
-                fontSize: 11,
-                lineHeight: 17,
-                fontWeight: "500",
-                color: colors.muted,
-                fontFamily: fonts.sans,
-              }}
-            >
-              {assistantText}
-            </Text>
-            {!!onOpenAssistant && <ChevronDown size={12} color={colors.faint} />}
-          </Pressable>
+          {modelSelector}
         </View>
         <Pressable
           accessibilityRole="button"

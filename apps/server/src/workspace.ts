@@ -19,16 +19,19 @@ import type { Store } from "./db.ts";
 import { AppError } from "./errors.ts";
 import type { Files } from "./files.ts";
 import type { GoogleAuth } from "./google-auth.ts";
-import { modelChoices } from "./models.ts";
+import { ModelSettingsService } from "./model-settings.ts";
 
 export class WorkspaceService {
+  readonly models: ModelSettingsService;
   private seeding = new Map<string, Promise<void>>();
   constructor(
     private readonly db: Store,
     private readonly config: Config,
     private readonly files: Files,
     private readonly googleAuth: GoogleAuth,
-  ) {}
+  ) {
+    this.models = new ModelSettingsService(db, config);
+  }
   google(owner: string, connectionId?: string) {
     return new GoogleClient({
       getAccessToken: () => this.googleAuth.accessToken(owner, connectionId),
@@ -320,6 +323,7 @@ export class WorkspaceService {
   }
 
   async snapshot(owner: string, query?: string): Promise<Workspace> {
+    const model = await this.models.resolve(owner);
     const { mail, events, connected } = await this.sourceSections(owner, true, true, query);
     const tokens = this.config.mode === "live" ? await this.googleAuth.tokens(owner) : null;
     return {
@@ -363,12 +367,15 @@ export class WorkspaceService {
       ],
       runtime: {
         provider: this.config.agentBackend === "sample" ? "sample" : "model",
-        configured: agentConfigured(this.config),
+        configured:
+          this.config.agentBackend === "model" ? model.configured : agentConfigured(this.config),
         openbotConfigured: false,
         richThreads: true,
-        model: this.config.model,
+        model: model.model,
+        modelSource: model.source,
+        modelLabels: this.models.labels(),
         // Only the model backend reads MODEL; sample and AG-UI runtimes are not switchable.
-        modelOptions: this.config.agentBackend === "model" ? modelChoices(this.config) : [],
+        modelOptions: await this.models.choices(owner),
       },
     };
   }

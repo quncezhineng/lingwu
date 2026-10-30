@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { AbstractAgent } from "@ag-ui/client";
 import { type BaseEvent, EventType, type RunAgentInput } from "@ag-ui/core";
 import { defineTool } from "@copilotkit/runtime/v2";
-import { Observable } from "rxjs";
+import { from, mergeMap, Observable } from "rxjs";
 import { z } from "zod";
 import {
   type AgentMemory,
@@ -22,6 +22,7 @@ import type { Config } from "../config.ts";
 import { createJevAdapter, type JevAdapter } from "../jev/adapter.ts";
 import { JevService } from "../jev/service.ts";
 import { presentChoicesTool } from "../jev/tools.ts";
+import type { ResolvedModel } from "../model-settings.ts";
 import { searchDescription, searchInputSchema, searchInstructions } from "../search.ts";
 import { recallMemories } from "./memory-recall.ts";
 import { reminderList } from "./reminder-list.ts";
@@ -64,9 +65,17 @@ export class ConversationAgent extends AbstractAgent {
     });
   }
   run(input: RunAgentInput): Observable<BaseEvent> {
-    return this.runInternal(input, false);
+    return this.config.agentBackend === "model"
+      ? from(this.service.workspace.models.resolve(this.owner)).pipe(
+          mergeMap((model) => this.runInternal(input, false, model)),
+        )
+      : this.runInternal(input, false);
   }
-  private runInternal(input: RunAgentInput, choiceContinuation: boolean): Observable<BaseEvent> {
+  private runInternal(
+    input: RunAgentInput,
+    choiceContinuation: boolean,
+    model?: ResolvedModel,
+  ): Observable<BaseEvent> {
     const latest = input.messages.filter((m) => m.role === "user").at(-1);
     const requestKey = `${input.threadId}:${latest?.id ?? input.runId}`;
     const jevMode = this.config.jevMode ?? "off";
@@ -89,7 +98,9 @@ export class ConversationAgent extends AbstractAgent {
             const messages = input.messages.map((message) =>
               message === latest ? { ...message, content: selection.continuation } : message,
             );
-            subscription = this.runInternal({ ...input, messages }, true).subscribe(subscriber);
+            subscription = this.runInternal({ ...input, messages }, true, model).subscribe(
+              subscriber,
+            );
           } catch (error) {
             if (cancelled) return;
             subscriber.next({
@@ -476,7 +487,8 @@ export class ConversationAgent extends AbstractAgent {
       }),
     ];
     const agent = tanstackAgent({
-      model: this.config.model ?? "openai/unconfigured",
+      model: model?.model ?? this.config.model ?? "openai/unconfigured",
+      connection: model?.connection,
       // Desktop work takes one step per click or key, each checked on a screenshot.
       maxSteps: this.config.computerProvider === "e2b-desktop" ? 16 : 6,
       stepLimitNote:
