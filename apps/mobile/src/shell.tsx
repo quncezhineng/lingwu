@@ -67,12 +67,13 @@ export const SECTION_NAV: NavItem[] = [
   { id: "apps", labelKey: "app.navApps", icon: Shapes },
 ];
 
-/** 移动端底部导航：与 Demo 一样只保留五条主路径。 */
+/** 移动端底部导航：保留高频主路径与灵感快捷入口。 */
 export const MOBILE_NAV: NavItem[] = [
   { id: "today", labelKey: "app.navToday", icon: Sparkles },
   { id: "watchlist", labelKey: "app.navWatchlistShort", icon: Target },
   { id: "activity", labelKey: "app.navActivity", icon: ListChecks },
   { id: "goals", labelKey: "app.navGoalsShort", icon: Bell },
+  { id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb },
 ];
 
 /** 侧栏底部的「我的」页面项。 */

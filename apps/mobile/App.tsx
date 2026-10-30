@@ -909,9 +909,7 @@ function WorkspaceShell({
                   >
                     {nav.map((item) => {
                       const active =
-                        section === item.id ||
-                        (item.id === "watchlist" && section === "portfolio") ||
-                        (item.id === "activity" && section === "ideas");
+                        section === item.id || (item.id === "watchlist" && section === "portfolio");
                       return (
                         <Pressable
                           key={item.id}
