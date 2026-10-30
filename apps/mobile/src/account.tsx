@@ -8,6 +8,7 @@ import {
   Archive,
   ArrowLeft,
   CalendarClock,
+  Cpu,
   type IconComponent,
   IdCard,
   LogOut,
@@ -252,7 +253,7 @@ function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
  */
 export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
   const { t } = useTranslation();
-  const { api } = useWorkspace();
+  const { api, open, workspace } = useWorkspace();
   const { enabled: richThreads } = useLingWuThread();
   const [view, setView] = useState<"overview" | "archived">("overview");
   const [profile, setProfile] = useState<AccountProfile>();
@@ -347,6 +348,22 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
             value={
               expiresAt ? `${dateLabel(expiresAt)} ${timeLabel(expiresAt)}` : t("app.profileUnset")
             }
+          />
+        </Card>
+      </View>
+      <View style={{ gap: 10 }}>
+        <Text style={s.heading}>{t("details.settingsTitle")}</Text>
+        <Card style={{ paddingVertical: 4 }}>
+          <LinkRow
+            icon={Cpu}
+            title={t("modelSettings.title")}
+            detail={
+              workspace.runtime.model
+                ? (workspace.runtime.modelLabels?.[workspace.runtime.model] ??
+                  workspace.runtime.model.split("/").slice(1).join("/"))
+                : t("modelSettings.notConfigured")
+            }
+            onPress={() => open({ type: "model-settings" })}
           />
         </Card>
       </View>

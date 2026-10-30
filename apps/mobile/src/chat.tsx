@@ -34,6 +34,7 @@ import { AssistantResponse } from "./assistant-response";
 import { BackgroundUpdates } from "./background-updates";
 import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
 import { displayUserMessage, promptWithAttachments } from "./chat-content";
+import { ComposerModelSelector } from "./composer-model-selector";
 import { BrowserThreadCard } from "./computer";
 import { ConversationHeader, type ConversationHeaderState } from "./conversation-header";
 import {
@@ -55,7 +56,7 @@ import { DesktopToolCard } from "./desktop-tool-card";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { type TranslationKey, useTranslation } from "./i18n";
-import { localizeAgentName, statusLabel } from "./i18n/translate";
+import { statusLabel } from "./i18n/translate";
 import {
   ArrowDown,
   ArrowUpRight,
@@ -1714,14 +1715,7 @@ export function ChatScreen({
                   }
                 />
               }
-              assistantLabel={t("app.agentSettingsLabel", {
-                name: localizeAgentName(
-                  agentWorkspace?.identity.name,
-                  agentWorkspace?.identity.nameCustomized,
-                ),
-              })}
-              assistantText={t("workbench.agent")}
-              onOpenAssistant={() => open({ type: "personality" })}
+              modelSelector={<ComposerModelSelector disabled={replying} />}
               sendLabel={t("chat.sendMessage")}
               stopLabel={t("chat.stopReply")}
               busy={replying}

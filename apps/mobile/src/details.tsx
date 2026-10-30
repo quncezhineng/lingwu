@@ -43,6 +43,7 @@ import {
   ChevronUp,
   CircleUserRound,
   Clock3,
+  Cpu,
   Download,
   Edit3,
   ExternalLink,
@@ -71,6 +72,7 @@ import {
   searchSymbols,
   useWatchlistState,
 } from "./market";
+import { ModelSettingsSheet } from "./model-settings";
 import { NoteEditorSheet } from "./note-ui";
 import { markdownPreviewDocument } from "./open-html-document";
 import PdfReader from "./PdfReader";
@@ -113,6 +115,7 @@ export function Details({ detail }: { detail: Detail }) {
   if (detail.type === "notifications") return <NotificationsSheet />;
   if (detail.type === "personality") return <AgentPersonalitySheet />;
   if (detail.type === "settings") return <SettingsSheet />;
+  if (detail.type === "model-settings") return <ModelSettingsSheet />;
   if (detail.type === "mail") return <MailDetail mail={detail.mail} />;
   if (detail.type === "email") return <EmailEditor draft={detail.draft} />;
   if (detail.type === "event")
@@ -179,6 +182,15 @@ function SettingsSheet() {
         <View style={{ gap: 8 }}>
           <Text style={s.label}>{t("details.settingsAgentHeading")}</Text>
           <Card style={{ paddingVertical: 6 }}>
+            <LinkRow
+              icon={Cpu}
+              title={t("modelSettings.title")}
+              detail={t("modelSettings.subtitle")}
+              onPress={() => {
+                navigate("account");
+                open({ type: "model-settings" });
+              }}
+            />
             <LinkRow
               icon={Bot}
               title={t("agent.personalityMemory")}

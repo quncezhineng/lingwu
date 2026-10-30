@@ -2,6 +2,52 @@ import type { Dictionary } from "../../types";
 
 /** 应用外壳文案（命名空间：app）：导航、标题、欢迎页与顶部状态栏。 */
 const app = {
+  "modelSettings.providerUnavailable":
+    "This provider is not enabled. Choose a provider from the list.",
+  "modelSettings.model": "Model",
+  "modelSettings.provider": "Provider",
+  "modelSettings.title": "Model connection",
+  "modelSettings.selectModel": "Select model",
+  "modelSettings.manage": "Manage models",
+  "modelSettings.noConfiguredModels": "No models configured. Add a model in My settings first.",
+  "modelSettings.switchFailed": "Could not switch models. Check your connection and try again.",
+  "modelSettings.personal": "Personal connection",
+  "modelSettings.server": "Server default",
+  "modelSettings.subtitle": "Choose a provider and model, then enter your API Key.",
+  "modelSettings.configure": "Configure model",
+  "modelSettings.loading": "Loading model settings",
+  "modelSettings.scope":
+    "Applies only to your account, for new chat turns and newly executed background tasks.",
+  "modelSettings.current": "Current model: {model}",
+  "modelSettings.notConfigured": "No model configured",
+  "modelSettings.setupUnavailable":
+    "Personal model settings are unavailable. Ask your administrator to enable the model backend and credential encryption.",
+  "modelSettings.endpointHint":
+    "The platform manages service endpoints and model parameters. No manual setup needed.",
+  "modelSettings.keepKey": "Key saved; leave blank to keep it",
+  "modelSettings.keyHint":
+    "Keys are encrypted by account and provider, never shown again or shared with other users.",
+  "modelSettings.test": "Test connection",
+  "modelSettings.save": "Save and enable",
+  "modelSettings.restore": "Remove personal settings and restore default model",
+  "modelSettings.testPassed": "Model directory reached and selected model found. Not saved yet.",
+  "modelSettings.saved": "Personal model settings saved and enabled",
+  "modelSettings.removed": "Personal settings removed; server default restored",
+  "modelSettings.requestFailed": "Request failed. Check your connection and reopen settings.",
+  "modelSettings.encryptionUnavailable":
+    "Server credential encryption is not configured. Keys cannot be saved yet.",
+  "modelSettings.backendUnavailable":
+    "This deployment does not enable a configurable model backend.",
+  "modelSettings.baseUrlNotAllowed":
+    "This provider's endpoint is misconfigured. Contact your administrator.",
+  "modelSettings.apiKeyRequired": "Enter the API Key for the selected provider.",
+  "modelSettings.authenticationFailed":
+    "Authentication failed. Check whether the API Key is correct and active.",
+  "modelSettings.rateLimited": "The model service is rate limited. Try again later.",
+  "modelSettings.connectionFailed":
+    "Cannot connect to the model service. Check BASE_URL and your network.",
+  "modelSettings.modelUnavailable":
+    "This model is unavailable. Choose another model or ask your administrator to update the catalogue.",
   "app.webTitle": "LingWu — Your personal investment research agent",
   "app.welcomeTitle": "Welcome to LingWu, your personal investment research agent.",
   "app.welcomeSubtitle": "Clear next steps for every research question.",

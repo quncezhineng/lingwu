@@ -24,16 +24,44 @@ import {
 import { map, mergeMap, type Observable } from "rxjs";
 import { z } from "zod";
 import { MODEL_MAX_RETRIES } from "../config.ts";
+import type { ModelConnection } from "../model-settings.ts";
 
 // Same "provider/model" strings, env vars and base URL formats as the AI SDK resolver in
 // @copilotkit/runtime. Each provider SDK retries transient failures up to MODEL_MAX_RETRIES times.
-function adapter(spec: string) {
+function adapter(spec: string, connection?: ModelConnection) {
   const [, provider = "", model = ""] = spec.trim().match(/^([^/:]*)[/:](.*)$/) ?? [];
   if (!provider || !model.trim())
     throw new Error(
       `Invalid model string "${spec}". Use "openai/gpt-5", "anthropic/claude-sonnet-4.5", "google/gemini-2.5-pro" or "deepseek/deepseek-flash".`,
     );
   const id = model.trim();
+  if (connection) {
+    return createOpenaiChatCompletions(id as OpenAIChatModel, connection.apiKey, {
+      baseURL: connection.baseUrl,
+      maxRetries: MODEL_MAX_RETRIES,
+      fetch: async (input, init) => {
+        try {
+          const response = await fetch(input, { ...init, redirect: "error" });
+          if (response.ok) return response;
+          await response.body?.cancel();
+          // Gateways may echo headers or keys in error bodies. Never pass them into transcripts.
+          return Response.json(
+            {
+              error: {
+                message:
+                  "Personal model request failed. Check your model connection in My settings.",
+              },
+            },
+            { status: response.status },
+          );
+        } catch {
+          throw new Error(
+            "Personal model connection failed. Check your model connection in My settings.",
+          );
+        }
+      },
+    });
+  }
   switch (provider.toLowerCase()) {
     case "openai":
       // OpenAI-compatible endpoints that do not implement the Responses API
@@ -142,6 +170,7 @@ const stateTools = [
 /** A BuiltInAgent in TanStack factory mode with the options of the classic AI SDK mode. */
 export function tanstackAgent(options: {
   model: string;
+  connection?: ModelConnection;
   maxSteps: number;
   tools: ToolDefinition[];
   prompt: string;
@@ -167,7 +196,7 @@ export function tanstackAgent(options: {
       )
         system += `\n## Application State\nThis is state from the application that you can edit by calling AGUISendStateSnapshot or AGUISendStateDelta.\n\`\`\`json\n${JSON.stringify(input.state, null, 2)}\n\`\`\`\n`;
       return chat({
-        adapter: adapter(options.model),
+        adapter: adapter(options.model, options.connection),
         messages: converted.messages,
         systemPrompts: system ? [system] : [],
         tools: [

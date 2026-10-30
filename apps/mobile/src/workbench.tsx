@@ -12,10 +12,11 @@ import Svg, { Polyline } from "react-native-svg";
 import type { AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
 import { MarketBriefingCard } from "./briefing-card";
+import { ComposerModelSelector } from "./composer-model-selector";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { greetingKeyForHour, userLocalHour } from "./greeting";
-import { activeLocaleTag, localizeAgentName, useTranslation } from "./i18n";
+import { activeLocaleTag, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
 import {
   Bell,
@@ -420,7 +421,6 @@ export function WorkbenchScreen() {
   }, []);
   const name =
     shortName(workspace.profile.name) || shortName(workspace.profile.email) || t("workbench.there");
-  const agentName = localizeAgentName(data?.identity.name, data?.identity.nameCustomized);
   // “动态”与任务活动页保持同一口径：所有状态统一按最近更新时间排序。
   const latestTasks = [...(data?.tasks ?? [])].sort((a, b) =>
     b.updatedAt.localeCompare(a.updatedAt),
@@ -595,9 +595,7 @@ export function WorkbenchScreen() {
                   }
                 />
               }
-              assistantLabel={t("app.agentSettingsLabel", { name: agentName })}
-              assistantText={t("workbench.agent")}
-              onOpenAssistant={() => open({ type: "personality" })}
+              modelSelector={<ComposerModelSelector />}
               sendLabel={t("workbench.sendAnalysis")}
             />
 
