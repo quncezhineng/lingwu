@@ -38,6 +38,7 @@ import { BrowserThreadCard } from "./computer";
 import { ConversationHeader, type ConversationHeaderState } from "./conversation-header";
 import {
   mergePersistedThreadMessages,
+  normalizeThreadMessages,
   readableToolCalls,
   threadHistoryPath,
 } from "./conversation-history";
@@ -536,6 +537,9 @@ export function ChatScreen({
             replaying.current += 1;
             setSyncing(true);
             try {
+              // Older Rich Threads records can use a compact tool-call shape
+              // that the runtime rejects when it is sent back as RunAgentInput.
+              agent.setMessages(normalizeThreadMessages(agent.messages));
               await runConversationTurn(
                 agentId,
                 () => copilotkit.connectAgent({ agent }),
@@ -578,7 +582,12 @@ export function ChatScreen({
               if (failure) throw failure;
             }
             if (active && persisted.length) {
-              agent.setMessages(mergePersistedThreadMessages(persisted, agent.messages));
+              agent.setMessages(
+                mergePersistedThreadMessages(
+                  normalizeThreadMessages(persisted),
+                  normalizeThreadMessages(agent.messages),
+                ),
+              );
             }
             if (connectionFailure) {
               setHistoryError(
@@ -593,7 +602,7 @@ export function ChatScreen({
           }
         } else {
           const { messages } = await api.request<{ messages: Message[] }>("/api/conversation");
-          if (active) agent.setMessages(messages);
+          if (active) agent.setMessages(normalizeThreadMessages(messages));
         }
         if (active) setLoaded(true);
       } catch (e) {
@@ -645,6 +654,7 @@ export function ChatScreen({
         agent.addMessage({ id: message.id, role: "user", content: message.text });
       }
       try {
+        agent.setMessages(normalizeThreadMessages(agent.messages));
         await runConversationTurn(
           agentId,
           () => copilotkit.runAgent({ agent }),

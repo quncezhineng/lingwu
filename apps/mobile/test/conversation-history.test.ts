@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { Message } from "@copilotkit/react-native/headless";
 import {
   mergePersistedThreadMessages,
+  normalizeThreadMessages,
   readableToolCalls,
   threadHistoryPath,
 } from "../src/conversation-history.ts";
@@ -37,6 +38,7 @@ test("persisted tool calls support nested and legacy top-level shapes", () => {
     toolCalls: [
       { id: "nested", function: { name: "delegate_task", arguments: '{"title":"研究"}' } },
       { id: "legacy", name: "use_desktop", arguments: { action: "screenshot" } },
+      { id: "compact", name: "browse_web", args: '{"url":"https://example.com"}' },
     ],
   };
 
@@ -51,7 +53,64 @@ test("persisted tool calls support nested and legacy top-level shapes", () => {
       type: "function",
       function: { name: "use_desktop", arguments: '{"action":"screenshot"}' },
     },
+    {
+      id: "compact",
+      type: "function",
+      function: { name: "browse_web", arguments: '{"url":"https://example.com"}' },
+    },
   ]);
+});
+
+test("persisted history is normalized before it is sent back to the runtime", () => {
+  const history = [
+    { id: "user-1", role: "user", content: "Read this page" },
+    {
+      id: "assistant-1",
+      role: "assistant",
+      toolCalls: [
+        {
+          id: "call-1",
+          name: "browse_web",
+          args: '{"url":"https://example.com"}',
+        },
+      ],
+    },
+    { id: "tool-1", role: "tool", toolCallId: "call-1", content: "Page text" },
+  ] as unknown as Message[];
+
+  assert.deepEqual(normalizeThreadMessages(history), [
+    history[0],
+    {
+      id: "assistant-1",
+      role: "assistant",
+      toolCalls: [
+        {
+          id: "call-1",
+          type: "function",
+          function: { name: "browse_web", arguments: '{"url":"https://example.com"}' },
+        },
+      ],
+    },
+    history[2],
+  ]);
+});
+
+test("canonical history is returned unchanged", () => {
+  const history = [
+    {
+      id: "assistant-1",
+      role: "assistant",
+      toolCalls: [
+        {
+          id: "call-1",
+          type: "function",
+          function: { name: "delegate_task", arguments: "{}" },
+        },
+      ],
+    },
+  ] satisfies Message[];
+
+  assert.equal(normalizeThreadMessages(history), history);
 });
 
 test("incomplete persisted tool calls are skipped instead of crashing the transcript", () => {
