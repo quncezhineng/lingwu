@@ -246,16 +246,6 @@ function Root() {
                   >
                     {t("common.agentName")}
                   </Text>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontStyle: "italic",
-                      color: colors.faint,
-                      fontFamily: fonts.serif,
-                    }}
-                  >
-                    lingwu
-                  </Text>
                 </View>
                 <View style={{ gap: 18 }}>
                   <View style={[s.row, { gap: 8 }]}>
@@ -372,15 +362,17 @@ function Root() {
                             {t("app.sendCodeSent")}
                           </Text>
                         )}
-                        <Field
-                          label={t("app.codeLabel")}
-                          value={code}
-                          onChangeText={setCode}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          keyboardType="number-pad"
-                          placeholder={t("app.codePlaceholder")}
-                        />
+                        <View style={{ marginTop: space.md }}>
+                          <Field
+                            label={t("app.codeLabel")}
+                            value={code}
+                            onChangeText={setCode}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            keyboardType="number-pad"
+                            placeholder={t("app.codePlaceholder")}
+                          />
+                        </View>
                         <Button
                           primary
                           busy={busy}
@@ -613,7 +605,7 @@ function WorkspaceShell({
       (task) => task.status === "waiting_approval" || task.status === "waiting_input",
     ) || data?.tasks.find((task) => task.status === "running");
   // 服务端保存英文默认名 Xiao Wu，展示前按语言本地化为「小悟」或「Xiao Wu」。
-  const agentName = localizeAgentName(data?.identity.name);
+  const agentName = localizeAgentName(data?.identity.name, data?.identity.nameCustomized);
   const status = activeTask
     ? activeTask.status === "waiting_approval"
       ? t("app.statusReadyToReview", { title: activeTask.title })

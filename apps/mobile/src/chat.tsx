@@ -1360,6 +1360,7 @@ export function ChatScreen({
                       action={action}
                       task={task}
                       agentName={agentWorkspace?.identity.name}
+                      agentNameCustomized={agentWorkspace?.identity.nameCustomized}
                       files={w.files}
                       onDecide={decideAction}
                       onOpenDetails={(item) => open({ type: "review", action: item })}
@@ -1400,6 +1401,7 @@ export function ChatScreen({
               action={action}
               task={task}
               agentName={agentWorkspace?.identity.name}
+              agentNameCustomized={agentWorkspace?.identity.nameCustomized}
               files={w.files}
               onDecide={decideAction}
               onOpenDetails={(item) => open({ type: "review", action: item })}
@@ -1410,6 +1412,7 @@ export function ChatScreen({
               key={`question-${task.id}`}
               task={task}
               agentName={agentWorkspace?.identity.name}
+              agentNameCustomized={agentWorkspace?.identity.nameCustomized}
             />
           ))}
           {!!latestDesktop && (
@@ -1689,7 +1692,10 @@ export function ChatScreen({
               />
             }
             assistantLabel={t("app.agentSettingsLabel", {
-              name: localizeAgentName(agentWorkspace?.identity.name),
+              name: localizeAgentName(
+                agentWorkspace?.identity.name,
+                agentWorkspace?.identity.nameCustomized,
+              ),
             })}
             assistantText={t("workbench.depthAnalysis")}
             onOpenAssistant={() => open({ type: "personality" })}

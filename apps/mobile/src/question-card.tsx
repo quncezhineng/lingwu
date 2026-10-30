@@ -21,7 +21,15 @@ export function taskHasQuestion(task: AgentTask): boolean {
   return !!stringState(task.state.answeredQuestion) && !!stringState(task.state.answer);
 }
 
-export function QuestionCard({ task, agentName }: { task: AgentTask; agentName?: string }) {
+export function QuestionCard({
+  task,
+  agentName,
+  agentNameCustomized,
+}: {
+  task: AgentTask;
+  agentName?: string;
+  agentNameCustomized?: boolean;
+}) {
   const { t } = useTranslation();
   const { mutate } = useAgentWorkspace();
   const { open } = useWorkspace();
@@ -40,7 +48,7 @@ export function QuestionCard({ task, agentName }: { task: AgentTask; agentName?:
   if (!question) return null;
 
   const needsFields = pending && answerFields(task);
-  const name = localizeAgentName(agentName);
+  const name = localizeAgentName(agentName, agentNameCustomized);
 
   async function submit() {
     const text = answer.trim();

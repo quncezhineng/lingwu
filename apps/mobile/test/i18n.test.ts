@@ -149,6 +149,22 @@ test("localizeAgentName 让默认智能体名称跟随当前语言", () => {
   }
 });
 
+test("localizeAgentName 保留用户明确自定义的同名昵称", () => {
+  const original = getActiveLocale();
+  try {
+    setActiveLocale("zh-Hans");
+    assert.equal(localizeAgentName("灵悟", true), "灵悟");
+    assert.equal(localizeAgentName("Xiao Wu", true), "Xiao Wu");
+    assert.equal(localizeAgentName("LingWu", true), "LingWu");
+    setActiveLocale("en");
+    assert.equal(localizeAgentName("小悟", true), "小悟");
+    assert.equal(localizeAgentName("灵儿", true), "灵儿");
+    assert.equal(localizeAgentName("Xiao Wu", true), "Xiao Wu");
+  } finally {
+    setActiveLocale(original);
+  }
+});
+
 test("runtimeLabel 把服务端固定英文文案翻译为当前语言，未登记值原样返回", () => {
   const original = getActiveLocale();
   try {

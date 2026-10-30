@@ -114,7 +114,11 @@ export function TaskThreadCard({ task }: { task: AgentTask }) {
   const hasQuestion = taskHasQuestion(task);
   return (
     <View style={{ gap: 12 }}>
-      <QuestionCard task={task} agentName={data?.identity.name} />
+      <QuestionCard
+        task={task}
+        agentName={data?.identity.name}
+        agentNameCustomized={data?.identity.nameCustomized}
+      />
       {/* 计划卡独立视觉：有步骤就展示步骤列表，不再用任务卡冒充计划卡 */}
       {!hasQuestion &&
         (task.plan.length ? (

@@ -420,7 +420,7 @@ export function WorkbenchScreen() {
   }, []);
   const name =
     shortName(workspace.profile.name) || shortName(workspace.profile.email) || t("workbench.there");
-  const agentName = localizeAgentName(data?.identity.name);
+  const agentName = localizeAgentName(data?.identity.name, data?.identity.nameCustomized);
   // “动态”与任务活动页保持同一口径：所有状态统一按最近更新时间排序。
   const latestTasks = [...(data?.tasks ?? [])].sort((a, b) =>
     b.updatedAt.localeCompare(a.updatedAt),

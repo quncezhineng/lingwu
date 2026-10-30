@@ -187,12 +187,12 @@ const DEFAULT_AGENT_NAME_ALIASES = new Set([
 
 /**
  * 统一智能体名称的展示：默认值在中文显示「小悟」、英文显示「Xiao Wu」。
- * 用户自定义名称原样返回，避免覆盖用户数据。
+ * 用户明确保存的自定义名称原样返回，即使它恰好与某个默认名称相同。
  */
-export function localizeAgentName(name?: string | null): string {
+export function localizeAgentName(name?: string | null, nameCustomized = false): string {
   const localized = tr("common.assistantName");
   if (!name) return localized;
-  return DEFAULT_AGENT_NAME_ALIASES.has(name.trim()) ? localized : name;
+  return !nameCustomized && DEFAULT_AGENT_NAME_ALIASES.has(name.trim()) ? localized : name;
 }
 
 /**

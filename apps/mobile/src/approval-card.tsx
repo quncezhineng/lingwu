@@ -191,6 +191,7 @@ export function ApprovalCard({
   action: incoming,
   task,
   agentName,
+  agentNameCustomized,
   files = [],
   onDecide,
   onOpenDetails,
@@ -198,6 +199,7 @@ export function ApprovalCard({
   action: ActionProposal;
   task?: AgentTask;
   agentName?: string;
+  agentNameCustomized?: boolean;
   files?: Artifact[];
   onDecide: (action: ActionProposal, decision: "approve" | "deny") => Promise<ActionProposal>;
   onOpenDetails: (action: ActionProposal) => void;
@@ -226,7 +228,7 @@ export function ApprovalCard({
     rows.some((row) => row.value.length > 180 || row.value.split("\n").length > 4);
   const Icon = action.kind === "email.send" ? Mail : CalendarDays;
   const StatusIcon = action.status === "succeeded" ? Check : CircleX;
-  const name = localizeAgentName(agentName);
+  const name = localizeAgentName(agentName, agentNameCustomized);
 
   async function decide(decision: "approve" | "deny") {
     if (busy) return;

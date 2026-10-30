@@ -2459,7 +2459,10 @@ export function AgentPersonalitySheet() {
   const { locale, t } = useTranslation();
   const { close } = useWorkspace();
   const { data, mutate } = useAgentWorkspace();
-  const [name, setName] = useState(localizeAgentName(data?.identity.name));
+  const [name, setName] = useState(
+    localizeAgentName(data?.identity.name, data?.identity.nameCustomized),
+  );
+  const [nameCustomized, setNameCustomized] = useState(data?.identity.nameCustomized === true);
   const [tone, setTone] = useState(data?.identity.tone || "warm");
   const [avatar, setAvatar] = useState(normalizeAvatar(data?.identity.avatar));
   const [showChatUpdates, setShowChatUpdates] = useState(data?.identity.showChatUpdates !== false);
@@ -2469,13 +2472,15 @@ export function AgentPersonalitySheet() {
   const [saved, setSaved] = useState(false);
   useEffect(() => {
     if (data?.identity) {
-      setName(localizeAgentName(data.identity.name));
+      setName(localizeAgentName(data.identity.name, data.identity.nameCustomized));
+      setNameCustomized(data.identity.nameCustomized === true);
       setTone(data.identity.tone);
       setAvatar(normalizeAvatar(data.identity.avatar));
       setShowChatUpdates(data.identity.showChatUpdates !== false);
     }
   }, [
     data?.identity.name,
+    data?.identity.nameCustomized,
     data?.identity.tone,
     data?.identity.avatar,
     data?.identity.showChatUpdates,
@@ -2526,7 +2531,14 @@ export function AgentPersonalitySheet() {
                 </Pressable>
               ))}
             </View>
-            <Field label={t("agent.nameLabel")} value={name} onChangeText={setName} />
+            <Field
+              label={t("agent.nameLabel")}
+              value={name}
+              onChangeText={(value) => {
+                setName(value);
+                setNameCustomized(true);
+              }}
+            />
             <View style={[s.row, { gap: 8 }]}>
               {(["warm", "concise", "thoughtful"] as const).map((item) => (
                 <Button key={item} small primary={tone === item} onPress={() => setTone(item)}>
@@ -2545,7 +2557,13 @@ export function AgentPersonalitySheet() {
               quietBusy
               disabled={!name.trim()}
               onPress={() =>
-                void save("/identity", { name: name.trim(), tone, avatar, showChatUpdates })
+                void save("/identity", {
+                  name: name.trim(),
+                  nameCustomized,
+                  tone,
+                  avatar,
+                  showChatUpdates,
+                })
               }
             >
               {t("agent.savePreferences")}
