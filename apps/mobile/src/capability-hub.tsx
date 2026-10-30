@@ -25,10 +25,12 @@ import {
   type IconComponent,
   Link2,
   Mail,
+  Plus,
   Search,
   ShieldCheck,
   Sparkles,
   Target,
+  Trash2,
   X,
 } from "./icons";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
@@ -150,6 +152,13 @@ const HUB_EMPTY_TITLE_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubPluginNoMatchTitle",
   skills: "agent.hubSkillNoMatchTitle",
   connectors: "agent.hubConnectorNoMatchTitle",
+  workspace: "agent.hubNoMatchTitle",
+};
+
+const HUB_MY_EMPTY_TITLE_LABELS: Record<CapabilityType, TranslationKey> = {
+  plugins: "agent.hubMyPluginsEmptyTitle",
+  skills: "agent.hubMySkillsEmptyTitle",
+  connectors: "agent.hubMyConnectorsEmptyTitle",
   workspace: "agent.hubNoMatchTitle",
 };
 
@@ -315,97 +324,147 @@ function ShortcutCard({
   );
 }
 
-function CapabilityCard({ item }: { item: CatalogItem }) {
+function CapabilityCard({
+  item,
+  tab,
+  installBusy,
+  onSetInstalled,
+}: {
+  item: CatalogItem;
+  tab: HubTab;
+  installBusy: boolean;
+  onSetInstalled: (installed: boolean) => void;
+}) {
   const { t } = useTranslation();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${item.title} · ${item.detail}`}
-      onPress={item.onPress}
-      style={({ pressed }) => ({
+    <View
+      style={{
         flex: 1,
         minWidth: 0,
-        minHeight: 158,
-        paddingTop: 16,
-        paddingHorizontal: 16,
-        paddingBottom: 12,
+        minHeight: 205,
         borderRadius: radius.card,
         borderWidth: 1,
-        borderColor: pressed ? colors.lineStrong : colors.line,
-        backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
-      })}
+        borderColor: colors.line,
+        backgroundColor: colors.paper,
+        overflow: "hidden",
+      }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <View
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: radius.field,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: item.iconSurface,
-          }}
-        >
-          <item.icon size={19} color={item.iconColor} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${item.title} · ${item.detail}`}
+        onPress={item.onPress}
+        style={({ pressed }) => ({
+          flex: 1,
+          paddingTop: 16,
+          paddingHorizontal: 16,
+          backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
+        })}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: radius.field,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: item.iconSurface,
+            }}
+          >
+            <item.icon size={19} color={item.iconColor} />
+          </View>
+          <Text
+            numberOfLines={1}
+            style={{
+              flex: 1,
+              color: colors.text,
+              fontSize: 14,
+              lineHeight: 20,
+              fontWeight: "500",
+              fontFamily: fonts.sans,
+            }}
+          >
+            {item.title}
+          </Text>
+          <ArrowUpRight size={14} strokeWidth={1.7} color={colors.disabled} />
         </View>
         <Text
-          numberOfLines={1}
+          numberOfLines={3}
           style={{
             flex: 1,
-            color: colors.text,
-            fontSize: 14,
-            lineHeight: 20,
-            fontWeight: "500",
+            marginTop: 14,
+            color: colors.muted,
+            fontSize: 13,
+            lineHeight: 17,
             fontFamily: fonts.sans,
           }}
         >
-          {item.title}
+          {item.detail}
         </Text>
-        <ArrowUpRight size={14} strokeWidth={1.7} color={colors.disabled} />
-      </View>
-      <Text
-        numberOfLines={3}
-        style={{
-          flex: 1,
-          marginTop: 14,
-          color: colors.muted,
-          fontSize: 13,
-          lineHeight: 17,
-          fontFamily: fonts.sans,
-        }}
-      >
-        {item.detail}
-      </Text>
-      <View
-        style={[
-          s.between,
-          {
-            marginTop: 12,
-            paddingTop: 10,
-            borderTopWidth: 1,
-            borderTopColor: colors.line,
-          },
-        ]}
-      >
-        <Text
-          numberOfLines={1}
-          style={{
-            maxWidth: "60%",
-            color: colors.faint,
-            fontSize: 11,
-            lineHeight: 16,
-            fontFamily: fonts.sans,
-          }}
+      </Pressable>
+      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+        <View
+          style={[
+            s.between,
+            {
+              paddingTop: 10,
+              borderTopWidth: 1,
+              borderTopColor: colors.line,
+            },
+          ]}
         >
-          {item.source}
-        </Text>
-        <StatusBadge
-          tone={item.state === "available" ? "paused" : "done"}
-          label={t(STATE_KEYS[item.state])}
-          style={item.state === "available" ? undefined : { backgroundColor: colors.sky }}
-        />
+          <Text
+            numberOfLines={1}
+            style={{
+              maxWidth: "52%",
+              color: colors.faint,
+              fontSize: 11,
+              lineHeight: 16,
+              fontFamily: fonts.sans,
+            }}
+          >
+            {item.source}
+          </Text>
+          <StatusBadge
+            tone={item.state === "available" ? "paused" : "done"}
+            label={t(STATE_KEYS[item.state])}
+            style={item.state === "available" ? undefined : { backgroundColor: colors.sky }}
+          />
+        </View>
+        {tab === "mine" ? (
+          <Button
+            small
+            icon={Trash2}
+            busy={installBusy}
+            onPress={() => onSetInstalled(false)}
+            style={{ width: "100%", marginTop: 10 }}
+          >
+            {t("agent.hubRemove")}
+          </Button>
+        ) : item.installed ? (
+          <Button
+            small
+            icon={Check}
+            disabled
+            onPress={() => undefined}
+            style={{ width: "100%", marginTop: 10 }}
+          >
+            {t("agent.hubInstalled")}
+          </Button>
+        ) : (
+          <Button
+            small
+            primary
+            icon={Plus}
+            busy={installBusy}
+            onPress={() => onSetInstalled(true)}
+            style={{ width: "100%", marginTop: 10 }}
+          >
+            {t("agent.hubInstall")}
+          </Button>
+        )}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -628,6 +687,7 @@ export function CapabilityHubScreen() {
   const [configError, setConfigError] = useState("");
   const [googleConnectingId, setGoogleConnectingId] = useState<"gmail" | "calendar">();
   const [selectedSkillId, setSelectedSkillId] = useState<string>();
+  const [installBusyId, setInstallBusyId] = useState<string>();
 
   const desktop = width >= breakpoints.desktop;
   const railWidth = desktop ? 232 : 0;
@@ -650,13 +710,17 @@ export function CapabilityHubScreen() {
   // 与连接器面板同一口径：选中模型即视为已连接（不再看 modelOptions 是否可切换）
   const modelConnected = Boolean(workspace.runtime.model);
   const modelOptions = workspace.runtime.modelOptions ?? [];
+  const installedCapabilityIds = new Set(
+    (workspace.installedCapabilities ?? []).map((capability) => capability.id),
+  );
   const builtInSource = t("agent.hubSourceLingwu");
   const workspaceSource = t("agent.hubSourceWorkspace");
   const skillSource = t("agent.hubSourceLingwu");
   const skillItems: CatalogItem[] = skillCatalog.map((skill) => {
+    const id = `skill:${skill.id}`;
     const appearance = SKILL_CATEGORY_APPEARANCE[skillCategory(skill)];
     return {
-      id: `skill:${skill.id}`,
+      id,
       type: "skills",
       tags: [...skill.categories],
       title: locale === "zh-Hans" ? skill.titleZh : skill.titleEn,
@@ -666,7 +730,7 @@ export function CapabilityHubScreen() {
       iconSurface: appearance.surface,
       source: skillSource,
       state: "ready",
-      installed: true,
+      installed: installedCapabilityIds.has(id),
       searchText: [
         skill.id,
         skill.titleZh,
@@ -720,6 +784,32 @@ export function CapabilityHubScreen() {
     }
   }
 
+  async function setCapabilityInstalled(item: CatalogItem, installed: boolean) {
+    if (installBusyId) return;
+    setInstallBusyId(item.id);
+    try {
+      await api.request(
+        `/api/capabilities/${encodeURIComponent(item.id)}`,
+        {
+          type: item.type,
+          installed,
+        },
+        "PUT",
+      );
+      await refresh();
+      if (!installed) setCategory("all");
+      notify(
+        t(installed ? "agent.hubInstalledNotice" : "agent.hubRemovedNotice", {
+          title: item.title,
+        }),
+      );
+    } catch (error) {
+      notify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setInstallBusyId(undefined);
+    }
+  }
+
   function startSelectedSkill(skill: SkillCatalogEntry) {
     ask(
       locale === "zh-Hans"
@@ -742,7 +832,7 @@ export function CapabilityHubScreen() {
       iconSurface: serviceBrands.gmail.surface,
       source: workspaceSource,
       state: "open",
-      installed: true,
+      installed: installedCapabilityIds.has("mail"),
       onPress: () => navigate("mail"),
     },
     {
@@ -756,7 +846,7 @@ export function CapabilityHubScreen() {
       iconSurface: serviceBrands.googleCalendar.surface,
       source: workspaceSource,
       state: "open",
-      installed: true,
+      installed: installedCapabilityIds.has("calendar-workspace"),
       onPress: () => navigate("calendar"),
     },
     {
@@ -770,7 +860,7 @@ export function CapabilityHubScreen() {
       iconSurface: colors.sky,
       source: builtInSource,
       state: modelConnected ? "connected" : "available",
-      installed: modelConnected,
+      installed: installedCapabilityIds.has("model"),
       onPress: () => setConfigSheet("model"),
     },
     {
@@ -784,7 +874,7 @@ export function CapabilityHubScreen() {
       iconSurface: serviceBrands.gmail.surface,
       source: "@Google",
       state: googleConnected ? "connected" : "available",
-      installed: googleConnected,
+      installed: installedCapabilityIds.has("gmail"),
       onPress: () => void openGoogleConnector("gmail"),
     },
     {
@@ -798,7 +888,7 @@ export function CapabilityHubScreen() {
       iconSurface: serviceBrands.googleCalendar.surface,
       source: "@Google",
       state: googleConnected ? "connected" : "available",
-      installed: googleConnected,
+      installed: installedCapabilityIds.has("calendar"),
       onPress: () => void openGoogleConnector("calendar"),
     },
     {
@@ -812,7 +902,7 @@ export function CapabilityHubScreen() {
       iconSurface: serviceBrands.browser.surface,
       source: builtInSource,
       state: browserConnected ? "connected" : "available",
-      installed: browserConnected,
+      installed: installedCapabilityIds.has("browser"),
       onPress: () => open({ type: "computer" }),
     },
     {
@@ -826,7 +916,7 @@ export function CapabilityHubScreen() {
       iconSurface: serviceBrands.openbot.surface,
       source: "@OpenBot",
       state: workspace.runtime.openbotConfigured ? "connected" : "available",
-      installed: workspace.runtime.openbotConfigured,
+      installed: installedCapabilityIds.has("openbot"),
       onPress: () => setConfigSheet("openbot"),
     },
   ];
@@ -908,6 +998,7 @@ export function CapabilityHubScreen() {
   const visibleRows = chunk(visibleItems, gridColumns);
   const activeCategoryLabel =
     categoryOptions.find((option) => option.id === category)?.labelKey ?? "agent.hubAllCategories";
+  const showMineEmptyState = tab === "mine" && category === "all" && !normalizedQuery;
 
   const searchField = (
     <View
@@ -1105,7 +1196,15 @@ export function CapabilityHubScreen() {
                       style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
                     >
                       {row.map((item) => (
-                        <CapabilityCard key={item.id} item={item} />
+                        <CapabilityCard
+                          key={item.id}
+                          item={item}
+                          tab={tab}
+                          installBusy={installBusyId === item.id}
+                          onSetInstalled={(installed) =>
+                            void setCapabilityInstalled(item, installed)
+                          }
+                        />
                       ))}
                       {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
                         <View key={key} style={{ flex: 1 }} />
@@ -1127,9 +1226,21 @@ export function CapabilityHubScreen() {
                 >
                   <Empty
                     icon={Search}
-                    title={t(HUB_EMPTY_TITLE_LABELS[typeFilter])}
-                    detail={t("agent.hubNoMatchDetail")}
-                  />
+                    title={t(
+                      showMineEmptyState
+                        ? HUB_MY_EMPTY_TITLE_LABELS[typeFilter]
+                        : HUB_EMPTY_TITLE_LABELS[typeFilter],
+                    )}
+                    detail={t(
+                      showMineEmptyState ? "agent.hubMyEmptyDetail" : "agent.hubNoMatchDetail",
+                    )}
+                  >
+                    {showMineEmptyState && (
+                      <Button small primary onPress={() => setTab("marketplace")}>
+                        {t("agent.hubBrowseMarketplace")}
+                      </Button>
+                    )}
+                  </Empty>
                 </View>
               )}
             </View>
