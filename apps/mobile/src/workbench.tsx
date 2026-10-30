@@ -596,7 +596,7 @@ export function WorkbenchScreen() {
                 />
               }
               assistantLabel={t("app.agentSettingsLabel", { name: agentName })}
-              assistantText={t("workbench.depthAnalysis")}
+              assistantText={t("workbench.agent")}
               onOpenAssistant={() => open({ type: "personality" })}
               sendLabel={t("workbench.sendAnalysis")}
             />

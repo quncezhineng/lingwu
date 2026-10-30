@@ -61,6 +61,7 @@ import { defaultCurrency, directionOf, formatPercent, formatPrice } from "./mark
 import { type InvestmentNote, loadNotes, useNotesState } from "./notes";
 import { QuoteCard } from "./quote-card";
 import { availabilityFromQuote, type QuoteAvailability, useQuotes } from "./quotes";
+import { useSidebarCollapsed } from "./sidebar-state";
 import { breakpoints, layout, space } from "./theme";
 import {
   Button,
@@ -1201,6 +1202,7 @@ export function WatchlistScreen() {
   const { api, notify, open, ask } = useWorkspace();
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
+  const sidebarWidth = useSidebarCollapsed() ? layout.sidebarCollapsed : layout.sidebar;
   const state = useWatchlistState();
   const notesState = useNotesState();
   const [filterQuery, setFilterQuery] = useState("");
@@ -1235,7 +1237,7 @@ export function WatchlistScreen() {
   // 否则 1000 宽附近会出现「壳层已进入桌面、内容区只剩 584」的断点悬崖。
   const contentWidth =
     width >= breakpoints.desktop
-      ? width - layout.sidebar - space.page * 2
+      ? width - sidebarWidth - space.page * 2
       : width - space.pageMobile * 2;
   const columns = contentWidth >= 960 ? 3 : contentWidth >= 560 ? 2 : 1;
   const cardWidth = columns === 1 ? "100%" : columns === 2 ? "48%" : "31.5%";

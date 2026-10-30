@@ -58,6 +58,7 @@ import { workbenchInsightView } from "./insight-view";
 import { NotesScreen } from "./notes-screen";
 import { PageHeader } from "./page-header";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
+import { useSidebarCollapsed } from "./sidebar-state";
 import { StatusBadge, type StatusTone } from "./status-badge";
 import { breakpoints, fonts, layout, radius, space } from "./theme";
 import {
@@ -1053,6 +1054,7 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
   const { data: agent, error: agentError } = useAgentWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
+  const sidebarWidth = useSidebarCollapsed() ? layout.sidebarCollapsed : layout.sidebar;
   const [section, setSection] = useState<LibrarySection>(initialSection);
   const [sourceFilter, setSourceFilter] = useState<FileSourceFilter>("all");
   const [formatFilter, setFormatFilter] = useState<FileFormatFilter>("all");
@@ -1084,7 +1086,7 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
   // 内容区宽度：桌面扣侧栏与页面 padding，决定资料卡栅格列数（避免单卡右侧大片留白）。
   const contentWidth =
     width >= breakpoints.desktop
-      ? width - layout.sidebar - space.page * 2
+      ? width - sidebarWidth - space.page * 2
       : width - space.pageMobile * 2;
   const columns = contentWidth >= 1080 ? 3 : contentWidth >= 700 ? 2 : 1;
   const cardWidth = columns === 1 ? "100%" : columns === 2 ? "48.5%" : "31.8%";
