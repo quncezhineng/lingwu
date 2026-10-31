@@ -63,6 +63,7 @@ const app = {
   "app.signIn": "Sign in",
   "app.signOutLabel": "Sign out",
   "app.profileDetails": "Personal details",
+  "app.profileModelHeading": "Model",
   "app.profileNickname": "Nickname",
   "app.profileAccountId": "Account ID",
   "app.profileSignInMethod": "Sign-in method",

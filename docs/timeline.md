@@ -5,6 +5,17 @@
 
 ## 变更记录
 
+### 2026-10-31 · 「我的」页面设置分组标题改为"模型"
+
+个人信息页面（`AccountScreen`）中「设置」分组下只有"大模型连接"一行，分组标题改为「模型」更贴合内容。移动端与桌面端共用该页面，一次修改两处同步生效；桌面端「设置」面板（`SettingsSheet`）标题保持不变。
+
+**修改**
+
+- `apps/mobile/src/i18n/locales/zh-Hans/app.ts`：新增 `app.profileModelHeading` = "模型"。
+- `apps/mobile/src/i18n/locales/en/app.ts`：新增 `app.profileModelHeading` = "Model"。
+- `apps/mobile/src/account.tsx`：个人信息页「设置」分组标题改用 `t("app.profileModelHeading")`，不再复用 `details.settingsTitle`。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
 ### 2026-10-30 · 移除欢迎界面品牌名旁的斜体小字 lingwu
 
 登录/欢迎界面（`App.tsx`）品牌名「灵悟」旁存在一个 13px 灰色斜体小字 `lingwu` 作为装饰，用户要求删除。

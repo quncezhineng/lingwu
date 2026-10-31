@@ -53,6 +53,7 @@ const app = {
   "app.signIn": "登录",
   "app.signOutLabel": "退出登录",
   "app.profileDetails": "个人信息",
+  "app.profileModelHeading": "模型",
   "app.profileNickname": "昵称",
   "app.profileAccountId": "账号 ID",
   "app.profileSignInMethod": "登录方式",

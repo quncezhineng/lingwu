@@ -352,7 +352,7 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
         </Card>
       </View>
       <View style={{ gap: 10 }}>
-        <Text style={s.heading}>{t("details.settingsTitle")}</Text>
+        <Text style={s.heading}>{t("app.profileModelHeading")}</Text>
         <Card style={{ paddingVertical: 4 }}>
           <LinkRow
             icon={Cpu}
