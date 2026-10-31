@@ -44,7 +44,7 @@ The report is a single self-contained HTML file with:
         font-size: 15px;
       }
       body {
-        font-family: 'Arial Narrow', Arial, sans-serif;
+        font-family: "Arial Narrow", Arial, sans-serif;
         color: #1a1a2e;
         background: #fff;
         line-height: 1.6;
@@ -265,7 +265,7 @@ The report is a single self-contained HTML file with:
         color: #444;
       }
       .appendix .source-detail .formula {
-        font-family: 'Courier New', monospace;
+        font-family: "Courier New", monospace;
         font-size: 9.5px;
         color: #555;
       }
@@ -862,29 +862,29 @@ The report is a single self-contained HTML file with:
       // ── Register Annotation Plugin ──
       // The CDN-loaded annotation plugin must be explicitly registered.
       // It is available as a global after the script tag loads.
-      if (window['chartjs-plugin-annotation']) {
-        Chart.register(window['chartjs-plugin-annotation']);
+      if (window["chartjs-plugin-annotation"]) {
+        Chart.register(window["chartjs-plugin-annotation"]);
       }
 
       // ── Chart Defaults ──
       Chart.defaults.font.family = "'Arial Narrow', Arial, sans-serif";
       Chart.defaults.font.size = 11;
-      Chart.defaults.color = '#555';
-      Chart.defaults.plugins.legend.position = 'bottom';
+      Chart.defaults.color = "#555";
+      Chart.defaults.plugins.legend.position = "bottom";
       Chart.defaults.plugins.legend.labels.boxWidth = 12;
 
       // ── Color Palette ──
       const COLORS = {
-        navy: '#1a1a4e',
-        blue: '#3366cc',
-        teal: '#0d9488',
-        orange: '#e67e22',
-        red: '#c0392b',
-        green: '#27ae60',
-        purple: '#8e44ad',
-        gray: '#7f8c8d',
-        lightBlue: '#85c1e9',
-        gold: '#f0b429',
+        navy: "#1a1a4e",
+        blue: "#3366cc",
+        teal: "#0d9488",
+        orange: "#e67e22",
+        red: "#c0392b",
+        green: "#27ae60",
+        purple: "#8e44ad",
+        gray: "#7f8c8d",
+        lightBlue: "#85c1e9",
+        gold: "#f0b429",
       };
       const COMP_COLORS = [
         COLORS.navy,
@@ -902,46 +902,46 @@ The report is a single self-contained HTML file with:
         const ctx = document.getElementById(canvasId);
         if (!ctx) return;
         new Chart(ctx, {
-          type: 'bar',
+          type: "bar",
           data: {
             labels: labels,
             datasets: [
               {
-                label: revLabel || 'Revenue ($B)',
+                label: revLabel || "Revenue ($B)",
                 data: revenueData,
-                backgroundColor: COLORS.navy + 'cc',
+                backgroundColor: COLORS.navy + "cc",
                 borderColor: COLORS.navy,
                 borderWidth: 1,
-                yAxisID: 'y',
+                yAxisID: "y",
                 order: 2,
               },
               {
-                label: 'Diluted EPS',
+                label: "Diluted EPS",
                 data: epsData,
-                type: 'line',
+                type: "line",
                 borderColor: COLORS.orange,
                 backgroundColor: COLORS.orange,
                 borderWidth: 2.5,
                 pointRadius: 4,
                 pointBackgroundColor: COLORS.orange,
                 tension: 0.3,
-                yAxisID: 'y1',
+                yAxisID: "y1",
                 order: 1,
               },
             ],
           },
           options: {
             responsive: true,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: "index", intersect: false },
             scales: {
               y: {
-                position: 'left',
-                title: { display: true, text: revLabel || 'Revenue ($B)', font: { size: 11 } },
-                grid: { color: '#eee' },
+                position: "left",
+                title: { display: true, text: revLabel || "Revenue ($B)", font: { size: 11 } },
+                grid: { color: "#eee" },
               },
               y1: {
-                position: 'right',
-                title: { display: true, text: 'EPS ($)', font: { size: 11 } },
+                position: "right",
+                title: { display: true, text: "EPS ($)", font: { size: 11 } },
                 grid: { drawOnChartArea: false },
               },
             },
@@ -954,25 +954,25 @@ The report is a single self-contained HTML file with:
         const ctx = document.getElementById(canvasId);
         if (!ctx) return;
         new Chart(ctx, {
-          type: 'line',
+          type: "line",
           data: {
             labels: labels,
             datasets: [
               {
-                label: 'Gross Margin %',
+                label: "Gross Margin %",
                 data: grossMargins,
                 borderColor: COLORS.blue,
-                backgroundColor: COLORS.blue + '20',
+                backgroundColor: COLORS.blue + "20",
                 borderWidth: 2.5,
                 pointRadius: 4,
                 fill: false,
                 tension: 0.3,
               },
               {
-                label: 'Operating Margin %',
+                label: "Operating Margin %",
                 data: opMargins,
                 borderColor: COLORS.teal,
-                backgroundColor: COLORS.teal + '20',
+                backgroundColor: COLORS.teal + "20",
                 borderWidth: 2.5,
                 pointRadius: 4,
                 fill: false,
@@ -984,9 +984,9 @@ The report is a single self-contained HTML file with:
             responsive: true,
             scales: {
               y: {
-                title: { display: true, text: 'Margin (%)', font: { size: 11 } },
-                grid: { color: '#eee' },
-                ticks: { callback: (v) => v.toFixed(1) + '%' },
+                title: { display: true, text: "Margin (%)", font: { size: 11 } },
+                grid: { color: "#eee" },
+                ticks: { callback: (v) => v.toFixed(1) + "%" },
               },
             },
           },
@@ -998,15 +998,15 @@ The report is a single self-contained HTML file with:
         const ctx = document.getElementById(canvasId);
         if (!ctx) return;
         new Chart(ctx, {
-          type: 'bar',
+          type: "bar",
           data: {
             labels: labels,
             datasets: [
               {
-                label: 'Revenue Growth y/y %',
+                label: "Revenue Growth y/y %",
                 data: growthData,
                 backgroundColor: growthData.map((v) =>
-                  v >= 0 ? COLORS.green + 'cc' : COLORS.red + 'cc',
+                  v >= 0 ? COLORS.green + "cc" : COLORS.red + "cc",
                 ),
                 borderColor: growthData.map((v) => (v >= 0 ? COLORS.green : COLORS.red)),
                 borderWidth: 1,
@@ -1017,9 +1017,9 @@ The report is a single self-contained HTML file with:
             responsive: true,
             scales: {
               y: {
-                title: { display: true, text: 'Growth (%)', font: { size: 11 } },
-                grid: { color: '#eee' },
-                ticks: { callback: (v) => v.toFixed(1) + '%' },
+                title: { display: true, text: "Growth (%)", font: { size: 11 } },
+                grid: { color: "#eee" },
+                ticks: { callback: (v) => v.toFixed(1) + "%" },
               },
             },
             plugins: { legend: { display: false } },
@@ -1034,36 +1034,36 @@ The report is a single self-contained HTML file with:
         const annotations = {};
         earningsDates.forEach((ed, i) => {
           let xValue = ed.date;
-          const isNeg = ed.move.startsWith('-');
-          annotations['earnings' + i] = {
-            type: 'line',
+          const isNeg = ed.move.startsWith("-");
+          annotations["earnings" + i] = {
+            type: "line",
             xMin: xValue,
             xMax: xValue,
-            borderColor: isNeg ? '#c0392b' : '#0d7a3e',
+            borderColor: isNeg ? "#c0392b" : "#0d7a3e",
             borderWidth: 2,
             borderDash: [6, 4],
             label: {
               display: true,
-              content: ed.label + ' (' + ed.move + ')',
-              position: i % 2 === 0 ? 'start' : 'end',
-              backgroundColor: isNeg ? '#c0392b' : '#0d7a3e',
-              color: '#fff',
-              font: { size: 10, weight: 'bold' },
+              content: ed.label + " (" + ed.move + ")",
+              position: i % 2 === 0 ? "start" : "end",
+              backgroundColor: isNeg ? "#c0392b" : "#0d7a3e",
+              color: "#fff",
+              font: { size: 10, weight: "bold" },
               padding: { top: 3, bottom: 3, left: 6, right: 6 },
               borderRadius: 3,
             },
           };
         });
         new Chart(ctx, {
-          type: 'line',
+          type: "line",
           data: {
             labels: labels,
             datasets: [
               {
-                label: ticker + ' Close',
+                label: ticker + " Close",
                 data: prices,
                 borderColor: COLORS.navy,
-                backgroundColor: COLORS.navy + '15',
+                backgroundColor: COLORS.navy + "15",
                 borderWidth: 1.5,
                 pointRadius: 0,
                 pointHitRadius: 4,
@@ -1074,21 +1074,21 @@ The report is a single self-contained HTML file with:
           },
           options: {
             responsive: true,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: "index", intersect: false },
             scales: {
               x: {
-                type: 'category',
+                type: "category",
                 ticks: { maxTicksLimit: 12, font: { size: 10 } },
                 grid: { display: false },
               },
               y: {
-                title: { display: true, text: 'Price ($)', font: { size: 11 } },
-                grid: { color: '#eee' },
+                title: { display: true, text: "Price ($)", font: { size: 11 } },
+                grid: { color: "#eee" },
               },
             },
             plugins: {
               annotation: { annotations: annotations },
-              tooltip: { callbacks: { label: (ctx) => ticker + ': $' + ctx.raw.toFixed(2) } },
+              tooltip: { callbacks: { label: (ctx) => ticker + ": $" + ctx.raw.toFixed(2) } },
             },
           },
         });
@@ -1105,7 +1105,7 @@ The report is a single self-contained HTML file with:
             label: ds.label,
             data: ds.data.map((v) => (v / base) * 100),
             borderColor: ds.color || COMP_COLORS[i % COMP_COLORS.length],
-            backgroundColor: 'transparent',
+            backgroundColor: "transparent",
             borderWidth: ds.isSubject ? 3 : 1.5,
             borderDash: ds.isSubject ? [] : [4, 2],
             pointRadius: 0,
@@ -1113,21 +1113,21 @@ The report is a single self-contained HTML file with:
           };
         });
         new Chart(ctx, {
-          type: 'line',
+          type: "line",
           data: { labels: labels, datasets: chartDatasets },
           options: {
             responsive: true,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: "index", intersect: false },
             scales: {
               y: {
-                title: { display: true, text: 'Indexed (100 = Start)', font: { size: 11 } },
-                grid: { color: '#eee' },
+                title: { display: true, text: "Indexed (100 = Start)", font: { size: 11 } },
+                grid: { color: "#eee" },
               },
               x: { ticks: { maxTicksLimit: 12 } },
             },
             plugins: {
               tooltip: {
-                callbacks: { label: (ctx) => ctx.dataset.label + ': ' + ctx.raw.toFixed(1) },
+                callbacks: { label: (ctx) => ctx.dataset.label + ": " + ctx.raw.toFixed(1) },
               },
             },
           },
@@ -1141,12 +1141,12 @@ The report is a single self-contained HTML file with:
         if (!ctx) return;
         companies.sort((a, b) => b.pe - a.pe);
         new Chart(ctx, {
-          type: 'bar',
+          type: "bar",
           data: {
             labels: companies.map((c) => c.label),
             datasets: [
               {
-                label: 'LTM P/E',
+                label: "LTM P/E",
                 data: companies.map((c) => c.pe),
                 backgroundColor: companies.map((c) =>
                   c.isSubject ? COLORS.navy : COLORS.lightBlue,
@@ -1157,21 +1157,21 @@ The report is a single self-contained HTML file with:
             ],
           },
           options: {
-            indexAxis: 'y',
+            indexAxis: "y",
             responsive: true,
             scales: {
               x: {
-                title: { display: true, text: 'LTM P/E', font: { size: 11 } },
-                grid: { color: '#eee' },
+                title: { display: true, text: "LTM P/E", font: { size: 11 } },
+                grid: { color: "#eee" },
               },
               y: {
-                ticks: { font: { size: 12, weight: 'bold' } },
+                ticks: { font: { size: 12, weight: "bold" } },
               },
             },
             plugins: {
               legend: { display: false },
               tooltip: {
-                callbacks: { label: (ctx) => 'P/E: ' + ctx.raw.toFixed(1) + 'x' },
+                callbacks: { label: (ctx) => "P/E: " + ctx.raw.toFixed(1) + "x" },
               },
             },
           },
@@ -1195,14 +1195,14 @@ The report is a single self-contained HTML file with:
     <script>
       try {
         createRevEpsChart(
-          'chart-rev-eps',
-          ['Q1 FY24', 'Q2 FY24', 'Q3 FY24', 'Q4 FY24', 'Q1 FY25', 'Q2 FY25', 'Q3 FY25', 'Q4 FY25'],
+          "chart-rev-eps",
+          ["Q1 FY24", "Q2 FY24", "Q3 FY24", "Q4 FY24", "Q1 FY25", "Q2 FY25", "Q3 FY25", "Q4 FY25"],
           [152.3, 161.6, 160.8, 173.4, 161.5, 169.3, 165.8, 178.0], // revenue in $B
           [1.47, 1.84, 1.53, 1.8, 1.56, 1.92, 1.6, 1.9], // diluted EPS
-          'Revenue ($B)',
+          "Revenue ($B)",
         );
       } catch (e) {
-        console.error('Figure 1 error:', e);
+        console.error("Figure 1 error:", e);
       }
     </script>
 
@@ -1210,13 +1210,13 @@ The report is a single self-contained HTML file with:
     <script>
       try {
         createMarginChart(
-          'chart-margins',
-          ['Q1 FY24', 'Q2 FY24', 'Q3 FY24', 'Q4 FY24', 'Q1 FY25', 'Q2 FY25', 'Q3 FY25', 'Q4 FY25'],
+          "chart-margins",
+          ["Q1 FY24", "Q2 FY24", "Q3 FY24", "Q4 FY24", "Q1 FY25", "Q2 FY25", "Q3 FY25", "Q4 FY25"],
           [24.0, 24.4, 24.2, 23.8, 24.5, 24.8, 24.6, 24.1], // gross margin %
           [4.2, 5.1, 4.5, 4.8, 4.6, 5.3, 4.7, 5.0], // operating margin %
         );
       } catch (e) {
-        console.error('Figure 2 error:', e);
+        console.error("Figure 2 error:", e);
       }
     </script>
 
@@ -1224,12 +1224,12 @@ The report is a single self-contained HTML file with:
     <script>
       try {
         createRevGrowthChart(
-          'chart-rev-growth',
-          ['Q1 FY25', 'Q2 FY25', 'Q3 FY25', 'Q4 FY25'], // Only 4 labels — quarters with y/y data
+          "chart-rev-growth",
+          ["Q1 FY25", "Q2 FY25", "Q3 FY25", "Q4 FY25"], // Only 4 labels — quarters with y/y data
           [6.0, 4.8, 3.1, 2.7], // y/y revenue growth % for those 4 quarters
         );
       } catch (e) {
-        console.error('Figure 3 error:', e);
+        console.error("Figure 3 error:", e);
       }
     </script>
 
@@ -1237,17 +1237,17 @@ The report is a single self-contained HTML file with:
     <script>
       try {
         createAnnotatedPriceChart(
-          'chart-price-annotated',
-          ['2025-02-18', '2025-02-19'], // ... daily date labels for 1 year
+          "chart-price-annotated",
+          ["2025-02-18", "2025-02-19"], // ... daily date labels for 1 year
           [170.5, 171.2], // ... daily closing prices
           [
-            { date: '2025-05-15', label: 'Q1 FY26', move: '+3.2%' },
-            { date: '2025-08-15', label: 'Q2 FY26', move: '-1.8%' },
+            { date: "2025-05-15", label: "Q1 FY26", move: "+3.2%" },
+            { date: "2025-08-15", label: "Q2 FY26", move: "-1.8%" },
           ],
-          'WMT',
+          "WMT",
         );
       } catch (e) {
-        console.error('Figure 5 error:', e);
+        console.error("Figure 5 error:", e);
       }
     </script>
 
@@ -1255,30 +1255,30 @@ The report is a single self-contained HTML file with:
     <script>
       try {
         createCompPerfChart(
-          'chart-comp-perf',
-          ['2025-02-18', '2025-03-18'], // ... date labels
+          "chart-comp-perf",
+          ["2025-02-18", "2025-03-18"], // ... date labels
           [
-            { label: 'WMT', data: [170.5, 172.3], isSubject: true },
-            { label: 'COST', data: [580.2, 595.1], isSubject: false },
-            { label: 'TGT', data: [142.0, 138.5], isSubject: false },
+            { label: "WMT", data: [170.5, 172.3], isSubject: true },
+            { label: "COST", data: [580.2, 595.1], isSubject: false },
+            { label: "TGT", data: [142.0, 138.5], isSubject: false },
           ],
         );
       } catch (e) {
-        console.error('Figure 6 error:', e);
+        console.error("Figure 6 error:", e);
       }
     </script>
 
     <!-- Figure 7: LTM P/E Comparison -->
     <script>
       try {
-        createPEChart('chart-pe-comp', [
-          { label: 'COST', pe: 52.3, isSubject: false },
-          { label: 'WMT', pe: 28.1, isSubject: true },
-          { label: 'TGT', pe: 15.6, isSubject: false },
-          { label: 'BJ', pe: 22.4, isSubject: false },
+        createPEChart("chart-pe-comp", [
+          { label: "COST", pe: 52.3, isSubject: false },
+          { label: "WMT", pe: 28.1, isSubject: true },
+          { label: "TGT", pe: 15.6, isSubject: false },
+          { label: "BJ", pe: 22.4, isSubject: false },
         ]);
       } catch (e) {
-        console.error('Figure 7 error:', e);
+        console.error("Figure 7 error:", e);
       }
     </script>
   </body>

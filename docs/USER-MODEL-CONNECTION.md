@@ -17,11 +17,11 @@ BASE_URL、模型 ID 及协议参数由服务端公共目录统一管理，不�
 
 ## 配置分层与存储
 
-| 层级 | 内容 | 存放位置 |
-| --- | --- | --- |
-| 平台公共配置 | 厂商标识、名称、协议、模型目录与默认模型、BASE_URL | `modelProviders` 目录及服务端环境变量 |
-| 用户连接 | 厂商、所选模型 ID 引用、加密 API Key、更新时间 | `records(owner, credentials, model:<provider>)` |
-| 用户模型偏好 | 当前 `provider/model-id` 引用 | `records(owner, settings, model)` |
+| 层级         | 内容                                               | 存放位置                                        |
+| ------------ | -------------------------------------------------- | ----------------------------------------------- |
+| 平台公共配置 | 厂商标识、名称、协议、模型目录与默认模型、BASE_URL | `modelProviders` 目录及服务端环境变量           |
+| 用户连接     | 厂商、所选模型 ID 引用、加密 API Key、更新时间     | `records(owner, credentials, model:<provider>)` |
+| 用户模型偏好 | 当前 `provider/model-id` 引用                      | `records(owner, settings, model)`               |
 
 用户记录不复制 BASE_URL 或基础模型参数。当前登录会话决定 owner，客户端不能指定其他 user。共享目录更新后，用户凭证仍然独立，新请求使用统一的厂商配置。
 

@@ -13,7 +13,7 @@ description_zh: >
   IV 排名和 IV 百分位分析，展示当前隐含波动率在其 252 天历史中的相对位置。返回 IV 排名（0-100）、IV 百分位（0-100）、IV 历史数据以及基于 IV 区间的交易信号。使用场景：决定买入还是卖出期权溢价、检查 IV 是否偏高或偏低、择时波动率交易、筛选 IV 极端值。
   触发词："IV 排名 AAPL"、"NVDA IV 高吗"、"IV 百分位 SPY"、"历史 IV TSLA"、"META 波动率便宜吗"、"IV 排名扫描"、"我应该卖期权溢价吗"
 globs:
-  - 'mock-data/*.json'
+  - "mock-data/*.json"
 ---
 
 # AlphaGBM IV Rank

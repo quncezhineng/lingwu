@@ -12,7 +12,7 @@ description_zh: >
   使用 AlphaGBM 五大支柱框架（基本面、技术面、情绪、资金流、估值）进行的 AI 驱动股票分析，采用真实市场数据。返回 1-10 综合评分及可操作信号。使用场景：分析任意股票、评估买卖决策、比较股票基本面、评估风险水平。
   触发词："分析 AAPL"、"你觉得 NVDA 怎么样"、"我该买 TSLA 吗"、"META 股票分析"、"SPY 是否被高估"、"GOOGL 风险评估"
 globs:
-  - 'mock-data/*.json'
+  - "mock-data/*.json"
 ---
 
 # AlphaGBM Stock Analysis

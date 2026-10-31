@@ -43,11 +43,11 @@ For a recording, show the `Sample · scripted decisions` caption, email card, cl
 
 The school, sender, recipient, message, and permission-slip document are fictional local workspace data in `apps/server/src/workspace.ts`. The candidate text in `apps/server/src/demo/jev-fixture.ts` was checked against Monterey Bay Aquarium's own pages on 2026-09-23:
 
-| Candidate | Supported detail | Official source |
-| --- | --- | --- |
-| Kelp Forest | 28-foot kelp exhibit with sardines and leopard sharks | [Kelp Forest](https://www.montereybayaquarium.org/visit/exhibits/kelp-forest/) |
-| Open Sea | Sea turtles, sardines, and tuna at a 90-foot viewing window | [Open Sea](https://www.montereybayaquarium.org/visit/exhibits/open-sea/) |
-| Rocky Shore | Bat-ray touch pool | [Rocky Shore](https://www.montereybayaquarium.org/visit/exhibits/rocky-shore) |
+| Candidate   | Supported detail                                            | Official source                                                                |
+| ----------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Kelp Forest | 28-foot kelp exhibit with sardines and leopard sharks       | [Kelp Forest](https://www.montereybayaquarium.org/visit/exhibits/kelp-forest/) |
+| Open Sea    | Sea turtles, sardines, and tuna at a 90-foot viewing window | [Open Sea](https://www.montereybayaquarium.org/visit/exhibits/open-sea/)       |
+| Rocky Shore | Bat-ray touch pool                                          | [Rocky Shore](https://www.montereybayaquarium.org/visit/exhibits/rocky-shore)  |
 
 For a fully live, non-scripted agent, run the ordinary API with `JEV_MODE=live`, a server-side `TYPESAFE_API_KEY`, and the required `CPK_INTELLIGENCE_API_KEY`. Configure a real model and browser worker separately. The isolated `pnpm dev:demo` command defaults to the labeled sample mode and does not forward a TypeSafe key unless `DEMO_JEV_MODE=live` is set. A sample recording must not be presented as evidence that live Jev was called.
 

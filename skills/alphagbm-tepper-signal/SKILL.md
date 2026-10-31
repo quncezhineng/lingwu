@@ -16,7 +16,7 @@ description_zh: |
   David Tepper 2009 年（+132%）和 2020 年（+82%）恐慌买入策略的量化版本。检测当前条件是否匹配 Tepper 信号：VIX ≥ 35 AND 恐惧评分 ≥ 80 AND 质量过滤（大盘股、正利润率）。仅在真正的市场恐慌时触发——其余时间返回"等待"状态，按 Tepper 自身框架约覆盖 80% 的交易日。该 API 复用我们现有的 FearScore 模块，因此信号可直接与多指标恐慌指数进行对比。
   触发词："这是 Tepper 买入信号吗"、"恐慌买入检测器 SPY"、"我该抄底恐慌吗"、"Tepper 风格入场检查"、"我们处于恐慌底部吗"、"VIX 35+ 且恐惧 80+ 了吗"、"今天的历史底部信号"
 globs:
-  - 'mock-data/tepper-signal/**'
+  - "mock-data/tepper-signal/**"
 ---
 
 # AlphaGBM Tepper Panic-Buy Signal

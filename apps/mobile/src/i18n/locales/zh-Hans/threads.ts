@@ -8,6 +8,8 @@ const threads = {
   "threads.mainChatSavedDetail": "保存在当前工作区",
   "threads.newSideChat": "新建旁聊",
   "threads.sideChats": "旁聊",
+  "threads.collapseSideChats": "收起旁聊会话",
+  "threads.expandSideChats": "展开旁聊会话",
   "threads.showActive": "显示进行中",
   "threads.archived": "已归档",
   "threads.archivedPageTitle": "已归档对话",
@@ -41,9 +43,8 @@ const threads = {
   "threads.workspaceSavedNote": "你的对话保存在当前工作区中，可在「应用」里管理各种连接。",
   "threads.delegateTask": "任务",
   "threads.agentComputer": "智能体电脑",
-  "threads.agentComputerDetail": "浏览器、会话与文档",
   "threads.calendar": "日历",
-  "threads.files": "我的资料",
+  "threads.files": "资料",
   "threads.appsAndSettings": "应用与能力",
 } satisfies Dictionary;
 

@@ -19,7 +19,6 @@ import {
   Check,
   ChevronRight,
   CircleDollarSign,
-  Cpu,
   FolderOpen,
   Globe2,
   Hand,
@@ -41,7 +40,7 @@ import { useWorkspace } from "./workspace";
 
 type HubTab = "marketplace" | "mine";
 type CapabilityType = "plugins" | "skills" | "connectors" | "workspace";
-type ConfigSheet = "model" | "openbot";
+type ConfigSheet = "openbot";
 type CapabilityCategoryId =
   | "research"
   | "analysis"
@@ -66,6 +65,8 @@ type CatalogItem = {
   source: string;
   state: CapabilityState;
   installed: boolean;
+  /** 系统预装能力不提供卸载入口。 */
+  system?: boolean;
   searchText?: string;
   onPress: () => void;
 };
@@ -371,7 +372,7 @@ function CapabilityAction({
     return (
       <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
         <ConnectedCapabilityBadge label={t("agent.hubStateConnected")} />
-        {tab === "mine" && (
+        {tab === "mine" && !item.system && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("agent.hubRemove")}
@@ -744,8 +745,6 @@ export function CapabilityHubScreen() {
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [configSheet, setConfigSheet] = useState<ConfigSheet>();
-  const [configBusy, setConfigBusy] = useState(false);
-  const [configError, setConfigError] = useState("");
   const [googleConnectingId, setGoogleConnectingId] = useState<"gmail" | "calendar">();
   const [selectedSkillId, setSelectedSkillId] = useState<string>();
   const [installBusyId, setInstallBusyId] = useState<string>();
@@ -768,9 +767,6 @@ export function CapabilityHubScreen() {
   const browserConnected = workspace.connections.some(
     (connection) => connection.id === "browser" && connection.status === "connected",
   );
-  // 与连接器面板同一口径：选中模型即视为已连接（不再看 modelOptions 是否可切换）
-  const modelConnected = Boolean(workspace.runtime.model);
-  const modelOptions = workspace.runtime.modelOptions ?? [];
   const installedCapabilityIds = new Set(
     (workspace.installedCapabilities ?? []).map((capability) => capability.id),
   );
@@ -831,20 +827,6 @@ export function CapabilityHubScreen() {
     }
   }
 
-  async function switchModel(model: string) {
-    setConfigBusy(true);
-    setConfigError("");
-    try {
-      await api.request("/api/model", { model });
-      await refresh();
-      notify(t("screens.connectionsModelSwitched", { model: shortModel(model) }));
-    } catch (error) {
-      setConfigError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setConfigBusy(false);
-    }
-  }
-
   async function setCapabilityInstalled(item: CatalogItem, installed: boolean) {
     if (installBusyId) return;
     setInstallBusyId(item.id);
@@ -893,7 +875,8 @@ export function CapabilityHubScreen() {
       iconSurface: serviceBrands.gmail.surface,
       source: workspaceSource,
       state: "open",
-      installed: installedCapabilityIds.has("mail"),
+      installed: true,
+      system: true,
       onPress: () => navigate("mail"),
     },
     {
@@ -907,22 +890,24 @@ export function CapabilityHubScreen() {
       iconSurface: serviceBrands.googleCalendar.surface,
       source: workspaceSource,
       state: "open",
-      installed: installedCapabilityIds.has("calendar-workspace"),
+      installed: true,
+      system: true,
       onPress: () => navigate("calendar"),
     },
     {
-      id: "model",
+      id: "browser",
       type: "plugins",
-      tags: ["connections"],
-      title: t("screens.connectionsModelLabel"),
-      detail: t("agent.hubModelDetail"),
-      icon: Cpu,
-      iconColor: colors.primary,
-      iconSurface: colors.sky,
+      tags: ["connections", "research"],
+      title: t("threads.agentComputer"),
+      detail: t("agent.hubBrowserDetail"),
+      icon: Globe2,
+      iconColor: serviceBrands.browser.fg,
+      iconSurface: serviceBrands.browser.surface,
       source: builtInSource,
-      state: modelConnected ? "connected" : "available",
-      installed: installedCapabilityIds.has("model"),
-      onPress: () => setConfigSheet("model"),
+      state: browserConnected ? "connected" : "available",
+      installed: true,
+      system: true,
+      onPress: () => open({ type: "computer" }),
     },
     {
       id: "gmail",
@@ -951,20 +936,6 @@ export function CapabilityHubScreen() {
       state: googleConnected ? "connected" : "available",
       installed: installedCapabilityIds.has("calendar"),
       onPress: () => void openGoogleConnector("calendar"),
-    },
-    {
-      id: "browser",
-      type: "connectors",
-      tags: ["connections", "research"],
-      title: t("threads.agentComputer"),
-      detail: t("agent.hubBrowserDetail"),
-      icon: Globe2,
-      iconColor: serviceBrands.browser.fg,
-      iconSurface: serviceBrands.browser.surface,
-      source: builtInSource,
-      state: browserConnected ? "connected" : "available",
-      installed: installedCapabilityIds.has("browser"),
-      onPress: () => open({ type: "computer" }),
     },
     {
       id: "openbot",
@@ -1311,67 +1282,14 @@ export function CapabilityHubScreen() {
 
       {configSheet && (
         <Sheet
-          title={configSheet === "model" ? t("screens.connectionsModelLabel") : "OpenBot"}
-          subtitle={
-            configSheet === "model"
-              ? t("screens.connectionsModelSubtitle")
-              : t("screens.connectionsOpenBotSubtitle")
-          }
-          onClose={() => {
-            setConfigSheet(undefined);
-            setConfigError("");
-          }}
+          title="OpenBot"
+          subtitle={t("screens.connectionsOpenBotSubtitle")}
+          onClose={() => setConfigSheet(undefined)}
         >
-          {configSheet === "model" ? (
-            <View style={{ gap: 18 }}>
-              {modelOptions.length ? (
-                modelOptions.map((choice) => (
-                  <View key={choice.provider} style={{ gap: 8 }}>
-                    <Text style={s.small}>{choice.label}</Text>
-                    <View style={[s.row, { gap: 7, flexWrap: "wrap" }]}>
-                      {choice.models.map((model) => {
-                        const current = model === workspace.runtime.model;
-                        return (
-                          <Pressable
-                            key={model}
-                            accessibilityRole="button"
-                            accessibilityState={{
-                              selected: current,
-                              disabled: configBusy || current,
-                            }}
-                            disabled={configBusy || current}
-                            onPress={() => void switchModel(model)}
-                            style={[s.row, { gap: 4, opacity: configBusy ? 0.5 : 1 }]}
-                          >
-                            <Chip tint={current ? colors.sky : undefined}>{shortModel(model)}</Chip>
-                            {current && <Check size={13} color={colors.primary} />}
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <Text style={s.muted}>{t("screens.connectionsModelEmpty")}</Text>
-              )}
-              {!!configError && (
-                <Text style={{ color: colors.danger, fontSize: 12, lineHeight: 18 }}>
-                  {configError}
-                </Text>
-              )}
-              <View style={[s.between, { gap: 15, paddingTop: 12 }]}>
-                <Text style={s.muted}>{t("screens.connectionsModelCurrent")}</Text>
-                <Text style={[s.text, { fontSize: 12 }]}>
-                  {workspace.runtime.model ?? t("screens.connectionsNotConnected")}
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <View style={{ gap: 14 }}>
-              <Text style={s.text}>{t("screens.connectionsOpenBotNotice")}</Text>
-              <Text style={s.muted}>{t("screens.connectionsOpenBotDetail")}</Text>
-            </View>
-          )}
+          <View style={{ gap: 14 }}>
+            <Text style={s.text}>{t("screens.connectionsOpenBotNotice")}</Text>
+            <Text style={s.muted}>{t("screens.connectionsOpenBotDetail")}</Text>
+          </View>
         </Sheet>
       )}
 
@@ -1384,8 +1302,4 @@ export function CapabilityHubScreen() {
       )}
     </View>
   );
-}
-
-function shortModel(spec: string) {
-  return spec.split("/").slice(1).join("/") || spec;
 }

@@ -29,17 +29,17 @@ These constraints apply throughout all DCF model building. Review before startin
 
 ```js
 // WRONG — throws InvalidArgument:
-const hdr = ws.getRange('A7:H7');
+const hdr = ws.getRange("A7:H7");
 hdr.merge();
-hdr.values = [['MARKET DATA & KEY INPUTS']]; // 1×1 array vs 1×8 range → fails
+hdr.values = [["MARKET DATA & KEY INPUTS"]]; // 1×1 array vs 1×8 range → fails
 
 // CORRECT — value first on single cell, then merge + format the range:
-ws.getRange('A7').values = [['MARKET DATA & KEY INPUTS']];
-const hdr = ws.getRange('A7:H7');
+ws.getRange("A7").values = [["MARKET DATA & KEY INPUTS"]];
+const hdr = ws.getRange("A7:H7");
 hdr.merge();
-hdr.format.fill.color = '#1F4E79';
+hdr.format.fill.color = "#1F4E79";
 hdr.format.font.bold = true;
-hdr.format.font.color = '#FFFFFF';
+hdr.format.font.color = "#FFFFFF";
 ```
 
 This applies to every merged section header in the DCF (market data, scenario blocks, cash flow projection, terminal value, valuation summary, sensitivity tables).

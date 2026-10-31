@@ -15,7 +15,7 @@ const search = {
   "search.kindConversation": "Conversations",
   "search.kindMail": "Mail",
   "search.kindEvent": "Calendar",
-  "search.kindMemory": "Investment preferences",
+  "search.kindMemory": "Memory",
   "search.kindMonitor": "Alerts",
 } satisfies Dictionary;
 

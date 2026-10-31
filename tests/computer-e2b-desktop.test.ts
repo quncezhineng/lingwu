@@ -316,40 +316,50 @@ test("commands run as the desktop user in /workspace with DISPLAY and the 30 sec
   assert.equal(f.calls.pause.length, 0);
 });
 
-test("the in-box wrapper keeps quoting, exit codes and does not wait for background apps", {
-  skip: process.platform === "win32" && "needs /bin/bash",
-}, () => {
-  // Drop the GNU timeout prefix so the wrapper runs on any POSIX host.
-  const local = (command: string) =>
-    desktopCommand(command, 16).replace("/usr/bin/timeout --signal=TERM --kill-after=2s 30s ", "");
-  const quoted = spawnSync(
-    "/bin/bash",
-    ["-c", local(`printf '%s' "it's"; echo oops >&2; exit 3`)],
-    {
+test(
+  "the in-box wrapper keeps quoting, exit codes and does not wait for background apps",
+  {
+    skip: process.platform === "win32" && "needs /bin/bash",
+  },
+  () => {
+    // Drop the GNU timeout prefix so the wrapper runs on any POSIX host.
+    const local = (command: string) =>
+      desktopCommand(command, 16).replace(
+        "/usr/bin/timeout --signal=TERM --kill-after=2s 30s ",
+        "",
+      );
+    const quoted = spawnSync(
+      "/bin/bash",
+      ["-c", local(`printf '%s' "it's"; echo oops >&2; exit 3`)],
+      {
+        encoding: "utf8",
+      },
+    );
+    assert.equal(quoted.status, 3);
+    assert.equal(quoted.stdout, "it's");
+    assert.equal(quoted.stderr, "oops\n");
+    const started = Date.now();
+    const background = spawnSync("/bin/bash", ["-c", local("sleep 5 & echo started")], {
       encoding: "utf8",
-    },
-  );
-  assert.equal(quoted.status, 3);
-  assert.equal(quoted.stdout, "it's");
-  assert.equal(quoted.stderr, "oops\n");
-  const started = Date.now();
-  const background = spawnSync("/bin/bash", ["-c", local("sleep 5 & echo started")], {
-    encoding: "utf8",
-  });
-  assert.equal(background.stdout, "started\n");
-  assert.ok(Date.now() - started < 3000, "a background process kept the command open");
-  const big = spawnSync("/bin/bash", ["-c", local("printf '%040d' 0")], { encoding: "utf8" });
-  assert.equal(big.stdout.length, 17, "output is capped in the box at limit + 1 bytes");
-  // A runaway writer is stopped once its temporary files pass the disk ceiling.
-  const runaway = spawnSync(
-    "/bin/bash",
-    ["-c", desktopCommand("yes", 16, 1024 * 1024).replace(/\/usr\/bin\/timeout \S+ \S+ 30s /, "")],
-    { encoding: "utf8", timeout: 10000 },
-  );
-  assert.equal(runaway.status, 143);
-  assert.equal(runaway.stdout.length, 17);
-  assert.match(runaway.stderr, /Output exceeded the limit/);
-});
+    });
+    assert.equal(background.stdout, "started\n");
+    assert.ok(Date.now() - started < 3000, "a background process kept the command open");
+    const big = spawnSync("/bin/bash", ["-c", local("printf '%040d' 0")], { encoding: "utf8" });
+    assert.equal(big.stdout.length, 17, "output is capped in the box at limit + 1 bytes");
+    // A runaway writer is stopped once its temporary files pass the disk ceiling.
+    const runaway = spawnSync(
+      "/bin/bash",
+      [
+        "-c",
+        desktopCommand("yes", 16, 1024 * 1024).replace(/\/usr\/bin\/timeout \S+ \S+ 30s /, ""),
+      ],
+      { encoding: "utf8", timeout: 10000 },
+    );
+    assert.equal(runaway.status, 143);
+    assert.equal(runaway.stdout.length, 17);
+    assert.match(runaway.stderr, /Output exceeded the limit/);
+  },
+);
 
 test("exit 124 is timed_out and leaves the box running, like Docker", async () => {
   const f = fake({ boxes: [{}], run: () => 124 });

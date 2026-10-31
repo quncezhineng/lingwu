@@ -66,10 +66,16 @@ const status = {
   "status.interrupted": "Interrupted",
   "status.idle": "Idle",
   "status.closed": "Closed",
-  // 语气与头像
+  // Tone, response style and avatars
+  "status.formal": "Formal",
+  "status.casual": "Casual",
+  "status.playful": "Playful",
   "status.warm": "Warm",
   "status.concise": "Concise",
   "status.thoughtful": "Thoughtful",
+  "status.short": "Short",
+  "status.detailed": "Detailed",
+  "status.bullets": "Bullet list",
   "status.avatar1": "Avatar 1",
   "status.avatar2": "Avatar 2",
   "status.avatar3": "Avatar 3",

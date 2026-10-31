@@ -13,7 +13,7 @@ description_zh: >
   针对单一到期日的二维波动率微笑和偏斜分析。横跨各执行价映射 IV 以揭示看跌偏斜、看涨偏斜和微笑形态。返回微笑曲线数据、偏斜指标（25-delta 偏斜、风险逆转）和形态分类。使用场景：分析看跌/看涨偏斜、检查看跌期权是否昂贵、理解期权定价中的方向性恐惧、寻找偏斜交易机会。
   触发词："vol smile AAPL"、"NVDA 偏斜分析"、"TSLA 看跌偏斜"、"SPY 微笑曲线陡峭吗"、"META 波动率偏斜"、"GOOGL 微笑形态"
 globs:
-  - 'mock-data/*.json'
+  - "mock-data/*.json"
 ---
 
 # AlphaGBM Volatility Smile

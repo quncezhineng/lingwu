@@ -11,7 +11,7 @@ description_zh: |
   监控标的列表的价格、IV 排名、异常活动、财报日期和评分变化。支持自定义监控列表和默认"热门期权"列表。
   触发词："添加 AAPL 到监控列表"、"我的监控列表"、"监控 NVDA TSLA META"、"监控列表预警"、"从监控列表移除 SPY"、"热门期权"、"我的监控列表里有什么"、"监控列表摘要"、"每日监控列表"
 globs:
-  - 'mock-data/watchlist/**'
+  - "mock-data/watchlist/**"
 ---
 
 # AlphaGBM Watchlist

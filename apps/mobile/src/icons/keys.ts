@@ -70,6 +70,8 @@ export const ICON_KEYS = {
   Monitor: "monitor",
   MoreHorizontal: "more-horizontal",
   MousePointerClick: "mouse-pointer-click",
+  PanelLeftClose: "panel-left-close",
+  PanelLeftOpen: "panel-left-open",
   PanelsTopLeft: "panels-top-left",
   Pause: "circle-pause",
   Pencil: "pen-line",

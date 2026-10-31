@@ -15,7 +15,7 @@ const search = {
   "search.kindConversation": "会话",
   "search.kindMail": "邮件",
   "search.kindEvent": "日历",
-  "search.kindMemory": "投资偏好",
+  "search.kindMemory": "记忆",
   "search.kindMonitor": "盯盘提醒",
 } satisfies Dictionary;
 

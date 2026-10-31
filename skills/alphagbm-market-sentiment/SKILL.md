@@ -11,7 +11,7 @@ description_zh: |
   全市场情绪仪表板，包含 VIX、Put/Call 比率、恐惧与贪婪指数、市场宽度和板块轮动分析。将当前市场状态分类为风险偏好（risk-on）、避险（risk-off）或中性。
   触发词："市场情绪"、"市场是否恐惧"、"VIX 分析"、"put call 比率"、"市场宽度"、"恐惧与贪婪"、"risk on or risk off"、"上涨/下跌家数"、"新高/新低"、"板块轮动"、"市场状态"
 globs:
-  - 'mock-data/market-sentiment/**'
+  - "mock-data/market-sentiment/**"
 ---
 
 # AlphaGBM Market Sentiment Dashboard

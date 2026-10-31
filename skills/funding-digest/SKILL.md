@@ -240,21 +240,21 @@ npm install simple-icons sharp
 **Lookup strategy:**
 
 ```javascript
-const si = require('simple-icons');
-const sharp = require('sharp');
+const si = require("simple-icons");
+const sharp = require("sharp");
 
 // Find an icon by exact title match (case-insensitive)
 function findSimpleIcon(companyName) {
   // Try exact match first
   for (const [key, val] of Object.entries(si)) {
-    if (!key.startsWith('si') || !val || !val.title) continue;
+    if (!key.startsWith("si") || !val || !val.title) continue;
     if (val.title.toLowerCase() === companyName.toLowerCase()) return val;
   }
   // Try without common suffixes (AI, Inc., Corp.)
-  const stripped = companyName.replace(/\s*(AI|Inc\.?|Corp\.?|Ltd\.?)$/i, '').trim();
+  const stripped = companyName.replace(/\s*(AI|Inc\.?|Corp\.?|Ltd\.?)$/i, "").trim();
   if (stripped !== companyName) {
     for (const [key, val] of Object.entries(si)) {
-      if (!key.startsWith('si') || !val || !val.title) continue;
+      if (!key.startsWith("si") || !val || !val.title) continue;
       if (val.title.toLowerCase() === stripped.toLowerCase()) return val;
     }
   }
@@ -263,9 +263,9 @@ function findSimpleIcon(companyName) {
 
 // Convert SVG to PNG with the brand's official color
 async function simpleIconToPng(icon, outputPath) {
-  const coloredSvg = icon.svg.replace('<svg', `<svg fill="#${icon.hex}"`);
+  const coloredSvg = icon.svg.replace("<svg", `<svg fill="#${icon.hex}"`);
   await sharp(Buffer.from(coloredSvg))
-    .resize(128, 128, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+    .resize(128, 128, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
     .png()
     .toFile(outputPath);
 }
@@ -295,19 +295,19 @@ async function generateInitialLogo(companyName, outputPath) {
 
 ```javascript
 async function fetchLogo(companyName, outputDir) {
-  const fileName = companyName.toLowerCase().replace(/[\s.]+/g, '-') + '.png';
+  const fileName = companyName.toLowerCase().replace(/[\s.]+/g, "-") + ".png";
   const outPath = path.join(outputDir, fileName);
 
   // Tier 1: Try simple-icons
   const icon = findSimpleIcon(companyName);
   if (icon) {
     await simpleIconToPng(icon, outPath);
-    return { path: outPath, source: 'simple-icons' };
+    return { path: outPath, source: "simple-icons" };
   }
 
   // Tier 2: Generate initial-based fallback
   await generateInitialLogo(companyName, outPath);
-  return { path: outPath, source: 'initial-fallback' };
+  return { path: outPath, source: "initial-fallback" };
 }
 ```
 
@@ -468,10 +468,10 @@ Adjust `colW` values as needed, but always recompute `TABLE_X` from `(SLIDE_W - 
 #### Code Structure
 
 ```javascript
-const pptxgen = require('pptxgenjs');
+const pptxgen = require("pptxgenjs");
 const pres = new pptxgen();
-pres.layout = 'LAYOUT_16x9';
-pres.title = 'Deal Flow Digest';
+pres.layout = "LAYOUT_16x9";
+pres.title = "Deal Flow Digest";
 
 const slide = pres.addSlide();
 const SLIDE_W = 13.33; // 16:9 slide width in inches
@@ -483,7 +483,7 @@ const SLIDE_W = 13.33; // 16:9 slide width in inches
 //    - Center the table: x = (SLIDE_W - tableWidth) / 2
 // 5. Footer
 
-pres.writeFile({ fileName: '/home/claude/deal-flow-digest.pptx' });
+pres.writeFile({ fileName: "/home/claude/deal-flow-digest.pptx" });
 ```
 
 Use factory functions (not shared objects) for shadows and repeated styles per the pptxgenjs pitfalls guidance.

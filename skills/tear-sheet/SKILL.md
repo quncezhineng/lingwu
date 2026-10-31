@@ -91,7 +91,7 @@ Place the source attribution and disclaimer in the actual document footer (repea
 **You MUST use these exact functions to create document elements. Do NOT write custom docx-js styling code.** Copy these functions into your generated Node script and call them. The Style Configuration prose above remains as documentation; these functions are the enforcement mechanism.
 
 ```javascript
-const docx = require('docx');
+const docx = require("docx");
 const {
   Document,
   Paragraph,
@@ -113,16 +113,16 @@ const {
 
 // ── Color constants ──
 const COLORS = {
-  PRIMARY: '1F3864',
-  ACCENT: '2E75B6',
-  TABLE_HEADER_FILL: 'D6E4F0',
-  TABLE_ALT_ROW: 'F2F2F2',
-  TABLE_BORDER: 'CCCCCC',
-  HEADER_TEXT: 'FFFFFF',
-  FOOTER_TEXT: '666666',
+  PRIMARY: "1F3864",
+  ACCENT: "2E75B6",
+  TABLE_HEADER_FILL: "D6E4F0",
+  TABLE_ALT_ROW: "F2F2F2",
+  TABLE_BORDER: "CCCCCC",
+  HEADER_TEXT: "FFFFFF",
+  FOOTER_TEXT: "666666",
 };
 
-const FONT = 'Arial';
+const FONT = "Arial";
 
 // ── 1. createHeaderBanner ──
 // Returns an array of docx elements: [banner paragraph, key-value table]
@@ -138,7 +138,7 @@ function createHeaderBanner(companyName, leftFields, rightFields) {
         font: FONT,
       }),
     ],
-    shading: { type: ShadingType.CLEAR, color: 'auto', fill: COLORS.PRIMARY },
+    shading: { type: ShadingType.CLEAR, color: "auto", fill: COLORS.PRIMARY },
     spacing: { after: 0 },
     alignment: AlignmentType.LEFT,
   });
@@ -148,7 +148,7 @@ function createHeaderBanner(companyName, leftFields, rightFields) {
       (f) =>
         new Paragraph({
           children: [
-            new TextRun({ text: f.label + '  ', bold: true, size: 18, font: FONT }),
+            new TextRun({ text: f.label + "  ", bold: true, size: 18, font: FONT }),
             new TextRun({ text: f.value, size: 18, font: FONT }),
           ],
           spacing: { after: 40 },
@@ -156,9 +156,9 @@ function createHeaderBanner(companyName, leftFields, rightFields) {
     );
   }
 
-  const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
   const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
-  const noShading = { type: ShadingType.CLEAR, color: 'auto', fill: 'FFFFFF' };
+  const noShading = { type: ShadingType.CLEAR, color: "auto", fill: "FFFFFF" };
 
   const kvTable = new Table({
     rows: [
@@ -210,7 +210,7 @@ function createSectionHeader(text) {
 function createTable(headers, rows, options = {}) {
   const fontSize = options.fontSize || 17; // 8.5pt default
   const headerFill = options.accentHeader ? COLORS.ACCENT : COLORS.TABLE_HEADER_FILL;
-  const headerTextColor = options.accentHeader ? COLORS.HEADER_TEXT : '000000';
+  const headerTextColor = options.accentHeader ? COLORS.HEADER_TEXT : "000000";
 
   const cellBorders = {
     top: { style: BorderStyle.SINGLE, size: 1, color: COLORS.TABLE_BORDER },
@@ -222,9 +222,9 @@ function createTable(headers, rows, options = {}) {
   const cellMargins = { top: 40, bottom: 40, left: 80, right: 80 };
 
   function isNumeric(val) {
-    if (typeof val !== 'string') return false;
-    const cleaned = val.replace(/[,$%()]/g, '').trim();
-    return cleaned !== '' && !isNaN(cleaned);
+    if (typeof val !== "string") return false;
+    const cleaned = val.replace(/[,$%()]/g, "").trim();
+    return cleaned !== "" && !isNaN(cleaned);
   }
 
   // Header row
@@ -245,7 +245,7 @@ function createTable(headers, rows, options = {}) {
               ],
             }),
           ],
-          shading: { type: ShadingType.CLEAR, color: 'auto', fill: headerFill },
+          shading: { type: ShadingType.CLEAR, color: "auto", fill: headerFill },
           borders: cellBorders,
           margins: cellMargins,
         }),
@@ -254,7 +254,7 @@ function createTable(headers, rows, options = {}) {
 
   // Data rows with alternating shading
   const dataRows = rows.map((row, rowIdx) => {
-    const fill = rowIdx % 2 === 1 ? COLORS.TABLE_ALT_ROW : 'FFFFFF';
+    const fill = rowIdx % 2 === 1 ? COLORS.TABLE_ALT_ROW : "FFFFFF";
     return new TableRow({
       children: row.map((cell, colIdx) => {
         const align = colIdx > 0 && isNumeric(cell) ? AlignmentType.RIGHT : AlignmentType.LEFT;
@@ -265,7 +265,7 @@ function createTable(headers, rows, options = {}) {
               alignment: align,
             }),
           ],
-          shading: { type: ShadingType.CLEAR, color: 'auto', fill: fill },
+          shading: { type: ShadingType.CLEAR, color: "auto", fill: fill },
           borders: cellBorders,
           margins: cellMargins,
         });
@@ -281,9 +281,9 @@ function createTable(headers, rows, options = {}) {
 
 // ── 4. createBulletList ──
 // items: string[], style: "synthesis" | "informational"
-function createBulletList(items, style = 'synthesis') {
+function createBulletList(items, style = "synthesis") {
   const indent =
-    style === 'synthesis'
+    style === "synthesis"
       ? { left: 360, hanging: 180 } // 360 DXA left, hanging indent for bullet
       : { left: 180 }; // 180 DXA, no hanging
 
@@ -291,7 +291,7 @@ function createBulletList(items, style = 'synthesis') {
     (item) =>
       new Paragraph({
         children: [
-          new TextRun({ text: '•  ', font: FONT, size: 18 }),
+          new TextRun({ text: "•  ", font: FONT, size: 18 }),
           new TextRun({ text: item, font: FONT, size: 18 }),
         ],
         indent: indent,
@@ -320,7 +320,7 @@ function createFooter(date) {
       new Paragraph({
         children: [
           new TextRun({
-            text: 'For informational purposes only. Not investment advice.',
+            text: "For informational purposes only. Not investment advice.",
             italics: true,
             size: 14,
             color: COLORS.FOOTER_TEXT,

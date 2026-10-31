@@ -163,6 +163,7 @@ test("agent request validation rejects malformed input with useful JSON errors",
     ["/ideas/missing", { action: "accept", prompt: " " }],
     ["/memories", { text: " " }],
     ["/identity", { name: "LingWu", tone: "angry" }],
+    ["/identity", { name: "LingWu", tone: "warm", communication: "verbose" }],
     ["/sample-page", { text: "a".repeat(100001) }],
   ] satisfies [string, unknown][]) {
     const response = await request(path, body);
@@ -237,14 +238,22 @@ test("memories can be edited and forgotten while identity changes persist", asyn
   await read("/identity", {
     name: "Nova",
     nameCustomized: true,
+    tagline: "Markets, made legible.",
     tone: "concise",
+    communication: "bullets",
+    style: "Use metric units and avoid emoji.",
+    userName: "Mina",
     avatar: "avatar2",
     showChatUpdates: false,
   });
   const snapshot = await read<AgentWorkspace>("");
   assert.equal(snapshot.identity.name, "Nova");
   assert.equal(snapshot.identity.nameCustomized, true);
+  assert.equal(snapshot.identity.tagline, "Markets, made legible.");
   assert.equal(snapshot.identity.tone, "concise");
+  assert.equal(snapshot.identity.communication, "bullets");
+  assert.equal(snapshot.identity.style, "Use metric units and avoid emoji.");
+  assert.equal(snapshot.identity.userName, "Mina");
   assert.equal(snapshot.identity.avatar, "avatar2");
   assert.equal(snapshot.identity.showChatUpdates, false);
   assert.equal(

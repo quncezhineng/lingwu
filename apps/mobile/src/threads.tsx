@@ -1,16 +1,19 @@
 import { useThreads } from "@copilotkit/react-native/headless";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import { useTranslation } from "./i18n";
 import {
   Archive,
   CalendarDays,
-  FileText,
+  ChevronDown,
+  ChevronUp,
   Heart,
+  Mail,
   MessageCircle,
   Monitor,
   Plus,
-  Settings2,
+  Shapes,
+  Target,
 } from "./icons";
 import { Button, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -118,12 +121,13 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
     select,
     start,
   } = useLingWuThread();
-  const { workspace, open, navigate } = useWorkspace();
+  const { open, navigate } = useWorkspace();
   const threads = useThreads({ agentId: "default", enabled, includeArchived: true, limit: 20 });
   const [editing, setEditing] = useState<string>();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [archived, setArchived] = useState(false);
+  const [sideChatsExpanded, setSideChatsExpanded] = useState(true);
   async function mutate(action: () => Promise<void>) {
     setError("");
     try {
@@ -133,7 +137,7 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
-  function go(section: "calendar" | "files" | "preferences" | "apps") {
+  function go(section: "mail" | "calendar" | "watchlist" | "preferences" | "apps") {
     onClose();
     navigate(section);
   }
@@ -164,8 +168,13 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet
       title={t("common.agentName")}
-      subtitle={
-        workspace.mode === "sample" ? t("threads.sheetSubtitleSample") : workspace.profile.name
+      titleIcon={
+        <Image
+          source={require("../assets/logo.png")}
+          resizeMode="contain"
+          style={{ width: 24, height: 24 }}
+          accessible={false}
+        />
       }
       onClose={onClose}
     >
@@ -200,118 +209,149 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
             >
               {t("threads.newSideChat")}
             </Button>
-            <View style={[s.between, { marginTop: 12 }]}>
-              <Text style={s.heading}>{t("threads.sideChats")}</Text>
+            <View style={[s.row, { marginTop: 12, gap: 6 }]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t(
+                  sideChatsExpanded ? "threads.collapseSideChats" : "threads.expandSideChats",
+                )}
+                accessibilityState={{ expanded: sideChatsExpanded }}
+                hitSlop={6}
+                onPress={() => setSideChatsExpanded((expanded) => !expanded)}
+                style={({ pressed }) => ({
+                  width: 30,
+                  height: 30,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor: pressed ? colors.overlay1 : "transparent",
+                })}
+              >
+                {sideChatsExpanded ? (
+                  <ChevronUp size={16} color={colors.muted} />
+                ) : (
+                  <ChevronDown size={16} color={colors.muted} />
+                )}
+              </Pressable>
+              <Text style={[s.heading, { flex: 1 }]}>{t("threads.sideChats")}</Text>
               <Button small onPress={() => setArchived(!archived)}>
                 {archived ? t("threads.showActive") : t("threads.archived")}
               </Button>
             </View>
-            {threads.isLoading && <ActivityIndicator color={colors.primary} />}
-            <ErrorNotice error={error || threads.error?.message} />
-            {threads.error && (
-              <Button small onPress={threads.refetchThreads}>
-                {t("threads.retryConversations")}
-              </Button>
-            )}
-            {!archived &&
-              visitedPending.map((item, index) => (
-                <LinkRow
-                  key={item.id}
-                  icon={MessageCircle}
-                  title={t("threads.sideChatNumber", { index: index + 1 })}
-                  detail={t("threads.openInThisApp")}
-                  onPress={() => {
-                    select(item);
-                    onClose();
-                  }}
-                />
-              ))}
-            {listedThreads.map((thread) => (
-              <View
-                key={thread.id}
-                style={{
-                  paddingVertical: 10,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.line,
-                  gap: 8,
-                }}
-              >
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t("threads.openConversation", {
-                    name: thread.name || t("threads.untitledConversation"),
-                  })}
-                  accessibilityState={{ selected: selection.id === thread.id }}
-                  onPress={() => {
-                    select({ id: thread.id, existing: true });
-                    onClose();
-                  }}
-                  // 会话列表行：行圆角 10，按压态用 overlay1
-                  style={({ pressed }) => [
-                    s.row,
-                    { gap: 10, paddingVertical: 4, borderRadius: 10 },
-                    pressed && { backgroundColor: colors.overlay1 },
-                  ]}
-                >
-                  <MessageCircle
-                    size={19}
-                    color={selection.id === thread.id ? colors.primary : colors.muted}
-                  />
-                  <Text style={[s.text, { flex: 1 }]}>
-                    {thread.name || t("threads.untitledConversation")}
-                  </Text>
-                </Pressable>
-                {editing === thread.id && (
-                  <Field
-                    label={t("threads.conversationName")}
-                    value={name}
-                    onChangeText={setName}
-                  />
+            {sideChatsExpanded && (
+              <>
+                {threads.isLoading && <ActivityIndicator color={colors.primary} />}
+                <ErrorNotice error={error || threads.error?.message} />
+                {threads.error && (
+                  <Button small onPress={threads.refetchThreads}>
+                    {t("threads.retryConversations")}
+                  </Button>
                 )}
-                <View style={[s.row, { gap: 8 }]}>
-                  <Button
-                    small
-                    disabled={threads.isMutating || (editing === thread.id && !name.trim())}
-                    onPress={() => {
-                      if (editing === thread.id)
-                        void mutate(() => threads.renameThread(thread.id, name.trim()));
-                      else {
-                        setEditing(thread.id);
-                        setName(thread.name || "");
-                      }
+                {!archived &&
+                  visitedPending.map((item, index) => (
+                    <LinkRow
+                      key={item.id}
+                      icon={MessageCircle}
+                      title={t("threads.sideChatNumber", { index: index + 1 })}
+                      detail={t("threads.openInThisApp")}
+                      onPress={() => {
+                        select(item);
+                        onClose();
+                      }}
+                    />
+                  ))}
+                {listedThreads.map((thread) => (
+                  <View
+                    key={thread.id}
+                    style={{
+                      paddingVertical: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.line,
+                      gap: 8,
                     }}
                   >
-                    {editing === thread.id ? t("threads.saveName") : t("threads.rename")}
-                  </Button>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("threads.openConversation", {
+                        name: thread.name || t("threads.untitledConversation"),
+                      })}
+                      accessibilityState={{ selected: selection.id === thread.id }}
+                      onPress={() => {
+                        select({ id: thread.id, existing: true });
+                        onClose();
+                      }}
+                      // 会话列表行：行圆角 10，按压态用 overlay1
+                      style={({ pressed }) => [
+                        s.row,
+                        { gap: 10, paddingVertical: 4, borderRadius: 10 },
+                        pressed && { backgroundColor: colors.overlay1 },
+                      ]}
+                    >
+                      <MessageCircle
+                        size={19}
+                        color={selection.id === thread.id ? colors.primary : colors.muted}
+                      />
+                      <Text style={[s.text, { flex: 1 }]}>
+                        {thread.name || t("threads.untitledConversation")}
+                      </Text>
+                    </Pressable>
+                    {editing === thread.id && (
+                      <Field
+                        label={t("threads.conversationName")}
+                        value={name}
+                        onChangeText={setName}
+                      />
+                    )}
+                    <View style={[s.row, { gap: 8 }]}>
+                      <Button
+                        small
+                        disabled={threads.isMutating || (editing === thread.id && !name.trim())}
+                        onPress={() => {
+                          if (editing === thread.id)
+                            void mutate(() => threads.renameThread(thread.id, name.trim()));
+                          else {
+                            setEditing(thread.id);
+                            setName(thread.name || "");
+                          }
+                        }}
+                      >
+                        {editing === thread.id ? t("threads.saveName") : t("threads.rename")}
+                      </Button>
+                      <Button
+                        small
+                        icon={Archive}
+                        disabled={threads.isMutating}
+                        onPress={() =>
+                          void mutate(() =>
+                            thread.archived
+                              ? threads.unarchiveThread(thread.id)
+                              : threads.archiveThread(thread.id),
+                          )
+                        }
+                      >
+                        {thread.archived ? t("threads.restore") : t("threads.archive")}
+                      </Button>
+                    </View>
+                  </View>
+                ))}
+                {!threads.isLoading && !threads.error && !listedThreads.length && (
+                  <Text style={s.muted}>
+                    {archived ? t("threads.emptyArchived") : t("threads.emptyActive")}
+                  </Text>
+                )}
+                <ErrorNotice error={threads.fetchMoreError?.message} />
+                {threads.hasMoreThreads && (
                   <Button
                     small
-                    icon={Archive}
-                    disabled={threads.isMutating}
-                    onPress={() =>
-                      void mutate(() =>
-                        thread.archived
-                          ? threads.unarchiveThread(thread.id)
-                          : threads.archiveThread(thread.id),
-                      )
-                    }
+                    busy={threads.isFetchingMoreThreads}
+                    onPress={threads.fetchMoreThreads}
                   >
-                    {thread.archived ? t("threads.restore") : t("threads.archive")}
+                    {t("threads.loadMore")}
                   </Button>
-                </View>
-              </View>
-            ))}
-            {!threads.isLoading && !threads.error && !listedThreads.length && (
-              <Text style={s.muted}>
-                {archived ? t("threads.emptyArchived") : t("threads.emptyActive")}
-              </Text>
+                )}
+                <Text style={s.small}>{t("threads.sideChatFootnote")}</Text>
+              </>
             )}
-            <ErrorNotice error={threads.fetchMoreError?.message} />
-            {threads.hasMoreThreads && (
-              <Button small busy={threads.isFetchingMoreThreads} onPress={threads.fetchMoreThreads}>
-                {t("threads.loadMore")}
-              </Button>
-            )}
-            <Text style={s.small}>{t("threads.sideChatFootnote")}</Text>
           </>
         ) : (
           <>
@@ -331,16 +371,16 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
         <LinkRow
           icon={Monitor}
           title={t("threads.agentComputer")}
-          detail={t("threads.agentComputerDetail")}
           onPress={() => {
             onClose();
             open({ type: "computer" });
           }}
         />
+        <LinkRow icon={Mail} title={t("app.titleMail")} onPress={() => go("mail")} />
         <LinkRow icon={CalendarDays} title={t("threads.calendar")} onPress={() => go("calendar")} />
-        <LinkRow icon={FileText} title={t("threads.files")} onPress={() => go("files")} />
+        <LinkRow icon={Target} title={t("app.navWatchlist")} onPress={() => go("watchlist")} />
         <LinkRow icon={Heart} title={t("app.navPreferences")} onPress={() => go("preferences")} />
-        <LinkRow icon={Settings2} title={t("threads.appsAndSettings")} onPress={() => go("apps")} />
+        <LinkRow icon={Shapes} title={t("threads.appsAndSettings")} onPress={() => go("apps")} />
       </View>
     </Sheet>
   );

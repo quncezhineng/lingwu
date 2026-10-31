@@ -2,7 +2,7 @@
  * 应用外壳。
  *
  * 桌面端是可折叠的文本/图标侧栏 + 主工作区，信息架构对齐 Demo：
- * 工作台、对话、自选、动态、灵感、盯盘、资料、投资偏好和应用。
+ * 工作台、对话、任务、自选与资料；个人记忆和能力从「我的」进入。
  * 进入对话时额外显示会话列表栏，保留完整的历史会话管理与切换能力。
  */
 import { useThreads } from "@copilotkit/react-native/headless";
@@ -25,26 +25,23 @@ import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
   Archive,
-  Bell,
   Check,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
+  ChevronUp,
   CircleUserRound,
   FileText,
-  Heart,
   type IconComponent,
   Lightbulb,
   ListChecks,
   MessageCircle,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelsTopLeft,
   Pencil,
   Plus,
   Search,
   Settings2,
-  Shapes,
-  Sparkles,
-  Target,
   Trash2,
   X,
 } from "./icons";
@@ -58,27 +55,22 @@ import { useWorkspace } from "./workspace";
 /** 侧栏中的导航项：都对应一个页面，点击切换到对应 section。 */
 export type NavItem = { id: Section; labelKey: TranslationKey; icon: IconComponent };
 
-/** 桌面侧栏的主要页面。 */
+/** 桌面侧栏只保留一级工作面；目标、记忆与能力在对应聚合页内继续深入。 */
 export const SECTION_NAV: NavItem[] = [
   { id: "today", labelKey: "app.navToday", icon: PanelsTopLeft },
   { id: "chat", labelKey: "app.navChat", icon: MessageCircle },
   { id: "activity", labelKey: "app.navActivity", icon: ListChecks },
-  { id: "watchlist", labelKey: "app.navWatchlist", icon: Target },
-  { id: "goals", labelKey: "app.navGoals", icon: Bell },
   { id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb },
   { id: "files", labelKey: "app.navFiles", icon: FileText },
-  { id: "preferences", labelKey: "app.navPreferences", icon: Heart },
-  { id: "apps", labelKey: "app.navApps", icon: Shapes },
 ];
 
-/** 移动端底部导航：保留高频主路径与灵感快捷入口。 */
+/** 移动端底部导航固定为五个一级入口，二级能力收进任务、资料与「我的」。 */
 export const MOBILE_NAV: NavItem[] = [
-  { id: "today", labelKey: "app.navToday", icon: Sparkles },
+  { id: "today", labelKey: "app.navToday", icon: PanelsTopLeft },
+  { id: "chat", labelKey: "app.navChat", icon: MessageCircle },
   { id: "activity", labelKey: "app.navActivity", icon: ListChecks },
-  { id: "watchlist", labelKey: "app.navWatchlistShort", icon: Target },
-  
-  { id: "goals", labelKey: "app.navGoalsShort", icon: Bell },
   { id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb },
+  { id: "files", labelKey: "app.navFiles", icon: FileText },
 ];
 
 /** 侧栏底部的「我的」页面项。 */
@@ -307,6 +299,8 @@ export function Rail({ name }: { name: string }) {
     (monitor) => monitor.status === "active",
   ).length;
   const accountLabel = workspace.profile.name.trim() || t(ACCOUNT_NAV.labelKey);
+  const accountActive =
+    section === ACCOUNT_NAV.id || ["preferences", "apps", "connections"].includes(section);
   const monitorStatus =
     activeMonitorCount > 0
       ? t("app.activeMonitors", { count: activeMonitorCount })
@@ -379,9 +373,9 @@ export function Rail({ name }: { name: string }) {
             })}
           >
             {collapsed ? (
-              <ChevronRight size={18} color={colors.muted} />
+              <PanelLeftOpen size={19} color={colors.muted} strokeWidth={1.7} />
             ) : (
-              <ChevronLeft size={18} color={colors.muted} />
+              <PanelLeftClose size={19} color={colors.muted} strokeWidth={1.7} />
             )}
           </SidebarButton>
         </View>
@@ -429,11 +423,7 @@ export function Rail({ name }: { name: string }) {
                 icon={item.icon}
                 label={t(item.labelKey)}
                 collapsed={collapsed}
-                active={
-                  section === item.id ||
-                  (item.id === "watchlist" && section === "portfolio") ||
-                  (item.id === "files" && section === "notes")
-                }
+                active={section === item.id || (item.id === "files" && section === "notes")}
                 badge={item.id === "activity" && activeCount ? activeCount : undefined}
                 onPress={() => navigate(item.id)}
               />
@@ -492,7 +482,7 @@ export function Rail({ name }: { name: string }) {
                       width: 5,
                       height: 5,
                       borderRadius: 3,
-                      backgroundColor: activeMonitorCount > 0 ? colors.primary : colors.disabled,
+                      backgroundColor: colors.success,
                     }}
                   />
                   <Text style={{ fontSize: 10, color: colors.muted }}>{monitorStatus}</Text>
@@ -513,7 +503,7 @@ export function Rail({ name }: { name: string }) {
               tip={collapsed ? `${t(ACCOUNT_NAV.labelKey)} · ${accountLabel}` : undefined}
               accessibilityRole="button"
               accessibilityLabel={accountLabel}
-              accessibilityState={{ selected: section === ACCOUNT_NAV.id }}
+              accessibilityState={{ selected: accountActive }}
               onPress={() => navigate(ACCOUNT_NAV.id)}
               style={({ pressed }) => ({
                 ...(collapsed ? { width: "100%" as const } : { flex: 1 }),
@@ -525,12 +515,11 @@ export function Rail({ name }: { name: string }) {
                 gap: 9,
                 paddingHorizontal: collapsed ? 0 : 10,
                 borderRadius: radius.control,
-                backgroundColor:
-                  section === ACCOUNT_NAV.id
-                    ? colors.skyStrong
-                    : pressed
-                      ? colors.overlay1
-                      : "transparent",
+                backgroundColor: accountActive
+                  ? colors.skyStrong
+                  : pressed
+                    ? colors.overlay1
+                    : "transparent",
               })}
             >
               <SidebarAccountAvatar avatarUrl={accountAvatarUrl} name={accountLabel} />
@@ -541,7 +530,7 @@ export function Rail({ name }: { name: string }) {
                     style={{
                       fontSize: 12,
                       fontWeight: "600",
-                      color: section === ACCOUNT_NAV.id ? colors.primaryStrong : colors.text,
+                      color: accountActive ? colors.primaryStrong : colors.text,
                     }}
                   >
                     {accountLabel}
@@ -856,6 +845,7 @@ export function ChatsColumn() {
   // 内联重命名：editingId 为当前正在改名的线程（服务端已存在的旁聊才算数）。
   const [editingId, setEditingId] = useState<string>();
   const [draft, setDraft] = useState("");
+  const [sideChatsExpanded, setSideChatsExpanded] = useState(true);
   // 旁聊操作下拉菜单：menuAnchor 记录铅笔按钮点击坐标与目标线程 id。
   const [menuAnchor, setMenuAnchor] = useState<MenuAnchor>();
 
@@ -963,6 +953,7 @@ export function ChatsColumn() {
     const id = start();
     const trimmed = (name ?? "").trim();
     if (trimmed) setDraftNames((map) => ({ ...map, [id]: trimmed }));
+    setSideChatsExpanded(true);
     setTitle("");
   };
 
@@ -1057,54 +1048,83 @@ export function ChatsColumn() {
           <>
             <View style={[s.between, { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2 }]}>
               <Text style={columnHeadingCompact}>{t("app.sideChatsHeading")}</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("app.newSideChatPlaceholder")}
-                onPress={() => create()}
-                style={({ pressed }) => ({
-                  width: 24,
-                  height: 24,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 999,
-                  backgroundColor: pressed ? colors.overlay1 : "transparent",
-                })}
-              >
-                <Plus size={15} color={colors.muted} />
-              </Pressable>
+              <View style={[s.row, { gap: 2 }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t(
+                    sideChatsExpanded ? "threads.collapseSideChats" : "threads.expandSideChats",
+                  )}
+                  accessibilityState={{ expanded: sideChatsExpanded }}
+                  hitSlop={6}
+                  onPress={() => setSideChatsExpanded((expanded) => !expanded)}
+                  style={({ pressed }) => ({
+                    width: 24,
+                    height: 24,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 999,
+                    backgroundColor: pressed ? colors.overlay1 : "transparent",
+                  })}
+                >
+                  {sideChatsExpanded ? (
+                    <ChevronUp size={15} color={colors.muted} />
+                  ) : (
+                    <ChevronDown size={15} color={colors.muted} />
+                  )}
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("app.newSideChatPlaceholder")}
+                  onPress={() => create()}
+                  style={({ pressed }) => ({
+                    width: 24,
+                    height: 24,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 999,
+                    backgroundColor: pressed ? colors.overlay1 : "transparent",
+                  })}
+                >
+                  <Plus size={15} color={colors.muted} />
+                </Pressable>
+              </View>
             </View>
 
-            {sideThreads.map((thread) => (
-              <ThreadRow
-                key={thread.id}
-                title={thread.name || t("threads.untitledConversation")}
-                detail={relativeDate(thread.lastRunAt ?? thread.updatedAt)}
-                active={selection.id === thread.id}
-                onPress={() => select({ id: thread.id, existing: true })}
-                editing={editingId === thread.id}
-                draft={draft}
-                onDraftChange={setDraft}
-                onStartEdit={(x, y) => {
-                  setMenuAnchor({ x, y, id: thread.id });
-                  setEditingId(undefined);
-                }}
-                onCommitEdit={() => commitRename(thread.id)}
-                onCancelEdit={() => setEditingId(undefined)}
-              />
-            ))}
-            {pendingThreads.map((item, index) => (
-              <ThreadRow
-                key={item.id}
-                title={draftNames[item.id] || t("threads.sideChatNumber", { index: index + 1 })}
-                detail={t("threads.openInThisApp")}
-                active={selection.id === item.id}
-                onPress={() => select(item)}
-              />
-            ))}
-            {!sideThreads.length && !pendingThreads.length && (
-              <Text style={[s.small, { paddingHorizontal: 12, paddingVertical: 8 }]}>
-                {t("threads.emptyActive")}
-              </Text>
+            {sideChatsExpanded && (
+              <>
+                {sideThreads.map((thread) => (
+                  <ThreadRow
+                    key={thread.id}
+                    title={thread.name || t("threads.untitledConversation")}
+                    detail={relativeDate(thread.lastRunAt ?? thread.updatedAt)}
+                    active={selection.id === thread.id}
+                    onPress={() => select({ id: thread.id, existing: true })}
+                    editing={editingId === thread.id}
+                    draft={draft}
+                    onDraftChange={setDraft}
+                    onStartEdit={(x, y) => {
+                      setMenuAnchor({ x, y, id: thread.id });
+                      setEditingId(undefined);
+                    }}
+                    onCommitEdit={() => commitRename(thread.id)}
+                    onCancelEdit={() => setEditingId(undefined)}
+                  />
+                ))}
+                {pendingThreads.map((item, index) => (
+                  <ThreadRow
+                    key={item.id}
+                    title={draftNames[item.id] || t("threads.sideChatNumber", { index: index + 1 })}
+                    detail={t("threads.openInThisApp")}
+                    active={selection.id === item.id}
+                    onPress={() => select(item)}
+                  />
+                ))}
+                {!sideThreads.length && !pendingThreads.length && (
+                  <Text style={[s.small, { paddingHorizontal: 12, paddingVertical: 8 }]}>
+                    {t("threads.emptyActive")}
+                  </Text>
+                )}
+              </>
             )}
           </>
         ) : (

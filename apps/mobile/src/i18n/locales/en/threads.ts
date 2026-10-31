@@ -8,6 +8,8 @@ const threads = {
   "threads.mainChatSavedDetail": "Saved in this workspace",
   "threads.newSideChat": "New side chat",
   "threads.sideChats": "Side chats",
+  "threads.collapseSideChats": "Collapse side chats",
+  "threads.expandSideChats": "Expand side chats",
   "threads.showActive": "Show active",
   "threads.archived": "Archived",
   "threads.archivedPageTitle": "Archived conversations",
@@ -43,9 +45,8 @@ const threads = {
     "Your conversation is saved in this workspace. You can manage connections in Apps.",
   "threads.delegateTask": "Tasks",
   "threads.agentComputer": "Agent computer",
-  "threads.agentComputerDetail": "Browser, sessions and documents",
   "threads.calendar": "Calendar",
-  "threads.files": "My materials",
+  "threads.files": "Materials",
   "threads.appsAndSettings": "Apps & capabilities",
 } satisfies Dictionary;
 

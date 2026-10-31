@@ -11,7 +11,7 @@ description_zh: |
   检测期权异常活动和聪明钱信号。监控成交量/持仓量比率飙升、大宗交易、异常行权价/到期日组合以及期权金净流入。
   触发词："异常期权活动"、"聪明钱 AAPL"、"大宗交易 NVDA"、"谁在买 TSLA 看跌"、"期权流"、"大宗交易"、"扫单"、"异常成交量"、"暗池活动"、"鲸鱼交易"
 globs:
-  - 'mock-data/unusual-activity/**'
+  - "mock-data/unusual-activity/**"
 ---
 
 # AlphaGBM Unusual Options Activity

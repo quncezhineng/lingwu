@@ -139,6 +139,22 @@ test("CopilotKit model worker executes server tools and persists the confirmed o
     { docker: computerFixture().runner },
   );
   try {
+    await server.agent.ensure("owner");
+    await db.compareAndSwap(
+      "owner",
+      "agent-settings",
+      "identity",
+      {},
+      {
+        name: "Nova",
+        nameCustomized: true,
+        tagline: "Markets, made legible.",
+        tone: "formal",
+        communication: "detailed",
+        style: "Use metric units and avoid emoji.",
+        userName: "Mina",
+      },
+    );
     const task = await server.agent.createTask("owner", {
       prompt: "Make a weekend plan",
       kind: "plan",
@@ -155,6 +171,11 @@ test("CopilotKit model worker executes server tools and persists the confirmed o
     assert.ok(requests.every((request) => request.path === "/v1/responses"));
     assert.ok(requests[0].body.includes('"name":"prepare_email"'));
     assert.ok(requests[0].body.includes('"name":"run_computer_command"'));
+    assert.ok(requests[0].body.includes("Nova"));
+    assert.ok(requests[0].body.includes("Be thorough."));
+    assert.ok(requests[0].body.includes("Mina"));
+    assert.ok(requests[0].body.includes("Use metric units and avoid emoji."));
+    assert.ok(!requests[0].body.includes("Keep replies short"));
     assert.ok(
       requests.some(
         (request) => request.body.includes("succeeded") && request.body.includes("hello"),

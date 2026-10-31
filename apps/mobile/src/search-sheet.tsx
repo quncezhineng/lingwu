@@ -1,6 +1,6 @@
 import { useThreads } from "@copilotkit/react-native/headless";
 import { useMemo, useState } from "react";
-import { TextInput, View } from "react-native";
+import { Platform, TextInput, type TextStyle, View } from "react-native";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
 import { fileSourceLabel } from "./file-library";
@@ -266,7 +266,10 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
             accessibilityLabel={t("search.placeholder")}
             placeholder={t("search.placeholder")}
             placeholderTextColor={colors.faint}
-            style={{ flex: 1, minHeight: 46, color: colors.text, fontSize: 14 }}
+            style={[
+              { flex: 1, minHeight: 46, color: colors.text, fontSize: 14 },
+              Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null,
+            ]}
           />
           {query.length > 0 && (
             <IconButton icon={X} label={t("search.clear")} onPress={() => setQuery("")} />

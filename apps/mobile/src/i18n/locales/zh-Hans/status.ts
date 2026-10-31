@@ -63,10 +63,16 @@ const status = {
   "status.interrupted": "已中断",
   "status.idle": "空闲",
   "status.closed": "已关闭",
-  // 语气与头像
+  // 语气、表达方式与头像
+  "status.formal": "正式",
+  "status.casual": "随和",
+  "status.playful": "活泼",
   "status.warm": "温和",
   "status.concise": "简洁",
   "status.thoughtful": "周到",
+  "status.short": "回答简短",
+  "status.detailed": "详细",
+  "status.bullets": "要点列表",
   "status.avatar1": "头像 1",
   "status.avatar2": "头像 2",
   "status.avatar3": "头像 3",

@@ -92,7 +92,7 @@ const screens = {
   // Files 文件
   "screens.filesSubtitle": "每次分析的成果、每份上传的资料，都留在这里。",
   "screens.filesImport": "上传资料",
-  "screens.libraryFiles": "文件资料",
+  "screens.libraryFiles": "文件",
   "screens.libraryInsights": "领悟卡",
   "screens.libraryNotes": "我的笔记",
   "screens.libraryInsightsEmptyTitle": "还没有沉淀下来的领悟卡",
@@ -113,7 +113,7 @@ const screens = {
   "screens.filesEmptyTitle": "你的文档都在这里",
   "screens.filesEmptyDetail":
     "支持 PDF、HTML、Markdown、图片、Word、Excel、PPT 和常见文本文件，单个文件不超过 10 MB。",
-  "screens.filesFilterAll": "全部资料",
+  "screens.filesFilterAll": "全部",
   "screens.filesFilterAnalysis": "分析生成",
   "screens.filesFilterUpload": "我的上传",
   "screens.filesFormatAll": "所有格式",

@@ -16,7 +16,7 @@ description_zh: |
   基于沃伦·巴菲特视角的任意股票代码评分表。从4个维度打分，每个维度分值区间0‑100分（业务/能力圈、护城河/持久竞争优势、管理层/资本配置、估值/合理价格对比10年期国债），并输出加权综合判定结果：可持有、可观察、规避。这并非通用基本面筛选工具，而是机械套用巴菲特专属分析框架：行业简易度、毛利率+净资产收益率+利润率阈值、自由现金流收益率对比国债、以分红持续性作为管理层的代理评判指标。
   触发指令：“Buffett analysis AAPL”、“score KO with Buffett lens”、“would Buffett buy MSFT”、“JNJ Buffett scorecard”、“AAPL moat analysis”、“fair price vs bonds”、“Buffett‑style verdict on NVDA”、“long‑term hold analysis”
 globs:
-  - 'mock-data/buffett-analysis/**'
+  - "mock-data/buffett-analysis/**"
 ---
 
 # AlphaGBM Buffett Analysis

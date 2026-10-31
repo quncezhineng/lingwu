@@ -75,11 +75,11 @@ Start with headers that force strategic thinking about what matters, input clean
 - Same principles either way — just translate the API calls.
 - **Office JS merged cell pitfall:** Do NOT call `.merge()` then set `.values` on the merged range (throws `InvalidArgument` — range still reports its pre-merge dimensions). Instead write the value to the top-left cell alone, then merge + format the full range:
   ```js
-  ws.getRange('A1').values = [['TECHNOLOGY — COMPARABLE COMPANY ANALYSIS']];
-  const hdr = ws.getRange('A1:H1');
+  ws.getRange("A1").values = [["TECHNOLOGY — COMPARABLE COMPANY ANALYSIS"]];
+  const hdr = ws.getRange("A1:H1");
   hdr.merge();
-  hdr.format.fill.color = '#1F4E79';
-  hdr.format.font.color = '#FFFFFF';
+  hdr.format.fill.color = "#1F4E79";
+  hdr.format.font.color = "#FFFFFF";
   hdr.format.font.bold = true;
   ```
 

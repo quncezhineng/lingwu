@@ -331,6 +331,7 @@ export function ErrorNotice({ error }: { error?: string }) {
 }
 export function Sheet({
   title,
+  titleIcon,
   subtitle,
   children,
   onClose,
@@ -340,6 +341,8 @@ export function Sheet({
   dismissOnBackdrop = true,
 }: {
   title: string;
+  /** 标题左侧装饰元素（如品牌 Logo），展示于标题文字之前。 */
+  titleIcon?: ReactNode;
   subtitle?: string;
   children: ReactNode;
   onClose: () => void;
@@ -423,12 +426,21 @@ export function Sheet({
             ]}
           >
             <View style={{ flex: 1, gap: 4 }}>
-              <Text
-                numberOfLines={2}
-                style={[s.title, mobileTitle && { fontSize: 22, lineHeight: 32 }]}
-              >
-                {title}
-              </Text>
+              <View style={s.row}>
+                {!!titleIcon && <View style={{ marginRight: 10 }}>{titleIcon}</View>}
+                <Text
+                  numberOfLines={2}
+                  style={[
+                    s.title,
+                    mobileTitle && { fontSize: 22, lineHeight: 32 },
+                    // 标题带品牌 Logo 时收紧字号，与左侧图形保持和谐。
+                    titleIcon ? { fontSize: 18, lineHeight: 26 } : undefined,
+                    titleIcon && mobileTitle ? { fontSize: 17, lineHeight: 24 } : undefined,
+                  ]}
+                >
+                  {title}
+                </Text>
+              </View>
               {!!subtitle && <Text style={s.muted}>{subtitle}</Text>}
             </View>
             <IconButton icon={X} label={t("ui.closeDetails")} onPress={onClose} />

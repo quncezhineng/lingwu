@@ -16,11 +16,11 @@ Extracted from Claude's actual `visualize:read_me` guidelines.
 ></script>
 <script>
   function initChart() {
-    new Chart(document.getElementById('myChart'), {
-      type: 'bar',
+    new Chart(document.getElementById("myChart"), {
+      type: "bar",
       data: {
-        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-        datasets: [{ label: 'Revenue', data: [12, 19, 8, 15] }],
+        labels: ["Q1", "Q2", "Q3", "Q4"],
+        datasets: [{ label: "Revenue", data: [12, 19, 8, 15] }],
       },
       options: { responsive: true, maintainAspectRatio: false },
     });
@@ -76,7 +76,7 @@ Negative values are `-$5M` not `$-5M` — sign before currency symbol.
 Use a formatter:
 
 ```js
-(v) => (v < 0 ? '-' : '') + '$' + Math.abs(v) + 'M';
+(v) => (v < 0 ? "-" : "") + "$" + Math.abs(v) + "M";
 ```
 
 ---
@@ -158,25 +158,25 @@ Use mermaid.js `erDiagram`, not Chart.js or SVG:
 </style>
 <div id="erd"></div>
 <script type="module">
-  import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
-  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  import mermaid from "https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs";
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
   await document.fonts.ready;
   mermaid.initialize({
     startOnLoad: false,
-    theme: 'base',
+    theme: "base",
     themeVariables: {
       darkMode: dark,
-      fontSize: '13px',
-      lineColor: dark ? '#9c9a92' : '#73726c',
-      textColor: dark ? '#c2c0b6' : '#3d3d3a',
+      fontSize: "13px",
+      lineColor: dark ? "#9c9a92" : "#73726c",
+      textColor: dark ? "#c2c0b6" : "#3d3d3a",
     },
   });
   const { svg } = await mermaid.render(
-    'erd-svg',
+    "erd-svg",
     `erDiagram
   USERS ||--o{ POSTS : writes
   POSTS ||--o{ COMMENTS : has`,
   );
-  document.getElementById('erd').innerHTML = svg;
+  document.getElementById("erd").innerHTML = svg;
 </script>
 ```

@@ -12,7 +12,7 @@ description_zh: >
   使用 AlphaGBM 多因子评分模型（流动性、IV 吸引力、希腊值平衡、风险/回报）为任意标的的期权合约进行评分和排名。返回已评分的期权链，并高亮最优合约。使用场景：评估交易哪个期权、找到最佳行权价/到期日、按质量排名期权。
   触发词："评分 AAPL 期权"、"NVDA 最佳期权"、"我该买哪个 TSLA call"、"SPY 期权链"、"排名 META puts"
 globs:
-  - 'mock-data/*.json'
+  - "mock-data/*.json"
 ---
 
 # AlphaGBM Options Score

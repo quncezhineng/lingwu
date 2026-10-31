@@ -24,6 +24,7 @@ import {
   type ProposalInput,
 } from "../../../packages/domain/src";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import { ArchivedThreadsScreen } from "./account";
 import { AgentPersonalitySheet, DelegateSheet, NotificationsSheet, TaskDetail } from "./agent-ui";
 import { artifactHasHtmlPreview, renderArtifactHtml } from "./artifact-html";
 import BrowserConsole from "./BrowserConsole";
@@ -34,12 +35,16 @@ import { localDateTime, zonedInstant } from "./date-time";
 import { fileExtension, fileKind, fileMimeType } from "./file-kind";
 import HtmlPreview from "./HtmlPreview";
 import { activeLocaleTag, useTranslation } from "./i18n";
+import { LanguagePicker } from "./i18n/LanguageSwitcher";
 import { statusLabel } from "./i18n/translate";
+import { LOCALE_LABELS } from "./i18n/types";
 import {
+  Archive,
   Bot,
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   CircleUserRound,
   Clock3,
@@ -50,6 +55,7 @@ import {
   FileText,
   Globe2,
   Heart,
+  Languages,
   Mail as MailIcon,
   Pencil,
   Plus,
@@ -61,6 +67,7 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Target,
   Trash2,
   X,
 } from "./icons";
@@ -78,6 +85,7 @@ import { markdownPreviewDocument } from "./open-html-document";
 import PdfReader from "./PdfReader";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { SymbolDetailSheet } from "./symbol-detail";
+import { useLingWuThread } from "./threads";
 import {
   Button,
   Card,
@@ -115,6 +123,7 @@ export function Details({ detail }: { detail: Detail }) {
   if (detail.type === "notifications") return <NotificationsSheet />;
   if (detail.type === "personality") return <AgentPersonalitySheet />;
   if (detail.type === "settings") return <SettingsSheet />;
+  if (detail.type === "archived") return <ArchivedThreadsDetail />;
   if (detail.type === "model-settings") return <ModelSettingsSheet />;
   if (detail.type === "mail") return <MailDetail mail={detail.mail} />;
   if (detail.type === "email") return <EmailEditor draft={detail.draft} />;
@@ -170,8 +179,15 @@ export function Details({ detail }: { detail: Detail }) {
   );
 }
 function SettingsSheet() {
-  const { t } = useTranslation();
-  const { close, open, navigate } = useWorkspace();
+  const { locale, t } = useTranslation();
+  const { close, open, navigate, workspace } = useWorkspace();
+  const { enabled: richThreads } = useLingWuThread();
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const currentLanguage = LOCALE_LABELS[locale];
+  const activeModel = workspace.runtime.model
+    ? (workspace.runtime.modelLabels?.[workspace.runtime.model] ??
+      workspace.runtime.model.split("/").slice(1).join("/"))
+    : t("modelSettings.notConfigured");
   return (
     <Sheet
       title={t("details.settingsTitle")}
@@ -183,15 +199,6 @@ function SettingsSheet() {
           <Text style={s.label}>{t("details.settingsAgentHeading")}</Text>
           <Card style={{ paddingVertical: 6 }}>
             <LinkRow
-              icon={Cpu}
-              title={t("modelSettings.title")}
-              detail={t("modelSettings.subtitle")}
-              onPress={() => {
-                navigate("account");
-                open({ type: "model-settings" });
-              }}
-            />
-            <LinkRow
               icon={Bot}
               title={t("agent.personalityMemory")}
               detail={t("details.settingsPersonalityDetail")}
@@ -200,8 +207,28 @@ function SettingsSheet() {
           </Card>
         </View>
         <View style={{ gap: 8 }}>
+          <Text style={s.label}>{t("details.settingsModelHeading")}</Text>
+          <Card style={{ paddingVertical: 6 }}>
+            <LinkRow
+              icon={Cpu}
+              title={t("modelSettings.title")}
+              detail={activeModel}
+              onPress={() => open({ type: "model-settings" })}
+            />
+          </Card>
+        </View>
+        <View style={{ gap: 8 }}>
           <Text style={s.label}>{t("details.settingsWorkspaceHeading")}</Text>
           <Card style={{ paddingVertical: 6 }}>
+            <LinkRow
+              icon={Target}
+              title={t("app.navWatchlist")}
+              detail={t("app.subtitleWatchlist")}
+              onPress={() => {
+                navigate("watchlist");
+                close();
+              }}
+            />
             <LinkRow
               icon={Heart}
               title={t("app.navPreferences")}
@@ -220,9 +247,14 @@ function SettingsSheet() {
                 close();
               }}
             />
+          </Card>
+        </View>
+        <View style={{ gap: 8 }}>
+          <Text style={s.label}>{t("details.settingsAccountTitle")}</Text>
+          <Card style={{ paddingVertical: 6 }}>
             <LinkRow
               icon={CircleUserRound}
-              title={t("details.settingsAccountTitle")}
+              title={t("app.profileDetails")}
               detail={t("details.settingsAccountDetail")}
               onPress={() => {
                 navigate("account");
@@ -231,8 +263,77 @@ function SettingsSheet() {
             />
           </Card>
         </View>
+        <View style={{ gap: 8 }}>
+          <Text style={s.label}>{t("common.language")}</Text>
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("common.currentLanguage", {
+                language: currentLanguage.english,
+              })}
+              accessibilityHint={t("common.changeLanguage")}
+              onPress={() => setLanguageOpen(true)}
+              style={({ pressed }) => [
+                s.row,
+                {
+                  width: "100%",
+                  gap: 14,
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  borderRadius: radius.card,
+                },
+                pressed && { backgroundColor: colors.overlay1 },
+              ]}
+            >
+              <View style={[s.iconBox, { backgroundColor: colors.surface }]}>
+                <Languages size={19} color={colors.text} />
+              </View>
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={[s.text, { fontWeight: "500" }]}>
+                  {t("details.settingsLanguageTitle")}
+                </Text>
+                <Text style={s.small}>{t("details.settingsLanguageDetail")}</Text>
+              </View>
+              <View style={[s.row, { gap: 6 }]}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
+                  {currentLanguage.short}
+                </Text>
+                <ChevronRight size={15} color={colors.muted} />
+              </View>
+            </Pressable>
+          </Card>
+        </View>
+        {richThreads && (
+          <View style={{ gap: 8 }}>
+            <Text style={s.label}>{t("app.conversationManagement")}</Text>
+            <Card style={{ paddingVertical: 6 }}>
+              <LinkRow
+                icon={Archive}
+                title={t("app.archivedConversations")}
+                detail={t("app.archivedConversationsDetail")}
+                onPress={() => open({ type: "archived" })}
+              />
+            </Card>
+          </View>
+        )}
         <Text style={s.small}>{t("details.settingsPrivacy")}</Text>
+        <LanguagePicker visible={languageOpen} onClose={() => setLanguageOpen(false)} centered />
       </View>
+    </Sheet>
+  );
+}
+
+/** 设置在「已归档对话」入口上打开的独立面板。 */
+function ArchivedThreadsDetail() {
+  const { t } = useTranslation();
+  const { close } = useWorkspace();
+  return (
+    <Sheet
+      title={t("threads.archivedPageTitle")}
+      subtitle={t("threads.archivedPageSubtitle")}
+      onClose={close}
+    >
+      <ArchivedThreadsScreen onBack={close} embedded />
     </Sheet>
   );
 }

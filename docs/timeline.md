@@ -5,6 +5,150 @@
 
 ## 变更记录
 
+### 2026-11-01 · 移动端旁聊抽屉「应用与能力」图标与设置页对齐
+
+移动端左侧抽屉（旁聊）中「应用与能力」入口原先使用 `Settings2`（齿轮）图标，与设置面板内同名入口的 `Shapes` 图标不一致。本次将旁聊抽屉中的图标改为与设置页面一致的 `Shapes`，保持同一功能入口在全局的视觉一致性。
+
+**修改**
+
+- `apps/mobile/src/threads.tsx`：「应用与能力」LinkRow 的图标由 `Settings2` 替换为 `Shapes`，并同步调整图标导入。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端旁聊抽屉移除「智能体电脑」简介
+
+移动端左侧抽屉（旁聊）中「智能体电脑」入口原先带有一行副标题简介「浏览器、会话与文档」，本次删除该简介，仅保留入口名称，与其他入口保持一致的单一文本行样式。
+
+**修改**
+
+- `apps/mobile/src/threads.tsx`：「智能体电脑」LinkRow 移除 `detail` 属性。
+- `apps/mobile/src/i18n/locales/zh-Hans/threads.ts` 与 `en/threads.ts`：删除已无引用的 `threads.agentComputerDetail` 键。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端顶栏新增搜索入口
+
+移动端顶栏左侧原本只有一个「侧栏抽屉」按钮，本次在其右侧并列新增全局搜索按钮，点击打开 `GlobalSearchSheet`，与桌面端复用同一搜索组件与 `search.title` 文案。
+
+**修改**
+
+- `apps/mobile/App.tsx`：顶栏左侧按钮包改为横向排列，在「侧栏抽屉」按钮（Menu）右侧新增 `Search` 图标按钮，`onPress` 复用 `setSearchOpen(true)`。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端底部导航「工作台」前置并作为默认主页
+
+移动端底部导航原顺序为「对话 / 工作台 / 任务 / 灵感 / 资料 / 我的」，本次将「工作台」调整到「对话」之前，使其成为第一个页签；应用打开时默认展示工作台（`today`）页面。
+
+**修改**
+
+- `apps/mobile/src/shell.tsx`：`MOBILE_NAV` 中 `today`（工作台）项调整至 `chat` 之前，顺序变为「工作台 / 对话 / 任务 / 灵感 / 资料」。
+- `apps/mobile/App.tsx`：默认页签已是 `useState<Section>("today")`，打开项目主页即显示工作台，无需额外改动。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端对话页移除右上角「智能体电脑」入口
+
+移动端顶栏右上角原先在对话（chat）页签下会额外叠加一个紧凑的「智能体电脑」入口按钮（`ComputerEntry`，状态点是圆点图标）。该入口在顶栏右侧与设置、通知按钮并列，信息密度偏高；智能体电脑仍可从「旁聊」抽屉与「应用与能力」等处进入，故本次在对话页将其移除。
+
+**修改**
+
+- `apps/mobile/App.tsx`：删除 `import { ComputerEntry } from "./src/computer";` 及对话页签下绝对定位渲染 `<ComputerEntry compact />` 的代码块。
+- `apps/mobile/src/computer.tsx`：`ComputerEntry` 组件保留导出（仍被共享模块引用），但已无任何渲染入口。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 左侧栏 Logo 标题字号收窄
+
+移动端旁聊抽屉标题带品牌 Logo 时，「灵悟」标题从 22px 收紧至 17px（移动端）/ 18px（桌面端），与 24px 的 Logo 图形保持视觉和谐。
+
+**修改**
+
+- `apps/mobile/src/ui.tsx`：`Sheet` 标题样式在存在 `titleIcon` 时叠加更紧凑的字号（移动端 17px / 桌面端 18px），行高同步调整。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端顶栏中间改为智能体状态按钮
+
+移动端顶栏中间区域原本展示「Logo + 灵悟 + 状态文字」，现替换为与桌面侧栏一致的智能体状态按钮：水豚头像 + 「{名称}在为你关注市场」+ 状态点 + 盯盘状态文案，点击可打开智能体设置（人格与记忆）面板。
+
+**修改**
+
+- `apps/mobile/App.tsx`：移除移动端中间的 `BrandMark` + 名称 + 状态文字渲染，改为 `Pressable` 智能体状态按钮（`Mascot` 头像 + `app.agentWatching` 文案 + 状态点 + `monitorStatus`），点击 `open({ type: "personality" })`；`activeTask`/`status` 计算替换为 `activeMonitorCount`/`monitorStatus`（取自 `data.monitors`）。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端左侧栏顶部标题改为 Logo + 项目名称
+
+移动端旁聊抽屉（ThreadsSheet）顶部的标题原本只有「灵悟」文字，本次在标题文字前加入品牌 Logo（`logo.png`）图形，与标题并排展示，形成「Logo + 项目名称」的组合。
+
+**修改**
+
+- `apps/mobile/src/ui.tsx`：`Sheet` 组件新增可选 `titleIcon` 属性，用于在标题文字前展示装饰元素（如品牌 Logo）；标题区域改为横向布局，图标与标题并排。
+- `apps/mobile/src/threads.tsx`：`ThreadsSheet` 传入 `titleIcon`（尺寸 24 的 `logo.png` 品牌 Logo），并新增 `Image` 导入。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端侧栏「资料」改为「自选与组合」入口
+
+移动端点击左上角菜单打开的「旁聊」抽屉中，原「资料」行（跳转资料页）改为「自选与组合」入口，点击跳转自选与组合（watchlist）页面，图标同步替换为靶心图标。
+
+**修改**
+
+- `apps/mobile/src/threads.tsx`：`ThreadsSheet` 中资料行改为 `Target` 图标 + `app.navWatchlist`（自选与组合）文案，点击调用 `go("watchlist")`；`go` 的签名从 `"calendar" | "files" | "preferences" | "apps"` 更新为 `"calendar" | "watchlist" | "preferences" | "apps"`；导入将 `FileText` 替换为 `Target`。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移除旁聊抽屉副标题中的工作区名称
+
+移动端点击左上角菜单打开的「旁聊」抽屉，其 Sheet 副标题在非样例模式下显示当前工作区/用户名（如 `luffy`）。该名称信息性与标题「灵悟」冗余，本次删除整个副标题，抽屉仅保留标题。
+
+**修改**
+
+- `apps/mobile/src/threads.tsx`：`ThreadsSheet` 移除 `subtitle` 属性（原为样例文本或 `workspace.profile.name`），并清理组件内不再使用的 `workspace` 解构。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 「我的」页设置入口移至移动端顶栏右上角
+
+移动端「我的」页面正文内原有的「设置」入口卡片迁移至页面顶栏右上角，与通知（铃铛）按钮同级、位于其左侧，仅当当前页签为「我的」时显示；桌面端不受影响（仍走侧边栏齿轮）。
+
+**修改**
+
+- `apps/mobile/src/account.tsx`：删除正文内 `compact` 条件下的「设置」卡片入口，并清理不再使用的 `Settings2`、`LinkRow`、`useWindowDimensions`、`breakpoints` 导入及 `open` 解构。
+- `apps/mobile/App.tsx`：移动端顶栏右上角操作组新增 `Settings2` 图标按钮，点击打开设置面板，与通知按钮同级排列。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端顶栏设置入口改为常驻显示
+
+原先移动端顶栏的「设置」齿轮按钮只在「我的」页签下显示，本次改为在任何页签下都常驻顶栏，与通知按钮永远并列。
+
+**修改**
+
+- `apps/mobile/App.tsx`：移除 `section === "account"` 条件，设置入口在移动端顶栏始终显示。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-11-01 · 移动端底部导航补充「灵感」入口
+
+移动端底部导航原先只有「对话 / 工作台 / 任务 / 资料 / 我的」五个页签，「灵感」此前并入「工作台」的高亮组（无独立 tab），导致移动端无法像桌面端一样直达灵感页。本次将「灵感」提升为底部导航独立入口。
+
+**修改**
+
+- `apps/mobile/src/shell.tsx`：`MOBILE_NAV` 新增 `{ id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb }`（位于「任务」与「资料」之间），复用桌面侧边栏已有的图标与 i18n key。
+- `apps/mobile/App.tsx`：底部导航 active 判定中，从「工作台」高亮组移除 `"ideas"`，避免「灵感」页签与「工作台」页签同时高亮。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
+### 2026-10-31 · 「个人上下文」与「对话管理」分组迁移至「设置」面板
+
+「我的」页面（`AccountScreen`）中的「个人上下文」（记忆 / 应用与能力 / 自选与组合）与「对话管理」（已归档对话）分组迁入桌面端「设置」面板（`SettingsSheet`），让配置类入口统一收拢。移动端没有侧边栏齿轮，因此在「我的」页面头像卡片下新增「设置」入口，保证两端都能打开设置面板。
+
+**合并去重**：设置面板「工作区」分组已含"记忆"与"应用与能力"两行，迁移时只补「自选与组合」一行，不复制重复入口。
+
+**修改**
+
+- `apps/mobile/src/workspace.tsx`：`Detail` 联合类型新增 `{ type: "archived" }`，用于在设置面板内打开「已归档对话」。
+- `apps/mobile/src/account.tsx`：
+  - 删除「个人上下文」「对话管理」两个分组及对应的 `view` 子页状态（memory / archived）。
+  - 导出 `ArchivedThreadsScreen` 并新增 `embedded` 属性，嵌入 Sheet 时隐藏页内标题与返回键。
+  - 头像卡片下新增移动端「设置」入口（`width < breakpoints.desktop` 时显示），调用 `open({ type: "settings" })`。
+  - 清理不再使用的 `navigate`、`useAgentWorkspace`、`richThreads` 及多余图标导入。
+- `apps/mobile/src/details.tsx`：
+  - `SettingsSheet`「工作区」分组新增「自选与组合」行（`Target` 图标 → `navigate("watchlist")`）。
+  - 新增「对话管理」分组（`richThreads` 条件）：已归档对话入口 → `open({ type: "archived" })`。
+  - 新增 `ArchivedThreadsDetail`：用 `Sheet` 承载 `ArchivedThreadsScreen`（embedded 模式）。
+- I18n 文案复用既有 key，无需新增。
+- 已通过 `npx tsc --noEmit` 类型检查。
+
 ### 2026-10-31 · 「我的」页面设置分组标题改为"模型"
 
 个人信息页面（`AccountScreen`）中「设置」分组下只有"大模型连接"一行，分组标题改为「模型」更贴合内容。移动端与桌面端共用该页面，一次修改两处同步生效；桌面端「设置」面板（`SettingsSheet`）标题保持不变。
@@ -960,11 +1104,11 @@ trae-preview 控制台出现 5 条日志：2 条嵌套 button 报错、1 条重�
 
 **根因与处理**
 
-| 日志 | 根因 | 处理 |
-|------|------|------|
-| 2× `In HTML, <button> cannot be a descendant of <button>` | React 19 的嵌套校验扩展到 `role="button"`：ThreadRow 外层整行是按钮，内层「重命名」Pressable 也设了 `accessibilityRole="button"`，Web 端渲染为 `div role="button"` 嵌套，触发告警 | [shell.tsx](../apps/mobile/src/shell.tsx)：去掉内层 Pressable 的 `accessibilityRole`（保留 onPress），渲染为普通 div + onClick，交互不变 |
-| 1× 重复 key `evidence-mail-fieldtrip` | 10-19 的去重只做了列表**内部**去重；当本地待建旁聊首次上线服务端列表的短暂窗口，同一 id 会同时出现在 `sideThreads` 与 `pendingThreads`（同一 ScrollView 的兄弟节点），以及 ThreadsSheet 的 `listedThreads` 与 `visitedPending`，跨列表重复 key | [shell.tsx](../apps/mobile/src/shell.tsx)：`pendingThreads` 增加 `seenSideIds.has(item.id)` 排除；[threads.tsx](../apps/mobile/src/threads.tsx)：先算 `listedThreads`，`visitedPending` 再按 `seenThreadIds` 跨列表排除 |
-| 2× `net::ERR_ABORTED /api/agent`、`/api/workspace` | 正常中断：`/api/agent` 每 3 秒轮询被新请求取代或页面切换时，浏览器取消在途请求；已 `catch(() => {})` 静默处理 | 无需改动（浏览器正常行为） |
+| 日志                                                      | 根因                                                                                                                                                                                                                                           | 处理                                                                                                                                                                                                                    |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2× `In HTML, <button> cannot be a descendant of <button>` | React 19 的嵌套校验扩展到 `role="button"`：ThreadRow 外层整行是按钮，内层「重命名」Pressable 也设了 `accessibilityRole="button"`，Web 端渲染为 `div role="button"` 嵌套，触发告警                                                              | [shell.tsx](../apps/mobile/src/shell.tsx)：去掉内层 Pressable 的 `accessibilityRole`（保留 onPress），渲染为普通 div + onClick，交互不变                                                                                |
+| 1× 重复 key `evidence-mail-fieldtrip`                     | 10-19 的去重只做了列表**内部**去重；当本地待建旁聊首次上线服务端列表的短暂窗口，同一 id 会同时出现在 `sideThreads` 与 `pendingThreads`（同一 ScrollView 的兄弟节点），以及 ThreadsSheet 的 `listedThreads` 与 `visitedPending`，跨列表重复 key | [shell.tsx](../apps/mobile/src/shell.tsx)：`pendingThreads` 增加 `seenSideIds.has(item.id)` 排除；[threads.tsx](../apps/mobile/src/threads.tsx)：先算 `listedThreads`，`visitedPending` 再按 `seenThreadIds` 跨列表排除 |
+| 2× `net::ERR_ABORTED /api/agent`、`/api/workspace`        | 正常中断：`/api/agent` 每 3 秒轮询被新请求取代或页面切换时，浏览器取消在途请求；已 `catch(() => {})` 静默处理                                                                                                                                  | 无需改动（浏览器正常行为）                                                                                                                                                                                              |
 
 **验证**
 
@@ -1202,12 +1346,12 @@ const integrityWarning = integrity.mismatched.length ? t("chat.streamIntegrityWa
 
 在 [ui.tsx](../apps/mobile/src/ui.tsx) 的 `Button` 组件中，改用 React Native 内置 `Animated` + `Easing`（原生驱动）实现三段动效：
 
-| 状态 | 触发时机 | 视觉变化 | 时长 / 曲线 |
-|------|----------|----------|-------------|
-| 按压 | `onPressIn` | 缩放到 0.97 | 90ms，`Easing.out(Easing.cubic)` |
-| 松开 | `onPressOut` | 弹簧回弹到 1 | `Animated.spring`（friction 6 / tension 180） |
-| 保存中 | `busy` 变 true | 加载指示器淡入、整体透明度降到 0.75 | 180ms，`Easing.inOut(Easing.cubic)` |
-| 保存完成 | `busy` 由 true 回 false | 一次轻微回弹脉冲（1 → 1.04 → 1） | 130ms 放大 + spring 回落 |
+| 状态     | 触发时机                | 视觉变化                            | 时长 / 曲线                                   |
+| -------- | ----------------------- | ----------------------------------- | --------------------------------------------- |
+| 按压     | `onPressIn`             | 缩放到 0.97                         | 90ms，`Easing.out(Easing.cubic)`              |
+| 松开     | `onPressOut`            | 弹簧回弹到 1                        | `Animated.spring`（friction 6 / tension 180） |
+| 保存中   | `busy` 变 true          | 加载指示器淡入、整体透明度降到 0.75 | 180ms，`Easing.inOut(Easing.cubic)`           |
+| 保存完成 | `busy` 由 true 回 false | 一次轻微回弹脉冲（1 → 1.04 → 1）    | 130ms 放大 + spring 回落                      |
 
 要点：
 
@@ -1254,11 +1398,11 @@ allowHeaders: ["Content-Type", "Authorization", "Accept", "Last-Event-ID", "Cach
 
 修复 CORS 后，控制台曾短暂出现以下报错，经排查均非代码缺陷：
 
-| 日志 | 真相 |
-|------|------|
-| `net::ERR_ABORTED /api/workspace`、`/api/agent` | 服务端热重载（`tsx watch`）重启时，在途请求被浏览器取消（瞬时） |
-| `REST connect request failed: Failed to fetch` | CopilotKit 将底层 `ERR_CONNECTION_REFUSED` 包装为 "Failed to fetch" |
-| `agent_connect_failed` / `agent_run_failed_event` / `Agent execution failed` | 连接未建立即触发运行失败事件的连锁反应 |
+| 日志                                                                         | 真相                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `net::ERR_ABORTED /api/workspace`、`/api/agent`                              | 服务端热重载（`tsx watch`）重启时，在途请求被浏览器取消（瞬时）     |
+| `REST connect request failed: Failed to fetch`                               | CopilotKit 将底层 `ERR_CONNECTION_REFUSED` 包装为 "Failed to fetch" |
+| `agent_connect_failed` / `agent_run_failed_event` / `Agent execution failed` | 连接未建立即触发运行失败事件的连锁反应                              |
 
 根因：修改 `app.ts` 触发 `tsx watch` 热重载，服务端重启的 1~2 秒内连接被拒绝。服务恢复后所有请求均返回 `200`，报错不再复现。
 

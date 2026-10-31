@@ -15,7 +15,7 @@ description_zh: |
   为任意标的生成的段永平风格卖方操作手册：在你"愿意买入"的价位 Sell Put、Covered Call 增强收益、以及基于当前 VIX 的恐慌买入背景判断。响应是三张聚焦的分析卡片——而非通用的期权筛选器——源自段永平在中国散户投资圈中著名的专属框架（仅做卖方、收租逻辑、永不做期权买方）。
   触发词："段永平风格 AAPL"、"sell put NVDA 愿意在 120 买入"、"covered call 收益 TSLA"、"我应该在这里 sell AAPL put 吗"、"卖方策略 MSFT"、"段氏分析"、"收权利金策略"、"段氏卖方操作手册"
 globs:
-  - 'mock-data/duan-analysis/**'
+  - "mock-data/duan-analysis/**"
 ---
 
 # AlphaGBM Duan Yongping Analysis

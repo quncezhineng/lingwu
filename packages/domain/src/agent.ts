@@ -132,11 +132,17 @@ export interface AgentNotification {
   createdAt: string;
   read: boolean;
 }
+export type AgentTone = "formal" | "casual" | "playful" | "concise" | "warm" | "thoughtful";
+export type AgentCommunication = "short" | "detailed" | "bullets";
 export interface AgentIdentity {
   name: string;
   /** Set after the user explicitly edits the name so default-name aliases remain verbatim. */
   nameCustomized?: boolean;
-  tone: "warm" | "concise" | "thoughtful";
+  tagline?: string;
+  tone: AgentTone;
+  communication?: AgentCommunication;
+  style?: string;
+  userName?: string;
   avatar?: "avatar1" | "avatar2" | "avatar3" | "avatar4" | "avatar5" | "avatar6";
   showChatUpdates?: boolean;
 }

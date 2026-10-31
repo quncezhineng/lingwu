@@ -6,15 +6,18 @@ const details = {
   "details.workspaceSubtitle": "Your personal inverstment research agent.",
   "details.connections": "Connections",
   "details.settingsTitle": "Settings",
-  "details.settingsSubtitle":
-    "Manage how LingWu works, your investment preferences and external connections.",
+  "details.settingsSubtitle": "Configure your agent's personality, model, workspace and account.",
   "details.settingsAgentHeading": "Agent",
+  "details.settingsModelHeading": "Model",
   "details.settingsWorkspaceHeading": "Workspace",
-  "details.settingsPersonalityDetail": "Name, avatar, tone and long-term memory.",
-  "details.settingsPreferencesDetail": "Investment goals, risk preferences and research habits.",
+  "details.settingsPersonalityDetail": "Shape its personality through its name, voice and manner.",
+  "details.settingsPreferencesDetail": "Review, correct or forget what LingWu remembers.",
   "details.settingsAppsDetail": "Plugins, skills and connectors.",
   "details.settingsAccountTitle": "Account & data",
-  "details.settingsAccountDetail": "Profile, sign-in method and archived conversations.",
+  "details.settingsAccountDetail":
+    "Review your personal details, sign-in method and account status.",
+  "details.settingsLanguageTitle": "Interface language",
+  "details.settingsLanguageDetail": "Choose the language used across LingWu.",
   "details.settingsPrivacy":
     "These settings affect only this workspace and can be changed anytime.",
 

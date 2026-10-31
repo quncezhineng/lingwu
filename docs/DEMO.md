@@ -12,14 +12,14 @@ The model responses use [CopilotKit AI Mock](https://github.com/quncezhineng/aim
 
 ### What the mobile recording shows
 
-| Time | Scene |
-| --- | --- |
-| 0:00–0:04 | Ask LingWu to explore Hacker News |
-| 0:04–0:09 | Read highlights from the live page |
-| 0:09–0:15 | Ask it to summarize CopilotKit |
+| Time      | Scene                                                                 |
+| --------- | --------------------------------------------------------------------- |
+| 0:00–0:04 | Ask LingWu to explore Hacker News                                     |
+| 0:04–0:09 | Read highlights from the live page                                    |
+| 0:09–0:15 | Ask it to summarize CopilotKit                                        |
 | 0:15–0:21 | Follow the inline browser and result, with Stop inside the input pill |
-| 0:21–0:31 | Take control of the same live browser |
-| 0:31–0:38 | Return to chat and the LingWu repository |
+| 0:21–0:31 | Take control of the same live browser                                 |
+| 0:31–0:38 | Return to chat and the LingWu repository                              |
 
 - A chat request to find interesting stories on Hacker News.
 - A server tool call that opens and reads the page, with a browser card inline in the conversation.
@@ -36,15 +36,15 @@ Captures are trimmed and paced for readability, including brief slowdowns of the
 
 A separate recording of the actual desktop web app, placed below the mobile demo in the README. Ask **“Check my emails for the school trip”**, open the school's reminder, then ask **“Research Monterey Bay Aquarium and suggest three exhibits”**. The 1440 × 810 browser capture sits inside a 1920 × 1080 canvas with the same cream, blue, and lilac background and LingWu 🪁 branding.
 
-| Time | Scene |
-| --- | --- |
+| Time      | Scene                                                          |
+| --------- | -------------------------------------------------------------- |
 | 0:00–0:06 | Ask for the school-trip email; the agent searches and reads it |
-| 0:06–0:13 | Open the inline email card and full message |
-| 0:13–0:17 | Review departure, return, and packing details |
-| 0:17–0:23 | Ask for research about Monterey Bay Aquarium |
-| 0:23–0:28 | Follow the aquarium website inline |
-| 0:28–0:33 | Read three exhibit excerpts and their source |
-| 0:33–0:42 | Take control, scroll the same browser, and return to chat |
+| 0:06–0:13 | Open the inline email card and full message                    |
+| 0:13–0:17 | Review departure, return, and packing details                  |
+| 0:17–0:23 | Ask for research about Monterey Bay Aquarium                   |
+| 0:23–0:28 | Follow the aquarium website inline                             |
+| 0:28–0:33 | Read three exhibit excerpts and their source                   |
+| 0:33–0:42 | Take control, scroll the same browser, and return to chat      |
 
 This recording uses the same AI Mock model and real Chromium tool flow described above, plus the actual `search_mail` and `read_mail_thread` tools against an isolated fictional mailbox. The model selects the thread ID returned by search and quotes its returned details. Opening the card loads the full thread through the app's existing email viewer. The aquarium excerpts come from exhibit entries on its current website. The email says “aquarium”; the second user prompt supplies Monterey Bay Aquarium explicitly.
 

@@ -93,7 +93,7 @@ const screens = {
   // Files 文件
   "screens.filesSubtitle": "Keep every analysis output and uploaded document together.",
   "screens.filesImport": "Upload document",
-  "screens.libraryFiles": "Documents",
+  "screens.libraryFiles": "Files",
   "screens.libraryInsights": "Insights",
   "screens.libraryNotes": "My notes",
   "screens.libraryInsightsEmptyTitle": "No saved insights yet",
@@ -115,7 +115,7 @@ const screens = {
   "screens.filesEmptyTitle": "Your documents live here",
   "screens.filesEmptyDetail":
     "PDF, HTML, Markdown, images, Word, Excel, PowerPoint, and common text files are supported, up to 10 MB per file.",
-  "screens.filesFilterAll": "All documents",
+  "screens.filesFilterAll": "All",
   "screens.filesFilterAnalysis": "From analysis",
   "screens.filesFilterUpload": "My uploads",
   "screens.filesFormatAll": "All formats",

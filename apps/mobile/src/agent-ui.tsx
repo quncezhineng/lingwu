@@ -15,8 +15,9 @@ import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-ma
 import type { Artifact, BrowserSession } from "../../../packages/domain/src";
 import type {
   AgentArtifact,
-  AgentMemory,
+  AgentCommunication,
   AgentTask,
+  AgentTone,
   Evidence,
   Goal,
   Idea,
@@ -331,7 +332,7 @@ const TASK_FILTERS: ReadonlyArray<{ id: TaskFilter; labelKey: TranslationKey }> 
   { id: "paused", labelKey: "agent.filterPaused" },
 ];
 
-/** 五态筛选：全部 / 分析中 / 待确认 / 已完成 / 已暂停。 */
+/** 五态筛选：全部 / 进行中 / 待确认 / 已完成 / 已暂停。 */
 function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
   switch (filter) {
     case "running":
@@ -1365,7 +1366,7 @@ function IdeaCard({ idea }: { idea: Idea }) {
     </View>
   );
 }
-export function GoalsScreen() {
+export function GoalsScreen({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const { open } = useWorkspace();
@@ -1384,27 +1385,29 @@ export function GoalsScreen() {
   const monitors = (data?.monitors || []).filter((item) => item.status !== "stopped");
   return (
     <View style={{ gap: 20 }}>
-      <PageHeader
-        title={t("agent.monitorsHeroTitle")}
-        description={t("agent.monitorsHeroDescription")}
-        compact={width < breakpoints.desktop}
-        actions={
-          activeTab === "reminders" ? (
-            <Button
-              small
-              primary
-              icon={Plus}
-              onPress={() => {
-                setReminderTemplate(undefined);
-                setAdding("Reminder");
-              }}
-            >
-              {t("agent.addReminder")}
-            </Button>
-          ) : undefined
-        }
-        style={{ marginBottom: 0 }}
-      />
+      {!embedded && (
+        <PageHeader
+          title={t("agent.monitorsHeroTitle")}
+          description={t("agent.monitorsHeroDescription")}
+          compact={width < breakpoints.desktop}
+          actions={
+            activeTab === "reminders" ? (
+              <Button
+                small
+                primary
+                icon={Plus}
+                onPress={() => {
+                  setReminderTemplate(undefined);
+                  setAdding("Reminder");
+                }}
+              >
+                {t("agent.addReminder")}
+              </Button>
+            ) : undefined
+          }
+          style={{ marginBottom: 0 }}
+        />
+      )}
       <AgentStatus />
       <View
         accessibilityRole="tablist"
@@ -2449,6 +2452,17 @@ export function NotificationsSheet() {
 }
 /** 可挑选的照片头像枚举，与 assets/avatar1~6.png 一一对应。 */
 const AVATAR_OPTIONS = ["avatar1", "avatar2", "avatar3", "avatar4", "avatar5", "avatar6"] as const;
+const TONE_OPTIONS = [
+  "formal",
+  "casual",
+  "playful",
+  "concise",
+] as const satisfies readonly AgentTone[];
+const COMMUNICATION_OPTIONS = [
+  "short",
+  "detailed",
+  "bullets",
+] as const satisfies readonly AgentCommunication[];
 function normalizeAvatar(value?: string): string {
   // 兼容旧版 sky/sand/lilac 等历史值，一律落入默认头像。
   return AVATAR_OPTIONS.includes(value as (typeof AVATAR_OPTIONS)[number])
@@ -2457,31 +2471,49 @@ function normalizeAvatar(value?: string): string {
 }
 export function AgentPersonalitySheet() {
   const { locale, t } = useTranslation();
+  const { width } = useWindowDimensions();
   const { close } = useWorkspace();
   const { data, mutate } = useAgentWorkspace();
   const [name, setName] = useState(
     localizeAgentName(data?.identity.name, data?.identity.nameCustomized),
   );
   const [nameCustomized, setNameCustomized] = useState(data?.identity.nameCustomized === true);
-  const [tone, setTone] = useState(data?.identity.tone || "warm");
+  const [tagline, setTagline] = useState(data?.identity.tagline ?? "");
+  const [tone, setTone] = useState<AgentTone>(data?.identity.tone ?? "warm");
+  const [communication, setCommunication] = useState<AgentCommunication>(
+    data?.identity.communication ?? "short",
+  );
+  const [style, setStyle] = useState(data?.identity.style ?? "");
+  const [userName, setUserName] = useState(data?.identity.userName ?? "");
   const [avatar, setAvatar] = useState(normalizeAvatar(data?.identity.avatar));
   const [showChatUpdates, setShowChatUpdates] = useState(data?.identity.showChatUpdates !== false);
-  const [memory, setMemory] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const compact = width < 600;
+  const visibleTones: AgentTone[] = TONE_OPTIONS.includes(tone as (typeof TONE_OPTIONS)[number])
+    ? [...TONE_OPTIONS]
+    : [...TONE_OPTIONS, tone];
   useEffect(() => {
     if (data?.identity) {
       setName(localizeAgentName(data.identity.name, data.identity.nameCustomized));
       setNameCustomized(data.identity.nameCustomized === true);
+      setTagline(data.identity.tagline ?? "");
       setTone(data.identity.tone);
+      setCommunication(data.identity.communication ?? "short");
+      setStyle(data.identity.style ?? "");
+      setUserName(data.identity.userName ?? "");
       setAvatar(normalizeAvatar(data.identity.avatar));
       setShowChatUpdates(data.identity.showChatUpdates !== false);
     }
   }, [
     data?.identity.name,
     data?.identity.nameCustomized,
+    data?.identity.tagline,
     data?.identity.tone,
+    data?.identity.communication,
+    data?.identity.style,
+    data?.identity.userName,
     data?.identity.avatar,
     data?.identity.showChatUpdates,
     locale,
@@ -2492,12 +2524,21 @@ export function AgentPersonalitySheet() {
     const timer = setTimeout(() => setSaved(false), 1600);
     return () => clearTimeout(timer);
   }, [saved]);
-  async function save(path: string, body: unknown) {
+  async function save() {
     setBusy(true);
     setError("");
     try {
-      await mutate(path, body);
-      if (path === "/memories") setMemory("");
+      await mutate("/identity", {
+        name: name.trim(),
+        nameCustomized,
+        tagline: tagline.trim(),
+        tone,
+        communication,
+        style: style.trim(),
+        userName: userName.trim(),
+        avatar,
+        showChatUpdates,
+      });
       setSaved(true);
     } catch (e) {
       setError(errorText(e));
@@ -2507,11 +2548,24 @@ export function AgentPersonalitySheet() {
   }
   return (
     <>
-      <Sheet title={t("agent.personalityMemory")} onClose={close}>
+      <Sheet
+        title={t("agent.personalityMemory")}
+        subtitle={t("agent.settingsSubtitle")}
+        onClose={close}
+      >
         <View style={{ gap: 22 }}>
-          <Card style={{ gap: 10 }}>
+          <Card style={{ gap: 14 }}>
             <SectionHeading title={t("agent.yourAgent")} />
-            <View style={[s.row, { gap: 12, justifyContent: "center", marginBottom: 12 }]}>
+            <View
+              style={[
+                s.row,
+                {
+                  gap: compact ? 4 : 8,
+                  justifyContent: "center",
+                  marginBottom: 6,
+                },
+              ]}
+            >
               {AVATAR_OPTIONS.map((item) => (
                 <Pressable
                   key={item}
@@ -2520,80 +2574,94 @@ export function AgentPersonalitySheet() {
                   accessibilityState={{ checked: avatar === item }}
                   onPress={() => setAvatar(item)}
                   style={{
-                    padding: 4,
+                    padding: compact ? 3 : 4,
                     borderRadius: 999,
                     borderWidth: 1,
                     borderColor: avatar === item ? colors.primary : colors.line,
                     backgroundColor: avatar === item ? colors.surface : colors.paper,
                   }}
                 >
-                  <Mascot size={62} variant={item} />
+                  <Mascot size={compact ? 42 : 52} variant={item} />
                 </Pressable>
               ))}
             </View>
             <Field
               label={t("agent.nameLabel")}
               value={name}
+              maxLength={80}
               onChangeText={(value) => {
                 setName(value);
                 setNameCustomized(true);
               }}
             />
-            <View style={[s.row, { gap: 8 }]}>
-              {(["warm", "concise", "thoughtful"] as const).map((item) => (
-                <Button key={item} small primary={tone === item} onPress={() => setTone(item)}>
-                  {statusLabel(item)}
-                </Button>
-              ))}
-            </View>
-            <CheckRow
-              label={t("agent.showBackgroundUpdates")}
-              checked={showChatUpdates}
-              onPress={() => setShowChatUpdates(!showChatUpdates)}
+            <Field
+              label={t("agent.taglineLabel")}
+              placeholder={t("agent.taglinePlaceholder")}
+              value={tagline}
+              maxLength={60}
+              onChangeText={setTagline}
             />
-            <Text style={s.small}>{t("agent.activityFullRecord")}</Text>
+            <View style={{ gap: 8 }}>
+              <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
+                {t("agent.toneLabel")}
+              </Text>
+              <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                {visibleTones.map((item) => (
+                  <Button key={item} small primary={tone === item} onPress={() => setTone(item)}>
+                    {statusLabel(item)}
+                  </Button>
+                ))}
+              </View>
+            </View>
+            <View style={{ gap: 8 }}>
+              <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
+                {t("agent.communicationLabel")}
+              </Text>
+              <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                {COMMUNICATION_OPTIONS.map((item) => (
+                  <Button
+                    key={item}
+                    small
+                    primary={communication === item}
+                    onPress={() => setCommunication(item)}
+                  >
+                    {statusLabel(item)}
+                  </Button>
+                ))}
+              </View>
+            </View>
+            <Field
+              label={t("agent.styleLabel")}
+              placeholder={t("agent.stylePlaceholder")}
+              value={style}
+              maxLength={1000}
+              multiline
+              onChangeText={setStyle}
+              style={{ minHeight: 96 }}
+            />
+            <Field
+              label={t("agent.userNameLabel")}
+              placeholder={t("agent.userNamePlaceholder")}
+              value={userName}
+              maxLength={60}
+              onChangeText={setUserName}
+            />
+            <View>
+              <CheckRow
+                label={t("agent.showBackgroundUpdates")}
+                checked={showChatUpdates}
+                onPress={() => setShowChatUpdates(!showChatUpdates)}
+              />
+              <Text style={s.small}>{t("agent.activityFullRecord")}</Text>
+            </View>
             <Button
               primary
               busy={busy}
               quietBusy
               disabled={!name.trim()}
-              onPress={() =>
-                void save("/identity", {
-                  name: name.trim(),
-                  nameCustomized,
-                  tone,
-                  avatar,
-                  showChatUpdates,
-                })
-              }
+              onPress={() => void save()}
             >
               {t("agent.savePreferences")}
-            </Button>
-          </Card>
-          <Card style={{ gap: 12 }}>
-            <SectionHeading title={t("agent.memory")} />
-            <Text style={s.muted}>{t("agent.memoryDetail")}</Text>
-            {data?.memories.map((item) => (
-              <MemoryRow key={item.id} memory={item} />
-            ))}
-            <Field
-              label={t("agent.rememberAboutMe")}
-              value={memory}
-              onChangeText={setMemory}
-              placeholder={t("agent.rememberPlaceholder")}
-            />
-            <Button
-              busy={busy}
-              quietBusy
-              disabled={!memory.trim()}
-              onPress={() =>
-                void save("/memories", {
-                  text: memory.trim(),
-                  source: t("agent.memorySourceUserAdded"),
-                })
-              }
-            >
-              {t("agent.remember")}
             </Button>
           </Card>
           <ErrorNotice error={error} />
@@ -2642,54 +2710,5 @@ export function AgentPersonalitySheet() {
         </Modal>
       )}
     </>
-  );
-}
-function MemoryRow({ memory }: { memory: AgentMemory }) {
-  const { t } = useTranslation();
-  const { mutate } = useAgentWorkspace();
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(memory.text);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function act(forget: boolean) {
-    setBusy(true);
-    setError("");
-    try {
-      await mutate(`/memories/${memory.id}${forget ? "/forget" : ""}`, forget ? {} : { text });
-      setEditing(false);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <View
-      style={{ gap: 8, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.line }}
-    >
-      {editing ? (
-        <Field label={t("agent.memory")} value={text} onChangeText={setText} />
-      ) : (
-        <Text style={s.text}>{memory.text}</Text>
-      )}
-      <Text style={s.small}>
-        {memory.source} · {stamp(memory.createdAt)}
-      </Text>
-      <View style={[s.row, { gap: 8 }]}>
-        {editing ? (
-          <Button small busy={busy} disabled={!text.trim()} onPress={() => void act(false)}>
-            {t("agent.saveCorrection")}
-          </Button>
-        ) : (
-          <Button small onPress={() => setEditing(true)}>
-            {t("agent.edit")}
-          </Button>
-        )}
-        <Button small danger busy={busy} onPress={() => void act(true)}>
-          {t("agent.forget")}
-        </Button>
-      </View>
-      <ErrorNotice error={error} />
-    </View>
   );
 }

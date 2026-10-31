@@ -123,25 +123,25 @@
 
 ## 已实现映射
 
-| Demo | lingwu 实现 |
-| --- | --- |
-| 工作台自然语言发起分析 | `WorkbenchScreen` → 现有 `ask()` → 分析对话 |
-| 今日领悟 | 最新 3 个真实 `AgentArtifact`；首尾禁用翻页、紧凑卡收藏、专用 `InsightDetail` 阅读弹层、依据折叠、讲浅一点、不同看法输入、记笔记、真实自选联动与资料库收藏列表 |
-| 进行中的分析 | `useAgentWorkspace().tasks` |
-| 自选与行情 | `WatchlistHubScreen` 提供“我的自选 / 投资组合”页签；自选页按 Demo 重构页头、市场筛选、即时搜索、桌面六列表格、移动卡片与添加自选弹窗；整行点击先打开 `WatchlistSymbolSheet` 摘要层，再由“查看详情”进入完整 `SymbolDetailSheet`，并继续复用真实 `useWatchlistState`、`useQuotes`、60 秒刷新和工作区持久化 |
-| 待确认提醒 | `waiting_approval` / `waiting_input` 任务 |
-| 投资偏好 | `PreferencesScreen` 按 Demo 重构为四类分类卡片、上下文横幅、新增/编辑共用弹层和删除确认；分类与正文写入真实 `/memories` API，旧记忆无分类时回退到默认分类 |
-| 投资组合 | 作为 `我的自选` 内的二级入口，复用现有 `PortfolioScreen` |
-| 投资笔记 | 作为 `我的资料` 内的二级入口，复用现有 `NotesScreen` |
-| 今日市场简报 | `MarketBriefingCard` 按 Demo 信息层级重构；指数与关注标的读取 `/api/briefings/latest`，阅读线索读取最新 `AgentArtifact`，支持折叠、下载和继续分析 |
-| 资料库 | `FilesScreen` 按 Demo 重构为文件资料 / 领悟卡 / 我的笔记三页签；文件区提供来源计数、名称搜索、按 PDF / Word / Excel / PPT / Markdown / 图片 / HTML / 文本分类筛选、真实文件列表、单文件与批量投入分析、下载、详情、空状态和上传区；来源筛选将 `Uploaded by you`/`upload` 映射为“我的上传”，其余真实来源归为“分析生成” |
-| 目标与提醒 | `GoalsScreen` 按 Demo 重构为双页签、上下文横幅、提醒模板、描述与周期调度、提醒卡开关/编辑/详情/停止及真实 monitor 数据；每日/每周提醒按上海时区计算，目标与里程碑保留在同一页面下方 |
-| 应用与资源 | `AppsScreen` 重构为「插件 / 技能 / 连接器 / 资料库」能力中心，连接器继续复用 `ConnectionsScreen` |
-| 工作台与对话输入区 | `PromptComposer` 统一附件、上传、资料库、聚焦态、深度分析入口、发送与停止生成；工作台和 `ChatScreen` 共用同一实现 |
-| 从我的资料选择 | `FilePickerSheet` 在工作台和任务对话中共用：多选、确认前草稿隔离、已选数量、上传入口、空状态；确认后展示可移除附件胶囊，并在输入为空时补入默认分析提示 |
-| 附件随消息发送 | `promptWithAttachments()` 将资料名称与稳定 artifact ID 追加到模型输入，用户消息气泡仍只展示正文和附件胶囊，不泄露内部标记 |
-| 侧栏助手状态 | 使用真实 `monitors` 中 `status === "active"` 的数量；整行打开智能体设置 |
-| 侧栏个人空间 | 读取 `/api/auth/me` 的真实姓名与头像，点击进入账户页；独立齿轮打开统一设置 |
+| Demo                   | lingwu 实现                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 工作台自然语言发起分析 | `WorkbenchScreen` → 现有 `ask()` → 分析对话                                                                                                                                                                                                                                                                           |
+| 今日领悟               | 最新 3 个真实 `AgentArtifact`；首尾禁用翻页、紧凑卡收藏、专用 `InsightDetail` 阅读弹层、依据折叠、讲浅一点、不同看法输入、记笔记、真实自选联动与资料库收藏列表                                                                                                                                                        |
+| 进行中的分析           | `useAgentWorkspace().tasks`                                                                                                                                                                                                                                                                                           |
+| 自选与行情             | `WatchlistHubScreen` 提供“我的自选 / 投资组合”页签；自选页按 Demo 重构页头、市场筛选、即时搜索、桌面六列表格、移动卡片与添加自选弹窗；整行点击先打开 `WatchlistSymbolSheet` 摘要层，再由“查看详情”进入完整 `SymbolDetailSheet`，并继续复用真实 `useWatchlistState`、`useQuotes`、60 秒刷新和工作区持久化              |
+| 待确认提醒             | `waiting_approval` / `waiting_input` 任务                                                                                                                                                                                                                                                                             |
+| 投资偏好               | `PreferencesScreen` 按 Demo 重构为四类分类卡片、上下文横幅、新增/编辑共用弹层和删除确认；分类与正文写入真实 `/memories` API，旧记忆无分类时回退到默认分类                                                                                                                                                             |
+| 投资组合               | 作为 `我的自选` 内的二级入口，复用现有 `PortfolioScreen`                                                                                                                                                                                                                                                              |
+| 投资笔记               | 作为 `我的资料` 内的二级入口，复用现有 `NotesScreen`                                                                                                                                                                                                                                                                  |
+| 今日市场简报           | `MarketBriefingCard` 按 Demo 信息层级重构；指数与关注标的读取 `/api/briefings/latest`，阅读线索读取最新 `AgentArtifact`，支持折叠、下载和继续分析                                                                                                                                                                     |
+| 资料库                 | `FilesScreen` 按 Demo 重构为文件资料 / 领悟卡 / 我的笔记三页签；文件区提供来源计数、名称搜索、按 PDF / Word / Excel / PPT / Markdown / 图片 / HTML / 文本分类筛选、真实文件列表、单文件与批量投入分析、下载、详情、空状态和上传区；来源筛选将 `Uploaded by you`/`upload` 映射为“我的上传”，其余真实来源归为“分析生成” |
+| 目标与提醒             | `GoalsScreen` 按 Demo 重构为双页签、上下文横幅、提醒模板、描述与周期调度、提醒卡开关/编辑/详情/停止及真实 monitor 数据；每日/每周提醒按上海时区计算，目标与里程碑保留在同一页面下方                                                                                                                                   |
+| 应用与资源             | `AppsScreen` 重构为「插件 / 技能 / 连接器 / 资料库」能力中心，连接器继续复用 `ConnectionsScreen`                                                                                                                                                                                                                      |
+| 工作台与对话输入区     | `PromptComposer` 统一附件、上传、资料库、聚焦态、深度分析入口、发送与停止生成；工作台和 `ChatScreen` 共用同一实现                                                                                                                                                                                                     |
+| 从我的资料选择         | `FilePickerSheet` 在工作台和任务对话中共用：多选、确认前草稿隔离、已选数量、上传入口、空状态；确认后展示可移除附件胶囊，并在输入为空时补入默认分析提示                                                                                                                                                                |
+| 附件随消息发送         | `promptWithAttachments()` 将资料名称与稳定 artifact ID 追加到模型输入，用户消息气泡仍只展示正文和附件胶囊，不泄露内部标记                                                                                                                                                                                             |
+| 侧栏助手状态           | 使用真实 `monitors` 中 `status === "active"` 的数量；整行打开智能体设置                                                                                                                                                                                                                                               |
+| 侧栏个人空间           | 读取 `/api/auth/me` 的真实姓名与头像，点击进入账户页；独立齿轮打开统一设置                                                                                                                                                                                                                                            |
 
 ## 信息架构调整
 

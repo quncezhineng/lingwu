@@ -48,18 +48,18 @@ The computer combines **persistent Chromium and an optional Linux workspace**. T
 
 ## Features
 
-| Surface | What runs in this alpha |
-| --- | --- |
-| **Chat** | CopilotKit headless chat with streamed AG-UI events, mailbox search and reading, send/stop in one input pill, a visible follow-up queue, retained drafts, delegated tasks, and inline email, browser, PDF, plan, and finance cards. |
-| **Agent computer** | Persistent browser profiles and takeover console; optional isolated Linux terminal, saved command receipts, editable workspace files, and PDF transfer. |
-| **Activity** | Durable task plans, progress, input requests, pause/resume/cancel/retry, approvals, and saved receipts. SQL leases recover interrupted work. |
-| **Ideas** | Suggestions with source evidence; edit, accept, or dismiss. Sent replies and completed matching work are excluded. |
-| **Goals & Tracking** | Goals and milestones; recurring public-page checks for changes, text availability, or USD price thresholds, with deduplicated alerts and failure backoff. |
-| **Documents** | Email attachment → PDF → requested form values → filled copy → reviewed reply → receipt. Native/web PDF viewing, paging, zoom, supported fields, and sharing. |
-| **Finance** | Import transaction CSV to create a spending summary with categories, transactions, and a savings-goal action. |
-| **Gmail & Calendar** | Google OAuth adapters, complete mail threads, drafts/attachments, calendar discovery, and reviewed event creation/update/deletion. Live credentials required. |
-| **Personal context** | Editable name, tone, avatar, and memories. Background-update preferences and durable in-app notifications. |
-| **Rich Threads** | CopilotKit Intelligence persistence in every mode, with a stable main conversation, side chats, renaming, archiving, restoring, and replay. A server-only project key is required. |
+| Surface              | What runs in this alpha                                                                                                                                                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Chat**             | CopilotKit headless chat with streamed AG-UI events, mailbox search and reading, send/stop in one input pill, a visible follow-up queue, retained drafts, delegated tasks, and inline email, browser, PDF, plan, and finance cards. |
+| **Agent computer**   | Persistent browser profiles and takeover console; optional isolated Linux terminal, saved command receipts, editable workspace files, and PDF transfer.                                                                             |
+| **Activity**         | Durable task plans, progress, input requests, pause/resume/cancel/retry, approvals, and saved receipts. SQL leases recover interrupted work.                                                                                        |
+| **Ideas**            | Suggestions with source evidence; edit, accept, or dismiss. Sent replies and completed matching work are excluded.                                                                                                                  |
+| **Goals & Tracking** | Goals and milestones; recurring public-page checks for changes, text availability, or USD price thresholds, with deduplicated alerts and failure backoff.                                                                           |
+| **Documents**        | Email attachment → PDF → requested form values → filled copy → reviewed reply → receipt. Native/web PDF viewing, paging, zoom, supported fields, and sharing.                                                                       |
+| **Finance**          | Import transaction CSV to create a spending summary with categories, transactions, and a savings-goal action.                                                                                                                       |
+| **Gmail & Calendar** | Google OAuth adapters, complete mail threads, drafts/attachments, calendar discovery, and reviewed event creation/update/deletion. Live credentials required.                                                                       |
+| **Personal context** | Editable name, tone, avatar, and memories. Background-update preferences and durable in-app notifications.                                                                                                                          |
+| **Rich Threads**     | CopilotKit Intelligence persistence in every mode, with a stable main conversation, side chats, renaming, archiving, restoring, and replay. A server-only project key is required.                                                  |
 
 The [feature inventory](docs/FEATURES.md) describes implemented capabilities and planned extensions. Health/bank/social connectors, device push, voice, generated executable tools, and automatic reservations/payments are on the [roadmap](ROADMAP.md).
 
@@ -111,14 +111,14 @@ For iOS or Android, use `pnpm --dir apps/mobile ios` or `pnpm --dir apps/mobile 
 
 The deploy form asks for three values you provide. Render generates the other two.
 
-| Variable | Set by | If it is missing |
-|---|---|---|
-| `CPK_INTELLIGENCE_API_KEY` | You. Run `npx copilotkit@latest login`, then `npx copilotkit@latest project select`. Keep it on the server. | Chat cannot open a thread. |
-| `CPK_TELEMETRY_ID` | You. Keep the identity generated by the same project selection. | Runtime usage cannot be attributed to the Intelligence signup account. |
-| `OPENAI_API_KEY` | You. Used by the default `openai/gpt-5`. Change `MODEL` and supply the matching provider key for Anthropic, Google, DeepSeek (`DEEPSEEK_API_KEY`) or Moonshot (`MOONSHOT_API_KEY`). | The model call fails. |
-| `LINGWU_ACCESS_KEY` | Render | You cannot sign in. Only used when the Supabase variables are unset. |
-| `TOKEN_ENCRYPTION_KEY` | Render | The API refuses to start in live mode. |
-| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | You | Optional. Unset means one shared key and one owner per deployment. |
+| Variable                                                          | Set by                                                                                                                                                                              | If it is missing                                                       |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `CPK_INTELLIGENCE_API_KEY`                                        | You. Run `npx copilotkit@latest login`, then `npx copilotkit@latest project select`. Keep it on the server.                                                                         | Chat cannot open a thread.                                             |
+| `CPK_TELEMETRY_ID`                                                | You. Keep the identity generated by the same project selection.                                                                                                                     | Runtime usage cannot be attributed to the Intelligence signup account. |
+| `OPENAI_API_KEY`                                                  | You. Used by the default `openai/gpt-5`. Change `MODEL` and supply the matching provider key for Anthropic, Google, DeepSeek (`DEEPSEEK_API_KEY`) or Moonshot (`MOONSHOT_API_KEY`). | The model call fails.                                                  |
+| `LINGWU_ACCESS_KEY`                                               | Render                                                                                                                                                                              | You cannot sign in. Only used when the Supabase variables are unset.   |
+| `TOKEN_ENCRYPTION_KEY`                                            | Render                                                                                                                                                                              | The API refuses to start in live mode.                                 |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | You                                                                                                                                                                                 | Optional. Unset means one shared key and one owner per deployment.     |
 
 Health check: `https://<lingwu-api>/api/health`.
 
@@ -137,11 +137,11 @@ Leaving the three variables unset keeps the original single-owner behaviour, so 
 
 ### Services
 
-| Service | Plan | What it runs |
-|---|---|---|
-| `lingwu-api` | Standard, with a 1 GB disk at `/var/data` | The Hono API and the in-process task worker. `DATA_DIR` is `/var/data/lingwu`. |
-| `lingwu-web` | Static site | The Expo web export. `EXPO_PUBLIC_API_URL` is baked in at build time. |
-| `lingwu-browser` | Private service, Standard, 1 GB disk at `/data` | Playwright and Chromium. The API calls it on the private network. |
+| Service          | Plan                                            | What it runs                                                                   |
+| ---------------- | ----------------------------------------------- | ------------------------------------------------------------------------------ |
+| `lingwu-api`     | Standard, with a 1 GB disk at `/var/data`       | The Hono API and the in-process task worker. `DATA_DIR` is `/var/data/lingwu`. |
+| `lingwu-web`     | Static site                                     | The Expo web export. `EXPO_PUBLIC_API_URL` is baked in at build time.          |
+| `lingwu-browser` | Private service, Standard, 1 GB disk at `/data` | Playwright and Chromium. The API calls it on the private network.              |
 
 **Standard** is the smallest plan that stays up. At 512 MB the process runs out of memory before it binds a port, because PGlite loads an embedded Postgres build.
 
@@ -233,16 +233,16 @@ flowchart TD
   API -. future adapter .-> OpenBot[OpenBot]
 ```
 
-| Directory | Purpose |
-| --- | --- |
-| `apps/mobile` | Shared iOS, Android, and web UI with CopilotKit headless hooks. |
-| `apps/server` | API, CopilotKit runtime, identity boundary, task engine, reviews, files, and persistence. |
-| `apps/worker` | Token-protected Playwright browser service with persistent profiles. |
-| `apps/computer` | Nonroot Linux image, bounded filesystem helper, and real container verification. |
-| `packages/domain` | Shared types and request validation. |
-| `packages/integrations` | Google and browser protocol adapters. |
-| `packages/backends` | Optional OpenBot HTTP adapter and its identity boundary. |
-| `tests` | Workflow, runtime, persistence, provider-contract, and authorization tests. |
+| Directory               | Purpose                                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `apps/mobile`           | Shared iOS, Android, and web UI with CopilotKit headless hooks.                           |
+| `apps/server`           | API, CopilotKit runtime, identity boundary, task engine, reviews, files, and persistence. |
+| `apps/worker`           | Token-protected Playwright browser service with persistent profiles.                      |
+| `apps/computer`         | Nonroot Linux image, bounded filesystem helper, and real container verification.          |
+| `packages/domain`       | Shared types and request validation.                                                      |
+| `packages/integrations` | Google and browser protocol adapters.                                                     |
+| `packages/backends`     | Optional OpenBot HTTP adapter and its identity boundary.                                  |
+| `tests`                 | Workflow, runtime, persistence, provider-contract, and authorization tests.               |
 
 ### OpenBot compatibility
 

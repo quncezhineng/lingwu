@@ -11,7 +11,7 @@ description_zh: |
   全面的财报季 IV 分析：历史 IV crush 数据、隐含波动预测、IV 排名策略标签，以及一张已定价可直接交易的 Iron Condor 报价。
   触发词："earnings crush AAPL"、"NVDA 财报前 IV"、"MSFT 隐含波动"、"META Iron Condor"、"AAPL 财报 IV 排名"、"TSLA 财报策略"、"AMZN 财报前是否应该卖期权"、"财报后 IV 下跌"、"财报前跨式策略"、"财报前策略"
 globs:
-  - 'mock-data/earnings-crush/**'
+  - "mock-data/earnings-crush/**"
 ---
 
 # AlphaGBM Earnings IV Panel

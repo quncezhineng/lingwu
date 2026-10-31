@@ -5,6 +5,7 @@ Before delivering an initiation report, verify all items below are complete.
 ## Critical Minimums - Reports Must Meet These
 
 **CRITICAL DO NOT DELIVER IF:**
+
 - ❌ DOCX report fewer than 30 pages → INCOMPLETE
 - ❌ Fewer than 25 embedded charts → INCOMPLETE
 - ❌ Fewer than 12 comprehensive tables → INCOMPLETE
@@ -21,17 +22,20 @@ Before delivering an initiation report, verify all items below are complete.
 ## DOCX Report - Length & Content
 
 **Length Verification:**
+
 - [ ] Report is 30-50 pages (count pages in final document)
 - [ ] Word count is 10,000-15,000 words
 - [ ] If under 30 pages: STOP and add more content
 
 **Visual Elements:**
-- [ ] 25-35 charts embedded (count them: _____ charts)
+
+- [ ] 25-35 charts embedded (count them: **\_** charts)
 - [ ] All charts are actual PNG/JPG image files (NOT text descriptions)
-- [ ] 12-20 comprehensive tables included (count them: _____ tables)
+- [ ] 12-20 comprehensive tables included (count them: **\_** tables)
 - [ ] Charts and tables interspersed throughout, not grouped at end
 
 **Chart Requirements:**
+
 - [ ] Revenue by product chart: Stacked Area format ✓
 - [ ] Revenue by geography chart: Stacked Bar format ✓
 - [ ] DCF sensitivity: 2-way Heat Map with color coding ✓
@@ -39,6 +43,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] All other charts are actual image files ✓
 
 **Table Requirements:**
+
 - [ ] Full Income Statement (40-50 rows) with 5 years historical + 5 years projected
 - [ ] Full Cash Flow Statement (30-40 rows)
 - [ ] Full Balance Sheet (35-45 rows)
@@ -54,6 +59,7 @@ Before delivering an initiation report, verify all items below are complete.
 ## DOCX Report - Structure
 
 **Page 1 Requirements:**
+
 - [ ] "INITIATING COVERAGE" header present (NOT "Company Update")
 - [ ] Thesis-focused title (NOT event-driven like "Strong Q4 Results")
 - [ ] Rating box with rating, price, target price, 52-week range, market cap, EV
@@ -63,6 +69,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] Source lines on all visuals
 
 **Content Sections:**
+
 - [ ] Table of Contents (Page 2)
 - [ ] Investment Thesis & Risks (3-5 pages)
 - [ ] Company Overview (6-12 pages) including:
@@ -80,6 +87,7 @@ Before delivering an initiation report, verify all items below are complete.
 ## DOCX Report - Formatting
 
 **Figure & Table Formatting:**
+
 - [ ] Every figure has caption above: "Figure X - [Company] [Descriptive Title]"
 - [ ] Every figure has source line below: "Source: [Specific sources with dates]"
 - [ ] Sequential figure numbering (Figure 1, 2, 3... no gaps)
@@ -88,6 +96,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] All years use "A" for actual, "E" for estimate notation
 
 **Professional Formatting:**
+
 - [ ] Consistent fonts throughout (Calibri, Arial, or similar)
 - [ ] Headers and footers with page numbers
 - [ ] Dense layout: 60-80% page coverage, minimal white space
@@ -97,12 +106,14 @@ Before delivering an initiation report, verify all items below are complete.
 ## Citations & Sources ⭐⭐⭐ CRITICAL
 
 **Source Attribution:**
+
 - [ ] Every figure has specific source with document name and date
 - [ ] Every table has specific source with document reference
 - [ ] Key statistics throughout text have footnotes with sources
 - [ ] NOT just generic "Company data" - must be specific
 
 **Hyperlinks:** ⭐⭐⭐ MANDATORY
+
 - [ ] ALL URLs are CLICKABLE HYPERLINKS (not plain text)
 - [ ] SEC filings hyperlinked to EDGAR viewer
 - [ ] Earnings transcripts hyperlinked (Seeking Alpha or company IR)
@@ -114,6 +125,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] Test 3-5 sample hyperlinks to ensure they work (Ctrl+Click)
 
 **Reference Page:**
+
 - [ ] "Data Sources & References" page at end of report
 - [ ] Lists ALL sources used in report
 - [ ] Sources organized by category (SEC Filings, Earnings Transcripts, etc.)
@@ -123,10 +135,12 @@ Before delivering an initiation report, verify all items below are complete.
 ## XLS Financial Model - Structure
 
 **File Structure:**
+
 - [ ] 15+ tabs in Excel workbook
 - [ ] Tabs include: Executive Summary, Assumptions, Historical Financials, Revenue Model, Operating Expenses, Income Statement, Balance Sheet, Cash Flow, Supporting Schedules, DCF Valuation, Comps Analysis, Precedent Transactions, Scenarios, Sensitivity Analysis, Charts
 
 **Formatting:**
+
 - [ ] Blue text for hardcoded inputs
 - [ ] Black text for formulas
 - [ ] Green text for links to other sheets
@@ -134,6 +148,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] Clear section headers and labels
 
 **Model Functionality:**
+
 - [ ] All numbers flow (change assumption → entire model updates)
 - [ ] DCF links to assumptions and projections
 - [ ] No circular references or errors
@@ -143,6 +158,7 @@ Before delivering an initiation report, verify all items below are complete.
 ## XLS Financial Model - Content
 
 **Projections:**
+
 - [ ] 3-5 years historical data
 - [ ] 5 years forward projections (FY+1 through FY+5)
 - [ ] Revenue broken down by product, geography, channel
@@ -151,6 +167,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] Full balance sheet with 35-45 line items
 
 **Valuation:**
+
 - [ ] Complete DCF model with all calculations shown
 - [ ] WACC calculation with all components
 - [ ] Terminal value calculation
@@ -175,12 +192,14 @@ Before delivering an initiation report, verify all items below are complete.
 ## Content Quality
 
 **Investment Thesis:**
+
 - [ ] 3-5 clear thesis pillars
 - [ ] Each pillar supported with specific data and quantification
 - [ ] Financial impact quantified for each pillar
 - [ ] Catalysts identified with timelines
 
 **Analysis Depth:**
+
 - [ ] Comprehensive business model analysis
 - [ ] Detailed competitive assessment
 - [ ] 3-5 year financial trends analyzed
@@ -188,6 +207,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] Management team analyzed (300-400 words per executive)
 
 **Assumptions:**
+
 - [ ] 2,000-3,000 words documenting ALL assumptions
 - [ ] Revenue growth assumptions by category/geography
 - [ ] Margin assumptions with bridge showing drivers
@@ -196,6 +216,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] Each assumption has specific quantification
 
 **Scenarios:**
+
 - [ ] 1,500-2,000 words on scenario analysis
 - [ ] Bull case with specific parameters and catalysts
 - [ ] Base case with detailed rationale
@@ -205,6 +226,7 @@ Before delivering an initiation report, verify all items below are complete.
 ## Writing Quality
 
 **Style:**
+
 - [ ] Lead with numbers ("Revenue grew 15% to $1.2B" not "Strong revenue")
 - [ ] Use "vs." not "versus"
 - [ ] Be direct and concise
@@ -212,6 +234,7 @@ Before delivering an initiation report, verify all items below are complete.
 - [ ] No informal language
 
 **Accuracy:**
+
 - [ ] No typos in ticker symbol
 - [ ] No typos in company name
 - [ ] All dates accurate
@@ -239,13 +262,15 @@ If ANY item fails, DO NOT DELIVER. Go back and fix.
 **Before delivery, fill in actual counts:**
 
 DOCX Report:
-- Page count: _____ pages (MUST BE 30-50)
-- Chart count: _____ charts (MUST BE 25-35)
-- Table count: _____ tables (MUST BE 12-20)
-- Word count: _____ words (MUST BE 10,000-15,000)
+
+- Page count: **\_** pages (MUST BE 30-50)
+- Chart count: **\_** charts (MUST BE 25-35)
+- Table count: **\_** tables (MUST BE 12-20)
+- Word count: **\_** words (MUST BE 10,000-15,000)
 
 XLS Model:
-- Tab count: _____ tabs (SHOULD BE 15+)
-- Model years: _____ historical + _____ projected
+
+- Tab count: **\_** tabs (SHOULD BE 15+)
+- Model years: **\_** historical + **\_** projected
 
 If any count is below minimum, STOP and add content before delivery.

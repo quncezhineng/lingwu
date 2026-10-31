@@ -11,7 +11,7 @@ description_zh: |
   将预测市场数据（Polymarket）与期权分析集成，揭示事件概率与期权隐含概率之间的错误定价信号。
   触发词："polymarket 信号"、"预测市场 vs 期权"、"事件概率"、"降息概率"、"选举概率 vs 期权"、"polymarket 套利"、"隐含概率不匹配"、"预测市场数据"、"事件驱动型期权"
 globs:
-  - 'mock-data/polymarket/**'
+  - "mock-data/polymarket/**"
 ---
 
 # AlphaGBM Polymarket Integration

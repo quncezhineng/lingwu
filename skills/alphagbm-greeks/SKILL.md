@@ -13,7 +13,7 @@ description_zh: >
   为任意期权合约或多腿组合提供希腊值仪表板。涵盖一阶希腊值（Delta、Gamma、Theta、Vega、Rho）和二阶希腊值（Charm、Vanna、Volga）。返回单个合约和组合级别的希腊值，附带情景热力图。使用场景：检查期权敏感度、管理持仓风险、理解 Theta 衰减、分析 Gamma 敞口、对冲投资组合。
   触发词："AAPL 220 call 希腊值"、"组合希腊值"、"Theta 衰减分析"、"NVDA Gamma 敞口"、"我持仓的 Delta"、"SPY 跨式 Vega 风险"
 globs:
-  - 'mock-data/*.json'
+  - "mock-data/*.json"
 ---
 
 # AlphaGBM Greeks

@@ -13,7 +13,7 @@ description_zh: >
   三维波动率曲面分析，横跨执行价（虚实值程度）和到期日映射隐含波动率。展示曲面每个点上的期权是便宜还是昂贵。返回曲面网格数据、平值期限结构、各到期日偏斜以及曲面异常。使用场景：检查 IV 是否昂贵、分析期限结构、发现定价错误的期权、理解波动率动态。
   触发词："vol surface AAPL"、"NVDA IV 贵吗"、"SPY 波动率期限结构"、"TSLA 曲面分析"、"META IV 曲面"、"显示 vol surface"
 globs:
-  - 'mock-data/*.json'
+  - "mock-data/*.json"
 ---
 
 # AlphaGBM Volatility Surface

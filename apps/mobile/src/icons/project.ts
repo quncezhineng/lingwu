@@ -296,6 +296,22 @@ export const PROJECT_ICONS: Record<string, IconDefinition> = {
       { tag: "circle", cx: 19, cy: 12, r: 1 },
     ],
   },
+  "panel-left-close": {
+    source: "project",
+    elements: [
+      { tag: "rect", x: 3, y: 3, width: 18, height: 18, rx: 2 },
+      { tag: "path", d: "M9 3v18" },
+      { tag: "path", d: "m16 15-3-3 3-3" },
+    ],
+  },
+  "panel-left-open": {
+    source: "project",
+    elements: [
+      { tag: "rect", x: 3, y: 3, width: 18, height: 18, rx: 2 },
+      { tag: "path", d: "M9 3v18" },
+      { tag: "path", d: "m14 9 3 3-3 3" },
+    ],
+  },
   "panels-top-left": {
     source: "project",
     elements: [
@@ -367,10 +383,11 @@ export const PROJECT_ICONS: Record<string, IconDefinition> = {
   settings: {
     source: "project",
     elements: [
-      { tag: "path", d: "M20 7h-9" },
-      { tag: "path", d: "M14 17H5" },
-      { tag: "circle", cx: 17, cy: 17, r: 3 },
-      { tag: "circle", cx: 7, cy: 7, r: 3 },
+      {
+        tag: "path",
+        d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z",
+      },
+      { tag: "circle", cx: 12, cy: 12, r: 3 },
     ],
   },
   shapes: {

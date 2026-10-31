@@ -26,42 +26,46 @@ async function candidateUrls(): Promise<string[]> {
   return [...new Set(urls)];
 }
 
-test("closeSession releases the session slot when cookie persistence fails", {
-  timeout: 120_000,
-}, async () => {
-  const dataDir = await mkdtemp(join(tmpdir(), "lingwu-browser-close-"));
-  const browser = await createBrowserManager({ dataDir, maxSessions: 1 });
-  const urls = await candidateUrls();
-  const firstUrl = urls[0];
-  assert.ok(firstUrl, "no candidate navigation URLs resolved");
-  const id = randomUUID();
-  const next = randomUUID();
-  let url = firstUrl;
-  let created = false;
-  for (const candidate of urls) {
-    try {
-      await browser.create(id, candidate);
-      url = candidate;
-      created = true;
-      break;
-    } catch (error) {
-      if ((error as { code?: string })?.code !== "NAVIGATION_FAILED") throw error;
+test(
+  "closeSession releases the session slot when cookie persistence fails",
+  {
+    timeout: 120_000,
+  },
+  async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "lingwu-browser-close-"));
+    const browser = await createBrowserManager({ dataDir, maxSessions: 1 });
+    const urls = await candidateUrls();
+    const firstUrl = urls[0];
+    assert.ok(firstUrl, "no candidate navigation URLs resolved");
+    const id = randomUUID();
+    const next = randomUUID();
+    let url = firstUrl;
+    let created = false;
+    for (const candidate of urls) {
+      try {
+        await browser.create(id, candidate);
+        url = candidate;
+        created = true;
+        break;
+      } catch (error) {
+        if ((error as { code?: string })?.code !== "NAVIGATION_FAILED") throw error;
+      }
     }
-  }
-  assert.ok(created, "could not navigate to any candidate URL");
-  try {
-    await mkdir(join(dataDir, id, "storage.json"), { recursive: true });
-    await browser.closeSession(id);
-    assert.equal(
-      browser.list().find((session) => session.id === id)?.status,
-      "closed",
-      "the session must read back as closed",
-    );
-    const reopened = await browser.create(next, url);
-    assert.equal(reopened.status, "active");
-    await browser.closeSession(next);
-  } finally {
-    await browser.close();
-    await rm(dataDir, { recursive: true, force: true });
-  }
-});
+    assert.ok(created, "could not navigate to any candidate URL");
+    try {
+      await mkdir(join(dataDir, id, "storage.json"), { recursive: true });
+      await browser.closeSession(id);
+      assert.equal(
+        browser.list().find((session) => session.id === id)?.status,
+        "closed",
+        "the session must read back as closed",
+      );
+      const reopened = await browser.create(next, url);
+      assert.equal(reopened.status, "active");
+      await browser.closeSession(next);
+    } finally {
+      await browser.close();
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  },
+);

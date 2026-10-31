@@ -1,6 +1,6 @@
 ---
 name_en: pitch-deck
-description_en: 'Populates investment banking pitch deck templates with data from source files. Use when: user provides a PowerPoint template to fill in, user has source data (Excel/CSV) to populate into slides, user mentions populating or filling a pitch deck template, or user needs to transfer data into existing slide layouts. Not for creating presentations from scratch.'
+description_en: "Populates investment banking pitch deck templates with data from source files. Use when: user provides a PowerPoint template to fill in, user has source data (Excel/CSV) to populate into slides, user mentions populating or filling a pitch deck template, or user needs to transfer data into existing slide layouts. Not for creating presentations from scratch."
 name_zh: 路演PPT
 description_zh: 构建投行标准的交易路演演示文稿。包含交易概览、投资亮点、行业分析、财务摘要和交易结构。用于客户推介和交易营销。
 ---

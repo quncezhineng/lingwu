@@ -11,7 +11,7 @@ description_zh: |
   对 2-5 只股票或期权进行逐项并排对比，覆盖 GBM 五大支柱评分、期权指标、技术面和估值。按类别标识胜出者。
   触发词："对比 AAPL vs MSFT"、"NVDA 还是 AMD"、"TSLA 和 META 哪个期权更便宜"、"科技股对比"、"并排对比"、"vs"、"哪个更好"、"对比期权"、"最低 IV"、"最佳价值股"
 globs:
-  - 'mock-data/compare/**'
+  - "mock-data/compare/**"
 ---
 
 # AlphaGBM Compare

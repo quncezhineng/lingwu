@@ -21,13 +21,13 @@ The upstream web provider uses `runtimeUrl="/api/copilotkit"`, `credentials="inc
 
 OpenBot pins `@copilotkit/runtime` **1.70.1** and always configures Intelligence. Its runtime routes were also checked in that published package:
 
-| Operation | Exact route |
-| --- | --- |
-| Runtime discovery | `GET /api/copilotkit/info` |
-| Run | `POST /api/copilotkit/agent/:agentId/run` with AG-UI `RunAgentInput` |
-| Reconnect | `POST /api/copilotkit/agent/:agentId/connect` with `RunAgentInput` |
-| Stop | `POST /api/copilotkit/agent/:agentId/stop/:threadId` |
-| History | `GET /api/copilotkit/threads/:threadId/messages?agentId=:agentId` |
+| Operation         | Exact route                                                          |
+| ----------------- | -------------------------------------------------------------------- |
+| Runtime discovery | `GET /api/copilotkit/info`                                           |
+| Run               | `POST /api/copilotkit/agent/:agentId/run` with AG-UI `RunAgentInput` |
+| Reconnect         | `POST /api/copilotkit/agent/:agentId/connect` with `RunAgentInput`   |
+| Stop              | `POST /api/copilotkit/agent/:agentId/stop/:threadId`                 |
+| History           | `GET /api/copilotkit/threads/:threadId/messages?agentId=:agentId`    |
 
 **Runtime run responses are Intelligence connection metadata, not raw SSE.** Use a compatible public CopilotKit client for transport. Separately, the supplied Bot service accepts `POST http://localhost:4200/ag-ui` with `RunAgentInput`, streams AG-UI SSE, and requires `x-openbot-agent-token: <MANAGED_AGENT_TOKEN>`. The LangGraph service uses port 4201. Connecting directly to that Bot omits OpenBot's runtime orchestration. [Runtime mount](https://github.com/quncezhineng/OpenBot/blob/a96d88c6fb75385842529d7db7d463f4a8c4a86e/server/src/copilot.ts#L2054), [published runtime source](https://unpkg.com/@copilotkit/runtime@1.70.1/dist/v2/runtime/core/fetch-router.mjs), [run response](https://unpkg.com/@copilotkit/runtime@1.70.1/dist/v2/runtime/handlers/intelligence/run.mjs), [Bot endpoint](https://github.com/quncezhineng/OpenBot/blob/a96d88c6fb75385842529d7db7d463f4a8c4a86e/agent-bot/src/index.ts)
 
@@ -35,20 +35,20 @@ OpenBot pins `@copilotkit/runtime` **1.70.1** and always configures Intelligence
 
 All paths below are relative to `OPENBOT_BASE_URL`; encode path IDs.
 
-| LingWu capability | OpenBot request |
-| --- | --- |
-| Start conversation | `POST /api/channels` `{agentIds:[id]}` → `{channel:{id,agentIds,threadId,...}}` |
-| Browser status/read/preview | `GET /api/computers/:botId/status`, `/read`, `/screenshot` |
-| Live screen | WebSocket `/api/computers/:botId/stream`, session and Bot-access checked |
-| Navigate | `POST /api/computers/:botId/navigate` `{url,toolCallId?}` |
-| Inspect controls | `POST /api/computers/:botId/snapshot` → `{snapshotId,elements,...}` |
-| Click/type | `POST .../click` `{ref,snapshotId}`; `POST .../type` adds `{text,submit?}` |
-| Key/scroll | `POST .../key` `{key,ref?,snapshotId?}`; `POST .../scroll` `{deltaY?}` |
-| Workspace files | `POST .../files/list` `{path?}`; `/files/read` `{path}`; `/files/write` `{path,contents,append?}` |
-| Shell | `POST .../exec` `{command,timeoutMs?}`; timeout 1,000–600,000 ms |
-| Human handover | `POST .../control/request` `{reason}`; `/control/take`; `/control/release` |
-| Conversation upload | `POST /api/channels/:channelId/attachments`, multipart `file`, `uploadGroup` → `{id,name,mimeType,sizeBytes}` |
-| Attachment download | `GET /api/attachments/:id` |
+| LingWu capability           | OpenBot request                                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Start conversation          | `POST /api/channels` `{agentIds:[id]}` → `{channel:{id,agentIds,threadId,...}}`                               |
+| Browser status/read/preview | `GET /api/computers/:botId/status`, `/read`, `/screenshot`                                                    |
+| Live screen                 | WebSocket `/api/computers/:botId/stream`, session and Bot-access checked                                      |
+| Navigate                    | `POST /api/computers/:botId/navigate` `{url,toolCallId?}`                                                     |
+| Inspect controls            | `POST /api/computers/:botId/snapshot` → `{snapshotId,elements,...}`                                           |
+| Click/type                  | `POST .../click` `{ref,snapshotId}`; `POST .../type` adds `{text,submit?}`                                    |
+| Key/scroll                  | `POST .../key` `{key,ref?,snapshotId?}`; `POST .../scroll` `{deltaY?}`                                        |
+| Workspace files             | `POST .../files/list` `{path?}`; `/files/read` `{path}`; `/files/write` `{path,contents,append?}`             |
+| Shell                       | `POST .../exec` `{command,timeoutMs?}`; timeout 1,000–600,000 ms                                              |
+| Human handover              | `POST .../control/request` `{reason}`; `/control/take`; `/control/release`                                    |
+| Conversation upload         | `POST /api/channels/:channelId/attachments`, multipart `file`, `uploadGroup` → `{id,name,mimeType,sizeBytes}` |
+| Attachment download         | `GET /api/attachments/:id`                                                                                    |
 
 Here `...` means `/api/computers/:botId`. [Computer routes](https://github.com/quncezhineng/OpenBot/blob/a96d88c6fb75385842529d7db7d463f4a8c4a86e/server/src/computer/routes.ts), [channels](https://github.com/quncezhineng/OpenBot/blob/a96d88c6fb75385842529d7db7d463f4a8c4a86e/server/src/channels/routes.ts), [uploads](https://github.com/quncezhineng/OpenBot/blob/a96d88c6fb75385842529d7db7d463f4a8c4a86e/server/src/channels/attachments.ts)
 

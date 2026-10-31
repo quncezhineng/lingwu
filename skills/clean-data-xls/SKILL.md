@@ -33,7 +33,7 @@ Clean messy data in the active sheet or a specified range.
 | Duplicates     | exact-duplicate rows and near-duplicates (case/whitespace differences)    |
 | Blanks         | empty cells in otherwise-populated columns                                |
 | Mixed types    | a column that's 98% numbers but has 3 text entries                        |
-| Encoding       | mojibake (`Ã©`, `â€™`), non-printing characters                           |
+| Encoding       | mojibake (`Ã©`, `â€™`), non-printing characters                         |
 | Errors         | `#REF!`, `#N/A`, `#VALUE!`, `#DIV/0!`                                     |
 
 ### Step 3: Propose fixes

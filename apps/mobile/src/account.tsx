@@ -8,7 +8,6 @@ import {
   Archive,
   ArrowLeft,
   CalendarClock,
-  Cpu,
   type IconComponent,
   IdCard,
   LogOut,
@@ -22,7 +21,7 @@ import {
   UserRound,
 } from "./icons";
 import { useLingWuThread } from "./threads";
-import { Button, Card, colors, dateLabel, Empty, ErrorNotice, LinkRow, s, timeLabel } from "./ui";
+import { Button, Card, colors, dateLabel, Empty, ErrorNotice, s, timeLabel } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 个人信息里的一行：图标 + 名称 + 取值。 */
@@ -62,8 +61,15 @@ function ProfileRow({
   );
 }
 
-/** 「我的」里的归档页：搜索、恢复并打开，或永久删除已归档对话。 */
-function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
+/** 「已归档对话」页：搜索、恢复并打开，或永久删除已归档对话。 */
+export function ArchivedThreadsScreen({
+  onBack,
+  embedded = false,
+}: {
+  onBack: () => void;
+  /** 嵌入到设置面板 Sheet 中时隐藏页内标题与返回键，由外层标题承担。 */
+  embedded?: boolean;
+}) {
   const { t } = useTranslation();
   const { notify } = useWorkspace();
   const { enabled, select } = useLingWuThread();
@@ -104,13 +110,17 @@ function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <View style={{ gap: 18 }}>
-      <Button small icon={ArrowLeft} onPress={onBack} style={{ alignSelf: "flex-start" }}>
-        {t("app.backToAccount")}
-      </Button>
-      <View style={{ gap: 5 }}>
-        <Text style={[s.title, { fontSize: 20 }]}>{t("threads.archivedPageTitle")}</Text>
-        <Text style={s.muted}>{t("threads.archivedPageSubtitle")}</Text>
-      </View>
+      {!embedded && (
+        <Button small icon={ArrowLeft} onPress={onBack} style={{ alignSelf: "flex-start" }}>
+          {t("app.backToAccount")}
+        </Button>
+      )}
+      {!embedded && (
+        <View style={{ gap: 5 }}>
+          <Text style={[s.title, { fontSize: 20 }]}>{t("threads.archivedPageTitle")}</Text>
+          <Text style={s.muted}>{t("threads.archivedPageSubtitle")}</Text>
+        </View>
+      )}
       <View
         style={[
           s.row,
@@ -253,9 +263,7 @@ function ArchivedThreadsScreen({ onBack }: { onBack: () => void }) {
  */
 export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
   const { t } = useTranslation();
-  const { api, open, workspace } = useWorkspace();
-  const { enabled: richThreads } = useLingWuThread();
-  const [view, setView] = useState<"overview" | "archived">("overview");
+  const { api } = useWorkspace();
   const [profile, setProfile] = useState<AccountProfile>();
   const [error, setError] = useState("");
   const load = useCallback(async () => {
@@ -283,7 +291,6 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
         <Button onPress={() => void load()}>{t("common.tryAgain")}</Button>
       </View>
     );
-  if (view === "archived") return <ArchivedThreadsScreen onBack={() => setView("overview")} />;
   const nickname = profile.displayName || t("app.profileUnset");
   const email = profile.email || t("app.profileUnset");
   // 简介：来自 user_profiles.bio，未填写时显示占位文案。
@@ -351,35 +358,6 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
           />
         </Card>
       </View>
-      <View style={{ gap: 10 }}>
-        <Text style={s.heading}>{t("app.profileModelHeading")}</Text>
-        <Card style={{ paddingVertical: 4 }}>
-          <LinkRow
-            icon={Cpu}
-            title={t("modelSettings.title")}
-            detail={
-              workspace.runtime.model
-                ? (workspace.runtime.modelLabels?.[workspace.runtime.model] ??
-                  workspace.runtime.model.split("/").slice(1).join("/"))
-                : t("modelSettings.notConfigured")
-            }
-            onPress={() => open({ type: "model-settings" })}
-          />
-        </Card>
-      </View>
-      {richThreads && (
-        <View style={{ gap: 10 }}>
-          <Text style={s.heading}>{t("app.conversationManagement")}</Text>
-          <Card style={{ paddingVertical: 4 }}>
-            <LinkRow
-              icon={Archive}
-              title={t("app.archivedConversations")}
-              detail={t("app.archivedConversationsDetail")}
-              onPress={() => setView("archived")}
-            />
-          </Card>
-        </View>
-      )}
       <View style={{ gap: 10 }}>
         <Button danger icon={LogOut} onPress={onSignOut}>
           {t("app.signOutLabel")}

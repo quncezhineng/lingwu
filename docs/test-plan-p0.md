@@ -8,12 +8,12 @@
 
 ### 1.1 In Scope
 
-| 需求 | 功能 | 优先级 |
-|------|------|--------|
-| R1 | 每日市场简报 | P0 |
-| R2 | 观察列表 | P0 |
-| R3 | 标的动态推送 | P0 |
-| R4 | 深度研究任务 | P0 |
+| 需求 | 功能         | 优先级 |
+| ---- | ------------ | ------ |
+| R1   | 每日市场简报 | P0     |
+| R2   | 观察列表     | P0     |
+| R3   | 标的动态推送 | P0     |
+| R4   | 深度研究任务 | P0     |
 
 ### 1.2 Out of Scope
 
@@ -60,6 +60,7 @@
 ### 3.1 R1: 每日市场简报
 
 #### TC-R1-001 简报在用户打开应用前已生成
+
 - **Source**: PRD R1 验收标准
 - **Requirement**: 简报在用户首次打开应用时已生成（≤ 用户所在时区 08:00）
 - **Priority**: P0
@@ -89,6 +90,7 @@
   - 需要 Mock 时间或使用测试环境调整系统时间
 
 #### TC-R1-002 简报要点数量 3-5 条
+
 - **Source**: PRD R1 验收标准
 - **Requirement**: 要点数量 3-5 条，每条 ≤ 50 字
 - **Priority**: P0
@@ -114,6 +116,7 @@
   - 需要验证 AI 生成的内容是否符合字数限制
 
 #### TC-R1-003 追问后 Agent 能基于简报内容继续展开分析
+
 - **Source**: PRD R1 验收标准
 - **Requirement**: 追问后 Agent 能基于简报内容继续展开分析
 - **Priority**: P0
@@ -140,6 +143,7 @@
   - 需要验证上下文传递是否正确
 
 #### TC-R1-004 生成失败时有降级提示
+
 - **Source**: PRD R1 验收标准
 - **Requirement**: 生成失败时有降级提示（如"今日简报生成失败，请手动刷新"）
 - **Priority**: P1
@@ -165,6 +169,7 @@
   - 需要 Mock 数据源故障场景
 
 #### TC-R1-005 生成失败时保留上次简报
+
 - **Source**: PRD 场景推导
 - **Requirement**: 当今日简报生成失败时，应保留并展示上次成功生成的简报
 - **Priority**: P1
@@ -190,6 +195,7 @@
   - 需要验证简报缓存策略
 
 #### TC-R1-006 用户无观察列表时的简报内容
+
 - **Source**: PRD 场景推导
 - **Requirement**: 当用户没有观察列表时，简报应包含通用市场信息
 - **Priority**: P2
@@ -215,6 +221,7 @@
   - 需要验证简报生成逻辑对不同用户状态的适配
 
 #### TC-R1-007 多时区用户的简报生成
+
 - **Source**: PRD 场景推导
 - **Requirement**: 不同用户时区的简报应在各自时区 08:00 前生成
 - **Priority**: P2
@@ -245,6 +252,7 @@
 ### 3.2 R2: 观察列表
 
 #### TC-R2-001 创建观察列表
+
 - **Source**: PRD R2 验收标准
 - **Requirement**: 列表创建操作即时生效
 - **Priority**: P0
@@ -272,6 +280,7 @@
   - 无
 
 #### TC-R2-002 删除观察列表
+
 - **Source**: PRD R2 验收标准
 - **Requirement**: 列表删除操作即时生效
 - **Priority**: P0
@@ -299,6 +308,7 @@
   - 需要验证级联删除逻辑
 
 #### TC-R2-003 添加标的到观察列表
+
 - **Source**: PRD R2 验收标准
 - **Requirement**: 标的添加后 ≤ 1 分钟展示最新行情
 - **Priority**: P0
@@ -329,6 +339,7 @@
   - 需要验证行情刷新机制（≤ 1 分钟）
 
 #### TC-R2-004 移除标的从观察列表
+
 - **Source**: PRD 场景推导
 - **Requirement**: 用户可以从观察列表中移除标的
 - **Priority**: P0
@@ -356,6 +367,7 @@
   - 无
 
 #### TC-R2-005 行情数据 ≤ 1 分钟刷新
+
 - **Source**: PRD R2 验收标准
 - **Requirement**: 行情数据刷新间隔 ≤ 1 分钟
 - **Priority**: P0
@@ -384,6 +396,7 @@
   - 需要考虑网络延迟和 API 响应时间
 
 #### TC-R2-006 标的代码不存在时的提示
+
 - **Source**: PRD 场景推导
 - **Requirement**: 当用户输入的标的代码不存在时，应给出明确提示
 - **Priority**: P1
@@ -408,6 +421,7 @@
   - 需要验证标的搜索和匹配逻辑
 
 #### TC-R2-007 网络断开时的缓存展示
+
 - **Source**: PRD 场景推导
 - **Requirement**: 网络断开时应展示缓存的行情数据
 - **Priority**: P1
@@ -434,6 +448,7 @@
   - 需要验证前端缓存策略
 
 #### TC-R2-008 100+ 标的分页加载
+
 - **Source**: PRD R2 验收标准 + 验收标准 10.3
 - **Requirement**: 支持至少 100 个标的/列表，分页加载不影响性能
 - **Priority**: P2
@@ -462,6 +477,7 @@
   - 需要性能测试验证
 
 #### TC-R2-009 多市场标的支持（A 股/港股/美股）
+
 - **Source**: PRD R2 功能行为
 - **Requirement**: 支持 A 股、港股、美股、ETF、基金等多市场标的
 - **Priority**: P1
@@ -493,6 +509,7 @@
 ### 3.3 R3: 标的动态推送
 
 #### TC-R3-001 价格异动推送延迟 ≤ 15 分钟
+
 - **Source**: PRD R3 验收标准
 - **Requirement**: 价格异动推送延迟 ≤ 15 分钟
 - **Priority**: P0
@@ -523,6 +540,7 @@
   - 需要验证推送服务性能
 
 #### TC-R3-002 推送内容完整
+
 - **Source**: PRD R3 验收标准
 - **Requirement**: 推送内容包含标的名称、异动类型、简要描述、一键查看详情
 - **Priority**: P0
@@ -551,6 +569,7 @@
   - 无
 
 #### TC-R3-003 推送服务故障时数据不丢失
+
 - **Source**: PRD 验收标准 10.2
 - **Requirement**: 推送服务故障时，异动数据保留在观察列表中，不丢失
 - **Priority**: P1
@@ -579,6 +598,7 @@
   - 需要验证数据持久化逻辑
 
 #### TC-R3-004 24h 去重：同一异动不重复推送
+
 - **Source**: PRD R3 验收标准
 - **Requirement**: 推送去重：同一异动 24 小时内不重复推送
 - **Priority**: P1
@@ -606,6 +626,7 @@
   - 需要验证去重逻辑的时间窗口计算
 
 #### TC-R3-005 用户关闭推送后不再推送
+
 - **Source**: PRD R3 验收标准
 - **Requirement**: 用户可一键关闭某标的的推送
 - **Priority**: P1
@@ -633,6 +654,7 @@
   - 无
 
 #### TC-R3-006 推送准确率 ≥ 95%
+
 - **Source**: PRD R3 验收标准
 - **Requirement**: 推送准确率 ≥ 95%（误报率 ≤ 5%）
 - **Priority**: P1
@@ -643,10 +665,10 @@
   1. 准备 100 个测试场景（包含真实异动和非异动）
   2. 执行异动检测逻辑
   3. 统计推送结果：
-    - 真实异动且推送：TP
-    - 真实异动但未推送：FN
-    - 非异动但推送：FP
-    - 非异动且未推送：TN
+  - 真实异动且推送：TP
+  - 真实异动但未推送：FN
+  - 非异动但推送：FP
+  - 非异动且未推送：TN
   4. 计算准确率 = (TP + TN) / (TP + TN + FP + FN)
 - **Expected Result**:
   - 准确率 ≥ 95%
@@ -667,6 +689,7 @@
 ### 3.4 R4: 深度研究任务
 
 #### TC-R4-001 研究任务完成时间 ≤ 5 分钟
+
 - **Source**: PRD R4 验收标准
 - **Requirement**: 研究任务完成时间 ≤ 5 分钟
 - **Priority**: P0
@@ -696,6 +719,7 @@
   - 需要考虑 LLM 推理时间
 
 #### TC-R4-002 研报包含 6 个模块
+
 - **Source**: PRD R4 验收标准
 - **Requirement**: 研报包含公司概况、财务分析、近期新闻、同业对比、估值分析、风险提示 6 个模块
 - **Priority**: P0
@@ -705,12 +729,12 @@
 - **Test Steps**:
   1. 查看生成的研报
   2. 检查是否包含以下模块：
-    - 公司概况（主营业务、行业地位、竞争优势）
-    - 财务分析（近 3 年营收/利润/现金流、关键比率）
-    - 近期新闻和公告汇总
-    - 同业对比（3-5 家可比公司）
-    - 估值分析（PE/PB/DCF，合理估值区间）
-    - 风险提示
+  - 公司概况（主营业务、行业地位、竞争优势）
+  - 财务分析（近 3 年营收/利润/现金流、关键比率）
+  - 近期新闻和公告汇总
+  - 同业对比（3-5 家可比公司）
+  - 估值分析（PE/PB/DCF，合理估值区间）
+  - 风险提示
   3. 调用 `GET /api/research-reports/:id` 验证 API 响应
 - **Expected Result**:
   - 研报包含全部 6 个模块
@@ -726,6 +750,7 @@
   - 需要验证 AI 生成内容的质量
 
 #### TC-R4-003 研报可导出为 PDF
+
 - **Source**: PRD R4 验收标准
 - **Requirement**: 研报可导出为 PDF
 - **Priority**: P0
@@ -753,6 +778,7 @@
   - 需要验证 PDF 生成库
 
 #### TC-R4-004 用户可追问研报中的任何部分
+
 - **Source**: PRD R4 验收标准
 - **Requirement**: 用户可追问研报中的任何部分
 - **Priority**: P0
@@ -780,6 +806,7 @@
   - 依赖 LLM 上下文理解能力
 
 #### TC-R4-005 研究过程实时展示进度
+
 - **Source**: PRD R4 功能行为
 - **Requirement**: 研究过程实时展示进度（AG-UI 流式）
 - **Priority**: P0
@@ -790,12 +817,12 @@
   1. 在对话中输入"研究一下宁德时代"
   2. 观察研究进度展示
   3. 验证是否展示以下步骤：
-    - 拉取最新行情数据
-    - 搜索近期新闻和公告
-    - 解析最近财报
-    - 对比同业公司
-    - 生成估值分析
-    - 汇总为结构化研报
+  - 拉取最新行情数据
+  - 搜索近期新闻和公告
+  - 解析最近财报
+  - 对比同业公司
+  - 生成估值分析
+  - 汇总为结构化研报
   4. 验证每个步骤的状态（pending/running/succeeded）
 - **Expected Result**:
   - 实时展示研究步骤列表
@@ -811,6 +838,7 @@
   - 依赖 AG-UI 流式通信
 
 #### TC-R4-006 任务失败保留中间步骤
+
 - **Source**: PRD 验收标准 10.2
 - **Requirement**: 深度研究任务失败时，保留已完成的中间步骤，允许重试
 - **Priority**: P1
@@ -839,6 +867,7 @@
   - 需要验证任务状态管理逻辑
 
 #### TC-R4-007 部分数据源不可用时降级
+
 - **Source**: PRD 场景推导
 - **Requirement**: 当部分数据源不可用时，研报应降级生成（标注缺失数据）
 - **Priority**: P1
@@ -865,6 +894,7 @@
   - 需要验证降级策略
 
 #### TC-R4-008 标的代码歧义时确认交互
+
 - **Source**: PRD 验收标准 10.3
 - **Requirement**: 标的代码在多个市场存在时，Agent 询问用户确认
 - **Priority**: P1
@@ -890,6 +920,7 @@
   - 需要验证标的匹配逻辑
 
 #### TC-R4-009 数据来源在研报中明确标注
+
 - **Source**: PRD R4 验收标准
 - **Requirement**: 数据来源在研报中明确标注
 - **Priority**: P1
@@ -916,39 +947,39 @@
 
 ## 4. 可追溯性矩阵
 
-| TC-ID | Source | Requirement | Scenario | Priority | Evidence Type |
-|-------|--------|-------------|----------|----------|---------------|
-| TC-R1-001 | PRD R1 验收标准 | 简报在用户首次打开应用时已生成 | Happy Path | P0 | screenshot + API response + logs |
-| TC-R1-002 | PRD R1 验收标准 | 要点数量 3-5 条，每条 ≤ 50 字 | Happy Path | P0 | API response + screenshot |
-| TC-R1-003 | PRD R1 验收标准 | 追问后 Agent 能基于简报内容继续展开分析 | Happy Path | P0 | screenshot + conversation log |
-| TC-R1-004 | PRD R1 验收标准 | 生成失败时有降级提示 | Error Path | P1 | screenshot + logs |
-| TC-R1-005 | PRD 场景推导 | 生成失败时保留上次简报 | Error Path | P1 | screenshot + API response |
-| TC-R1-006 | PRD 场景推导 | 用户无观察列表时的简报内容 | Edge Case | P2 | API response + screenshot |
-| TC-R1-007 | PRD 场景推导 | 多时区用户的简报生成 | Edge Case | P2 | API response + timestamps |
-| TC-R2-001 | PRD R2 验收标准 | 列表创建操作即时生效 | Happy Path | P0 | screenshot + API response |
-| TC-R2-002 | PRD R2 验收标准 | 列表删除操作即时生效 | Happy Path | P0 | screenshot + API response |
-| TC-R2-003 | PRD R2 验收标准 | 标的添加后 ≤ 1 分钟展示最新行情 | Happy Path | P0 | screenshot + API response + timestamps |
-| TC-R2-004 | PRD 场景推导 | 移除标的从观察列表 | Happy Path | P0 | screenshot + API response |
-| TC-R2-005 | PRD R2 验收标准 | 行情数据 ≤ 1 分钟刷新 | Happy Path | P0 | screenshot + network logs |
-| TC-R2-006 | PRD 场景推导 | 标的代码不存在时的提示 | Error Path | P1 | screenshot |
-| TC-R2-007 | PRD 场景推导 | 网络断开时的缓存展示 | Error Path | P1 | screenshot + cache logs |
-| TC-R2-008 | PRD R2 验收标准 + 10.3 | 100+ 标的分页加载 | Edge Case | P2 | screenshot + performance logs |
-| TC-R2-009 | PRD R2 功能行为 | 多市场标的支持 | Happy Path | P1 | screenshot + API response |
-| TC-R3-001 | PRD R3 验收标准 | 价格异动推送延迟 ≤ 15 分钟 | Happy Path | P0 | screenshot + timestamps + logs |
-| TC-R3-002 | PRD R3 验收标准 | 推送内容完整 | Happy Path | P0 | screenshot |
-| TC-R3-003 | PRD 验收标准 10.2 | 推送服务故障时数据不丢失 | Error Path | P1 | screenshot + logs + DB records |
-| TC-R3-004 | PRD R3 验收标准 | 24h 去重 | Happy Path | P1 | logs + dedup verification |
-| TC-R3-005 | PRD R3 验收标准 | 用户关闭推送后不再推送 | Happy Path | P1 | screenshot + API response + logs |
-| TC-R3-006 | PRD R3 验收标准 | 推送准确率 ≥ 95% | Happy Path | P1 | test scenarios + statistics |
-| TC-R4-001 | PRD R4 验收标准 | 研究任务完成时间 ≤ 5 分钟 | Happy Path | P0 | screenshot + timestamps |
-| TC-R4-002 | PRD R4 验收标准 | 研报包含 6 个模块 | Happy Path | P0 | screenshot + API response |
-| TC-R4-003 | PRD R4 验收标准 | 研报可导出为 PDF | Happy Path | P0 | PDF file + screenshot |
-| TC-R4-004 | PRD R4 验收标准 | 用户可追问研报中的任何部分 | Happy Path | P0 | screenshot + conversation log |
-| TC-R4-005 | PRD R4 功能行为 | 研究过程实时展示进度 | Happy Path | P0 | screenshot + AG-UI logs |
-| TC-R4-006 | PRD 验收标准 10.2 | 任务失败保留中间步骤 | Error Path | P1 | screenshot + logs |
-| TC-R4-007 | PRD 场景推导 | 部分数据源不可用时降级 | Error Path | P1 | screenshot + logs |
-| TC-R4-008 | PRD 验收标准 10.3 | 标的代码歧义时确认交互 | Edge Case | P1 | screenshot |
-| TC-R4-009 | PRD R4 验收标准 | 数据来源在研报中明确标注 | Happy Path | P1 | screenshot |
+| TC-ID     | Source                 | Requirement                             | Scenario   | Priority | Evidence Type                          |
+| --------- | ---------------------- | --------------------------------------- | ---------- | -------- | -------------------------------------- |
+| TC-R1-001 | PRD R1 验收标准        | 简报在用户首次打开应用时已生成          | Happy Path | P0       | screenshot + API response + logs       |
+| TC-R1-002 | PRD R1 验收标准        | 要点数量 3-5 条，每条 ≤ 50 字           | Happy Path | P0       | API response + screenshot              |
+| TC-R1-003 | PRD R1 验收标准        | 追问后 Agent 能基于简报内容继续展开分析 | Happy Path | P0       | screenshot + conversation log          |
+| TC-R1-004 | PRD R1 验收标准        | 生成失败时有降级提示                    | Error Path | P1       | screenshot + logs                      |
+| TC-R1-005 | PRD 场景推导           | 生成失败时保留上次简报                  | Error Path | P1       | screenshot + API response              |
+| TC-R1-006 | PRD 场景推导           | 用户无观察列表时的简报内容              | Edge Case  | P2       | API response + screenshot              |
+| TC-R1-007 | PRD 场景推导           | 多时区用户的简报生成                    | Edge Case  | P2       | API response + timestamps              |
+| TC-R2-001 | PRD R2 验收标准        | 列表创建操作即时生效                    | Happy Path | P0       | screenshot + API response              |
+| TC-R2-002 | PRD R2 验收标准        | 列表删除操作即时生效                    | Happy Path | P0       | screenshot + API response              |
+| TC-R2-003 | PRD R2 验收标准        | 标的添加后 ≤ 1 分钟展示最新行情         | Happy Path | P0       | screenshot + API response + timestamps |
+| TC-R2-004 | PRD 场景推导           | 移除标的从观察列表                      | Happy Path | P0       | screenshot + API response              |
+| TC-R2-005 | PRD R2 验收标准        | 行情数据 ≤ 1 分钟刷新                   | Happy Path | P0       | screenshot + network logs              |
+| TC-R2-006 | PRD 场景推导           | 标的代码不存在时的提示                  | Error Path | P1       | screenshot                             |
+| TC-R2-007 | PRD 场景推导           | 网络断开时的缓存展示                    | Error Path | P1       | screenshot + cache logs                |
+| TC-R2-008 | PRD R2 验收标准 + 10.3 | 100+ 标的分页加载                       | Edge Case  | P2       | screenshot + performance logs          |
+| TC-R2-009 | PRD R2 功能行为        | 多市场标的支持                          | Happy Path | P1       | screenshot + API response              |
+| TC-R3-001 | PRD R3 验收标准        | 价格异动推送延迟 ≤ 15 分钟              | Happy Path | P0       | screenshot + timestamps + logs         |
+| TC-R3-002 | PRD R3 验收标准        | 推送内容完整                            | Happy Path | P0       | screenshot                             |
+| TC-R3-003 | PRD 验收标准 10.2      | 推送服务故障时数据不丢失                | Error Path | P1       | screenshot + logs + DB records         |
+| TC-R3-004 | PRD R3 验收标准        | 24h 去重                                | Happy Path | P1       | logs + dedup verification              |
+| TC-R3-005 | PRD R3 验收标准        | 用户关闭推送后不再推送                  | Happy Path | P1       | screenshot + API response + logs       |
+| TC-R3-006 | PRD R3 验收标准        | 推送准确率 ≥ 95%                        | Happy Path | P1       | test scenarios + statistics            |
+| TC-R4-001 | PRD R4 验收标准        | 研究任务完成时间 ≤ 5 分钟               | Happy Path | P0       | screenshot + timestamps                |
+| TC-R4-002 | PRD R4 验收标准        | 研报包含 6 个模块                       | Happy Path | P0       | screenshot + API response              |
+| TC-R4-003 | PRD R4 验收标准        | 研报可导出为 PDF                        | Happy Path | P0       | PDF file + screenshot                  |
+| TC-R4-004 | PRD R4 验收标准        | 用户可追问研报中的任何部分              | Happy Path | P0       | screenshot + conversation log          |
+| TC-R4-005 | PRD R4 功能行为        | 研究过程实时展示进度                    | Happy Path | P0       | screenshot + AG-UI logs                |
+| TC-R4-006 | PRD 验收标准 10.2      | 任务失败保留中间步骤                    | Error Path | P1       | screenshot + logs                      |
+| TC-R4-007 | PRD 场景推导           | 部分数据源不可用时降级                  | Error Path | P1       | screenshot + logs                      |
+| TC-R4-008 | PRD 验收标准 10.3      | 标的代码歧义时确认交互                  | Edge Case  | P1       | screenshot                             |
+| TC-R4-009 | PRD R4 验收标准        | 数据来源在研报中明确标注                | Happy Path | P1       | screenshot                             |
 
 ---
 
@@ -956,33 +987,33 @@
 
 ### 5.1 可自动化测试（约 60%）
 
-| TC-ID | 自动化类型 | 工具 | 说明 |
-|-------|-----------|------|------|
-| TC-R1-001 | API 测试 | Playwright / Cypress | 定时任务触发 + API 验证 |
-| TC-R1-002 | API 测试 | Jest / Vitest | 数据结构验证 |
-| TC-R2-001 | API 测试 | Playwright / Cypress | CRUD 操作 |
-| TC-R2-002 | API 测试 | Playwright / Cypress | CRUD 操作 |
-| TC-R2-003 | API 测试 | Playwright / Cypress | 添加标的 + 行情验证 |
-| TC-R2-004 | API 测试 | Playwright / Cypress | 移除标的 |
-| TC-R2-005 | API 测试 | Playwright / Cypress | 定时刷新验证 |
-| TC-R2-008 | 性能测试 | Lighthouse / k6 | 分页加载性能 |
-| TC-R3-001 | API 测试 | 自定义脚本 | 推送延迟测量 |
-| TC-R3-004 | API 测试 | 自定义脚本 | 去重逻辑验证 |
-| TC-R4-001 | API 测试 | 自定义脚本 | 任务耗时测量 |
-| TC-R4-002 | API 测试 | Jest / Vitest | 数据结构验证 |
+| TC-ID     | 自动化类型 | 工具                 | 说明                    |
+| --------- | ---------- | -------------------- | ----------------------- |
+| TC-R1-001 | API 测试   | Playwright / Cypress | 定时任务触发 + API 验证 |
+| TC-R1-002 | API 测试   | Jest / Vitest        | 数据结构验证            |
+| TC-R2-001 | API 测试   | Playwright / Cypress | CRUD 操作               |
+| TC-R2-002 | API 测试   | Playwright / Cypress | CRUD 操作               |
+| TC-R2-003 | API 测试   | Playwright / Cypress | 添加标的 + 行情验证     |
+| TC-R2-004 | API 测试   | Playwright / Cypress | 移除标的                |
+| TC-R2-005 | API 测试   | Playwright / Cypress | 定时刷新验证            |
+| TC-R2-008 | 性能测试   | Lighthouse / k6      | 分页加载性能            |
+| TC-R3-001 | API 测试   | 自定义脚本           | 推送延迟测量            |
+| TC-R3-004 | API 测试   | 自定义脚本           | 去重逻辑验证            |
+| TC-R4-001 | API 测试   | 自定义脚本           | 任务耗时测量            |
+| TC-R4-002 | API 测试   | Jest / Vitest        | 数据结构验证            |
 
 ### 5.2 需手动测试（约 40%）
 
-| TC-ID | 原因 | 说明 |
-|-------|------|------|
-| TC-R1-003 | AI 内容质量 | 需要人工评估 Agent 回复质量 |
-| TC-R1-006 | AI 内容质量 | 需要人工评估简报内容 |
-| TC-R3-002 | 推送内容质量 | 需要人工评估推送文案 |
-| TC-R3-006 | 大量测试数据 | 需要 100+ 测试场景 |
-| TC-R4-003 | PDF 质量 | 需要人工评估 PDF 格式和内容 |
-| TC-R4-004 | AI 内容质量 | 需要人工评估追问回复质量 |
-| TC-R4-007 | 降级策略 | 需要人工评估降级内容 |
-| TC-R4-009 | 数据来源标注 | 需要人工验证数据来源准确性 |
+| TC-ID     | 原因         | 说明                        |
+| --------- | ------------ | --------------------------- |
+| TC-R1-003 | AI 内容质量  | 需要人工评估 Agent 回复质量 |
+| TC-R1-006 | AI 内容质量  | 需要人工评估简报内容        |
+| TC-R3-002 | 推送内容质量 | 需要人工评估推送文案        |
+| TC-R3-006 | 大量测试数据 | 需要 100+ 测试场景          |
+| TC-R4-003 | PDF 质量     | 需要人工评估 PDF 格式和内容 |
+| TC-R4-004 | AI 内容质量  | 需要人工评估追问回复质量    |
+| TC-R4-007 | 降级策略     | 需要人工评估降级内容        |
+| TC-R4-009 | 数据来源标注 | 需要人工验证数据来源准确性  |
 
 ### 5.3 自动化建议
 
@@ -998,16 +1029,19 @@
 ### 6.1 执行顺序
 
 **Week 2（后端 API 就绪后）：**
+
 1. API 测试（R1-R4 的 P0 用例）
 2. 数据模型验证
 3. 耐久任务执行测试
 
 **Week 3（前端实现就绪后）：**
+
 1. Web E2E 测试（R1-R4 的 P0 用例）
 2. UI 交互测试
 3. 跨浏览器测试（Chrome/Safari/Firefox）
 
 **Week 4（集成测试）：**
+
 1. 端到端集成测试
 2. 性能测试
 3. 手动测试（AI 内容质量评估）
@@ -1032,12 +1066,12 @@
 
 ### 7.1 风险
 
-| 风险 | 影响 | 缓解措施 |
-|------|------|---------|
-| 行情数据源不稳定 | 高 | 使用 Mock 数据进行测试，真实 API 作为补充 |
-| AI 生成内容质量不稳定 | 中 | 建立评分标准，定期人工抽检 |
-| 耐久任务执行时间不确定 | 中 | 调整时间配置，使用测试环境 |
-| 推送服务性能问题 | 中 | 使用 Mock 推送服务进行压力测试 |
+| 风险                   | 影响 | 缓解措施                                  |
+| ---------------------- | ---- | ----------------------------------------- |
+| 行情数据源不稳定       | 高   | 使用 Mock 数据进行测试，真实 API 作为补充 |
+| AI 生成内容质量不稳定  | 中   | 建立评分标准，定期人工抽检                |
+| 耐久任务执行时间不确定 | 中   | 调整时间配置，使用测试环境                |
+| 推送服务性能问题       | 中   | 使用 Mock 推送服务进行压力测试            |
 
 ### 7.2 依赖
 

@@ -27,6 +27,7 @@ import {
   Clock3,
   FolderOpen,
   Heart,
+  Lightbulb,
   ListChecks,
   Plus,
   ShieldCheck,
@@ -702,6 +703,26 @@ export function WorkbenchScreen() {
                   : composerRef.current?.focus()
               }
             />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("app.navIdeas")}
+              onPress={() => navigate("ideas")}
+              style={({ pressed }) => [
+                s.row,
+                {
+                  alignSelf: "flex-end",
+                  gap: 5,
+                  minHeight: 34,
+                  paddingHorizontal: 4,
+                  borderRadius: radius.control,
+                  backgroundColor: pressed ? colors.overlay1 : "transparent",
+                },
+              ]}
+            >
+              <Lightbulb size={13} strokeWidth={1.7} color={colors.muted} />
+              <Text style={{ fontSize: 11, color: colors.muted }}>{t("app.navIdeas")}</Text>
+              <ChevronRight size={12} strokeWidth={1.7} color={colors.faint} />
+            </Pressable>
           </View>
 
           <View>

@@ -148,14 +148,14 @@ For charts, use `onload` callback pattern to handle script load ordering:
 ></script>
 <script>
   function initChart() {
-    const slider = document.getElementById('param');
-    const out = document.getElementById('param-out');
+    const slider = document.getElementById("param");
+    const out = document.getElementById("param-out");
     let chart = null;
 
     function update() {
       const val = parseFloat(slider.value);
       out.textContent = val;
-      document.getElementById('stat1').textContent = val.toFixed(1);
+      document.getElementById("stat1").textContent = val.toFixed(1);
 
       const labels = [],
         data = [];
@@ -165,11 +165,11 @@ For charts, use `onload` callback pattern to handle script load ordering:
       }
 
       if (chart) chart.destroy();
-      chart = new Chart(document.getElementById('myChart'), {
-        type: 'line',
+      chart = new Chart(document.getElementById("myChart"), {
+        type: "line",
         data: {
           labels,
-          datasets: [{ data, borderColor: '#7F77DD', borderWidth: 2, pointRadius: 0, fill: false }],
+          datasets: [{ data, borderColor: "#7F77DD", borderWidth: 2, pointRadius: 0, fill: false }],
         },
         options: {
           responsive: true,
@@ -180,7 +180,7 @@ For charts, use `onload` callback pattern to handle script load ordering:
       });
     }
 
-    slider.addEventListener('input', update);
+    slider.addEventListener("input", update);
     update();
   }
   if (window.Chart) initChart();

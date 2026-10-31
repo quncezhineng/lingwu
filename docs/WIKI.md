@@ -16,15 +16,15 @@ LingWu 是一个个人智能体（personal agent）应用，核心特点在于�
 
 **技术栈**：
 
-| 层 | 技术 |
-| --- | --- |
-| 客户端 | Expo / React Native（iOS、Android、Web 三端） |
-| UI 框架 | CopilotKit React Native（headless hooks）+ AG-UI 流式事件 |
-| 服务端 | Hono + CopilotKit Runtime |
-| 持久化 | PGlite（嵌入式 Postgres）或 PostgreSQL |
-| 浏览器 | Playwright + Chromium（持久化 profile） |
-| 容器 | Docker（可选的 Linux 计算机） |
-| 类型校验 | Zod |
+| 层       | 技术                                                      |
+| -------- | --------------------------------------------------------- |
+| 客户端   | Expo / React Native（iOS、Android、Web 三端）             |
+| UI 框架  | CopilotKit React Native（headless hooks）+ AG-UI 流式事件 |
+| 服务端   | Hono + CopilotKit Runtime                                 |
+| 持久化   | PGlite（嵌入式 Postgres）或 PostgreSQL                    |
+| 浏览器   | Playwright + Chromium（持久化 profile）                   |
+| 容器     | Docker（可选的 Linux 计算机）                             |
+| 类型校验 | Zod                                                       |
 
 **前置要求**：Node 24 LTS、pnpm 11.19.0、CopilotKit Intelligence 项目密钥。
 
@@ -32,18 +32,18 @@ LingWu 是一个个人智能体（personal agent）应用，核心特点在于�
 
 ## 2. 功能清单
 
-| 功能面 | 说明 |
-| --- | --- |
-| **Chat（对话）** | CopilotKit headless 对话，流式 AG-UI 事件；邮箱搜索与阅读；单按钮发送/停止；可见的后续任务队列；草稿保留；任务委派；内联邮件/浏览器/PDF/计划/财务卡片。 |
-| **Agent 计算机** | 持久化浏览器 profile 与接管控制台；可选隔离 Linux 终端；命令回执；可编辑工作区文件；PDF 传输。 |
-| **Activity（活动）** | 持久化任务计划、进度、输入请求、暂停/恢复/取消/重试、审批、保存的回执。SQL 租约可恢复被中断的工作。 |
-| **Ideas（想法）** | 带来源证据的建议；可编辑、采纳或忽略；已发送的回复和已完成的工作会被排除。 |
-| **Goals & Tracking** | 目标与里程碑；周期性公共页面检查（内容变化、文本可用性、USD 价格阈值），去重告警与失败退避。 |
-| **Documents（文档）** | 邮件附件 → PDF → 表单值 → 填写副本 → 审核回复 → 回执。原生/网页 PDF 查看、翻页、缩放、字段支持与分享。 |
-| **Finance（财务）** | 导入交易 CSV，生成带分类、交易明细和储蓄目标动作的消费汇总。 |
-| **Gmail & Calendar** | Google OAuth 适配器、完整邮件线程、草稿/附件、日历发现、受审核的事件增删改。 |
-| **个人上下文** | 可编辑的姓名、语气、头像与记忆；后台更新偏好与持久化应用内通知。 |
-| **Rich Threads** | CopilotKit Intelligence 持久化（全模式），稳定主对话、侧聊、重命名、归档、恢复与回放。 |
+| 功能面                | 说明                                                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Chat（对话）**      | CopilotKit headless 对话，流式 AG-UI 事件；邮箱搜索与阅读；单按钮发送/停止；可见的后续任务队列；草稿保留；任务委派；内联邮件/浏览器/PDF/计划/财务卡片。 |
+| **Agent 计算机**      | 持久化浏览器 profile 与接管控制台；可选隔离 Linux 终端；命令回执；可编辑工作区文件；PDF 传输。                                                          |
+| **Activity（活动）**  | 持久化任务计划、进度、输入请求、暂停/恢复/取消/重试、审批、保存的回执。SQL 租约可恢复被中断的工作。                                                     |
+| **Ideas（想法）**     | 带来源证据的建议；可编辑、采纳或忽略；已发送的回复和已完成的工作会被排除。                                                                              |
+| **Goals & Tracking**  | 目标与里程碑；周期性公共页面检查（内容变化、文本可用性、USD 价格阈值），去重告警与失败退避。                                                            |
+| **Documents（文档）** | 邮件附件 → PDF → 表单值 → 填写副本 → 审核回复 → 回执。原生/网页 PDF 查看、翻页、缩放、字段支持与分享。                                                  |
+| **Finance（财务）**   | 导入交易 CSV，生成带分类、交易明细和储蓄目标动作的消费汇总。                                                                                            |
+| **Gmail & Calendar**  | Google OAuth 适配器、完整邮件线程、草稿/附件、日历发现、受审核的事件增删改。                                                                            |
+| **个人上下文**        | 可编辑的姓名、语气、头像与记忆；后台更新偏好与持久化应用内通知。                                                                                        |
+| **Rich Threads**      | CopilotKit Intelligence 持久化（全模式），稳定主对话、侧聊、重命名、归档、恢复与回放。                                                                  |
 
 > 健康/银行/社交连接器、设备推送、语音、生成式可执行工具、自动预约/支付等功能仍在 [路线图](ROADMAP.md) 中。
 
@@ -71,16 +71,16 @@ flowchart TD
 
 ### 目录结构
 
-| 目录 | 用途 |
-| --- | --- |
-| `apps/mobile` | 共享的 iOS、Android、Web UI，使用 CopilotKit headless hooks。 |
-| `apps/server` | API、CopilotKit Runtime、身份边界、任务引擎、审核、文件与持久化。 |
-| `apps/worker` | Token 保护的 Playwright 浏览器服务，带持久化 profile。 |
-| `apps/computer` | 非 root Linux 镜像、受限文件系统助手与真实容器验证。 |
-| `packages/domain` | 共享类型与请求校验。 |
-| `packages/integrations` | Google 与浏览器协议适配器。 |
-| `packages/backends` | 可选 OpenBot HTTP 适配器及其身份边界。 |
-| `tests` | 工作流、运行时、持久化、provider 契约与授权测试。 |
+| 目录                    | 用途                                                              |
+| ----------------------- | ----------------------------------------------------------------- |
+| `apps/mobile`           | 共享的 iOS、Android、Web UI，使用 CopilotKit headless hooks。     |
+| `apps/server`           | API、CopilotKit Runtime、身份边界、任务引擎、审核、文件与持久化。 |
+| `apps/worker`           | Token 保护的 Playwright 浏览器服务，带持久化 profile。            |
+| `apps/computer`         | 非 root Linux 镜像、受限文件系统助手与真实容器验证。              |
+| `packages/domain`       | 共享类型与请求校验。                                              |
+| `packages/integrations` | Google 与浏览器协议适配器。                                       |
+| `packages/backends`     | 可选 OpenBot HTTP 适配器及其身份边界。                            |
+| `tests`                 | 工作流、运行时、持久化、provider 契约与授权测试。                 |
 
 ---
 
@@ -120,20 +120,20 @@ pnpm dev:web
 
 关键配置项（完整注释见 `.env.example`）：
 
-| 变量 | 说明 |
-| --- | --- |
-| `CPK_INTELLIGENCE_API_KEY` | CopilotKit Intelligence 服务端项目密钥（必填，全模式） |
-| `CPK_TELEMETRY_ID` | 运行时遥测身份标识 |
-| `MODEL` | 默认模型（如 `openai/gpt-5`） |
-| `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MOONSHOT_API_KEY` | 各 provider 密钥 |
-| `AGENT_BACKEND` | `model` 或示例模式 |
-| `WORKSPACE_MODE` | `live`（生产）或示例模式 |
-| `TOKEN_ENCRYPTION_KEY` | 32 随机字节的 base64 编码 |
-| `LINGWU_ACCESS_KEY` | 单租户共享访问密钥（未设 Supabase 时使用） |
-| `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` | 多用户工作区（可选） |
-| `BROWSER_WORKER_URL` / `WORKER_TOKEN` | 浏览器执行器地址与令牌 |
-| `COMPUTER_ENABLED` | 启用 Docker Linux 计算机 |
-| `WEB_SEARCH_ENABLED` | 是否启用公共网页搜索（默认 true） |
+| 变量                                                                | 说明                                                   |
+| ------------------------------------------------------------------- | ------------------------------------------------------ |
+| `CPK_INTELLIGENCE_API_KEY`                                          | CopilotKit Intelligence 服务端项目密钥（必填，全模式） |
+| `CPK_TELEMETRY_ID`                                                  | 运行时遥测身份标识                                     |
+| `MODEL`                                                             | 默认模型（如 `openai/gpt-5`）                          |
+| `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `MOONSHOT_API_KEY`          | 各 provider 密钥                                       |
+| `AGENT_BACKEND`                                                     | `model` 或示例模式                                     |
+| `WORKSPACE_MODE`                                                    | `live`（生产）或示例模式                               |
+| `TOKEN_ENCRYPTION_KEY`                                              | 32 随机字节的 base64 编码                              |
+| `LINGWU_ACCESS_KEY`                                                 | 单租户共享访问密钥（未设 Supabase 时使用）             |
+| `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` | 多用户工作区（可选）                                   |
+| `BROWSER_WORKER_URL` / `WORKER_TOKEN`                               | 浏览器执行器地址与令牌                                 |
+| `COMPUTER_ENABLED`                                                  | 启用 Docker Linux 计算机                               |
+| `WEB_SEARCH_ENABLED`                                                | 是否启用公共网页搜索（默认 true）                      |
 
 ---
 
@@ -143,11 +143,11 @@ pnpm dev:web
 
 [render.yaml](render.yaml) 部署三个服务：
 
-| 服务 | 计划 | 运行内容 |
-| --- | --- | --- |
-| `lingwu-api` | Standard，1 GB 磁盘 `/var/data` | Hono API 与进程内任务执行器 |
-| `lingwu-web` | 静态站点 | Expo Web 导出 |
-| `lingwu-browser` | 私有服务，Standard，2 GB 磁盘 `/data`（持久化 Chromium profile 与已下载 PDF，1 GB 会写满导致启动崩溃，见下方「部署」章节） | Playwright 与 Chromium |
+| 服务             | 计划                                                                                                                       | 运行内容                    |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `lingwu-api`     | Standard，1 GB 磁盘 `/var/data`                                                                                            | Hono API 与进程内任务执行器 |
+| `lingwu-web`     | 静态站点                                                                                                                   | Expo Web 导出               |
+| `lingwu-browser` | 私有服务，Standard，2 GB 磁盘 `/data`（持久化 Chromium profile 与已下载 PDF，1 GB 会写满导致启动崩溃，见下方「部署」章节） | Playwright 与 Chromium      |
 
 **注意**：Standard 是最小可用计划（512 MB 会因 PGlite 加载嵌入式 Postgres 而内存不足）。磁盘保存数据库、PDF 与签名密钥，重新部署不挂载会清空数据。**必须启用 live 模式**（`WORKSPACE_MODE=live`）。
 
@@ -212,20 +212,20 @@ LingWu 的原生客户端与个人智能体工作流独立于 OpenBot。已禁�
 
 ## 10. 文档索引
 
-| 文档 | 内容 |
-| --- | --- |
-| [README.md](README.md) | 项目主入口 |
-| [FEATURES.md](FEATURES.md) | 功能清单与扩展计划 |
-| [COMPUTER.md](COMPUTER.md) | Linux 计算机、终端与工作区文件 |
-| [RICH-THREADS.md](RICH-THREADS.md) | CopilotKit Rich Threads 配置 |
-| [conversation-streaming.md](conversation-streaming.md) | 对话流式协议与可靠性 |
-| [EXPERIENCE.md](EXPERIENCE.md) | 交互设计与对话行为 |
-| [OPENBOT-INTEGRATION.md](OPENBOT-INTEGRATION.md) | OpenBot 集成契约 |
-| [I18N.md](I18N.md) | 本地化与语言切换 |
-| [TELEMETRY.md](TELEMETRY.md) | 遥测配置与退出 |
-| [VERIFICATION.md](VERIFICATION.md) | 验证结果与限制 |
-| [DEMO.md](DEMO.md) | 演示复现步骤 |
-| [timeline.md](timeline.md) | 项目时间线 |
+| 文档                                                   | 内容                           |
+| ------------------------------------------------------ | ------------------------------ |
+| [README.md](README.md)                                 | 项目主入口                     |
+| [FEATURES.md](FEATURES.md)                             | 功能清单与扩展计划             |
+| [COMPUTER.md](COMPUTER.md)                             | Linux 计算机、终端与工作区文件 |
+| [RICH-THREADS.md](RICH-THREADS.md)                     | CopilotKit Rich Threads 配置   |
+| [conversation-streaming.md](conversation-streaming.md) | 对话流式协议与可靠性           |
+| [EXPERIENCE.md](EXPERIENCE.md)                         | 交互设计与对话行为             |
+| [OPENBOT-INTEGRATION.md](OPENBOT-INTEGRATION.md)       | OpenBot 集成契约               |
+| [I18N.md](I18N.md)                                     | 本地化与语言切换               |
+| [TELEMETRY.md](TELEMETRY.md)                           | 遥测配置与退出                 |
+| [VERIFICATION.md](VERIFICATION.md)                     | 验证结果与限制                 |
+| [DEMO.md](DEMO.md)                                     | 演示复现步骤                   |
+| [timeline.md](timeline.md)                             | 项目时间线                     |
 
 ---
 

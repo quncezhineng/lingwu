@@ -32,8 +32,7 @@ analysis was run instead on a five-file, read-only copy of the upstream conversa
   `ev_b1120ba492cbf77e5c433b7b8163a7a20a8b0f95ff81673a290baf6f84010cd0`.
 
 REA independently located the upstream `WebSocket` request in `api.ts` at line 492, the
-`fetch` calls at lines 137 and 318, and the non-retryable close codes 4401/4404 at lines 463 and
-465. These are static observations: REA parses inert source and does not prove runtime execution.
+`fetch` calls at lines 137 and 318, and the non-retryable close codes 4401/4404 at lines 463 and 465. These are static observations: REA parses inert source and does not prove runtime execution.
 The details below combine this evidence with direct read-only source inspection. No file in the
 upstream project was modified.
 
@@ -287,17 +286,17 @@ live region rather than announcing every token.
 
 ## Failure handling summary
 
-| Failure | Behavior |
-| --- | --- |
-| Event sequence hole | Immediately reconnect from last applied id; server replays suffix |
-| Network drop / half-open socket | Exponential backoff; 45 s watchdog; resume with `Last-Event-ID` |
-| Cursor outside retained window | `ready.reset`; clear drafts and rebuild from retained tail |
-| Auth expiry / missing thread | Stop retry loop and show the specific error |
-| SSE parser partial frame | Buffer until a complete frame; bounded at 2 MB |
-| Slow SSE consumer | Server closes instead of growing memory; client resumes from ledger |
-| Runtime `RUN_ERROR` | Finish drafts, show error, offer retry |
-| Persisted text differs from stream | Persisted text wins; integrity warning is shown |
-| Process restart | Recent ledger tail is replayed from `Store` |
+| Failure                            | Behavior                                                            |
+| ---------------------------------- | ------------------------------------------------------------------- |
+| Event sequence hole                | Immediately reconnect from last applied id; server replays suffix   |
+| Network drop / half-open socket    | Exponential backoff; 45 s watchdog; resume with `Last-Event-ID`     |
+| Cursor outside retained window     | `ready.reset`; clear drafts and rebuild from retained tail          |
+| Auth expiry / missing thread       | Stop retry loop and show the specific error                         |
+| SSE parser partial frame           | Buffer until a complete frame; bounded at 2 MB                      |
+| Slow SSE consumer                  | Server closes instead of growing memory; client resumes from ledger |
+| Runtime `RUN_ERROR`                | Finish drafts, show error, offer retry                              |
+| Persisted text differs from stream | Persisted text wins; integrity warning is shown                     |
+| Process restart                    | Recent ledger tail is replayed from `Store`                         |
 
 ## Verification
 

@@ -41,6 +41,7 @@ export type Detail =
   | { type: "computer" }
   | { type: "personality" }
   | { type: "settings" }
+  | { type: "archived" }
   | { type: "model-settings" }
   | { type: "menu" };
 export interface WorkspaceContextValue {

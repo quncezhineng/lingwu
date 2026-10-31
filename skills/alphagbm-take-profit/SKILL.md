@@ -16,7 +16,7 @@ description_zh: |
   量化一只股票适合长期持有还是需要分阶段止盈——采用创新的"过山车率"指标（入场后浮盈达到 +50% 又在退出前从峰值回落超过 50% 的概率）。对每只标的使用约 10 年日线历史数据运行 15 种退出策略，返回各策略的中位数。首次查询新标的约需 30 秒，全局缓存后后续查询即时返回。
   触发词："我应该长期持有 TQQQ 吗"、"NVDA 止盈策略"、"AAPL 适合持有吗"、"TSLA 过山车率"、"卖出策略 COIN"、"什么时候卖 NVDA"、"QQQ 止盈计划"、"我的股票退出策略"、"杠杆 ETF 持有分析"
 globs:
-  - 'mock-data/take-profit/**'
+  - "mock-data/take-profit/**"
 ---
 
 # AlphaGBM Take-Profit Strategy Lab

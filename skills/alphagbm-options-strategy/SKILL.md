@@ -14,7 +14,7 @@ description_zh: >
   基于你的市场观点（看涨、看跌、中性、波动）推荐最优多腿期权策略。支持 15+ 种策略模板，包括价差、蝶式、跨式、铁秃鹰和收租策略。返回完整的盈亏曲线、盈亏平衡点和盈利概率。使用场景：选择期权策略、围绕财报规划交易、构建多腿仓位、比较策略替代方案。
   触发词："AAPL 期权策略"、"NVDA 看涨策略"、"TSLA 财报最佳策略"、"SPY Iron Condor"、"META 熊市看跌价差"、"GOOGL 收租策略"、"QQQ 中性策略"
 globs:
-  - 'mock-data/*.json'
+  - "mock-data/*.json"
 ---
 
 # AlphaGBM Options Strategy

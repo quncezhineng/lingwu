@@ -18,18 +18,18 @@ The image includes matching Playwright and Chromium versions. The Docker build u
 
 All endpoints except `GET /health` require `Authorization: Bearer <WORKER_TOKEN>`. JSON writes require `Content-Type: application/json`.
 
-| Method | Path | Input / response |
-| --- | --- | --- |
-| GET | `/health` | `{ "status": "ok" }` (process health only) |
-| GET | `/sessions` | `Session[]` |
-| POST | `/sessions` | `{ id: UUID, url }` → `Session`, HTTP 201; reopens a saved profile |
-| POST | `/sessions/:id/navigate` | `{ url }` → `Session` |
-| POST | `/sessions/:id/close` | `Session`; retains profile and PDFs |
-| GET | `/sessions/:id/screenshot` | 1280 × 800 PNG |
-| GET | `/sessions/:id/read` | `{ url, title, text, truncated }`; visible page text capped at 100,000 characters |
-| POST | `/sessions/:id/input` | One input below → `Session` |
-| GET | `/sessions/:id/downloads` | `{ downloads: { id, name, size, mimeType: "application/pdf" }[], failures: { id, name, code, message, createdAt }[] }` |
-| GET | `/sessions/:id/downloads/:downloadId` | PDF bytes, attachment disposition |
+| Method | Path                                  | Input / response                                                                                                       |
+| ------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/health`                             | `{ "status": "ok" }` (process health only)                                                                             |
+| GET    | `/sessions`                           | `Session[]`                                                                                                            |
+| POST   | `/sessions`                           | `{ id: UUID, url }` → `Session`, HTTP 201; reopens a saved profile                                                     |
+| POST   | `/sessions/:id/navigate`              | `{ url }` → `Session`                                                                                                  |
+| POST   | `/sessions/:id/close`                 | `Session`; retains profile and PDFs                                                                                    |
+| GET    | `/sessions/:id/screenshot`            | 1280 × 800 PNG                                                                                                         |
+| GET    | `/sessions/:id/read`                  | `{ url, title, text, truncated }`; visible page text capped at 100,000 characters                                      |
+| POST   | `/sessions/:id/input`                 | One input below → `Session`                                                                                            |
+| GET    | `/sessions/:id/downloads`             | `{ downloads: { id, name, size, mimeType: "application/pdf" }[], failures: { id, name, code, message, createdAt }[] }` |
+| GET    | `/sessions/:id/downloads/:downloadId` | PDF bytes, attachment disposition                                                                                      |
 
 `Session` is `{ id, title, url, status: "active" | "closed" | "error", updatedAt }`. UUIDs use versions 1–8 and RFC variant bits. Screenshot clicks must use native image coordinates, even when the displayed image is scaled.
 

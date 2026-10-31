@@ -14,7 +14,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import type { Section, Workspace } from "../../packages/domain/src";
 import { AccountScreen } from "./src/account";
-import { AgentActivityScreen, AgentStatus, GoalsScreen, IdeasScreen } from "./src/agent-ui";
+import { AgentStatus, IdeasScreen } from "./src/agent-ui";
 import { AgentWorkspaceProvider, useAgentWorkspace } from "./src/agent-workspace";
 import {
   type AccountProfile,
@@ -28,19 +28,18 @@ import {
 } from "./src/api";
 import { CapabilityHubScreen } from "./src/capability-hub";
 import { ChatScreen, WorkspaceTools } from "./src/chat";
-import { ComputerEntry } from "./src/computer";
 import { ComputerDraftProvider } from "./src/computer-drafts";
 import { Details } from "./src/details";
 import { I18nProvider, localizeAgentName, useTranslation } from "./src/i18n";
-import { LanguageSwitcher } from "./src/i18n/LanguageSwitcher";
 import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
-import { Bell, Menu, Search } from "./src/icons";
+import { Bell, Menu, Search, Settings2 } from "./src/icons";
 import { PageHeader } from "./src/page-header";
 import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
 import { GlobalSearchSheet } from "./src/search-sheet";
 import { ACCOUNT_NAV, BrandMark, ChatsColumn, MOBILE_NAV, Rail } from "./src/shell";
+import { TaskHubScreen } from "./src/task-hub";
 import { breakpoints, layout } from "./src/theme";
 import { ThreadsProvider, ThreadsSheet, useLingWuThread } from "./src/threads";
 import { Toast, type ToastState } from "./src/toast";
@@ -600,21 +599,15 @@ function WorkspaceShell({
   const pending =
     (data?.notifications.filter((n) => !n.read).length || 0) +
     workspace.actions.filter((a) => a.status === "awaiting_review").length;
-  const activeTask =
-    data?.tasks.find(
-      (task) => task.status === "waiting_approval" || task.status === "waiting_input",
-    ) || data?.tasks.find((task) => task.status === "running");
   // 服务端保存英文默认名 Xiao Wu，展示前按语言本地化为「小悟」或「Xiao Wu」。
   const agentName = localizeAgentName(data?.identity.name, data?.identity.nameCustomized);
-  const status = activeTask
-    ? activeTask.status === "waiting_approval"
-      ? t("app.statusReadyToReview", { title: activeTask.title })
-      : activeTask.status === "waiting_input"
-        ? t("app.statusNeedsInput", { title: activeTask.title })
-        : activeTask.plan.find((step) => step.status === "running")?.title || activeTask.title
-    : data?.tasks.some((task) => task.status === "queued")
-      ? t("app.statusPickingUp")
-      : t("app.statusIdle");
+  const activeMonitorCount = (data?.monitors ?? []).filter(
+    (monitor) => monitor.status === "active",
+  ).length;
+  const monitorStatus =
+    activeMonitorCount > 0
+      ? t("app.activeMonitors", { count: activeMonitorCount })
+      : t("app.noActiveMonitors");
   const title = titles[section] || titles.apps;
   const Screen =
     section === "today"
@@ -627,15 +620,13 @@ function WorkspaceShell({
             ? CalendarScreen
             : section === "browser"
               ? BrowserScreen
-              : section === "activity"
-                ? AgentActivityScreen
+              : section === "activity" || section === "goals"
+                ? TaskHubScreen
                 : section === "ideas"
                   ? IdeasScreen
-                  : section === "goals"
-                    ? GoalsScreen
-                    : section === "preferences"
-                      ? PreferencesScreen
-                      : CapabilityHubScreen;
+                  : section === "preferences"
+                    ? PreferencesScreen
+                    : CapabilityHubScreen;
   return (
     <>
       <WorkspaceTools />
@@ -662,38 +653,83 @@ function WorkspaceShell({
                   }}
                 >
                   <View style={{ position: "absolute", left: 0, top: 4 }}>
-                    <IconButton
-                      icon={Menu}
-                      label={t("app.openConversations")}
-                      onPress={() => setThreadsOpen(true)}
-                    />
+                    <View style={[s.row, { alignItems: "center", gap: 4 }]}>
+                      <IconButton
+                        icon={Menu}
+                        label={t("app.openConversations")}
+                        onPress={() => setThreadsOpen(true)}
+                      />
+                      {/* 移动端顶部搜索入口：紧跟左侧栏按钮。 */}
+                      <IconButton
+                        icon={Search}
+                        label={t("search.title")}
+                        onPress={() => setSearchOpen(true)}
+                      />
+                    </View>
                   </View>
                   <View
-                    pointerEvents="none"
+                    pointerEvents="box-none"
                     style={{
                       alignItems: "center",
                       justifyContent: "center",
                       height: 56,
-                      gap: 2,
                     }}
                   >
-                    <View style={[s.row, { gap: 7, justifyContent: "center" }]}>
-                      <BrandMark size={22} />
-                      <Text
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("app.agentSettingsLabel", { name: agentName })}
+                      onPress={() => open({ type: "personality" })}
+                      style={({ pressed }) => ({
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 10,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: radius.control,
+                        backgroundColor: pressed ? colors.overlay1 : "transparent",
+                      })}
+                    >
+                      <View
                         style={{
-                          fontSize: 17,
-                          fontWeight: "600",
-                          color: colors.text,
-                          letterSpacing: 0,
-                          fontFamily: fonts.serif,
+                          width: 30,
+                          height: 30,
+                          borderRadius: 15,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderWidth: 1,
+                          borderColor: colors.line,
+                          backgroundColor: colors.paper,
                         }}
                       >
-                        {t("common.agentName")}
-                      </Text>
-                    </View>
-                    <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
-                      {status}
-                    </Text>
+                        <Mascot
+                          size={24}
+                          variant={data?.identity.avatar}
+                          background={colors.paper}
+                        />
+                      </View>
+                      <View style={{ gap: 1 }}>
+                        <Text
+                          numberOfLines={1}
+                          style={{ fontSize: 12, fontWeight: "600", color: colors.text }}
+                        >
+                          {t("app.agentWatching", { name: agentName })}
+                        </Text>
+                        <View style={[s.row, { gap: 5 }]}>
+                          <View
+                            style={{
+                              width: 5,
+                              height: 5,
+                              borderRadius: 3,
+                              backgroundColor: colors.success,
+                            }}
+                          />
+                          <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
+                            {monitorStatus}
+                          </Text>
+                        </View>
+                      </View>
+                    </Pressable>
                   </View>
                   <View
                     style={{
@@ -705,6 +741,12 @@ function WorkspaceShell({
                       gap: 4,
                     }}
                   >
+                    {/* 移动端的「设置」入口：始终在顶栏显示，与通知按钮同级。 */}
+                    <IconButton
+                      icon={Settings2}
+                      label={t("details.settingsTitle")}
+                      onPress={() => open({ type: "settings" })}
+                    />
                     <View>
                       <IconButton
                         icon={Bell}
@@ -726,13 +768,7 @@ function WorkspaceShell({
                         />
                       )}
                     </View>
-                    <LanguageSwitcher compact />
                   </View>
-                  {section === "chat" && (
-                    <View style={{ position: "absolute", right: 90, top: 8 }}>
-                      <ComputerEntry compact />
-                    </View>
-                  )}
                 </View>
               )}
               {desktop && (
@@ -831,7 +867,6 @@ function WorkspaceShell({
                         />
                       )}
                     </View>
-                    <LanguageSwitcher compact />
                   </View>
                 </View>
               )}
@@ -848,6 +883,7 @@ function WorkspaceShell({
                     keyboardShouldPersistTaps="handled"
                   >
                     {section !== "today" &&
+                      section !== "activity" &&
                       section !== "files" &&
                       section !== "notes" &&
                       section !== "goals" && (
@@ -924,7 +960,13 @@ function WorkspaceShell({
                   >
                     {nav.map((item) => {
                       const active =
-                        section === item.id || (item.id === "watchlist" && section === "portfolio");
+                        section === item.id ||
+                        (item.id === "watchlist" && section === "portfolio") ||
+                        (item.id === "activity" && section === "goals") ||
+                        (item.id === "today" && ["watchlist", "portfolio"].includes(section)) ||
+                        (item.id === "files" && section === "notes") ||
+                        (item.id === "account" &&
+                          ["preferences", "apps", "connections"].includes(section));
                       return (
                         <Pressable
                           key={item.id}

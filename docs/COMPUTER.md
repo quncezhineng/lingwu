@@ -64,15 +64,15 @@ How it maps to the Docker contract:
 
 With this provider the agent gets one more tool, `use_desktop`, in chat and in delegated tasks. It mirrors the shape of Anthropic's computer-use tool:
 
-| Action | Arguments | xdotool call |
-| --- | --- | --- |
-| `screenshot` | none | none |
-| `left_click`, `double_click`, `right_click` | optional `coordinate` `[x, y]` | `mousemove --sync x y click 1` (`--repeat 2`, button 3) |
-| `mouse_move` | `coordinate` | `mousemove --sync x y` |
-| `type` | `text` (up to 1000 characters) | `type --delay 12 -- text` |
-| `key` | `text`, xdotool key names or combos such as `Return` or `ctrl+l` | `key -- ...` |
-| `scroll` | `scroll_direction`, optional `scroll_amount` (default 3) and `coordinate` | wheel buttons 4 to 7 |
-| `wait` | optional `duration` in seconds (default 1, up to 10) | `sleep` |
+| Action                                      | Arguments                                                                 | xdotool call                                            |
+| ------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `screenshot`                                | none                                                                      | none                                                    |
+| `left_click`, `double_click`, `right_click` | optional `coordinate` `[x, y]`                                            | `mousemove --sync x y click 1` (`--repeat 2`, button 3) |
+| `mouse_move`                                | `coordinate`                                                              | `mousemove --sync x y`                                  |
+| `type`                                      | `text` (up to 1000 characters)                                            | `type --delay 12 -- text`                               |
+| `key`                                       | `text`, xdotool key names or combos such as `Return` or `ctrl+l`          | `key -- ...`                                            |
+| `scroll`                                    | `scroll_direction`, optional `scroll_amount` (default 3) and `coordinate` | wheel buttons 4 to 7                                    |
+| `wait`                                      | optional `duration` in seconds (default 1, up to 10)                      | `sleep`                                                 |
 
 - **Every action returns a fresh screenshot.** Coordinates are pixels in that screenshot; the screen is 1280x800, so no scaling is involved. The screenshot is a JPEG (about 40 to 200 KB) taken with `scrot` half a second after the input.
 - **The image goes to the model as an image.** The tool returns TanStack AI content parts (a text part with the receipt, plus an image part). `@tanstack/ai` keeps a content-part array as the tool message, and all three adapters send it as a multimodal tool result: Anthropic `tool_result` blocks, OpenAI Responses `function_call_output` with `input_image`, Gemini `functionResponse.parts`. The AG-UI result event that is stored in the chat thread keeps only the text part, so later turns never replay image data as text.

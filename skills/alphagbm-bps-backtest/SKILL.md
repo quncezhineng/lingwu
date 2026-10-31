@@ -9,7 +9,7 @@ description_en: Full walk-forward Bull Put Spread backtest over ~8 years of dail
 name_zh: AlphaGBM BPS回测
 description_zh: 对约 8 年的日线历史数据完成完整的向前滚动牛市看跌期权价差回测。同一请求下同时运行带信号（恐慌分数≥60入场）版本与无信号对照组，方便你量化评估在你设定的参数下，该恐慌入场规则是否能为此标的带来超额收益。输出内容包含权益曲线、四项关键绩效指标（年化收益率/胜率/最大回撤/夏普比率）、交易台账，以及通俗易懂的分析结论。
 globs:
-  - 'mock-data/bps-backtest/**'
+  - "mock-data/bps-backtest/**"
 ---
 
 # AlphaGBM BPS Backtest

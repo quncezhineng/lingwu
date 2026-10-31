@@ -153,23 +153,23 @@ def add_section(slide, x, y, w, header_text, bullets, header_size=10, bullet_siz
   slide.addText(
     [
       {
-        text: 'Headquarters: Austin, Texas; Founded 2003',
+        text: "Headquarters: Austin, Texas; Founded 2003",
         options: { bullet: { indent: 10 }, breakLine: true },
       },
       {
-        text: 'Employees: 140,000+ globally across 6 continents',
+        text: "Employees: 140,000+ globally across 6 continents",
         options: { bullet: { indent: 10 }, breakLine: true },
       },
       {
-        text: 'CEO: Elon Musk; CFO: Vaibhav Taneja',
+        text: "CEO: Elon Musk; CFO: Vaibhav Taneja",
         options: { bullet: { indent: 10 }, breakLine: true },
       },
       {
-        text: 'Market Cap: $850B (#6 globally by market cap)',
+        text: "Market Cap: $850B (#6 globally by market cap)",
         options: { bullet: { indent: 10 }, breakLine: true },
       },
       {
-        text: 'Segments: Automotive (85%), Energy (10%), Services (5%)',
+        text: "Segments: Automotive (85%), Energy (10%), Services (5%)",
         options: { bullet: { indent: 10 } },
       },
     ],
@@ -179,8 +179,8 @@ def add_section(slide, x, y, w, header_text, bullets, header_size=10, bullet_siz
       w: 4.5,
       h: 2.6,
       fontSize: 11,
-      fontFace: 'Arial',
-      valign: 'top',
+      fontFace: "Arial",
+      valign: "top",
       paraSpaceAfter: 6,
     },
   );
@@ -216,7 +216,7 @@ Must pass "30-second comprehension test" for a busy executive.
 
 ```javascript
 const pptx = new pptxgen();
-pptx.layout = 'LAYOUT_4x3'; // 10" wide × 7.5" tall - MUST USE THIS
+pptx.layout = "LAYOUT_4x3"; // 10" wide × 7.5" tall - MUST USE THIS
 ```
 
 ### Slide Coordinate System
@@ -249,7 +249,7 @@ PptxGenJS uses inches. 4:3 slide = **10" wide × 7.5" tall**.
 **Company Name (Ticker)** - Example: `Tesla, Inc. (TSLA)`
 
 ```javascript
-slide.addText('Tesla, Inc. (TSLA)', { x: 0.3, y: 0.2, w: 9.4, h: 0.35, fontSize: 18, bold: true });
+slide.addText("Tesla, Inc. (TSLA)", { x: 0.3, y: 0.2, w: 9.4, h: 0.35, fontSize: 18, bold: true });
 ```
 
 ### 4-Quadrant Layout (y=0.6 to y=7.2)
@@ -285,16 +285,16 @@ slide.addShape(pptx.shapes.RECTANGLE, {
   y: 0.6,
   w: 0.08,
   h: 0.25,
-  fill: { color: 'E31937' }, // Use company brand color
+  fill: { color: "E31937" }, // Use company brand color
 });
-slide.addText('Company Overview', {
+slide.addText("Company Overview", {
   x: 0.45,
   y: 0.6,
   w: 4.5,
   h: 0.3,
   fontSize: 14,
   bold: true,
-  fontFace: 'Arial',
+  fontFace: "Arial",
 });
 ```
 
@@ -348,8 +348,8 @@ slide.addChart(
   pptx.charts.BAR,
   [
     {
-      name: 'FY2024 Revenue by Region',
-      labels: ['North America', 'EMEA', 'China', 'APLA'],
+      name: "FY2024 Revenue by Region",
+      labels: ["North America", "EMEA", "China", "APLA"],
       values: [21.4, 13.6, 7.6, 6.7],
     },
   ],
@@ -358,14 +358,14 @@ slide.addChart(
     y: 4.1,
     w: 4.5,
     h: 3.0, // Fits in bottom-right quadrant (4:3)
-    barDir: 'bar',
-    chartColors: ['FF6B35'],
+    barDir: "bar",
+    chartColors: ["FF6B35"],
     showValue: true,
     dataLabelFontSize: 10,
     catAxisLabelFontSize: 10,
     valAxisLabelFontSize: 10,
-    dataLabelFormatCode: '$#,##0.0B',
-    title: 'Revenue by Geography',
+    dataLabelFormatCode: "$#,##0.0B",
+    title: "Revenue by Geography",
     titleFontSize: 12,
     titleBold: true,
   },
@@ -379,8 +379,8 @@ slide.addChart(
   pptx.charts.PIE,
   [
     {
-      name: 'Product Mix',
-      labels: ['Footwear', 'Apparel', 'Equipment'],
+      name: "Product Mix",
+      labels: ["Footwear", "Apparel", "Equipment"],
       values: [68, 29, 3],
     },
   ],
@@ -391,11 +391,11 @@ slide.addChart(
     h: 3.0, // Fits in bottom-right quadrant (4:3)
     showPercent: true,
     showLegend: true,
-    legendPos: 'r',
+    legendPos: "r",
     dataLabelFontSize: 10,
     legendFontSize: 10,
-    chartColors: ['FF6B35', '2C2C2C', '4A4A4A'],
-    title: 'Revenue Mix FY24',
+    chartColors: ["FF6B35", "2C2C2C", "4A4A4A"],
+    title: "Revenue Mix FY24",
     titleFontSize: 12,
     titleBold: true,
   },
@@ -409,8 +409,8 @@ slide.addChart(
   pptx.charts.LINE,
   [
     {
-      name: 'Revenue ($B)',
-      labels: ['FY21', 'FY22', 'FY23', 'FY24', 'FY25E'],
+      name: "Revenue ($B)",
+      labels: ["FY21", "FY22", "FY23", "FY24", "FY25E"],
       values: [44.5, 46.7, 48.5, 51.4, 54.2],
     },
   ],
@@ -419,13 +419,13 @@ slide.addChart(
     y: 1.2,
     w: 9.4,
     h: 5.5, // Full width for 4:3 slide
-    chartColors: ['FF6B35'],
+    chartColors: ["FF6B35"],
     showValue: true,
     lineSmooth: true,
     dataLabelFontSize: 11,
     catAxisLabelFontSize: 11,
     valAxisLabelFontSize: 11,
-    title: 'Revenue Trend & Forecast',
+    title: "Revenue Trend & Forecast",
     titleFontSize: 14,
     titleBold: true,
   },
@@ -447,43 +447,43 @@ slide.addShape(pptx.shapes.RECTANGLE, {
   y: 3.7,
   w: 0.08,
   h: 0.25,
-  fill: { color: 'E31937' },
+  fill: { color: "E31937" },
 });
-slide.addText('Key Financials & Valuation', {
+slide.addText("Key Financials & Valuation", {
   x: 0.45,
   y: 3.7,
   w: 4.5,
   h: 0.3,
   fontSize: 14,
   bold: true,
-  fontFace: 'Arial',
+  fontFace: "Arial",
 });
 
 // Financial data table
 slide.addTable(
   [
     [
-      { text: 'Metric', options: { bold: true, fill: '003366', color: 'FFFFFF' } },
-      { text: 'FY24', options: { bold: true, fill: '003366', color: 'FFFFFF' } },
-      { text: 'FY25E', options: { bold: true, fill: '003366', color: 'FFFFFF' } },
+      { text: "Metric", options: { bold: true, fill: "003366", color: "FFFFFF" } },
+      { text: "FY24", options: { bold: true, fill: "003366", color: "FFFFFF" } },
+      { text: "FY25E", options: { bold: true, fill: "003366", color: "FFFFFF" } },
     ],
-    ['Revenue', '$51.4B', '$54.2B'],
-    ['YoY Growth', '+6.0%', '+5.5%'],
-    ['EBITDA', '$8.9B', '$9.5B'],
-    ['EBITDA Margin', '17.3%', '17.5%'],
-    ['EPS', '$3.42', '$3.75'],
-    ['Market Cap', '$185B', '—'],
-    ['EV/EBITDA', '12.5x', '11.7x'],
+    ["Revenue", "$51.4B", "$54.2B"],
+    ["YoY Growth", "+6.0%", "+5.5%"],
+    ["EBITDA", "$8.9B", "$9.5B"],
+    ["EBITDA Margin", "17.3%", "17.5%"],
+    ["EPS", "$3.42", "$3.75"],
+    ["Market Cap", "$185B", "—"],
+    ["EV/EBITDA", "12.5x", "11.7x"],
   ],
   {
     x: 0.45,
     y: 4.1,
     w: 4.3,
     h: 3.0, // Below header in bottom-left quadrant
-    fontFace: 'Arial',
+    fontFace: "Arial",
     fontSize: 10,
-    border: { pt: 0.5, color: 'CCCCCC' },
-    valign: 'middle',
+    border: { pt: 0.5, color: "CCCCCC" },
+    valign: "middle",
     colW: [1.8, 1.25, 1.25], // Column widths
   },
 );

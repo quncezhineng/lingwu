@@ -13,7 +13,7 @@ description_zh: |
   为每个标的计算恐慌指数（0-100），权重来自六个真实信号：VIX、IV 排名、RSI-14、期权成交量异常、Put/Call 比率和连续下跌天数。评分 ≥ 60 触发 Bull Put Spread 入场信号。基于 FearDesk 方法论设计；在信号触发时做 BPS 回测年化收益率约 10.8%，对比无条件入场约 3.5%。
   触发词："恐惧评分 QQQ"、"NVDA 是否超卖"、"恐慌指数 SPY"、"BPS 信号 TSLA"、"现在是恐惧时间吗"、"BPS 入场时机"、"什么时候卖 put"、"AAPL 是否恐慌"、"逆向入场信号"、"超卖读数"、"VIX 加 RSI"
 globs:
-  - 'mock-data/fear-score/**'
+  - "mock-data/fear-score/**"
 ---
 
 # AlphaGBM FearScore

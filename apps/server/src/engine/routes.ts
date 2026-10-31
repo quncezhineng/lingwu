@@ -12,6 +12,7 @@ import {
   MEMORY_CATEGORIES,
 } from "../../../../packages/domain/src/agent.ts";
 import { AppError } from "../errors.ts";
+import { AGENT_COMMUNICATION_VALUES, AGENT_TONE_VALUES } from "./agent-persona.ts";
 import type { AgentService } from "./service.ts";
 
 const text = z.string().trim().min(1).max(4000);
@@ -140,7 +141,11 @@ export function agentRoutes(service: AgentService): Hono<{ Variables: { owner: s
       .object({
         name: z.string().trim().min(1).max(80),
         nameCustomized: z.boolean().optional(),
-        tone: z.enum(["warm", "concise", "thoughtful"]),
+        tagline: z.string().trim().max(60).optional(),
+        tone: z.enum(AGENT_TONE_VALUES),
+        communication: z.enum(AGENT_COMMUNICATION_VALUES).optional(),
+        style: z.string().trim().max(1000).optional(),
+        userName: z.string().trim().max(60).optional(),
         avatar: z
           .enum(["avatar1", "avatar2", "avatar3", "avatar4", "avatar5", "avatar6"])
           .optional(),
