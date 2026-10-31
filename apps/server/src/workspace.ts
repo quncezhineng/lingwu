@@ -6,6 +6,7 @@ import type {
   Artifact,
   BrowserSession,
   CalendarEvent,
+  CapabilityInstall,
   Mail,
   ProposalInput,
   Workspace,
@@ -55,6 +56,32 @@ export class WorkspaceService {
     return this.config.mode === "sample"
       ? (await this.db.get<{ enabled: boolean }>(owner, "settings", "google"))?.enabled !== false
       : Boolean(await this.googleAuth.tokens(owner));
+  }
+  installedCapabilities(owner: string) {
+    return this.db.list<CapabilityInstall>(owner, "capability-installs");
+  }
+  /**
+   * Persist a user's marketplace choice independently from whether the
+   * connector is currently reachable. Reinstalling is idempotent.
+   */
+  async setCapabilityInstalled(
+    owner: string,
+    id: string,
+    type: CapabilityInstall["type"],
+    installed: boolean,
+  ): Promise<CapabilityInstall[]> {
+    if (installed) {
+      const current = await this.db.get<CapabilityInstall>(owner, "capability-installs", id);
+      if (!current || current.type !== type)
+        await this.db.put(owner, "capability-installs", {
+          id,
+          type,
+          installedAt: current?.installedAt ?? new Date().toISOString(),
+        });
+    } else {
+      await this.db.remove(owner, "capability-installs", id);
+    }
+    return this.installedCapabilities(owner);
   }
   async calendars(owner: string) {
     const connection = await this.connection(owner);
@@ -325,7 +352,10 @@ export class WorkspaceService {
   async snapshot(owner: string, query?: string): Promise<Workspace> {
     const model = await this.models.resolve(owner);
     const { mail, events, connected } = await this.sourceSections(owner, true, true, query);
-    const tokens = this.config.mode === "live" ? await this.googleAuth.tokens(owner) : null;
+    const [tokens, installedCapabilities] = await Promise.all([
+      this.config.mode === "live" ? this.googleAuth.tokens(owner) : null,
+      this.installedCapabilities(owner),
+    ]);
     return {
       mode: this.config.mode,
       profile: {
@@ -338,6 +368,7 @@ export class WorkspaceService {
       browsers: await this.db.list<BrowserSession>(owner, "browsers"),
       actions: await this.db.list<ActionProposal>(owner, "actions"),
       activity: await this.db.list<ActivityEntry>(owner, "activity"),
+      installedCapabilities,
       connections: [
         {
           id: "google",

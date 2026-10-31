@@ -362,6 +362,30 @@ export async function createApp(
     );
     return c.json(snapshot);
   });
+  /** Persist the user's marketplace install choice for a plugin, skill or connector. */
+  app.put("/api/capabilities/:id", async (c) => {
+    const id = z
+      .string()
+      .trim()
+      .min(1)
+      .max(240)
+      .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/, "Invalid capability id")
+      .parse(c.req.param("id"));
+    const body = z
+      .object({
+        type: z.enum(["plugins", "skills", "connectors"]),
+        installed: z.boolean(),
+      })
+      .parse(await c.req.json());
+    return c.json({
+      installedCapabilities: await workspace.setCapabilityInstalled(
+        c.get("owner"),
+        id,
+        body.type,
+        body.installed,
+      ),
+    });
+  });
   /** 可选模型目录：只列出服务端已配置密钥的厂商，密钥本身永不下发到 App。 */
   app.get("/api/models", async (c) => {
     const owner = c.get("owner");

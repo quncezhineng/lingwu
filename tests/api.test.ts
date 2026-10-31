@@ -307,6 +307,59 @@ test("sample workspace serves a real PDF and filling creates a new version", asy
   forged.searchParams.set("owner", "another-user");
   assert.equal((await app.request(forged.toString())).status, 403);
 });
+test("plugins, skills and connectors persist install state and can be removed", async () => {
+  const capabilities = [
+    { id: "mail", type: "plugins" },
+    { id: "skill:dcf-model", type: "skills" },
+    { id: "gmail", type: "connectors" },
+  ] as const;
+  const before = await app.request("/api/workspace", { headers: headers() });
+  assert.equal(before.status, 200);
+  assert.deepEqual((await before.json()).installedCapabilities, []);
+
+  for (const [index, capability] of capabilities.entries()) {
+    const install = await app.request(`/api/capabilities/${encodeURIComponent(capability.id)}`, {
+      method: "PUT",
+      headers: headers(),
+      body: JSON.stringify({ type: capability.type, installed: true }),
+    });
+    assert.equal(install.status, 200);
+    const installed = (await install.json()).installedCapabilities;
+    assert.equal(installed.length, index + 1);
+    const entry = installed.find((item: { id: string }) => item.id === capability.id);
+    assert.equal(entry?.type, capability.type);
+    assert.match(entry?.installedAt, /^\d{4}-\d{2}-\d{2}T/);
+  }
+
+  const skillPath = `/api/capabilities/${encodeURIComponent("skill:dcf-model")}`;
+  const duplicate = await app.request(skillPath, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify({ type: "skills", installed: true }),
+  });
+  assert.equal(duplicate.status, 200);
+  const afterDuplicate = (await duplicate.json()).installedCapabilities;
+  assert.equal(afterDuplicate.length, capabilities.length);
+
+  const afterInstall = await app.request("/api/workspace", { headers: headers() });
+  assert.deepEqual(
+    new Set(
+      (await afterInstall.json()).installedCapabilities.map((item: { id: string }) => item.id),
+    ),
+    new Set(capabilities.map((capability) => capability.id)),
+  );
+
+  for (const capability of capabilities) {
+    const remove = await app.request(`/api/capabilities/${encodeURIComponent(capability.id)}`, {
+      method: "PUT",
+      headers: headers(),
+      body: JSON.stringify({ type: capability.type, installed: false }),
+    });
+    assert.equal(remove.status, 200);
+  }
+  const afterRemove = await app.request("/api/workspace", { headers: headers() });
+  assert.deepEqual((await afterRemove.json()).installedCapabilities, []);
+});
 test("reviewed sample email persists a receipt, then revocation blocks another proposal", async () => {
   const propose = () =>
     app.request("/api/actions", {

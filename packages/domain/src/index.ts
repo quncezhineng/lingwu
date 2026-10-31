@@ -185,6 +185,11 @@ export interface Connection {
   account?: string;
   capabilities: string[];
 }
+export interface CapabilityInstall {
+  id: string;
+  type: "plugins" | "skills" | "connectors";
+  installedAt: string;
+}
 export interface Workspace {
   mode: WorkspaceMode;
   profile: { name: string; email: string };
@@ -195,6 +200,7 @@ export interface Workspace {
   actions: ActionProposal[];
   activity: ActivityEntry[];
   connections: Connection[];
+  installedCapabilities: CapabilityInstall[];
   runtime: {
     provider: "sample" | "model" | "openbot";
     configured: boolean;
