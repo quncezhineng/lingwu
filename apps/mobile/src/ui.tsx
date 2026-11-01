@@ -337,6 +337,7 @@ export function Sheet({
   onClose,
   wide,
   narrow,
+  small,
   fullscreen,
   dismissOnBackdrop = true,
 }: {
@@ -349,6 +350,8 @@ export function Sheet({
   wide?: boolean;
   /** 紧凑阅读浮层：用于单张领悟卡等短内容，避免桌面端出现过宽留白。 */
   narrow?: boolean;
+  /** 小型选择浮层：桌面端收窄，移动端保留左右留白。 */
+  small?: boolean;
   /** 全屏模式：弹窗铺满整个网页/屏幕（如研究产物详情），优先级最高。 */
   fullscreen?: boolean;
   /** 点击弹窗外的深色背板区域时是否关闭弹窗，默认开启。 */
@@ -385,8 +388,19 @@ export function Sheet({
             s.sheet,
             wide && { maxWidth: 1050 },
             narrow && { maxWidth: 560 },
+            small && { maxWidth: 440 },
             compact &&
-              !fullscreen && {
+              !fullscreen &&
+              small && {
+                width: Math.min(width - space.md * 2, 440),
+                maxHeight: "88%",
+                marginBottom: Math.max(insets.bottom, space.md),
+                borderBottomLeftRadius: radius.sheet,
+                borderBottomRightRadius: radius.sheet,
+              },
+            compact &&
+              !fullscreen &&
+              !small && {
                 borderBottomLeftRadius: 0,
                 borderBottomRightRadius: 0,
                 paddingBottom: Math.max(insets.bottom, 12),

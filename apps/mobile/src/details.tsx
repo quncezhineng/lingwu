@@ -57,6 +57,7 @@ import {
   Heart,
   Languages,
   Mail as MailIcon,
+  Monitor,
   Pencil,
   Plus,
   Reply,
@@ -220,6 +221,33 @@ function SettingsSheet() {
         <View style={{ gap: 8 }}>
           <Text style={s.label}>{t("details.settingsWorkspaceHeading")}</Text>
           <Card style={{ paddingVertical: 6 }}>
+            <LinkRow
+              icon={Monitor}
+              title={t("threads.agentComputer")}
+              detail={t("computer.sheetSubtitle")}
+              onPress={() => {
+                close();
+                open({ type: "computer" });
+              }}
+            />
+            <LinkRow
+              icon={MailIcon}
+              title={t("app.titleMail")}
+              detail={t("app.subtitleMail")}
+              onPress={() => {
+                navigate("mail");
+                close();
+              }}
+            />
+            <LinkRow
+              icon={CalendarDays}
+              title={t("app.titleCalendar")}
+              detail={t("app.subtitleCalendar")}
+              onPress={() => {
+                navigate("calendar");
+                close();
+              }}
+            />
             <LinkRow
               icon={Target}
               title={t("app.navWatchlist")}

@@ -65,7 +65,13 @@ export function ComputerEntry({ compact = false }: { compact?: boolean }) {
     </Pressable>
   );
 }
-export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
+export function BrowserThreadCard({
+  browser,
+  fill = false,
+}: {
+  browser: BrowserSession;
+  fill?: boolean;
+}) {
   const { open } = useWorkspace();
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
@@ -78,7 +84,7 @@ export function BrowserThreadCard({ browser }: { browser: BrowserSession }) {
         padding: 13,
         backgroundColor: colors.surface,
         gap: 12,
-        maxWidth: 440,
+        maxWidth: fill ? undefined : 440,
         width: "100%",
       }}
     >
@@ -270,7 +276,7 @@ export function ComputerSheet() {
             {[...workspace.browsers]
               .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
               .map((browser) => (
-                <BrowserThreadCard key={browser.id} browser={browser} />
+                <BrowserThreadCard key={browser.id} browser={browser} fill />
               ))}
             {!workspace.browsers.length && (
               <Text style={s.muted}>{t("computer.emptyBrowsers")}</Text>

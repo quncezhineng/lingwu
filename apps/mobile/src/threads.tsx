@@ -2,19 +2,7 @@ import { useThreads } from "@copilotkit/react-native/headless";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import { useTranslation } from "./i18n";
-import {
-  Archive,
-  CalendarDays,
-  ChevronDown,
-  ChevronUp,
-  Heart,
-  Mail,
-  MessageCircle,
-  Monitor,
-  Plus,
-  Shapes,
-  Target,
-} from "./icons";
+import { Archive, ChevronDown, ChevronUp, MessageCircle, Plus, Trash2 } from "./icons";
 import { Button, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -121,13 +109,14 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
     select,
     start,
   } = useLingWuThread();
-  const { open, navigate } = useWorkspace();
+  const { navigate } = useWorkspace();
   const threads = useThreads({ agentId: "default", enabled, includeArchived: true, limit: 20 });
   const [editing, setEditing] = useState<string>();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [archived, setArchived] = useState(false);
   const [sideChatsExpanded, setSideChatsExpanded] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<string>();
   async function mutate(action: () => Promise<void>) {
     setError("");
     try {
@@ -136,10 +125,6 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }
-  function go(section: "mail" | "calendar" | "watchlist" | "preferences" | "apps") {
-    onClose();
-    navigate(section);
   }
   // 运行时首屏可能返回重复 id（平台随机生成的 slug 线程）；且本地待建的旁聊首次
   // 上线服务端列表时，同一 id 会同时出现在 visitedPending 与 listedThreads
@@ -302,7 +287,7 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
                         onChangeText={setName}
                       />
                     )}
-                    <View style={[s.row, { gap: 8 }]}>
+                    <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
                       <Button
                         small
                         disabled={threads.isMutating || (editing === thread.id && !name.trim())}
@@ -331,7 +316,52 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
                       >
                         {thread.archived ? t("threads.restore") : t("threads.archive")}
                       </Button>
+                      <Button
+                        small
+                        danger
+                        icon={Trash2}
+                        disabled={threads.isMutating}
+                        onPress={() => setPendingDelete(thread.id)}
+                      >
+                        {t("threads.delete")}
+                      </Button>
                     </View>
+                    {pendingDelete === thread.id && (
+                      <View
+                        style={{
+                          gap: 9,
+                          padding: 12,
+                          borderRadius: 10,
+                          backgroundColor: colors.errorSoft,
+                        }}
+                      >
+                        <Text style={[s.text, { fontWeight: "500", color: colors.danger }]}>
+                          {t("threads.deleteConfirmTitle")}
+                        </Text>
+                        <Text style={s.small}>{t("threads.deleteConfirmNote")}</Text>
+                        <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                          <Button
+                            small
+                            danger
+                            disabled={threads.isMutating}
+                            onPress={() =>
+                              void mutate(async () => {
+                                await threads.deleteThread(thread.id);
+                                setPendingDelete(undefined);
+                                if (selection.id === thread.id) {
+                                  select({ id: mainId, existing: true });
+                                }
+                              })
+                            }
+                          >
+                            {t("threads.permanentlyDelete")}
+                          </Button>
+                          <Button small onPress={() => setPendingDelete(undefined)}>
+                            {t("common.cancel")}
+                          </Button>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 ))}
                 {!threads.isLoading && !threads.error && !listedThreads.length && (
@@ -367,20 +397,6 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
             <Text style={s.muted}>{t("threads.workspaceSavedNote")}</Text>
           </>
         )}
-        <View style={s.divider} />
-        <LinkRow
-          icon={Monitor}
-          title={t("threads.agentComputer")}
-          onPress={() => {
-            onClose();
-            open({ type: "computer" });
-          }}
-        />
-        <LinkRow icon={Mail} title={t("app.titleMail")} onPress={() => go("mail")} />
-        <LinkRow icon={CalendarDays} title={t("threads.calendar")} onPress={() => go("calendar")} />
-        <LinkRow icon={Target} title={t("app.navWatchlist")} onPress={() => go("watchlist")} />
-        <LinkRow icon={Heart} title={t("app.navPreferences")} onPress={() => go("preferences")} />
-        <LinkRow icon={Shapes} title={t("threads.appsAndSettings")} onPress={() => go("apps")} />
       </View>
     </Sheet>
   );

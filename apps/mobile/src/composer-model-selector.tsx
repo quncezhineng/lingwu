@@ -1,11 +1,9 @@
-import { createElement, useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useTranslation } from "./i18n";
-import { Check, ChevronDown } from "./icons";
-import { colors, fonts, radius, s, shadow } from "./ui";
+import { Check, ChevronDown, Settings2 } from "./icons";
+import { Button, colors, fonts, radius, Sheet, s, space } from "./ui";
 import { useWorkspace } from "./workspace";
-
-const manageValue = "__manage_models__";
 
 /** Compact picker shared by the workbench and chat composers. Credentials stay in My settings. */
 export function ComposerModelSelector({ disabled = false }: { disabled?: boolean }) {
@@ -13,6 +11,7 @@ export function ComposerModelSelector({ disabled = false }: { disabled?: boolean
   const { t } = useTranslation();
   const [current, setCurrent] = useState(workspace.runtime.model);
   const [busy, setBusy] = useState(false);
+  const [pendingModel, setPendingModel] = useState<string>();
   const [expanded, setExpanded] = useState(false);
   const options = workspace.runtime.modelOptions ?? [];
   const label = (model: string) =>
@@ -32,12 +31,9 @@ export function ComposerModelSelector({ disabled = false }: { disabled?: boolean
   }
 
   async function select(model: string) {
-    if (model === manageValue) {
-      manage();
-      return;
-    }
     if (!model || model === current || blocked) return;
     setBusy(true);
+    setPendingModel(model);
     try {
       const result = await api.request<{ model: string }>("/api/model", { model });
       setCurrent(result.model);
@@ -49,6 +45,7 @@ export function ComposerModelSelector({ disabled = false }: { disabled?: boolean
       notify(t("modelSettings.switchFailed"));
     } finally {
       setBusy(false);
+      setPendingModel(undefined);
     }
   }
 
@@ -69,10 +66,10 @@ export function ComposerModelSelector({ disabled = false }: { disabled?: boolean
       <Text
         numberOfLines={1}
         style={{
-          maxWidth: 180,
-          fontSize: 11,
-          lineHeight: 17,
-          fontWeight: "500",
+          maxWidth: 190,
+          fontSize: 12,
+          lineHeight: 18,
+          fontWeight: "600",
           color: colors.muted,
           fontFamily: fonts.sans,
         }}
@@ -83,127 +80,122 @@ export function ComposerModelSelector({ disabled = false }: { disabled?: boolean
     </>
   );
   const triggerStyle = {
-    minHeight: 34,
+    minHeight: 40,
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 6,
-    paddingHorizontal: 7,
+    gap: 7,
+    paddingHorizontal: 9,
     borderRadius: radius.control,
     opacity: blocked ? 0.55 : 1,
   };
   return (
-    <View style={{ position: "relative", flexShrink: 1, minWidth: 0, zIndex: 5 }}>
-      {Platform.OS === "web" ? (
-        <View style={triggerStyle}>
-          {content}
-          {createElement(
-            "select",
-            {
-              "aria-label": t("modelSettings.selectModel"),
-              value: current ?? "",
-              disabled: blocked,
-              onChange: (event: { target: { value: string } }) => void select(event.target.value),
-              style: {
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                opacity: 0,
-                cursor: blocked ? "default" : "pointer",
-                fontSize: 13,
-              },
-            },
-            createElement("option", { value: "", disabled: true }, t("modelSettings.selectModel")),
-            ...options.map((provider) =>
-              createElement(
-                "optgroup",
-                { key: provider.provider, label: provider.label },
-                provider.models.map((model) =>
-                  createElement("option", { key: model, value: model }, label(model)),
-                ),
-              ),
-            ),
-            ...(current && !options.some((provider) => provider.models.includes(current))
-              ? [createElement("option", { key: "current", value: current, disabled: true }, title)]
-              : []),
-            createElement("option", { value: manageValue }, t("modelSettings.manage")),
-          )}
-        </View>
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("modelSettings.selectModel")}
-          accessibilityValue={{ text: title }}
-          accessibilityState={{ expanded, disabled: blocked, busy }}
-          disabled={blocked}
-          onPress={() => setExpanded(!expanded)}
-          style={({ pressed }) => [
-            triggerStyle,
-            { backgroundColor: pressed ? colors.overlay1 : "transparent" },
-          ]}
+    <View style={{ flexShrink: 1, minWidth: 0 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("modelSettings.selectModel")}
+        accessibilityValue={{ text: title }}
+        accessibilityState={{ expanded, disabled: blocked, busy }}
+        disabled={blocked}
+        hitSlop={8}
+        onPress={() => setExpanded(true)}
+        style={({ pressed }) => [
+          triggerStyle,
+          { backgroundColor: pressed ? colors.overlay1 : "transparent" },
+        ]}
+      >
+        {content}
+      </Pressable>
+      {expanded && (
+        <Sheet
+          small
+          title={t("modelSettings.selectModel")}
+          subtitle={
+            current
+              ? t("modelSettings.current", { model: title })
+              : t("modelSettings.noConfiguredModels")
+          }
+          onClose={() => setExpanded(false)}
         >
-          {content}
-        </Pressable>
-      )}
-      {Platform.OS !== "web" && expanded && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: "100%",
-            left: 0,
-            minWidth: 240,
-            maxWidth: 320,
-            marginBottom: 8,
-            padding: 6,
-            borderWidth: 1,
-            borderColor: colors.line,
-            borderRadius: radius.panel,
-            backgroundColor: colors.paper,
-            ...shadow.card,
-          }}
-        >
-          <ScrollView style={{ maxHeight: 260 }}>
-            {!options.length && (
-              <Text style={[s.small, { padding: 10 }]}>
+          <View style={{ gap: space.lg }}>
+            {!options.length ? (
+              <Text style={[s.muted, { lineHeight: 22, paddingVertical: space.sm }]}>
                 {t("modelSettings.noConfiguredModels")}
               </Text>
-            )}
-            {options.map((provider) => (
-              <View key={provider.provider} style={{ gap: 2 }}>
-                <Text style={[s.small, { padding: 8 }]}>{provider.label}</Text>
-                {provider.models.map((model) => (
-                  <Pressable
-                    key={model}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: model === current, disabled: blocked }}
-                    disabled={blocked}
-                    onPress={() => void select(model)}
-                    style={[
-                      s.between,
-                      {
-                        padding: 10,
-                        borderRadius: radius.control,
-                        backgroundColor: model === current ? colors.sky : colors.paper,
-                      },
-                    ]}
+            ) : (
+              options.map((provider) => (
+                <View key={provider.provider} style={{ gap: 7 }}>
+                  <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
+                    {provider.label}
+                  </Text>
+                  <View
+                    style={{
+                      overflow: "hidden",
+                      borderWidth: 1,
+                      borderColor: colors.line,
+                      borderRadius: radius.panel,
+                      backgroundColor: colors.paper,
+                    }}
                   >
-                    <Text style={s.text}>{label(model)}</Text>
-                    {model === current && <Check size={14} color={colors.primary} />}
-                  </Pressable>
-                ))}
-              </View>
-            ))}
-          </ScrollView>
-          <Pressable
-            accessibilityRole="button"
-            onPress={manage}
-            style={{ padding: 10, borderTopWidth: 1, borderTopColor: colors.line }}
-          >
-            <Text style={[s.text, { color: colors.primaryStrong }]}>
+                    {provider.models.map((model, index) => {
+                      const selected = model === current;
+                      const pending = pendingModel === model;
+                      return (
+                        <Pressable
+                          key={model}
+                          accessibilityRole="button"
+                          accessibilityState={{
+                            selected,
+                            disabled: blocked,
+                            busy: pending,
+                          }}
+                          disabled={blocked}
+                          onPress={() => void select(model)}
+                          style={({ pressed }) => [
+                            s.between,
+                            {
+                              minHeight: 54,
+                              gap: space.sm,
+                              paddingHorizontal: space.md,
+                              paddingVertical: space.sm,
+                              borderBottomWidth: index < provider.models.length - 1 ? 1 : 0,
+                              borderBottomColor: colors.lineSoft,
+                              backgroundColor: selected
+                                ? colors.sky
+                                : pressed
+                                  ? colors.overlay1
+                                  : colors.paper,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              flex: 1,
+                              fontSize: 15,
+                              lineHeight: 23,
+                              fontWeight: selected ? "600" : "500",
+                              color: colors.text,
+                              fontFamily: fonts.sans,
+                            }}
+                          >
+                            {label(model)}
+                          </Text>
+                          {pending ? (
+                            <ActivityIndicator size="small" color={colors.primary} />
+                          ) : selected ? (
+                            <Check size={17} color={colors.primaryStrong} />
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))
+            )}
+            <Button icon={Settings2} onPress={manage} style={{ minHeight: 48 }}>
               {t("modelSettings.manage")}
-            </Text>
-          </Pressable>
-        </View>
+            </Button>
+          </View>
+        </Sheet>
       )}
     </View>
   );
