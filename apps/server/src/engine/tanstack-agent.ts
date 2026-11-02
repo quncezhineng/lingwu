@@ -9,6 +9,7 @@ import {
 import {
   chat,
   isContentPartArray,
+  type ModelMessage,
   maxIterations,
   type SchemaInput,
   toolDefinition,
@@ -16,15 +17,67 @@ import {
 import { type AnthropicChatModel, anthropicText } from "@tanstack/ai-anthropic";
 import { type GeminiTextModel, geminiText } from "@tanstack/ai-gemini";
 import {
-  createOpenaiChatCompletions,
+  type OpenAIChatCompletionsConfig,
+  OpenAIChatCompletionsTextAdapter,
   type OpenAIChatModel,
-  openaiChatCompletions,
   openaiText,
 } from "@tanstack/ai-openai";
 import { map, mergeMap, type Observable } from "rxjs";
 import { z } from "zod";
 import { MODEL_MAX_RETRIES } from "../config.ts";
 import type { ModelConnection } from "../model-settings.ts";
+
+/**
+ * DeepSeek thinking mode requires reasoning_content to be echoed back on an
+ * assistant turn that also contains tool calls. TanStack retains that text as
+ * `thinking` during a run, but its Chat Completions serializer only emits the
+ * OpenAI-standard message fields.
+ */
+export class ReasoningChatCompletionsAdapter<
+  TModel extends OpenAIChatModel,
+> extends OpenAIChatCompletionsTextAdapter<TModel> {
+  constructor(
+    config: OpenAIChatCompletionsConfig,
+    model: TModel,
+    private readonly sendReasoningContent: boolean,
+  ) {
+    super(config, model);
+  }
+
+  protected override extractReasoning(chunk: unknown): { text: string } | undefined {
+    const delta = (
+      chunk as {
+        choices?: Array<{
+          delta?: { reasoning?: unknown; reasoning_content?: unknown };
+        }>;
+      }
+    ).choices?.[0]?.delta;
+    const raw = delta?.reasoning_content ?? delta?.reasoning;
+    return typeof raw === "string" && raw.length > 0 ? { text: raw } : undefined;
+  }
+
+  protected override convertMessage(message: ModelMessage) {
+    const converted = super.convertMessage(message);
+    if (!this.sendReasoningContent || message.role !== "assistant" || !message.toolCalls?.length)
+      return converted;
+    const reasoning = message.thinking?.map((part) => part.content).join("");
+    if (!reasoning) return converted;
+    return { ...converted, reasoning_content: reasoning };
+  }
+}
+
+function reasoningChatCompletions(
+  model: string,
+  apiKey: string,
+  config: Omit<OpenAIChatCompletionsConfig, "apiKey">,
+  sendReasoningContent: boolean,
+) {
+  return new ReasoningChatCompletionsAdapter(
+    { apiKey, ...config },
+    model as OpenAIChatModel,
+    sendReasoningContent,
+  );
+}
 
 // Same "provider/model" strings, env vars and base URL formats as the AI SDK resolver in
 // @copilotkit/runtime. Each provider SDK retries transient failures up to MODEL_MAX_RETRIES times.
@@ -36,41 +89,51 @@ function adapter(spec: string, connection?: ModelConnection) {
     );
   const id = model.trim();
   if (connection) {
-    return createOpenaiChatCompletions(id as OpenAIChatModel, connection.apiKey, {
-      baseURL: connection.baseUrl,
-      maxRetries: MODEL_MAX_RETRIES,
-      fetch: async (input, init) => {
-        try {
-          const response = await fetch(input, { ...init, redirect: "error" });
-          if (response.ok) return response;
-          await response.body?.cancel();
-          // Gateways may echo headers or keys in error bodies. Never pass them into transcripts.
-          return Response.json(
-            {
-              error: {
-                message:
-                  "Personal model request failed. Check your model connection in My settings.",
+    return reasoningChatCompletions(
+      id,
+      connection.apiKey,
+      {
+        baseURL: connection.baseUrl,
+        maxRetries: MODEL_MAX_RETRIES,
+        fetch: async (input, init) => {
+          try {
+            const response = await fetch(input, { ...init, redirect: "error" });
+            if (response.ok) return response;
+            await response.body?.cancel();
+            // Gateways may echo headers or keys in error bodies. Never pass them into transcripts.
+            return Response.json(
+              {
+                error: {
+                  message:
+                    "Personal model request failed. Check your model connection in My settings.",
+                },
               },
-            },
-            { status: response.status },
-          );
-        } catch {
-          throw new Error(
-            "Personal model connection failed. Check your model connection in My settings.",
-          );
-        }
+              { status: response.status },
+            );
+          } catch {
+            throw new Error(
+              "Personal model connection failed. Check your model connection in My settings.",
+            );
+          }
+        },
       },
-    });
+      true,
+    );
   }
   switch (provider.toLowerCase()) {
     case "openai":
       // OpenAI-compatible endpoints that do not implement the Responses API
       // tool loop (e.g. DeepSeek) can opt into the Chat Completions wire format.
       if (process.env.OPENAI_CHAT_COMPLETIONS === "true")
-        return openaiChatCompletions(id as OpenAIChatModel, {
-          baseURL: process.env.OPENAI_BASE_URL,
-          maxRetries: MODEL_MAX_RETRIES,
-        });
+        return reasoningChatCompletions(
+          id,
+          process.env.OPENAI_API_KEY?.trim() ?? "",
+          {
+            baseURL: process.env.OPENAI_BASE_URL,
+            maxRetries: MODEL_MAX_RETRIES,
+          },
+          true,
+        );
       return openaiText(id as OpenAIChatModel, {
         baseURL: process.env.OPENAI_BASE_URL,
         maxRetries: MODEL_MAX_RETRIES,
@@ -115,10 +178,51 @@ function openAiCompatible(
   const apiKey = process.env[`${prefix}_API_KEY`]?.trim();
   if (!apiKey)
     throw new Error(`MODEL uses the ${provider} provider, but ${prefix}_API_KEY is not set.`);
-  return createOpenaiChatCompletions(model as OpenAIChatModel, apiKey, {
-    baseURL: process.env[`${prefix}_BASE_URL`]?.trim() || defaultBaseUrl,
-    maxRetries: MODEL_MAX_RETRIES,
-  });
+  return reasoningChatCompletions(
+    model,
+    apiKey,
+    {
+      baseURL: process.env[`${prefix}_BASE_URL`]?.trim() || defaultBaseUrl,
+      maxRetries: MODEL_MAX_RETRIES,
+    },
+    true,
+  );
+}
+
+/**
+ * CopilotKit's AG-UI converter drops `reasoning` messages and therefore loses
+ * the text DeepSeek requires when replaying an earlier tool-call turn. Attach
+ * each reasoning block to the assistant turn that follows it.
+ */
+export function attachReplayReasoning(
+  messages: ReturnType<typeof convertInputToTanStackAI>["messages"],
+  inputMessages: RunAgentInput["messages"],
+) {
+  let targetIndex = 0;
+  let pending: Array<{ content: string; signature?: string }> = [];
+  for (const source of inputMessages) {
+    if (source.role === "reasoning") {
+      if (source.content || source.encryptedValue) {
+        pending.push({
+          content: source.content ?? "",
+          ...(source.encryptedValue ? { signature: source.encryptedValue } : {}),
+        });
+      }
+      continue;
+    }
+    if (source.role !== "user" && source.role !== "assistant" && source.role !== "tool") continue;
+    const target = messages[targetIndex++] as
+      | (ReturnType<typeof convertInputToTanStackAI>["messages"][number] & {
+          thinking?: Array<{ content: string; signature?: string }>;
+        })
+      | undefined;
+    if (!target) break;
+    if (source.role === "assistant" && pending.length) {
+      target.thinking = [...(target.thinking ?? []), ...pending];
+    }
+    pending = [];
+  }
+  return messages;
 }
 
 /** With OPENAI_BASE_URL set, a gateway model ID most likely needs the openai/ prefix. */
@@ -183,6 +287,7 @@ export function tanstackAgent(options: {
     type: "tanstack",
     factory: ({ input, abortController }) => {
       const converted = convertInputToTanStackAI(input);
+      attachReplayReasoning(converted.messages, input.messages);
       // Build the system prompt like the classic mode. It does not forward system messages.
       let system = options.prompt;
       if (input.context.length) {

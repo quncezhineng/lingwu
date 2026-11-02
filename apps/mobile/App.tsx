@@ -14,6 +14,8 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import type { Section, Workspace } from "../../packages/domain/src";
 import { AccountScreen } from "./src/account";
+import { AgentProductShell } from "./src/agent-product";
+import { AgentSpaceProvider } from "./src/agent-space";
 import { AgentStatus, IdeasScreen } from "./src/agent-ui";
 import { AgentWorkspaceProvider, useAgentWorkspace } from "./src/agent-workspace";
 import {
@@ -416,7 +418,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   const { t } = useTranslation();
   const api = useMemo(() => new LingWuApi(token), [token]);
   const [workspace, setWorkspace] = useState<Workspace>();
-  const [section, setSection] = useState<Section>("today");
+  const [section, setSection] = useState<Section>("chat");
   const [detail, setDetail] = useState<Detail>();
   const [toast, setToast] = useState<ToastState>();
   const [error, setError] = useState("");
@@ -516,20 +518,23 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
       <AgentWorkspaceProvider>
         <ComputerDraftProvider key={token}>
           <ThreadsProvider>
-            <WorkspaceShell
-              detail={detail}
-              toast={toast}
-              clearToast={() => setToast(undefined)}
-              error={error}
-              prompt={prompt}
-              onSignOut={signOut}
-            />
+            <AgentSpaceProvider>
+              <AgentProductShell
+                detail={detail}
+                toast={toast}
+                clearToast={() => setToast(undefined)}
+                error={error}
+                prompt={prompt}
+                onSignOut={signOut}
+              />
+            </AgentSpaceProvider>
           </ThreadsProvider>
         </ComputerDraftProvider>
       </AgentWorkspaceProvider>
     </WorkspaceContext.Provider>
   );
 }
+// biome-ignore lint/correctness/noUnusedVariables: kept while native-only legacy surfaces migrate.
 function WorkspaceShell({
   detail,
   toast,

@@ -6,8 +6,9 @@ import { z } from "zod";
 import { tanstackAgent } from "../apps/server/src/engine/tanstack-agent.ts";
 import { chatCompletionsFixture, modelFixture } from "./helpers/model.ts";
 
-const run = (agent: BuiltInAgent) => {
-  const input: RunAgentInput = {
+const run = (
+  agent: BuiltInAgent,
+  input: RunAgentInput = {
     threadId: "gateway-fixture",
     runId: "gateway-fixture-run",
     messages: [{ id: "m1", role: "user", content: "Use the tool once, then finish." }],
@@ -15,7 +16,8 @@ const run = (agent: BuiltInAgent) => {
     tools: [],
     context: [],
     forwardedProps: {},
-  };
+  },
+) => {
   return new Promise<{ error?: string; finished: boolean; text: string }>((resolve) => {
     let error: string | undefined;
     let finished = false;
@@ -138,6 +140,103 @@ for (const provider of [
     }
   });
 }
+
+test("deepseek replays reasoning_content when a tool call continues the same run", async (t) => {
+  const { requests } = await chatCompletionsFixture(
+    t,
+    (index) =>
+      index === 0 ? { name: "note_step", arguments: { note: "step one done" } } : undefined,
+    { baseUrl: "DEEPSEEK_BASE_URL", apiKey: "DEEPSEEK_API_KEY" },
+    {
+      reasoning: (index) => (index === 0 ? "I need to check the current state first." : undefined),
+    },
+  );
+  const agent = tanstackAgent({
+    model: "deepseek/fixture",
+    maxSteps: 3,
+    tools: [
+      defineTool({
+        name: "note_step",
+        description: "Record a step note",
+        parameters: z.object({ note: z.string() }),
+        execute: async ({ note }) => ({ recorded: note }),
+      }),
+    ],
+    prompt: "Use the tool once, then finish.",
+  });
+
+  const outcome = await run(agent);
+
+  assert.equal(outcome.error, undefined);
+  assert.equal(requests.length, 2);
+  const second = JSON.parse(requests[1]?.body ?? "{}") as {
+    messages?: Array<Record<string, unknown>>;
+  };
+  const toolCallTurn = second.messages?.find(
+    (message) => message.role === "assistant" && Array.isArray(message.tool_calls),
+  );
+  assert.equal(toolCallTurn?.reasoning_content, "I need to check the current state first.");
+});
+
+test("deepseek replays persisted AG-UI reasoning before a tool-call assistant turn", async (t) => {
+  const { requests } = await chatCompletionsFixture(t, () => undefined, {
+    baseUrl: "DEEPSEEK_BASE_URL",
+    apiKey: "DEEPSEEK_API_KEY",
+  });
+  const agent = tanstackAgent({
+    model: "deepseek/fixture",
+    maxSteps: 1,
+    tools: [],
+    prompt: "Answer the latest question.",
+  });
+  const outcome = await run(agent, {
+    threadId: "replayed-reasoning",
+    runId: "replayed-reasoning-run",
+    messages: [
+      { id: "u1", role: "user", content: "Check something first." },
+      {
+        id: "r1",
+        role: "reasoning",
+        content: "The earlier turn needed a tool before I could answer.",
+      },
+      {
+        id: "a1",
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "call-history",
+            type: "function",
+            function: { name: "note_step", arguments: '{"note":"old"}' },
+          },
+        ],
+      },
+      {
+        id: "t1",
+        role: "tool",
+        toolCallId: "call-history",
+        content: '{"recorded":"old"}',
+      },
+      { id: "u2", role: "user", content: "Now answer the latest question." },
+    ],
+    state: {},
+    tools: [],
+    context: [],
+    forwardedProps: {},
+  });
+
+  assert.equal(outcome.error, undefined);
+  const body = JSON.parse(requests[0]?.body ?? "{}") as {
+    messages?: Array<Record<string, unknown>>;
+  };
+  const historicalToolCall = body.messages?.find(
+    (message) => message.role === "assistant" && Array.isArray(message.tool_calls),
+  );
+  assert.equal(
+    historicalToolCall?.reasoning_content,
+    "The earlier turn needed a tool before I could answer.",
+  );
+});
 
 test("without the flag the OpenAI adapter keeps using the Responses API", async (t) => {
   const previous = process.env.OPENAI_CHAT_COMPLETIONS;

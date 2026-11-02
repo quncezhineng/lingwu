@@ -438,10 +438,27 @@ export function ChatScreen({
   prompt,
   thread,
   active = true,
+  hideHeader = false,
+  agentContext,
+  emptyEyebrow,
+  emptyTitleLead,
+  emptyTitleTail,
+  emptySubtitle,
+  composerPlaceholder,
+  onThreadUsed,
 }: {
   prompt?: { id: number; text: string; attachmentIds?: readonly string[] };
   thread?: Selection;
   active?: boolean;
+  /** The Agent shell supplies the primary header, so the legacy thread header can be hidden. */
+  hideHeader?: boolean;
+  agentContext?: { name: string; role: string; persona: string };
+  emptyEyebrow?: string;
+  emptyTitleLead?: string;
+  emptyTitleTail?: string;
+  emptySubtitle?: string;
+  composerPlaceholder?: string;
+  onThreadUsed?: () => void;
 }) {
   const { api, workspace: w, refresh, navigate, open, notify } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
@@ -455,6 +472,11 @@ export function ChatScreen({
   const threadId = richThreads ? selection.id : "local-main";
   const agentId = `lingwu-${threadId}`;
   const { agent, isReady } = useAgent({ agentId, runtimeAgentId: "default", threadId });
+  useAgentContext({
+    description:
+      "The currently selected LingWu Agent. Its name, responsibility and persona define how it should work. This context does not grant access to resources owned by other Agents.",
+    value: agentContext ?? { name: "LingWu", role: "research assistant", persona: "" },
+  });
   // A replayable mirror of the runtime's text events. The direct runtime transport
   // remains authoritative while attached; this channel repairs gaps and restores
   // an in-flight reply after a reload or a dropped connection.
@@ -670,6 +692,7 @@ export function ChatScreen({
           () => copilotkit.runAgent({ agent }),
           (onError) => copilotkit.subscribe({ onError }),
         );
+        onThreadUsed?.();
         // 线程由 runAgent 在平台上创建后才可命名；命名失败不影响主流程。
         if (firstTitle) void renameThread(threadId, firstTitle).catch(() => {});
         await Promise.all([refresh(), refreshAgent()]);
@@ -710,6 +733,7 @@ export function ChatScreen({
       richThreads,
       renameThread,
       threadId,
+      onThreadUsed,
     ],
   );
   const runQueued = useCallback(
@@ -1042,16 +1066,18 @@ export function ChatScreen({
         >
           <Text>{streamAnnouncement}</Text>
         </View>
-        <View style={conversationColumnStyle}>
-          <ConversationHeader
-            title={threadName}
-            status={headerStatus}
-            state={headerState}
-            onOpenFiles={() => setFilesOpen((open) => !open)}
-            filesOpen={filesOpen}
-            filesLabel={t("chat.openArtifacts")}
-          />
-        </View>
+        {!hideHeader && (
+          <View style={conversationColumnStyle}>
+            <ConversationHeader
+              title={threadName}
+              status={headerStatus}
+              state={headerState}
+              onOpenFiles={() => setFilesOpen((open) => !open)}
+              filesOpen={filesOpen}
+              filesLabel={t("chat.openArtifacts")}
+            />
+          </View>
+        )}
         <ScrollView
           ref={list}
           style={messageColumnStyle}
@@ -1107,7 +1133,7 @@ export function ChatScreen({
                       }}
                     />
                     <Text style={[typography.eyebrow, { color: colors.primaryStrong }]}>
-                      {t("chat.emptyEyebrow")}
+                      {emptyEyebrow ?? t("chat.emptyEyebrow")}
                     </Text>
                   </View>
                   <Text
@@ -1122,9 +1148,11 @@ export function ChatScreen({
                       fontFamily: fonts.serif,
                     }}
                   >
-                    {t("chat.emptyTitleLead")}
+                    {emptyTitleLead ?? t("chat.emptyTitleLead")}
                     {"\n"}
-                    <Text style={{ color: colors.faint }}>{t("chat.emptyTitleTail")}</Text>
+                    <Text style={{ color: colors.faint }}>
+                      {emptyTitleTail ?? t("chat.emptyTitleTail")}
+                    </Text>
                   </Text>
                   <Text
                     style={[
@@ -1136,7 +1164,7 @@ export function ChatScreen({
                       },
                     ]}
                   >
-                    {t("chat.emptySubtitle")}
+                    {emptySubtitle ?? t("chat.emptySubtitle")}
                   </Text>
                   <View style={[s.row, { gap: 7, marginTop: 4 }]}>
                     <Sparkles size={13} color={colors.faint} />
@@ -1684,7 +1712,7 @@ export function ChatScreen({
                     ? historyError
                       ? t("chat.conversationUnavailable")
                       : t("chat.loadingConversation")
-                    : t("chat.messagePlaceholder")
+                    : (composerPlaceholder ?? t("chat.messagePlaceholder"))
               }
               accessibilityLabel={t("chat.messageLingWu")}
               inputMinHeight={44}

@@ -14,6 +14,7 @@ import {
 import type { MarketDataService } from "../../../packages/integrations/src/market-data.ts";
 import { ActionService } from "./actions.ts";
 import { agentConfigured, makeRuntime } from "./agent.ts";
+import { agentSpaceSchema, type PersistedAgentSpace } from "./agent-space.ts";
 import { createAuth } from "./auth.ts";
 import { BrowserService } from "./browser.ts";
 import { ComputerService, type DockerRunner } from "./computer.ts";
@@ -361,6 +362,21 @@ export async function createApp(
         : connection,
     );
     return c.json(snapshot);
+  });
+  app.get("/api/agent-space", async (c) => {
+    const saved = await db.get<PersistedAgentSpace & { id: string }>(
+      c.get("owner"),
+      "agent-settings",
+      "space",
+    );
+    if (!saved) return c.json(null);
+    const { id: _id, ...state } = saved;
+    return c.json(state);
+  });
+  app.put("/api/agent-space", async (c) => {
+    const state = agentSpaceSchema.parse(await c.req.json());
+    await db.put(c.get("owner"), "agent-settings", { id: "space", ...state });
+    return c.json({ ok: true });
   });
   /** Persist the user's marketplace install choice for a plugin, skill or connector. */
   app.put("/api/capabilities/:id", async (c) => {

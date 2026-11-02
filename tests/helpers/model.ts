@@ -176,6 +176,9 @@ export async function chatCompletionsFixture(
   t: TestContext,
   reply: (index: number) => ModelCall | undefined | Promise<ModelCall | undefined>,
   env: { baseUrl?: string; apiKey?: string } = {},
+  options: {
+    reasoning?: (index: number) => string | undefined;
+  } = {},
 ) {
   const baseUrlVar = env.baseUrl ?? "OPENAI_BASE_URL";
   const apiKeyVar = env.apiKey ?? "OPENAI_API_KEY";
@@ -197,7 +200,14 @@ export async function chatCompletionsFixture(
           choices: [{ index: 0, delta, finish_reason: finish }],
         })}\n\n`,
       );
-    chunk({ role: "assistant" }, null);
+    const reasoning = options.reasoning?.(index);
+    chunk(
+      {
+        role: "assistant",
+        ...(reasoning ? { reasoning_content: reasoning } : {}),
+      },
+      null,
+    );
     if (call) {
       chunk({ content: "I'll check first." }, null);
       chunk(
