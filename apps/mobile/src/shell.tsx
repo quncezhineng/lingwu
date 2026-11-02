@@ -19,6 +19,7 @@ import {
   View,
 } from "react-native";
 import type { Section } from "../../../packages/domain/src";
+import { AccountAvatar } from "./account-avatar";
 import { useAgentWorkspace } from "./agent-workspace";
 import type { AccountProfile } from "./api";
 import { useTranslation } from "./i18n";
@@ -205,38 +206,6 @@ export function BrandMark({ size = 28 }: { size?: number }) {
       style={{ width: size, height: size, flexShrink: 0 }}
       accessible={false}
     />
-  );
-}
-
-function SidebarAccountAvatar({ avatarUrl, name }: { avatarUrl?: string; name: string }) {
-  const initial = name.trim().charAt(0).toUpperCase() || "?";
-  return (
-    <View
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: 999,
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        borderWidth: 1,
-        borderColor: colors.line,
-        backgroundColor: colors.paper,
-      }}
-    >
-      {avatarUrl ? (
-        <Image
-          source={{ uri: avatarUrl }}
-          resizeMode="cover"
-          accessible={false}
-          style={{ width: 28, height: 28 }}
-        />
-      ) : (
-        <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primaryStrong }}>
-          {initial}
-        </Text>
-      )}
-    </View>
   );
 }
 
@@ -522,7 +491,12 @@ export function Rail({ name }: { name: string }) {
                     : "transparent",
               })}
             >
-              <SidebarAccountAvatar avatarUrl={accountAvatarUrl} name={accountLabel} />
+              <AccountAvatar
+                avatarUrl={accountAvatarUrl}
+                name={accountLabel}
+                size={28}
+                borderRadius={999}
+              />
               {!collapsed && (
                 <View style={{ flex: 1 }}>
                   <Text

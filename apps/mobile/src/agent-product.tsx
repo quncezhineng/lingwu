@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AccountScreen } from "./account";
+import { AccountAvatar } from "./account-avatar";
 import { AgentOnboarding } from "./agent-onboarding";
 import { AgentOrb } from "./agent-orb";
 import { type AgentPanel, AgentSheets } from "./agent-sheets";
@@ -18,6 +19,7 @@ import { useAgentSpace } from "./agent-space";
 import { AGENT_CAPABILITY_LABELS, type AgentDefinition } from "./agent-space-model";
 import { AgentStatus } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
+import type { AccountProfile } from "./api";
 import { CapabilityHubScreen } from "./capability-hub";
 import { ChatScreen, WorkspaceTools } from "./chat";
 import { Details } from "./details";
@@ -113,7 +115,22 @@ function AgentRail({
 }) {
   const { t } = useTranslation();
   const { agents, current, selectAgent, preferences } = useAgentSpace();
-  const { navigate } = useWorkspace();
+  const { api, navigate, section } = useWorkspace();
+  const [accountAvatarUrl, setAccountAvatarUrl] = useState<string>();
+  useEffect(() => {
+    let active = true;
+    void api
+      .request<AccountProfile>("/api/auth/me")
+      .then((profile) => {
+        if (active) setAccountAvatarUrl(profile.avatarUrl ?? undefined);
+      })
+      .catch(() => {
+        // The account page owns the error state; the rail keeps its initial fallback.
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, section]);
   const choose = (agent: AgentDefinition) => {
     selectAgent(agent.id);
     navigate("chat");
@@ -244,20 +261,12 @@ function AgentRail({
           gap: 10,
         })}
       >
-        <View
-          style={{
-            width: 31,
-            height: 31,
-            borderRadius: 10,
-            backgroundColor: colors.tertiary,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text style={{ fontSize: 11, color: colors.muted, fontWeight: "600" }}>
-            {(preferences.name || "L").charAt(0).toUpperCase()}
-          </Text>
-        </View>
+        <AccountAvatar
+          avatarUrl={accountAvatarUrl}
+          name={preferences.name || "L"}
+          size={31}
+          borderRadius={10}
+        />
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>
             {preferences.name || t("agentSpace.account")}
