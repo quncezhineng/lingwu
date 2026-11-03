@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import type { Artifact } from "../../../packages/domain/src";
+import { Text } from "./app-text";
 import { fileSourceLabel } from "./file-library";
 import { useTranslation } from "./i18n";
 import { Check, FileText, FolderOpen, Upload } from "./icons";

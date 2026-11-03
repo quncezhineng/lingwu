@@ -4,14 +4,62 @@ import type { Message } from "@copilotkit/react-native/headless";
 import {
   mergePersistedThreadMessages,
   normalizeThreadMessages,
+  prependHistoryPage,
   readableToolCalls,
+  threadHistoryPagePath,
   threadHistoryPath,
+  visibleHistoryWindow,
 } from "../src/conversation-history.ts";
 
-test("thread history uses the authenticated Rich Threads endpoint", () => {
+test("full model context uses the authenticated thread snapshot endpoint", () => {
   assert.equal(
     threadHistoryPath("thread/with space"),
-    "/api/copilotkit/threads/thread%2Fwith%20space/messages",
+    "/api/conversation/threads/thread%2Fwith%20space/context",
+  );
+});
+
+test("history starts at the latest 30 messages and encodes an exclusive older cursor", () => {
+  assert.equal(
+    threadHistoryPagePath("thread/with space"),
+    "/api/conversation/threads/thread%2Fwith%20space/messages?limit=30",
+  );
+  assert.equal(
+    threadHistoryPagePath("thread", "message/old?"),
+    "/api/conversation/threads/thread/messages?limit=30&before=message%2Fold%3F",
+  );
+  assert.equal(
+    threadHistoryPagePath(undefined, "legacy"),
+    "/api/conversation?limit=30&before=legacy",
+  );
+});
+
+test("restoring full model context does not reveal unloaded messages in the transcript", () => {
+  const context = Array.from({ length: 90 }, (_, i) => ({
+    id: `m${i}`,
+    role: "user",
+    content: `${i}`,
+  })) satisfies Message[];
+  assert.deepEqual(visibleHistoryWindow(context, "m60"), context.slice(60));
+  assert.deepEqual(visibleHistoryWindow(context, "m30"), context.slice(30));
+  assert.deepEqual(visibleHistoryWindow(context, null), context);
+});
+
+test("older pages stay chronological after a turn has loaded full model context", () => {
+  const context = Array.from({ length: 90 }, (_, i) => ({
+    id: `m${i}`,
+    role: "user",
+    content: `${i}`,
+  })) satisfies Message[];
+  const older = context.slice(30, 60);
+  assert.deepEqual(prependHistoryPage(older, context.slice(60)), context.slice(30));
+  assert.deepEqual(prependHistoryPage(older, context), context);
+  const withLive = [
+    ...context,
+    { id: "new", role: "assistant", content: "New reply" },
+  ] satisfies Message[];
+  assert.deepEqual(
+    visibleHistoryWindow(prependHistoryPage(older, withLive), "m30"),
+    withLive.slice(30),
   );
 });
 

@@ -1,11 +1,5 @@
-import {
-  Pressable,
-  type StyleProp,
-  Text,
-  useWindowDimensions,
-  View,
-  type ViewStyle,
-} from "react-native";
+import { Pressable, type StyleProp, useWindowDimensions, View, type ViewStyle } from "react-native";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { ArrowUpRight, type IconComponent, Sparkles, Star } from "./icons";
 import { breakpoints, colors, radius, space, statusColors, typography } from "./theme";

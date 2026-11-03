@@ -2,6 +2,7 @@ import type { Dictionary } from "../../types";
 
 /** 主对话界面文案（命名空间：chat）。 */
 const chat = {
+  "chat.tableScrollHint": "Scroll horizontally to view the full table",
   "chat.serverToolTask": "Task",
   "chat.serverToolAgentProgress": "Agent progress",
   "chat.serverToolGoal": "Goal",
@@ -10,12 +11,19 @@ const chat = {
   "chat.serverToolSaving": "Saving {name}…",
   "chat.serverToolWaiting": "Waiting for the server.",
   "chat.serverToolOpenWorkspace": "Open the workspace to see the saved result.",
+  "chat.taskCreationIncomplete":
+    "This task was not created. You can continue describing what you need in the conversation.",
+  "chat.serverToolIncomplete":
+    "This operation was not completed. You can continue in the conversation.",
   "chat.serverToolView": "View {name}",
   "chat.historyLoadError":
     "Could not load conversation. Your saved messages have not been changed. {detail}",
   "chat.stopError": "Could not stop response: {detail}",
   "chat.saveError": "Conversation could not be saved: {detail}",
   "chat.retryLoadingConversation": "Retry loading conversation",
+  "chat.loadEarlierMessages": "Load earlier messages",
+  "chat.loadingEarlierMessages": "Loading earlier messages…",
+  "chat.retryEarlierMessages": "Could not load earlier messages. Tap to retry",
   "chat.emptyTitle": "Your personal investment research agent, at the ready.",
   "chat.emptyTitleLead": "Your personal investment research agent",
   "chat.emptyTitleTail": "research agent, at the ready.",

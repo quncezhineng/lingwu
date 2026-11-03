@@ -9,11 +9,11 @@ import {
   AccessibilityInfo,
   Animated,
   Pressable,
-  Text,
   useWindowDimensions,
   View,
   type ViewStyle,
 } from "react-native";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { currencySymbol, directionOf, formatPercent } from "./market-format";

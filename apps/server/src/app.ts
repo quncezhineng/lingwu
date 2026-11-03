@@ -1,6 +1,6 @@
 import "./config.ts";
 import { randomUUID } from "node:crypto";
-import { MessageSchema } from "@ag-ui/core";
+import { type Message, MessageSchema } from "@ag-ui/core";
 import { CopilotKitIntelligence } from "@copilotkit/runtime/v2";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -20,6 +20,11 @@ import { BrowserService } from "./browser.ts";
 import { ComputerService, type DockerRunner } from "./computer.ts";
 import { computerRoutes } from "./computer-routes.ts";
 import { assertApiDeploymentConfig, type Config } from "./config.ts";
+import {
+  ConversationHistory,
+  conversationHistoryPage,
+  historyQuery,
+} from "./conversation-history.ts";
 import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
 import { financialRoutes } from "./engine/financial-routes.ts";
@@ -87,6 +92,11 @@ export async function createApp(
   );
   const intelligence = new CopilotKitIntelligence({ apiKey: config.intelligenceApiKey });
   const conversationStream = new ConversationStream(db);
+  const conversationHistory = new ConversationHistory(
+    async (owner, threadId) =>
+      (await intelligence.getThreadMessages({ userId: owner, threadId })).messages,
+    async (owner, threadId) => (await conversationStream.status(owner, threadId)).lastEventId,
+  );
   const runtime = makeRuntime(config, agent, auth, intelligence, conversationStream);
   // 启动时恢复上一次在 App 里选中的模型，让选择跨重启保留。
   // 若该厂商的密钥已被移除，则回退到 .env 的 MODEL，避免指向不可用的模型。
@@ -124,7 +134,11 @@ export async function createApp(
   app.onError((error, c) => {
     if (error instanceof z.ZodError)
       return c.json({ error: error.issues.map((i) => i.message).join("; ") }, 422);
-    if (error instanceof AppError) return c.json({ error: error.message }, error.status);
+    if (error instanceof AppError)
+      return c.json(
+        { error: error.message, ...(error.code ? { code: error.code } : {}) },
+        error.status,
+      );
     if (error.name === "PdfError" || error.name === "RecurringEventError")
       return c.json({ error: error.message }, 422);
     if (error instanceof SyntaxError) return c.json({ error: "Invalid request data" }, 400);
@@ -620,9 +634,28 @@ export async function createApp(
     }
     return c.json({ threadId: main.threadId, existing: true });
   });
-  app.get("/api/conversation", async (c) =>
-    c.json((await db.get(c.get("owner"), "conversations", "default")) ?? { messages: [] }),
+  app.get("/api/conversation/threads/:threadId/messages", async (c) => {
+    const query = historyQuery.parse(c.req.query());
+    const messages = await conversationHistory.messages(c.get("owner"), c.req.param("threadId"));
+    return c.json(conversationHistoryPage(messages, query));
+  });
+  app.get("/api/conversation/threads/:threadId/context", async (c) =>
+    c.json({
+      messages: await conversationHistory.messages(c.get("owner"), c.req.param("threadId")),
+    }),
   );
+  app.get("/api/conversation", async (c) => {
+    const saved = (await db.get<{ messages: Message[] }>(
+      c.get("owner"),
+      "conversations",
+      "default",
+    )) ?? { messages: [] };
+    return c.json(
+      c.req.query("limit") !== undefined || c.req.query("before") !== undefined
+        ? conversationHistoryPage(saved.messages, historyQuery.parse(c.req.query()))
+        : saved,
+    );
+  });
   app.put("/api/conversation", async (c) => {
     const body = await c.req.json();
     const messages = z.array(z.unknown()).max(1000).parse(body.messages);

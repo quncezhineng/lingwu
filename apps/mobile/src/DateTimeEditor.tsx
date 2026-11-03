@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "./app-text";
 import DateFields from "./DateFields";
 import { isCompleteInstant, localDateTime, zonedInstant } from "./date-time";
 import { useTranslation } from "./i18n";

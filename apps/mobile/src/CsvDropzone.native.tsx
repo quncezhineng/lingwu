@@ -1,5 +1,7 @@
 /** 原生上传区：点击选择 CSV 文件。 */
-import { Text, View } from "react-native";
+/** 原生上传区：点击选择 CSV 文件。 */
+import { View } from "react-native";
+import { Text } from "./app-text";
 import type { PickedCsv } from "./csv-file";
 import { pickCsvFile } from "./csv-file";
 import { Upload } from "./icons";

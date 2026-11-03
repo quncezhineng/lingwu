@@ -2,6 +2,7 @@ import type { Dictionary } from "../../types";
 
 /** 主对话界面文案（命名空间：chat）。 */
 const chat = {
+  "chat.tableScrollHint": "左右滑动查看完整表格",
   "chat.serverToolTask": "任务",
   "chat.serverToolAgentProgress": "智能体进度",
   "chat.serverToolGoal": "目标",
@@ -10,11 +11,16 @@ const chat = {
   "chat.serverToolSaving": "正在保存{name}…",
   "chat.serverToolWaiting": "正在等待服务器。",
   "chat.serverToolOpenWorkspace": "打开工作区即可查看已保存的结果。",
+  "chat.taskCreationIncomplete": "这次任务未能创建。你可以在对话中继续说明需求。",
+  "chat.serverToolIncomplete": "这次操作未完成。你可以回到对话继续。",
   "chat.serverToolView": "查看{name}",
   "chat.historyLoadError": "无法加载对话。你已保存的消息没有发生变化。{detail}",
   "chat.stopError": "无法停止回复：{detail}",
   "chat.saveError": "无法保存对话：{detail}",
   "chat.retryLoadingConversation": "重试加载对话",
+  "chat.loadEarlierMessages": "加载更早消息",
+  "chat.loadingEarlierMessages": "正在加载更早消息…",
+  "chat.retryEarlierMessages": "加载未完成，点击重试",
   "chat.emptyTitle": "你的个人投研智能体，随时待命。",
   "chat.emptyTitleLead": "你的个人投研智能体，",
   "chat.emptyTitleTail": "随时待命。",

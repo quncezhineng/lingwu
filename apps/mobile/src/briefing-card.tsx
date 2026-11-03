@@ -10,12 +10,12 @@ import {
   ActivityIndicator,
   LayoutAnimation,
   Pressable,
-  Text,
   useWindowDimensions,
   View,
 } from "react-native";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text } from "./app-text";
 import {
   briefingIndices,
   briefingInsightView,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { AccountScreen } from "./account";
 import { AgentOrb } from "./agent-orb";
@@ -8,23 +8,23 @@ import {
   AGENT_CAPABILITY_LABELS,
   AGENT_TEMPLATES,
   type AgentAvatarId,
-  type AgentSkill,
   type AgentTemplateId,
 } from "./agent-space-model";
-import { AgentStatus, TaskCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text } from "./app-text";
+import { BotEditPage } from "./bot-pages/edit";
+import { BotGoalsMemoryPage } from "./bot-pages/goals-memory";
+import { BotHistoryPage } from "./bot-pages/history";
+import { BotLibraryPage } from "./bot-pages/library";
+import { useBotResources } from "./bot-pages/shared";
+import { BotSkillsPage } from "./bot-pages/skills";
 import { MarketBriefingCard } from "./briefing-card";
 import { CapabilityHubScreen } from "./capability-hub";
 import { useTranslation } from "./i18n";
 import {
-  Bell,
-  Check,
   ChevronRight,
   Clock3,
-  FileText,
-  Folder,
-  MessageCircle,
-  MoreHorizontal,
+  type MessageCircle,
   Plus,
   Settings2,
   Sparkles,
@@ -32,18 +32,26 @@ import {
   Target,
 } from "./icons";
 import { InsightCard } from "./insight-card";
+import { ModelSelector } from "./model-selector";
 import { FilesScreen } from "./screens";
 import { TaskHubScreen } from "./task-hub";
-import { Button, colors, Field, radius, SectionHeading, Sheet, s, space, typography } from "./ui";
+import { Button, colors, Field, radius, Sheet, s, typography } from "./ui";
+import { WatchlistAddSheet } from "./watchlist";
 import { WatchlistHubScreen } from "./watchlist-hub";
 import { useWorkspace } from "./workspace";
 
 export type AgentPanel =
   | "more"
   | "manage"
+  | "bot-edit"
+  | "bot-library"
+  | "bot-skills"
+  | "bot-history"
+  | "bot-goals-memory"
   | "create"
   | "preferences"
   | "watchlist"
+  | "watchlist-add"
   | "tasks"
   | "files"
   | "insights"
@@ -58,6 +66,7 @@ function PanelButton({
   badge,
   onPress,
   active,
+  compact = false,
 }: {
   icon: typeof MessageCircle;
   title: string;
@@ -65,15 +74,16 @@ function PanelButton({
   badge?: number;
   onPress: () => void;
   active?: boolean;
+  compact?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 62,
-        paddingHorizontal: 12,
-        paddingVertical: 11,
+        minHeight: 52,
+        paddingHorizontal: 7,
+        paddingVertical: 8,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: active ? colors.accentLine : "transparent",
@@ -85,8 +95,8 @@ function PanelButton({
     >
       <View
         style={{
-          width: 38,
-          height: 38,
+          width: compact ? 32 : 38,
+          height: compact ? 32 : 38,
           borderRadius: 12,
           alignItems: "center",
           justifyContent: "center",
@@ -96,8 +106,8 @@ function PanelButton({
         <Icon size={18} color={active ? colors.primary : colors.muted} />
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-        <Text style={[s.text, { fontWeight: "600" }]}>{title}</Text>
-        {!!detail && (
+        <Text style={[s.text, { fontSize: 13, fontWeight: "500" }]}>{title}</Text>
+        {!!detail && !compact && (
           <Text numberOfLines={2} style={[s.small, { color: colors.faint }]}>
             {detail}
           </Text>
@@ -125,7 +135,121 @@ function PanelButton({
 }
 
 function SheetSection({ children }: { children: React.ReactNode }) {
-  return <View style={{ gap: 4, marginBottom: space.lg }}>{children}</View>;
+  return <View style={{ gap: 4, marginBottom: 16 }}>{children}</View>;
+}
+
+export function AgentMoreContent({
+  onPanel,
+  compact = true,
+  showWatchlistLink = true,
+}: {
+  onPanel: (panel: AgentPanel) => void;
+  compact?: boolean;
+  showWatchlistLink?: boolean;
+}) {
+  const { t, locale } = useTranslation();
+  const { current } = useAgentSpace();
+  const { data } = useAgentWorkspace();
+  const tasks = data?.tasks ?? [];
+  const activeTasks = tasks.filter(
+    (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
+  );
+  const capabilityPriority = ["reminder", "research", "financials"];
+  const capabilityRank = (id: string) => {
+    const index = capabilityPriority.indexOf(id);
+    return index < 0 ? capabilityPriority.length : index;
+  };
+  const capabilities = current.skills
+    .filter((skill) => !["quote", "brief", "notes"].includes(skill))
+    .sort((a, b) => capabilityRank(a) - capabilityRank(b))
+    .slice(0, 4);
+  return (
+    <View style={{ gap: 6 }}>
+      <SheetSection>
+        <PanelButton
+          compact={compact}
+          icon={Star}
+          title={t("agentSpace.marketBrief")}
+          detail={t("agentSpace.marketBriefDetail")}
+          onPress={() => onPanel("brief")}
+        />
+        <PanelButton
+          compact={compact}
+          icon={Sparkles}
+          title={t("agentSpace.insights")}
+          detail={t("agentSpace.insightsDetail")}
+          onPress={() => onPanel("insights")}
+        />
+        {showWatchlistLink && (
+          <PanelButton
+            compact={compact}
+            icon={Star}
+            title={t("agentSpace.watchlist")}
+            detail={t("agentSpace.watchlistDetail")}
+            onPress={() => onPanel("watchlist")}
+          />
+        )}
+        <PanelButton
+          compact={compact}
+          icon={Clock3}
+          title={t("agentSpace.tasks")}
+          detail={t("agentSpace.tasksDetail")}
+          badge={activeTasks.length}
+          onPress={() => onPanel("tasks")}
+        />
+      </SheetSection>
+
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 9 }}>
+        {capabilities.map((capability) => {
+          const label = AGENT_CAPABILITY_LABELS[capability];
+          return (
+            <Pressable
+              key={capability}
+              accessibilityRole="button"
+              onPress={() => onPanel("capabilities")}
+              style={({ pressed }) => ({
+                width: "47%",
+                minHeight: 64,
+                padding: 11,
+                borderRadius: 15,
+                borderWidth: 1,
+                borderColor: colors.line,
+                backgroundColor: pressed ? colors.surface : colors.paper,
+                gap: 9,
+              })}
+            >
+              <Sparkles size={15} color={colors.primary} />
+              <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]} numberOfLines={2}>
+                {label ? label[locale === "zh-Hans" ? "zh" : "en"] : capability}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => onPanel("capabilities")}
+        style={({ pressed }) => ({
+          minHeight: 43,
+          marginTop: 8,
+          borderWidth: 1,
+          borderStyle: "dashed",
+          borderColor: colors.lineStrong,
+          borderRadius: 12,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 9,
+          backgroundColor: pressed ? colors.overlay1 : "transparent",
+        })}
+      >
+        <Plus size={17} color={colors.faint} />
+        <Text style={{ fontSize: 13, color: colors.faint }}>
+          {t("agentSpace.unlockMoreFeatures")}
+        </Text>
+      </Pressable>
+    </View>
+  );
 }
 
 function AgentMoreSheet({
@@ -135,116 +259,10 @@ function AgentMoreSheet({
   onClose: () => void;
   onPanel: (panel: AgentPanel) => void;
 }) {
-  const { t, locale } = useTranslation();
-  const { current } = useAgentSpace();
-  const { data } = useAgentWorkspace();
-  const tasks = data?.tasks ?? [];
-  const agentTasks = tasks.filter(
-    (task) => task.threadId === current.threadId || (!task.threadId && current.system),
-  );
-  const activeTasks = agentTasks.filter(
-    (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
-  );
-  const linkedMonitors = (data?.monitors ?? []).filter((monitor) =>
-    agentTasks.some((task) => task.id === monitor.taskId),
-  );
-  const capabilities = current.skills.slice(0, 4);
+  const { t } = useTranslation();
   return (
-    <Sheet title={t("agentSpace.more")} onClose={onClose} wide>
-      <View style={{ gap: 6 }}>
-        <Text style={[typography.eyebrow, { color: colors.faint, marginBottom: 7 }]}>
-          {t("agentSpace.globalArea")}
-        </Text>
-        <SheetSection>
-          <PanelButton
-            icon={Star}
-            title={t("agentSpace.marketBrief")}
-            detail={t("agentSpace.marketBriefDetail")}
-            onPress={() => onPanel("brief")}
-          />
-          <PanelButton
-            icon={Sparkles}
-            title={t("agentSpace.insights")}
-            detail={t("agentSpace.insightsDetail")}
-            onPress={() => onPanel("insights")}
-          />
-          <PanelButton
-            icon={Star}
-            title={t("agentSpace.watchlist")}
-            detail={t("agentSpace.watchlistDetail")}
-            onPress={() => onPanel("watchlist")}
-          />
-          <PanelButton
-            icon={Clock3}
-            title={t("agentSpace.tasks")}
-            detail={t("agentSpace.tasksDetail")}
-            badge={activeTasks.length}
-            onPress={() => onPanel("tasks")}
-          />
-        </SheetSection>
-
-        <Text style={[typography.eyebrow, { color: colors.faint, marginTop: 6, marginBottom: 7 }]}>
-          {t("agentSpace.agentLearned", { name: current.name })}
-        </Text>
-        <SheetSection>
-          <PanelButton
-            icon={Bell}
-            title={t("agentSpace.scheduledTasks")}
-            detail={`${linkedMonitors.filter((monitor) => monitor.status === "active").length} · ${current.name}`}
-            onPress={() => {
-              onClose();
-              onPanel("manage");
-            }}
-          />
-          <PanelButton
-            icon={Clock3}
-            title={t("agentSpace.taskHistory")}
-            detail={`${agentTasks.length} · ${current.name}`}
-            onPress={() => onPanel("tasks")}
-          />
-        </SheetSection>
-
-        <Text style={[typography.eyebrow, { color: colors.faint, marginBottom: 9 }]}>
-          {t("agentSpace.quickCapabilities")}
-        </Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 9 }}>
-          {capabilities.map((capability) => {
-            const label = AGENT_CAPABILITY_LABELS[capability];
-            return (
-              <Pressable
-                key={capability}
-                accessibilityRole="button"
-                onPress={() => onPanel("capabilities")}
-                style={({ pressed }) => ({
-                  width: "48%",
-                  minHeight: 82,
-                  padding: 13,
-                  borderRadius: 15,
-                  borderWidth: 1,
-                  borderColor: colors.line,
-                  backgroundColor: pressed ? colors.surface : colors.paper,
-                  gap: 9,
-                })}
-              >
-                <Sparkles size={18} color={colors.primary} />
-                <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]} numberOfLines={2}>
-                  {label ? label[locale === "zh-Hans" ? "zh" : "en"] : capability}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <Button
-          icon={MoreHorizontal}
-          onPress={() => onPanel("capabilities")}
-          style={{ marginTop: 12 }}
-        >
-          {t("agentSpace.allCapabilities")}
-        </Button>
-        <Text style={[s.small, { color: colors.faint, marginTop: 10, lineHeight: 18 }]}>
-          {t("agentSpace.globalNote")}
-        </Text>
-      </View>
+    <Sheet botLayout title={t("agentSpace.more")} onClose={onClose} wide>
+      <AgentMoreContent onPanel={onPanel} />
     </Sheet>
   );
 }
@@ -271,6 +289,7 @@ function CreateAgentSheet({ onClose, onCreated }: { onClose: () => void; onCreat
   if (!template) {
     return (
       <Sheet
+        botLayout
         title={t("agentSpace.createTitle")}
         subtitle={t("agentSpace.createSubtitle")}
         onClose={onClose}
@@ -304,7 +323,7 @@ function CreateAgentSheet({ onClose, onCreated }: { onClose: () => void; onCreat
   }
 
   return (
-    <Sheet title={t("agentSpace.customizeTitle")} onClose={onClose} narrow>
+    <Sheet botLayout title={t("agentSpace.customizeTitle")} onClose={onClose} narrow>
       <View style={{ alignItems: "center", marginBottom: 8 }}>
         <AgentOrb avatar={avatar} size={68} />
       </View>
@@ -356,146 +375,26 @@ function CreateAgentSheet({ onClose, onCreated }: { onClose: () => void; onCreat
   );
 }
 
-function PersonaEditor({ onSaved }: { onSaved: () => void }) {
+function AgentManagerSheet({
+  onClose,
+  onPanel,
+  onDismiss,
+}: {
+  onClose: () => void;
+  onPanel: (panel: AgentPanel) => void;
+  onDismiss: () => void;
+}) {
   const { t } = useTranslation();
-  const { current, updateAgent } = useAgentSpace();
-  const [name, setName] = useState(current.name);
-  const [role, setRole] = useState(current.role);
-  const [persona, setPersona] = useState(current.persona);
-  const [avatar, setAvatar] = useState(current.avatar);
-  return (
-    <View style={{ gap: 2 }}>
-      <View style={{ alignItems: "center", marginBottom: 8 }}>
-        <AgentOrb avatar={avatar} size={62} />
-      </View>
-      <Field label={t("agentSpace.agentName")} value={name} onChangeText={setName} maxLength={20} />
-      <Field label={t("agentSpace.agentRole")} value={role} onChangeText={setRole} maxLength={30} />
-      <Field
-        label={t("agentSpace.agentPersona")}
-        value={persona}
-        onChangeText={setPersona}
-        maxLength={1000}
-        multiline
-      />
-      <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-        {(["orb", "bloom", "moon", "planet", "cat"] as AgentAvatarId[]).map((item) => (
-          <Pressable
-            key={item}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: avatar === item }}
-            onPress={() => setAvatar(item)}
-            style={{
-              width: 43,
-              height: 43,
-              borderRadius: radius.full,
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 1,
-              borderColor: avatar === item ? colors.primary : colors.line,
-              backgroundColor: avatar === item ? colors.sky : colors.paper,
-            }}
-          >
-            <AgentOrb avatar={item} size={30} />
-          </Pressable>
-        ))}
-      </View>
-      <Button
-        primary
-        disabled={!name.trim() || !persona.trim()}
-        onPress={() => {
-          updateAgent(current.id, { name, role, persona, avatar });
-          onSaved();
-        }}
-      >
-        {t("agentSpace.savePersona")}
-      </Button>
-    </View>
-  );
-}
-
-function SkillEditor({ skill, onClose }: { skill?: AgentSkill; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { current, saveSkill } = useAgentSpace();
-  const [name, setName] = useState(() => skill?.name ?? t("agentSpace.skillSampleName"));
-  const [purpose, setPurpose] = useState(
-    () => skill?.purpose ?? t("agentSpace.skillSamplePurpose"),
-  );
-  const [instructions, setInstructions] = useState(
-    () => skill?.instructions ?? t("agentSpace.skillSampleInstructions"),
-  );
-  const [outputFormat, setOutputFormat] = useState(
-    () => skill?.outputFormat ?? t("agentSpace.skillSampleOutput"),
-  );
-  return (
-    <View style={{ gap: 2 }}>
-      <Field label={t("agentSpace.skillName")} value={name} onChangeText={setName} maxLength={40} />
-      <Field
-        label={t("agentSpace.skillPurpose")}
-        value={purpose}
-        onChangeText={setPurpose}
-        maxLength={120}
-      />
-      <Field
-        label={t("agentSpace.skillInstructions")}
-        value={instructions}
-        onChangeText={setInstructions}
-        maxLength={4000}
-        multiline
-      />
-      <Field
-        label={t("agentSpace.skillOutput")}
-        value={outputFormat}
-        onChangeText={setOutputFormat}
-        maxLength={800}
-        multiline
-      />
-      <Button
-        primary
-        disabled={!name.trim() || !instructions.trim()}
-        onPress={() => {
-          saveSkill(current.id, { name, purpose, instructions, outputFormat }, skill?.id);
-          onClose();
-        }}
-      >
-        {t("agentSpace.saveSkill")}
-      </Button>
-    </View>
-  );
-}
-
-function AgentManagerSheet({ onClose }: { onClose: () => void }) {
-  const { t, locale } = useTranslation();
-  const { current, deleteAgent, toggleSkill } = useAgentSpace();
-  const { data } = useAgentWorkspace();
-  const { open, navigate } = useWorkspace();
-  const [tab, setTab] = useState<"profile" | "tasks" | "files" | "skills" | "settings">("profile");
-  const [editingPersona, setEditingPersona] = useState(false);
-  const [editingSkill, setEditingSkill] = useState<AgentSkill | "new" | undefined>();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const agentTasks = (data?.tasks ?? []).filter(
-    (task) => task.threadId === current.threadId || (!task.threadId && current.system),
-  );
-  const agentArtifacts = (data?.artifacts ?? []).filter((artifact) =>
-    agentTasks.some((task) => task.id === artifact.taskId),
-  );
-  const agentTaskIds = new Set(agentTasks.map((task) => task.id));
-  const liveMonitors = (data?.monitors ?? []).filter(
-    (monitor) => monitor.status !== "stopped" && agentTaskIds.has(monitor.taskId),
-  );
-  const libraryCount = agentArtifacts.length;
+  const { current, data, tasks: agentTasks, artifacts: agentArtifacts, files } = useBotResources();
+  const libraryCount = agentArtifacts.length + files.length;
   const skillCount = current.skills.length + current.customSkills.length;
 
   return (
-    <Sheet title={current.name} onClose={onClose} wide>
+    <Sheet botLayout title={current.name} onClose={onClose} narrow>
       <View
         style={{
-          padding: 18,
-          borderRadius: 18,
-          borderWidth: 1,
-          borderColor: colors.line,
-          backgroundColor: colors.paper,
-          gap: 14,
+          paddingTop: 9,
+          gap: 15,
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
@@ -520,362 +419,83 @@ function AgentManagerSheet({ onClose }: { onClose: () => void }) {
             </View>
             <Text style={[s.small, { marginTop: 3 }]}>{current.role}</Text>
           </View>
-          <Button small icon={Settings2} onPress={() => setEditingPersona(true)}>
-            {t("agentSpace.editPersona")}
+          <Button small icon={Settings2} onPress={() => onPanel("bot-edit")}>
+            {t("agent.edit")}
           </Button>
         </View>
-        <Text style={[s.muted, { fontSize: 13, lineHeight: 22 }]}>{current.persona}</Text>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          {[
-            [String(liveMonitors.length), t("agentSpace.scheduledTasks")],
-            [String(libraryCount), t("agentSpace.artifacts")],
-            [String(skillCount), t("agentSpace.skills")],
-          ].map(([value, label]) => (
+        <Text
+          style={[
+            s.muted,
+            {
+              fontSize: 11,
+              lineHeight: 22,
+              padding: 15,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: colors.accentLine,
+              backgroundColor: colors.sky,
+            },
+          ]}
+        >
+          {current.persona}
+        </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            paddingHorizontal: 6,
+            paddingVertical: 15,
+            borderRadius: 17,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: colors.paper,
+          }}
+        >
+          {(
+            [
+              ["tasks", String(data?.tasks.length ?? 0), t("agentSpace.tasks")],
+              ["bot-library", String(libraryCount), t("agentSpace.library")],
+              ["bot-skills", String(skillCount), t("agentSpace.skills")],
+            ] as const
+          ).map(([id, value, label], index) => (
             <Pressable
-              key={label}
-              onPress={() =>
-                setTab(
-                  label === t("agentSpace.artifacts")
-                    ? "files"
-                    : label === t("agentSpace.skills")
-                      ? "skills"
-                      : "tasks",
-                )
-              }
+              key={id}
+              accessibilityRole="button"
+              accessibilityLabel={`${label} ${value}`}
+              onPress={() => onPanel(id)}
               style={{
                 flex: 1,
-                minHeight: 59,
-                borderRadius: 13,
-                backgroundColor: colors.surfaceRaised,
+                minHeight: 56,
+                borderRightWidth: index < 2 ? 1 : 0,
+                borderRightColor: colors.line,
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 2,
               }}
             >
-              <Text style={[s.metric, { fontSize: 18, color: colors.text }]}>{value}</Text>
+              <Text style={[s.metric, { fontSize: 22, color: colors.primaryStrong }]}>{value}</Text>
               <Text style={[s.small, { color: colors.faint }]}>{label}</Text>
             </Pressable>
           ))}
         </View>
       </View>
 
-      {editingPersona ? (
-        <View style={{ marginTop: 18 }}>
-          <SectionHeading title={t("agentSpace.editPersona")} />
-          <PersonaEditor onSaved={() => setEditingPersona(false)} />
-        </View>
-      ) : editingSkill ? (
-        <View style={{ marginTop: 18 }}>
-          <SectionHeading
-            title={editingSkill === "new" ? t("agentSpace.createSkill") : t("agentSpace.editSkill")}
+      <View style={{ marginTop: 12, gap: 4 }}>
+        <SheetSection>
+          <PanelButton
+            icon={Clock3}
+            title={t("agentSpace.analysisHistory")}
+            detail={`${agentTasks.length} · ${current.name}`}
+            onPress={() => onPanel("bot-history")}
           />
-          <SkillEditor
-            skill={editingSkill === "new" ? undefined : editingSkill}
-            onClose={() => setEditingSkill(undefined)}
+          <PanelButton
+            icon={Target}
+            title={t("agentSpace.goalsMemory")}
+            detail={`${data?.goals.length ?? 0} · ${data?.memories.length ?? 0}`}
+            onPress={() => onPanel("bot-goals-memory")}
           />
-        </View>
-      ) : (
-        <>
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 4,
-              padding: 4,
-              borderRadius: 12,
-              backgroundColor: colors.surface,
-              marginVertical: 18,
-            }}
-          >
-            {(
-              [
-                ["profile", t("agentSpace.manageAgent"), MessageCircle],
-                ["tasks", t("agentSpace.scheduledTasks"), Bell],
-                ["files", t("agentSpace.artifacts"), Folder],
-                ["skills", t("agentSpace.skills"), Sparkles],
-                ["settings", t("agentSpace.persona"), Settings2],
-              ] as const
-            ).map(([id, label]) => (
-              <Pressable
-                key={id}
-                onPress={() => setTab(id)}
-                style={{
-                  flex: 1,
-                  minHeight: 36,
-                  borderRadius: 9,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: tab === id ? colors.paper : "transparent",
-                }}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: 11,
-                    lineHeight: 16,
-                    fontWeight: tab === id ? "600" : "500",
-                    color: tab === id ? colors.primaryStrong : colors.muted,
-                  }}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {tab === "profile" && (
-            <View style={{ gap: 4 }}>
-              <SheetSection>
-                <PanelButton
-                  icon={Clock3}
-                  title={t("agentSpace.analysisHistory")}
-                  detail={`${agentTasks.length} · ${current.name}`}
-                  onPress={() => setTab("tasks")}
-                />
-                <PanelButton
-                  icon={Target}
-                  title={t("agentSpace.goalsMemory")}
-                  detail={`${data?.goals.length ?? 0} · ${data?.memories.length ?? 0}`}
-                  onPress={() => setTab("settings")}
-                />
-              </SheetSection>
-              <Text style={[s.small, { color: colors.faint, lineHeight: 18 }]}>
-                {t("agentSpace.sampleNote")}
-              </Text>
-            </View>
-          )}
-
-          {tab === "tasks" && (
-            <View style={{ gap: 12 }}>
-              <SectionHeading title={t("agentSpace.scheduledTasks")} count={liveMonitors.length} />
-              {liveMonitors.length ? (
-                liveMonitors.map((monitor) => (
-                  <View
-                    key={monitor.id}
-                    style={{
-                      padding: 14,
-                      borderRadius: 14,
-                      borderWidth: 1,
-                      borderColor: colors.line,
-                      backgroundColor: colors.paper,
-                      gap: 7,
-                    }}
-                  >
-                    <Text style={[s.text, { fontWeight: "600" }]}>{monitor.title}</Text>
-                    <Text style={s.small}>
-                      {monitor.schedule === "daily"
-                        ? `${monitor.timeOfDay ?? "08:30"} · Asia/Shanghai`
-                        : monitor.schedule === "weekly"
-                          ? `${monitor.weekday ?? 1} · ${monitor.timeOfDay ?? "08:30"}`
-                          : `${monitor.intervalMinutes} min`}
-                    </Text>
-                    <Text
-                      style={[
-                        s.small,
-                        { color: monitor.status === "active" ? colors.success : colors.faint },
-                      ]}
-                    >
-                      {monitor.status}
-                    </Text>
-                  </View>
-                ))
-              ) : (
-                <Text style={[s.muted, { paddingVertical: 18 }]}>{t("agentSpace.noTasks")}</Text>
-              )}
-              <SectionHeading
-                title={t("agentSpace.taskHistory")}
-                count={agentTasks.length}
-                style={{ marginTop: 8 }}
-              />
-              {agentTasks.length ? (
-                agentTasks.slice(0, 8).map((task) => <TaskCard key={task.id} task={task} compact />)
-              ) : (
-                <Text style={[s.muted, { paddingVertical: 14 }]}>{t("agentSpace.noTasks")}</Text>
-              )}
-            </View>
-          )}
-
-          {tab === "files" && (
-            <View style={{ gap: 10 }}>
-              <SectionHeading title={t("agentSpace.artifacts")} count={libraryCount} />
-              {agentArtifacts.length ? (
-                agentArtifacts.map((artifact) => (
-                  <PanelButton
-                    key={artifact.id}
-                    icon={FileText}
-                    title={artifact.title}
-                    detail={artifact.summary}
-                    onPress={() => open({ type: "artifact", artifact })}
-                  />
-                ))
-              ) : (
-                <Text style={[s.muted, { paddingVertical: 18 }]}>{t("agentSpace.noInsights")}</Text>
-              )}
-            </View>
-          )}
-
-          {tab === "skills" && (
-            <View style={{ gap: 8 }}>
-              <View style={[s.between, { marginBottom: 5 }]}>
-                <Text style={s.heading}>{t("agentSpace.customSkills")}</Text>
-                <Button small icon={Plus} onPress={() => setEditingSkill("new")}>
-                  {t("agentSpace.createSkill")}
-                </Button>
-              </View>
-              {current.customSkills.length ? (
-                current.customSkills.map((skill) => (
-                  <Pressable
-                    key={skill.id}
-                    onPress={() => setEditingSkill(skill)}
-                    style={({ pressed }) => ({
-                      padding: 14,
-                      borderRadius: 15,
-                      borderWidth: 1,
-                      borderColor: colors.line,
-                      backgroundColor: pressed ? colors.surface : colors.paper,
-                      gap: 7,
-                    })}
-                  >
-                    <View style={s.between}>
-                      <Text style={[s.text, { fontWeight: "600" }]}>{skill.name}</Text>
-                      <Pressable
-                        accessibilityRole="switch"
-                        accessibilityState={{ checked: skill.enabled }}
-                        onPress={() => toggleSkill(current.id, skill.id)}
-                        style={{
-                          width: 35,
-                          height: 21,
-                          borderRadius: radius.full,
-                          padding: 3,
-                          alignItems: skill.enabled ? "flex-end" : "flex-start",
-                          backgroundColor: skill.enabled ? colors.primary : colors.lineStrong,
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: 15,
-                            height: 15,
-                            borderRadius: radius.full,
-                            backgroundColor: colors.paper,
-                          }}
-                        />
-                      </Pressable>
-                    </View>
-                    <Text style={s.small}>
-                      {skill.purpose || t("agentSpace.skillInstructions")}
-                    </Text>
-                    <Text style={[s.small, { color: colors.faint }]}>
-                      {t(skill.enabled ? "agentSpace.skillEnabled" : "agentSpace.skillDisabled")} ·{" "}
-                      {t("agentSpace.skillVersion", { version: skill.version })}
-                    </Text>
-                  </Pressable>
-                ))
-              ) : (
-                <Text style={[s.muted, { paddingVertical: 18 }]}>{t("agentSpace.skillEmpty")}</Text>
-              )}
-              <SectionHeading title={t("agentSpace.quickCapabilities")} style={{ marginTop: 10 }} />
-              {current.skills.map((capability) => (
-                <View
-                  key={capability}
-                  style={[
-                    s.between,
-                    {
-                      minHeight: 48,
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.lineSoft,
-                    },
-                  ]}
-                >
-                  <Text style={s.text}>
-                    {AGENT_CAPABILITY_LABELS[capability]?.[locale === "zh-Hans" ? "zh" : "en"] ??
-                      capability}
-                  </Text>
-                  <Check size={16} color={colors.success} />
-                </View>
-              ))}
-            </View>
-          )}
-
-          {tab === "settings" && (
-            <View style={{ gap: 8 }}>
-              <SectionHeading title={t("agentSpace.persona")} />
-              <PersonaEditor onSaved={() => setTab("profile")} />
-              <View style={{ height: 1, backgroundColor: colors.line, marginVertical: 18 }} />
-              <SectionHeading title={t("agentSpace.goalsMemory")} />
-              {(data?.goals ?? []).slice(0, 5).map((goal) => (
-                <PanelButton
-                  key={goal.id}
-                  icon={Target}
-                  title={goal.title}
-                  detail={goal.status}
-                  onPress={() => {
-                    navigate("goals");
-                    onClose();
-                  }}
-                />
-              ))}
-              {(data?.memories ?? []).slice(0, 5).map((memory) => (
-                <View
-                  key={memory.id}
-                  style={{
-                    padding: 12,
-                    borderRadius: 12,
-                    backgroundColor: colors.surfaceRaised,
-                    gap: 4,
-                  }}
-                >
-                  <Text style={[s.text, { fontSize: 13 }]}>{memory.text}</Text>
-                  <Text style={[s.small, { color: colors.faint }]}>{memory.source}</Text>
-                </View>
-              ))}
-              {!current.system && (
-                <>
-                  {confirmDelete && (
-                    <View
-                      style={{
-                        marginTop: 16,
-                        padding: 14,
-                        borderRadius: 13,
-                        backgroundColor: colors.errorSoft,
-                        gap: 10,
-                      }}
-                    >
-                      <Text style={[s.text, { fontWeight: "600", color: colors.danger }]}>
-                        {t("agentSpace.deleteAgent")}
-                      </Text>
-                      <Text style={s.small}>{t("agentSpace.deleteAgentNote")}</Text>
-                      <View style={{ flexDirection: "row", gap: 8 }}>
-                        <Button
-                          small
-                          danger
-                          onPress={() => {
-                            deleteAgent(current.id);
-                            onClose();
-                          }}
-                        >
-                          {t("agentSpace.deleteAgent")}
-                        </Button>
-                        <Button small onPress={() => setConfirmDelete(false)}>
-                          {t("common.cancel")}
-                        </Button>
-                      </View>
-                    </View>
-                  )}
-                  {!confirmDelete && (
-                    <Button danger style={{ marginTop: 16 }} onPress={() => setConfirmDelete(true)}>
-                      {t("agentSpace.deleteAgent")}
-                    </Button>
-                  )}
-                </>
-              )}
-              {current.system && (
-                <Text style={[s.small, { color: colors.faint, marginTop: 10 }]}>
-                  {t("agentSpace.systemCannotDelete")}
-                </Text>
-              )}
-            </View>
-          )}
-        </>
-      )}
+        </SheetSection>
+        <ModelSelector onManage={onDismiss} />
+      </View>
     </Sheet>
   );
 }
@@ -894,6 +514,7 @@ function PreferencesSheet({ onClose }: { onClose: () => void }) {
   ] as const;
   return (
     <Sheet
+      botLayout
       title={t("agentSpace.preferences")}
       subtitle={t("agentSpace.preferencesDetail")}
       onClose={onClose}
@@ -959,7 +580,7 @@ function InsightsSheet({ onClose }: { onClose: () => void }) {
     (artifact) => artifact.kind === "research_report" || artifact.kind === "report",
   );
   return (
-    <Sheet title={t("agentSpace.insights")} onClose={onClose} wide>
+    <Sheet botLayout title={t("agentSpace.insights")} onClose={onClose} wide>
       <View style={{ gap: 12 }}>
         <Text style={[s.muted, { lineHeight: 20 }]}>{t("agentSpace.insightsDetail")}</Text>
         {insights.length ? (
@@ -988,8 +609,10 @@ export function AgentSheets({
   onClose,
   onPanel,
   onSignOut,
+  onDismiss,
 }: {
   panel?: AgentPanel;
+  onDismiss: () => void;
   onClose: () => void;
   onPanel: (panel: AgentPanel) => void;
   onSignOut: () => void;
@@ -998,45 +621,56 @@ export function AgentSheets({
   const { current } = useAgentSpace();
   if (!panel) return null;
   if (panel === "more") return <AgentMoreSheet onClose={onClose} onPanel={onPanel} />;
-  if (panel === "manage") return <AgentManagerSheet onClose={onClose} />;
+  if (panel === "manage")
+    return <AgentManagerSheet onClose={onClose} onPanel={onPanel} onDismiss={onDismiss} />;
+  if (panel === "bot-edit") return <BotEditPage onClose={onClose} onDeleted={onDismiss} />;
+  if (panel === "bot-library") return <BotLibraryPage onClose={onDismiss} />;
+  if (panel === "bot-skills") return <BotSkillsPage onClose={onDismiss} />;
+  if (panel === "bot-history") return <BotHistoryPage onClose={onDismiss} />;
+  if (panel === "bot-goals-memory") return <BotGoalsMemoryPage onClose={onDismiss} />;
   if (panel === "create") return <CreateAgentSheet onClose={onClose} onCreated={onClose} />;
   if (panel === "preferences") return <PreferencesSheet onClose={onClose} />;
+  if (panel === "watchlist-add") return <WatchlistAddSheet onClose={onDismiss} />;
   if (panel === "watchlist")
     return (
-      <Sheet title={t("agentSpace.watchlist")} onClose={onClose} wide>
-        <WatchlistHubScreen />
+      <Sheet botLayout title={t("agentSpace.watchlist")} onClose={onClose} wide>
+        <WatchlistHubScreen mode="embedded" />
       </Sheet>
     );
   if (panel === "tasks")
     return (
-      <Sheet title={t("agentSpace.tasks")} onClose={onClose} wide>
-        <AgentStatus />
-        <TaskHubScreen />
+      <Sheet botLayout title={t("agentSpace.tasks")} onClose={onDismiss} wide>
+        <TaskHubScreen initialTab="tasks" />
       </Sheet>
     );
   if (panel === "files")
     return (
-      <Sheet title={t("agentSpace.library")} onClose={onClose} wide>
+      <Sheet botLayout title={t("agentSpace.library")} onClose={onClose} wide>
         <FilesScreen />
       </Sheet>
     );
   if (panel === "insights") return <InsightsSheet onClose={onClose} />;
   if (panel === "brief")
     return (
-      <Sheet title={t("agentSpace.marketBrief")} onClose={onClose} wide>
+      <Sheet botLayout title={t("agentSpace.marketBrief")} onClose={onClose} wide>
         <MarketBriefingCard plain onRequestClose={onClose} />
       </Sheet>
     );
   if (panel === "capabilities")
     return (
-      <Sheet title={`${t("agentSpace.skillCenter")} · ${current.name}`} onClose={onClose} wide>
-        <CapabilityHubScreen />
+      <Sheet
+        botLayout
+        title={`${t("agentSpace.skillCenter")} · ${current.name}`}
+        onClose={onClose}
+        wide
+      >
+        <CapabilityHubScreen mode="embedded" />
       </Sheet>
     );
   if (panel === "account")
     return (
-      <Sheet title={t("agentSpace.account")} onClose={onClose} wide>
-        <AccountScreen onSignOut={onSignOut} />
+      <Sheet botLayout title={t("agentSpace.account")} onClose={onClose} wide>
+        <AccountScreen onSignOut={onSignOut} onOpenPreferences={() => onPanel("preferences")} />
       </Sheet>
     );
   return null;

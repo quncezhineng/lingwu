@@ -24,6 +24,7 @@ import type {
   Mail,
   ProposalInput,
 } from "../../../../packages/domain/src/index.ts";
+import { resolveMonitorCurrency } from "../../../../packages/domain/src/monitor-currency.ts";
 import { MarketDataService } from "../../../../packages/integrations/src/market-data.ts";
 import type { ActionService } from "../actions.ts";
 import type { BrowserService } from "../browser.ts";
@@ -41,6 +42,7 @@ import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { executeModelTask } from "./model.ts";
+import { readMonitoredPrice } from "./monitor-price.ts";
 import { NotesService } from "./notes.ts";
 import {
   countPageDiff,
@@ -298,6 +300,14 @@ export class AgentService {
     threadId?: string,
   ) {
     const input = createTaskSchema.parse(raw);
+    // Monitoring rules own their execution tasks. Direct delegation would create
+    // an orphan task that cannot be checked or resumed without a real rule.
+    if (input.kind === "monitor" && !held)
+      throw new AppError(
+        "Create this reminder through the monitoring setup before starting it.",
+        422,
+        "TASK_SETUP_REQUIRED",
+      );
     const id = idempotencyKey ? hash(`task:${idempotencyKey}`) : randomUUID();
     const existing = await this.db.get<AgentTask>(owner, "tasks", id);
     if (existing) return existing;
@@ -375,9 +385,17 @@ export class AgentService {
     if (action === "resume" && task.status !== "paused")
       throw new AppError("Only paused tasks can be resumed", 409);
     if (action === "pause" && (terminal.has(task.status) || task.status === "paused")) return task;
-    if (task.kind === "monitor" && action === "resume") {
+    if (task.kind === "monitor" && (action === "resume" || action === "retry")) {
+      const monitorId = typeof task.input.monitorId === "string" ? task.input.monitorId : "";
+      const monitor = monitorId ? await this.db.get<Monitor>(owner, "monitors", monitorId) : null;
+      if (!monitor || monitor.taskId !== task.id)
+        throw new AppError(
+          "This reminder needs to be set up again before it can continue.",
+          409,
+          "TASK_SETUP_REQUIRED",
+        );
       // Both UI entry points must activate the monitor before a worker can claim its task.
-      await this.controlMonitor(owner, String(task.input.monitorId), "resume");
+      await this.controlMonitor(owner, monitorId, "resume");
       const resumed = await this.getTask(owner, id);
       await this.db.put(owner, "run-events", {
         id: randomUUID(),
@@ -523,6 +541,10 @@ export class AgentService {
   }
   async createMonitor(owner: string, raw: unknown, idempotencyKey?: string) {
     const input = monitorInputSchema.parse(raw);
+    if (input.condition === "price_below") {
+      input.currency = resolveMonitorCurrency(input);
+      if (!input.currency) throw new AppError("Choose CNY, HKD or USD for this price watch", 422);
+    }
     const url = new URL(input.url);
     if (url.protocol === "sample:" && this.config.mode !== "sample")
       throw new AppError("Sample sources are unavailable in live workspaces", 422);
@@ -566,6 +588,13 @@ export class AgentService {
     if (monitor.status === "stopped")
       throw new AppError("Create a new watch to restart this stopped monitor", 409);
     const input = monitorInputSchema.parse(raw);
+    if (input.condition === "price_below") {
+      input.currency = resolveMonitorCurrency({
+        ...input,
+        currency: input.currency ?? monitor.currency,
+      });
+      if (!input.currency) throw new AppError("Choose CNY, HKD or USD for this price watch", 422);
+    }
     const url = new URL(input.url);
     if (url.protocol === "sample:" && this.config.mode !== "sample")
       throw new AppError("Sample sources are unavailable in live workspaces", 422);
@@ -595,7 +624,7 @@ export class AgentService {
         {
           title: input.title,
           prompt: `Watch ${input.url} for ${input.condition}${input.value ? `: ${input.value}` : ""}${input.description ? `. Context: ${input.description}` : ""}`,
-          state: { ...task.state, lastHash: null },
+          state: { ...task.state, lastHash: null, matched: false, failures: 0, notice: null },
         },
       );
     }
@@ -1324,6 +1353,11 @@ export class AgentService {
       .replace(/\n{3,}/g, "\n\n")
       .trim();
     const currentHash = hash(text);
+    const currency =
+      monitor.condition === "price_below" ? resolveMonitorCurrency(monitor) : undefined;
+    if (monitor.condition === "price_below" && !currency)
+      throw new Error("Choose a currency before this price watch can continue");
+    const observedPrice = currency ? readMonitoredPrice(observation.text, currency) : undefined;
     const previousHash =
       typeof task.state.lastHash === "string" ? task.state.lastHash : monitor.lastHash;
     const matched =
@@ -1331,7 +1365,7 @@ export class AgentService {
         ? Boolean(previousHash && previousHash !== currentHash)
         : monitor.condition === "contains"
           ? text.toLowerCase().includes(monitor.value.toLowerCase())
-          : this.matchesPrice(text, Number(monitor.value));
+          : observedPrice !== undefined && observedPrice < Number(monitor.value);
     const previouslyMatched = Boolean(task.state.matched);
     // For change watches, keep the page lines and a relative-time-free fingerprint of the whole text.
     const change = monitor.condition === "change";
@@ -1362,7 +1396,14 @@ export class AgentService {
       owner,
       "monitors",
       monitor.id,
-      { status: "active", checks: monitor.checks },
+      {
+        status: "active",
+        checks: monitor.checks,
+        nextCheckAt: monitor.nextCheckAt,
+        url: monitor.url,
+        condition: monitor.condition,
+        value: monitor.value,
+      },
       {
         checks: monitor.checks + 1,
         lastCheckedAt: date(),
@@ -1428,9 +1469,5 @@ export class AgentService {
       ],
       plan: task.plan.map((s) => ({ ...s, status: "succeeded" })),
     };
-  }
-  private matchesPrice(text: string, threshold: number) {
-    const matches = [...text.matchAll(/(?:\$|USD)\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?)/g)];
-    return matches.some((m) => Number(m[1].replace(/,/g, "")) < threshold);
   }
 }

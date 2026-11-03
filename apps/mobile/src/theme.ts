@@ -3,8 +3,8 @@
  *
  * 设计语言来自「冷静的投研工作台」：暖灰画布、白色纸面、1px 细描边，
  * 品牌蓝只用于操作、选中和数据强调；红涨绿跌保持独立语义。
- * 版式采用 Noto Sans SC 承担界面与数据，Noto Serif SC 只承担问候、洞察与
- * 长阅读标题，形成“研究刊物 + 工具界面”的双声部。
+ * 全站界面、正文与数据统一使用 Noto Serif SC，与「我的自选」保持一致，
+ * 通过字号和字重区分层级。
  *
  * 约束：
  * - 本文件是仓库里唯一允许出现十六进制色值的 App 模块（产物 HTML 模板、图表色板、
@@ -16,6 +16,7 @@
  */
 import type { TextStyle, ViewStyle } from "react-native";
 import { Platform } from "react-native";
+import { webFontFamily } from "./font-family";
 
 /** 基础色板。 */
 export const colors = {
@@ -100,26 +101,19 @@ export const statusColors = {
   stepDone: "#8499B8",
 } as const;
 
-/** Web 端优先使用中文系统字体；原生端保持在平台字体回退内。 */
+/** The shared typeface is the watchlist's existing serif stack on every surface. */
+const applicationFont = Platform.select({
+  web: webFontFamily,
+  ios: "Songti SC",
+  android: "serif",
+  default: "serif",
+});
 export const fonts = {
-  sans: Platform.select({
-    web: '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
-    ios: "PingFang SC",
-    android: "sans-serif",
-    default: "sans-serif",
-  }),
-  serif: Platform.select({
-    web: '"Noto Serif SC", "Songti SC", STSong, Georgia, serif',
-    ios: "Songti SC",
-    android: "serif",
-    default: "serif",
-  }),
-  number: Platform.select({
-    web: 'Georgia, "Times New Roman", serif',
-    ios: "Georgia",
-    android: "serif",
-    default: "serif",
-  }),
+  ui: applicationFont,
+  // Compatibility aliases keep existing component APIs on the same typeface.
+  sans: applicationFont,
+  serif: applicationFont,
+  number: applicationFont,
 } as const;
 
 /**
@@ -222,7 +216,7 @@ export const typography = {
     letterSpacing: 0,
     fontFamily: fonts.sans,
   },
-  /** 26/37：页面 H1（Demo .page-head h1，sans / w500 / ls 1 → 归 0.5）。 */
+  /** 26/37：页面 H1，统一字体 / w500 / ls 0.5。 */
   h1: {
     fontSize: 26,
     lineHeight: 37,

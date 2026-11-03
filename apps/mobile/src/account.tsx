@@ -1,7 +1,8 @@
 import { useThreads } from "@copilotkit/react-native/headless";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, View } from "react-native";
 import type { AccountProfile } from "./api";
+import { Text, TextInput } from "./app-text";
 import { filterArchivedThreads } from "./archived-threads";
 import { useTranslation } from "./i18n";
 import {
@@ -16,12 +17,13 @@ import {
   Monitor,
   RotateCcw,
   Search,
+  Settings2,
   ShieldCheck,
   Trash2,
   UserRound,
 } from "./icons";
 import { useLingWuThread } from "./threads";
-import { Button, Card, colors, dateLabel, Empty, ErrorNotice, s, timeLabel } from "./ui";
+import { Button, Card, colors, dateLabel, Empty, ErrorNotice, LinkRow, s, timeLabel } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 个人信息里的一行：图标 + 名称 + 取值。 */
@@ -261,7 +263,13 @@ export function ArchivedThreadsScreen({
  * 数据来自 /api/auth/me：owner（账号 ID）、邮箱与昵称都随会话隔离，
  * 因此换一个账号登录看到的完全是另一份信息。
  */
-export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
+export function AccountScreen({
+  onSignOut,
+  onOpenPreferences,
+}: {
+  onSignOut: () => void;
+  onOpenPreferences?: () => void;
+}) {
   const { t } = useTranslation();
   const { api } = useWorkspace();
   const [profile, setProfile] = useState<AccountProfile>();
@@ -358,6 +366,16 @@ export function AccountScreen({ onSignOut }: { onSignOut: () => void }) {
           />
         </Card>
       </View>
+      {onOpenPreferences && (
+        <Card style={{ paddingVertical: 4 }}>
+          <LinkRow
+            icon={Settings2}
+            title={t("agentSpace.preferences")}
+            detail={t("agentSpace.preferencesDetail")}
+            onPress={onOpenPreferences}
+          />
+        </Card>
+      )}
       <View style={{ gap: 10 }}>
         <Button danger icon={LogOut} onPress={onSignOut}>
           {t("app.signOutLabel")}

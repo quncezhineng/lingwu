@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { AppState, Image, Pressable, Text, View } from "react-native";
+import { AppState, Image, Pressable, View } from "react-native";
 import type { BrowserSession } from "../../../packages/domain/src";
 import type { ComputerSnapshot } from "../../../packages/domain/src/computer";
+import { Text } from "./app-text";
 import { browserAddress } from "./browser-address";
 import { useComputerDraft } from "./computer-drafts";
 import { computerStatus } from "./computer-status";

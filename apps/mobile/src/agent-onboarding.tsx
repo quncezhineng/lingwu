@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentAvatarId } from "./agent-space-model";
+import { Text, TextInput } from "./app-text";
 import { useTranslation } from "./i18n";
-import { ArrowRight, Check } from "./icons";
-import { Button, colors, fonts, radius, s, space, typography } from "./ui";
+import { ArrowRight, Check, ChevronDown, ChevronLeft } from "./icons";
+import { Button, colors, fonts, radius, s } from "./ui";
 
 const AVATARS: AgentAvatarId[] = ["orb", "bloom", "moon", "planet", "cat"];
 const MARKETS = ["A股", "港股", "美股", "基金"];
@@ -29,10 +31,10 @@ function ChoiceRow({
       accessibilityState={{ checked: selected }}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 58,
-        paddingHorizontal: 14,
+        minHeight: 47,
+        paddingHorizontal: 13,
         paddingVertical: 12,
-        borderRadius: radius.field,
+        borderRadius: 13,
         borderWidth: 1,
         borderColor: selected ? colors.primary : colors.line,
         backgroundColor: selected ? colors.sky : pressed ? colors.surface : colors.paper,
@@ -42,13 +44,13 @@ function ChoiceRow({
       })}
     >
       <View style={{ flex: 1, gap: 3 }}>
-        <Text style={[s.text, { fontWeight: "600" }]}>{title}</Text>
+        <Text style={[s.text, { fontSize: 12, lineHeight: 18, fontWeight: "500" }]}>{title}</Text>
         {!!detail && <Text style={s.small}>{detail}</Text>}
       </View>
       <View
         style={{
-          width: 19,
-          height: 19,
+          width: 16,
+          height: 16,
           borderRadius: radius.full,
           borderWidth: 1,
           borderColor: selected ? colors.primary : colors.lineStrong,
@@ -101,6 +103,26 @@ function Chip({
   );
 }
 
+function OptionalSection({ title, children }: { title: string; children: ReactNode }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <View style={{ gap: 10 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={() => setExpanded(!expanded)}
+        style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8 }}
+      >
+        <View style={{ transform: [{ rotate: expanded ? "180deg" : "0deg" }] }}>
+          <ChevronDown size={13} color={colors.faint} />
+        </View>
+        <Text style={{ fontSize: 10, lineHeight: 18, color: colors.faint }}>{title}</Text>
+      </Pressable>
+      {expanded && children}
+    </View>
+  );
+}
+
 export function AgentOnboarding() {
   const { t } = useTranslation();
   const {
@@ -113,12 +135,25 @@ export function AgentOnboarding() {
     updateAgent,
   } = useAgentSpace();
   const { width } = useWindowDimensions();
-  const compact = width < 700;
+  const compact = width < 600;
+  const scroll = useRef<ScrollView>(null);
   const step = state.onboardingStep;
   const [agentName, setAgentName] = useState(current.name);
   const [avatar, setAvatar] = useState<AgentAvatarId>(current.avatar);
   const [userName, setUserName] = useState(preferences.name);
   const [goal, setGoal] = useState(preferences.goal);
+
+  useEffect(() => {
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
+  const previousAnswer = [
+    undefined,
+    current.name,
+    preferences.name,
+    preferences.risk,
+    preferences.markets.join("、") || t("agentSpace.marketsLater"),
+  ][step];
 
   const risks = [
     ["稳健一些", "riskSteady", "riskSteadyDetail"],
@@ -165,21 +200,31 @@ export function AgentOnboarding() {
 
   return (
     <ScrollView
+      ref={scroll}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
         flexGrow: 1,
         width: "100%",
-        maxWidth: 720,
+        maxWidth: agentLayout.onboardingMaxWidth,
         alignSelf: "center",
-        paddingHorizontal: compact ? space.pageMobile : space.page,
-        paddingTop: compact ? 20 : 46,
-        paddingBottom: 42,
-        justifyContent: "center",
+        paddingHorizontal: agentLayout.pagePadding,
+        paddingTop: compact ? 24 : 44,
+        paddingBottom: 32,
       }}
     >
-      <View style={[s.between, { marginBottom: 26 }]}>
-        <Text style={[typography.eyebrow, { color: colors.faint }]}>
+      <View style={[s.between, { marginBottom: 23, gap: 12 }]}>
+        {step > 0 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("common.back")}
+            onPress={() => advanceOnboarding(step - 1)}
+            style={{ paddingVertical: 6, paddingRight: 4 }}
+          >
+            <ChevronLeft size={16} color={colors.faint} />
+          </Pressable>
+        )}
+        <Text style={{ fontSize: 9, lineHeight: 14, color: colors.faint, flex: 1 }}>
           {t("agentSpace.onboardingProgress", { step: step + 1 })}
         </Text>
         <View style={{ flexDirection: "row", gap: 4 }}>
@@ -187,7 +232,7 @@ export function AgentOnboarding() {
             <View
               key={index}
               style={{
-                width: compact ? 17 : 24,
+                width: 15,
                 height: 3,
                 borderRadius: 4,
                 backgroundColor: index <= step ? colors.primary : colors.line,
@@ -197,15 +242,37 @@ export function AgentOnboarding() {
         </View>
       </View>
 
+      {!!previousAnswer && (
+        <View
+          style={{
+            alignSelf: "flex-end",
+            maxWidth: "86%",
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderRadius: 16,
+            borderBottomRightRadius: 5,
+            backgroundColor: colors.surface,
+            marginBottom: 25,
+          }}
+        >
+          <Text style={{ fontSize: 11, lineHeight: 20, color: colors.muted }}>
+            {previousAnswer}
+          </Text>
+        </View>
+      )}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 11 }}>
+        <AgentOrb avatar={avatar} size={14} />
+        <Text style={{ fontSize: 10, color: colors.faint }}>{current.name}</Text>
+      </View>
       <Text
         style={{
           color: colors.text,
-          fontSize: compact ? 22 : 26,
-          lineHeight: compact ? 34 : 40,
-          fontWeight: "500",
-          fontFamily: fonts.serif,
+          fontSize: 15,
+          lineHeight: 28,
+          fontWeight: "400",
+          fontFamily: fonts.sans,
           letterSpacing: 0.1,
-          marginBottom: 24,
+          marginBottom: 17,
         }}
       >
         {step === 0
@@ -224,15 +291,16 @@ export function AgentOnboarding() {
           backgroundColor: colors.paper,
           borderWidth: 1,
           borderColor: colors.line,
-          borderRadius: 20,
-          padding: compact ? 18 : 24,
-          gap: 16,
+          borderRadius: 23,
+          paddingHorizontal: 18,
+          paddingVertical: 20,
+          gap: 12,
         }}
       >
         {step === 0 && (
           <>
             <View style={{ alignItems: "center" }}>
-              <AgentOrb avatar={avatar} size={66} />
+              <AgentOrb avatar={avatar} size={65} />
             </View>
             <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
               {t("agentSpace.onboardingName")}
@@ -247,15 +315,19 @@ export function AgentOnboarding() {
               style={[
                 s.input,
                 {
+                  minHeight: 48,
+                  borderRadius: 13,
                   textAlign: "center",
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: "600",
                   color: colors.primaryStrong,
                 },
               ]}
             />
             <Text style={[s.small, { color: colors.faint }]}>{t("agentSpace.avatar")}</Text>
-            <View style={{ flexDirection: "row", justifyContent: "center", gap: 9 }}>
+            <View
+              style={{ flexDirection: "row", justifyContent: "center", gap: width < 360 ? 6 : 7 }}
+            >
               {AVATARS.map((item) => (
                 <Pressable
                   key={item}
@@ -264,8 +336,8 @@ export function AgentOnboarding() {
                   accessibilityState={{ checked: avatar === item }}
                   onPress={() => setAvatar(item)}
                   style={{
-                    width: 49,
-                    height: 49,
+                    width: width < 360 ? 40 : 43,
+                    height: width < 360 ? 40 : 43,
                     borderRadius: radius.full,
                     alignItems: "center",
                     justifyContent: "center",
@@ -274,7 +346,7 @@ export function AgentOnboarding() {
                     backgroundColor: avatar === item ? colors.sky : colors.paper,
                   }}
                 >
-                  <AgentOrb avatar={item} size={34} />
+                  <AgentOrb avatar={item} size={31} />
                 </Pressable>
               ))}
             </View>
@@ -336,19 +408,18 @@ export function AgentOnboarding() {
                 />
               ))}
             </View>
-            <Text style={[s.small, { fontWeight: "600", color: colors.text, marginTop: 5 }]}>
-              {t("agentSpace.areas")}
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {AREAS.map((value) => (
-                <Chip
-                  key={value}
-                  label={value}
-                  selected={preferences.areas.includes(value)}
-                  onPress={() => setPreferences({ areas: toggle(preferences.areas, value) })}
-                />
-              ))}
-            </View>
+            <OptionalSection title={t("agentSpace.areas")}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {AREAS.map((value) => (
+                  <Chip
+                    key={value}
+                    label={value}
+                    selected={preferences.areas.includes(value)}
+                    onPress={() => setPreferences({ areas: toggle(preferences.areas, value) })}
+                  />
+                ))}
+              </View>
+            </OptionalSection>
             <Button onPress={() => advanceOnboarding(4)}>{t("agentSpace.marketsLater")}</Button>
           </>
         )}
@@ -382,35 +453,52 @@ export function AgentOnboarding() {
               placeholderTextColor={colors.faint}
               style={s.input}
             />
-            <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
-              {t("agentSpace.horizon")}
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {HORIZONS.map((value) => (
-                <Chip
-                  key={value}
-                  label={value}
-                  selected={preferences.horizon === value}
-                  onPress={() => setPreferences({ horizon: value })}
-                />
-              ))}
-            </View>
+            <OptionalSection title={t("agentSpace.horizon")}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {HORIZONS.map((value) => (
+                  <Chip
+                    key={value}
+                    label={value}
+                    selected={preferences.horizon === value}
+                    onPress={() => setPreferences({ horizon: value })}
+                  />
+                ))}
+              </View>
+            </OptionalSection>
           </>
         )}
 
-        <Button
-          primary
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canContinue }}
           disabled={!canContinue}
           onPress={next}
-          style={{ minHeight: 48, marginTop: 4 }}
-          icon={step === 4 ? undefined : ArrowRight}
+          style={({ pressed }) => ({
+            minHeight: 46,
+            marginTop: 9,
+            borderRadius: 15,
+            backgroundColor: colors.primaryAction,
+            opacity: !canContinue ? 0.5 : pressed ? 0.85 : 1,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 7,
+          })}
         >
-          {step === 4
-            ? t("agentSpace.finishOnboarding", { name: current.name })
-            : t("agentSpace.continue")}
-        </Button>
+          <Text style={{ fontSize: 12, fontWeight: "500", color: colors.onPrimary }}>
+            {step === 4
+              ? t("agentSpace.finishOnboarding", { name: current.name })
+              : t("agentSpace.continue")}
+          </Text>
+          <ArrowRight size={14} color={colors.onPrimary} />
+        </Pressable>
       </View>
-      <Text style={[s.small, { textAlign: "center", color: colors.faint, marginTop: 16 }]}>
+      <Text
+        style={[
+          s.small,
+          { fontSize: 9, lineHeight: 17, textAlign: "center", color: colors.faint, marginTop: 17 },
+        ]}
+      >
         {t("agentSpace.onboardingFootnote")}
       </Text>
     </ScrollView>

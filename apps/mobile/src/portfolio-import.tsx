@@ -6,8 +6,9 @@
  * （mock 模式本地合并）。部分成功必须二次确认。
  */
 import { useMemo, useRef, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import type { LingWuApi } from "./api";
+import { Text } from "./app-text";
 import { CsvDropzone } from "./CsvDropzone";
 import {
   autoMap,
@@ -29,6 +30,7 @@ import { type PickedCsv, saveTextFile } from "./csv-file";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { AlertTriangle, Check, CircleX } from "./icons";
+import { ModalOverlay } from "./modal-overlay";
 import {
   type Currency,
   commitMockImport,
@@ -136,7 +138,7 @@ function ConfirmModal({
   onConfirm: () => void;
 }) {
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onCancel}>
+    <ModalOverlay visible onRequestClose={onCancel}>
       <Pressable onPress={onCancel} style={s.modalShade}>
         <Pressable
           accessibilityViewIsModal
@@ -155,7 +157,7 @@ function ConfirmModal({
           </View>
         </Pressable>
       </Pressable>
-    </Modal>
+    </ModalOverlay>
   );
 }
 
@@ -177,7 +179,7 @@ function ColumnPicker({
     return `${header || "col"}#${occurrence}`;
   });
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+    <ModalOverlay visible onRequestClose={onClose}>
       <Pressable onPress={onClose} style={s.modalShade}>
         <Pressable
           accessibilityViewIsModal
@@ -224,7 +226,7 @@ function ColumnPicker({
           ))}
         </Pressable>
       </Pressable>
-    </Modal>
+    </ModalOverlay>
   );
 }
 

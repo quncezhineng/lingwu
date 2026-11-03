@@ -10,16 +10,9 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Linking,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Linking, Platform, Pressable, View } from "react-native";
 import type { AgentTask, RunEvent } from "../../../packages/domain/src/agent";
+import { Text, TextInput } from "./app-text";
 import { FinancialsSection } from "./financials-card";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";

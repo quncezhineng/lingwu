@@ -4,8 +4,6 @@ import {
   Image,
   Linking,
   Pressable,
-  Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -16,6 +14,7 @@ import type {
   EmailDraft,
 } from "../../../packages/domain/src";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text, TextInput } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";

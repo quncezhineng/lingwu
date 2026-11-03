@@ -254,6 +254,17 @@ assistant bubble. `RUN_FINISHED` marks the run's drafts complete and clears the 
 
 ### Reconnection and cleanup
 
+Initial transcript hydration reads the newest 30 visible messages from
+`GET /api/conversation/threads/:threadId/messages?limit=30`, not `connectAgent` history replay.
+An exclusive `before=<messageId>` cursor loads older pages as the reader scrolls upward; tool results
+are included without counting as separate visible messages. The legacy transcript accepts the same
+pagination query. The initial position is the bottom of the latest page, and prepending an older page
+restores the reader's offset. Full persisted context is restored separately when submitting a turn,
+without expanding the visible history window. Rich Threads currently returns all messages to the
+server; pagination bounds the app response, not the upstream SDK read. Page requests and
+`GET /api/conversation/threads/:threadId/context` share an owner-scoped, bounded 30-second snapshot
+cache with single-flight reads; advancing the local event sequence invalidates the cache.
+
 - Exponential backoff starts at roughly 500 ms, caps at 15 seconds, includes jitter, and allows 12
   attempts. Authentication and missing-thread errors are non-retryable.
 - The attempt counter resets only after the transport delivers bytes. A server or proxy that opens

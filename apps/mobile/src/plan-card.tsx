@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, View, type ViewStyle } from "react-native";
 import type { TaskStep } from "../../../packages/domain/src/agent";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel } from "./i18n/translate";
 import { Check, ChevronDown, ChevronUp, CircleX, Clock3 } from "./icons";

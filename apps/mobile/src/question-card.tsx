@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import type { AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text, TextInput } from "./app-text";
 import { localizeAgentName, runtimeLabel, useTranslation } from "./i18n";
 import { MessageCircleQuestion } from "./icons";
 import { Button, colors, ErrorNotice } from "./ui";

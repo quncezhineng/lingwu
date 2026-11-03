@@ -1,5 +1,6 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import type { AgentAvatarId } from "./agent-space-model";
+import { Text } from "./app-text";
 import { colors, radius } from "./theme";
 
 const palette: Record<AgentAvatarId, { background: string; foreground: string; glyph: string }> = {

@@ -5,11 +5,12 @@
  * 提供无障碍摘要与「查看数据表」替代（月度采样）。
  */
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import Svg, { Line, Path, Text as SvgText } from "react-native-svg";
+import { Text } from "./app-text";
 import { directionOf } from "./market-format";
 import type { RiskSeriesPoint } from "./portfolio";
-import { chartNeutral, colors, marketDirectionColor, s } from "./ui";
+import { chartNeutral, colors, fonts, marketDirectionColor, s } from "./ui";
 
 const NEUTRAL = chartNeutral;
 const HEIGHT = 120;
@@ -143,6 +144,7 @@ export function ReturnComparisonChart({
                 x={2}
                 y={yFor(value) + 3}
                 fontSize={10}
+                fontFamily={fonts.serif}
                 fill={colors.faint}
               >
                 {`${value > 0 ? "+" : ""}${value.toFixed(1)}%`}
@@ -158,6 +160,7 @@ export function ReturnComparisonChart({
                 }
                 y={HEIGHT - 4}
                 fontSize={10}
+                fontFamily={fonts.serif}
                 fill={colors.faint}
               >
                 {point?.date.slice(5) ?? ""}

@@ -10,14 +10,12 @@ import {
 } from "@copilotkit/react-native/headless";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
+  ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
   Linking,
   Platform,
   Pressable,
   ScrollView,
-  Text,
-  type TextInput,
   type TextStyle,
   useWindowDimensions,
   View,
@@ -26,31 +24,39 @@ import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-ma
 import { z } from "zod";
 import type { ActionProposal, Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
+import { agentLayout } from "./agent-layout";
+import { AgentOrb } from "./agent-orb";
+import type { AgentAvatarId } from "./agent-space-model";
 import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text, type TextInput } from "./app-text";
 import { ApprovalCard } from "./approval-card";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { BackgroundUpdates } from "./background-updates";
 import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
 import { displayUserMessage, promptWithAttachments } from "./chat-content";
-import { ComposerModelSelector } from "./composer-model-selector";
+import { ComposerDock, ComposerMatte } from "./composer-dock";
 import { BrowserThreadCard } from "./computer";
 import { ConversationHeader, type ConversationHeaderState } from "./conversation-header";
 import {
   mergePersistedThreadMessages,
   normalizeThreadMessages,
+  prependHistoryPage,
   readableToolCalls,
+  type ThreadHistoryPage,
+  threadHistoryPagePath,
   threadHistoryPath,
+  visibleHistoryWindow,
 } from "./conversation-history";
 import { ConversationQueue, type QueuedMessage } from "./conversation-queue";
 import {
   ConversationTurnError,
-  replayedRunError,
   runConversationTurn,
   showsRunError,
   threadLocked,
 } from "./conversation-run";
+import { type PrependAnchor, restorePrependOffset } from "./conversation-scroll";
 import { type ConversationDraft, useConversationStream, verifyDrafts } from "./conversation-stream";
 import { DesktopToolCard } from "./desktop-tool-card";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
@@ -75,11 +81,13 @@ import { confirmedJevSelection, displayJevUserMessage, latestJevPanelId } from "
 import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
 import { MemoryRecallCard } from "./memory-recall-card";
+import { ModalBackdrop } from "./modal-overlay";
 import { PromptComposer } from "./prompt-composer";
 import { QuestionCard, taskHasQuestion } from "./question-card";
 import { QuoteToolCard } from "./quote-tool-card";
 import { ReminderToolCard } from "./reminder-tool-card";
 import { SearchToolCard } from "./search-tool-card";
+import { serverToolOutcome } from "./task-presentation";
 import { breakpoints, typography } from "./theme";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
 import { type Selection, useLingWuThread } from "./threads";
@@ -92,16 +100,20 @@ const displayParameters = z.record(z.string(), z.unknown());
 /** 对话标题与输入区等宽居中，消息列稍窄，左右各留出 5px。 */
 const conversationColumnStyle = {
   width: "100%",
-  maxWidth: 965,
+  maxWidth: agentLayout.columnMaxWidth,
   alignSelf: "center",
 } as const;
 
-const messageColumnStyle = { ...conversationColumnStyle, maxWidth: 955 } as const;
+const messageColumnStyle = {
+  ...conversationColumnStyle,
+  maxWidth: agentLayout.messageMaxWidth,
+} as const;
 
 // 用户消息气泡（品牌色底、反白文字）上的 Markdown 渲染：标题/加粗/链接跟随 onPrimary 白色系，
 // 行内代码与代码块保留浅蓝底做区隔，保证品牌底色气泡内的可读性。
 const userMarkdownTextStyle: TextStyle = {
   color: colors.onPrimary,
+  fontFamily: fonts.serif,
   fontSize: 16,
   lineHeight: 24,
 };
@@ -109,7 +121,10 @@ const userMarkdownStyle: Partial<MarkdownStyles> = {
   text: userMarkdownTextStyle,
   paragraph: { marginTop: 0, marginBottom: 4 },
   list: { marginBottom: 4 },
+  listUnorderedItemIcon: { fontFamily: fonts.serif },
+  listOrderedItemIcon: { fontFamily: fonts.serif },
   headingContainer: { marginTop: 6, marginBottom: 2 },
+  heading: { fontFamily: fonts.serif },
   heading1: { fontSize: 19, lineHeight: 25, color: colors.onPrimary },
   heading2: { fontSize: 17, lineHeight: 23, color: colors.onPrimary },
   heading3: { fontSize: 16, lineHeight: 22, color: colors.onPrimary },
@@ -151,7 +166,7 @@ const serverToolNameKeys: Record<string, TranslationKey> = {
 type ThreadApproval = { action: ActionProposal; task: AgentTask };
 
 /** Reads the task created by a delegate_task tool call so its approvals can sit in the same turn. */
-function delegatedTaskIds(message: Message, messages: Message[]): Set<string> {
+function delegatedTaskIds(message: Message, messages: readonly Message[]): Set<string> {
   const ids = new Set<string>();
   for (const call of readableToolCalls(message)) {
     if (call.function.name !== "delegate_task") continue;
@@ -399,32 +414,38 @@ function ServerToolCard({
     ? data?.tasks.find((item) => item.id === parsed.data.id || item.id === parsed.data.taskId)
     : undefined;
   if (task) return <TaskThreadCard task={task} />;
+  const outcome = serverToolOutcome(result, {
+    loading,
+    requiresReceipt: name !== "Agent progress",
+  });
   return (
     <Card style={{ padding: 16, gap: 10 }}>
       <Text style={s.heading}>
         {loading ? t("chat.serverToolSaving", { name: label.toLowerCase() }) : label}
       </Text>
-      {parsed.success && parsed.data.error ? (
-        <ErrorNotice error={parsed.data.error} />
-      ) : (
-        <Text style={s.muted}>
-          {loading ? t("chat.serverToolWaiting") : t("chat.serverToolOpenWorkspace")}
-        </Text>
+      <Text style={s.muted}>
+        {outcome.state === "incomplete"
+          ? t(name === "Task" ? "chat.taskCreationIncomplete" : "chat.serverToolIncomplete")
+          : loading
+            ? t("chat.serverToolWaiting")
+            : t("chat.serverToolOpenWorkspace")}
+      </Text>
+      {outcome.state === "saved" && (
+        <Button
+          small
+          onPress={() =>
+            navigate(
+              name === "Goal" || name === "Tracking"
+                ? "goals"
+                : name === "Memory"
+                  ? "apps"
+                  : "activity",
+            )
+          }
+        >
+          {t("chat.serverToolView", { name: label.toLowerCase() })}
+        </Button>
       )}
-      <Button
-        small
-        onPress={() =>
-          navigate(
-            name === "Goal" || name === "Tracking"
-              ? "goals"
-              : name === "Memory"
-                ? "apps"
-                : "activity",
-          )
-        }
-      >
-        {t("chat.serverToolView", { name: label.toLowerCase() })}
-      </Button>
     </Card>
   );
 }
@@ -439,6 +460,7 @@ export function ChatScreen({
   thread,
   active = true,
   hideHeader = false,
+  contentTopInset = 15,
   agentContext,
   emptyEyebrow,
   emptyTitleLead,
@@ -452,7 +474,9 @@ export function ChatScreen({
   active?: boolean;
   /** The Agent shell supplies the primary header, so the legacy thread header can be hidden. */
   hideHeader?: boolean;
-  agentContext?: { name: string; role: string; persona: string };
+  /** Scrollable space before the first message when the shell overlays its navigation. */
+  contentTopInset?: number;
+  agentContext?: { name: string; role: string; persona: string; avatar?: AgentAvatarId };
   emptyEyebrow?: string;
   emptyTitleLead?: string;
   emptyTitleTail?: string;
@@ -503,8 +527,9 @@ export function ChatScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
-  // Replayed messages show before connectAgent returns; new turns wait until it does.
-  const [syncing, setSyncing] = useState(false);
+  // Reattach only to the app-owned live stream; persisted history is a snapshot,
+  // never a replay of all the previous runs through connectAgent.
+  const syncing = stream.state.activeRunId !== null;
   const [picking, setPicking] = useState(false);
   const [pickerSelection, setPickerSelection] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -523,15 +548,42 @@ export function ChatScreen({
   const [saveError, setSaveError] = useState("");
   const [historyError, setHistoryError] = useState("");
   const [historyAttempt, setHistoryAttempt] = useState(0);
-  // Loads still replaying history. A count, so an old load finishing does not end a newer one.
-  const replaying = useRef(0);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderError, setOlderError] = useState(false);
+  const [historyPositioned, setHistoryPositioned] = useState(false);
+  const [firstHistoryId, setFirstHistoryId] = useState<string | null>(null);
+  const historySource = useRef<"thread" | "legacy">("thread");
+  const historyGeneration = useRef(0);
+  const hydratedThread = useRef<string | null>(null);
+  const olderRequest = useRef(false);
+  const initialScroll = useRef(true);
+  const scrollMetrics = useRef({ height: 0, y: 0, bottomInset: hideHeader ? 90 : 20 });
+  const scrollViewportHeight = useRef(0);
+  const prependAnchor = useRef<PrependAnchor | null>(null);
   // Set while a queued message is being sent, so a lock refusal holds it instead of failing.
   const queuedTurn = useRef(false);
   const [keyboardPadding, setKeyboardPadding] = useState(0);
+  const [composerDockHeight, setComposerDockHeight] = useState(70);
+  const measuredDockHeight = useRef(70);
+  const pendingComposerResize = useRef<{ height: number; following: boolean } | null>(null);
+  const floatingComposer = hideHeader;
+  const contentBottomInset = floatingComposer ? composerDockHeight + 20 : 20;
   const [streamAnnouncement, setStreamAnnouncement] = useState("");
   const streamWasActive = useRef(false);
   const streamNeedsHistoryRefresh = useRef(false);
   const streamGaps = useRef(0);
+
+  const onComposerHeightChange = useCallback((height: number) => {
+    if (height === measuredDockHeight.current) return;
+    measuredDockHeight.current = height;
+    pendingComposerResize.current = {
+      height,
+      following: pendingComposerResize.current?.following ?? followLatest.current,
+    };
+    setComposerDockHeight(height);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -550,96 +602,61 @@ export function ChatScreen({
   useEffect(() => {
     if (!isReady) return;
     let active = true;
+    const generation = ++historyGeneration.current;
+    const initial = hydratedThread.current !== threadId;
     setHistoryError("");
-    setLoaded(false);
-    setSyncing(false);
-    const replay = agent.subscribe({
-      onMessagesChanged: ({ messages }) => {
-        if (active && richThreads && messages.length) setLoaded(true);
-      },
-    });
+    olderRequest.current = false;
+    setLoadingOlder(false);
+    if (initial) {
+      setLoaded(false);
+      setHistoryPositioned(false);
+      setFirstHistoryId(null);
+      setHistoryCursor(null);
+      setHasOlder(false);
+      setOlderError(false);
+      prependAnchor.current = null;
+      initialScroll.current = true;
+      followLatest.current = true;
+      setAwayFromLatest(false);
+    }
     async function hydrate() {
       try {
-        if (richThreads) {
-          if (selection.existing) {
-            // Replaying history re-emits past RUN_ERROR events, so connection failures are
-            // handled separately from transcript loading. connectAgent returns once the
-            // thread is idle and also waits for a reply still running before reload.
-            let connectionFailure: unknown;
-            replaying.current += 1;
-            setSyncing(true);
-            try {
-              // Older Rich Threads records can use a compact tool-call shape
-              // that the runtime rejects when it is sent back as RunAgentInput.
-              agent.setMessages(normalizeThreadMessages(agent.messages));
-              await runConversationTurn(
-                agentId,
-                () => copilotkit.connectAgent({ agent }),
-                (onError) => copilotkit.subscribe({ onError }),
-                [replayedRunError],
-              );
-            } catch (error) {
-              connectionFailure = error;
-            } finally {
-              replaying.current -= 1;
-              if (active) setSyncing(false);
-            }
-            let persisted: Message[] = [];
-            let historyFailure: unknown;
-            try {
-              // Replay covers the latest run; the thread API is the complete
-              // transcript, including older turns and their tool messages.
-              const { messages } = await api.request<{ messages: Message[] }>(
-                threadHistoryPath(threadId),
-              );
-              persisted = messages;
-            } catch (error) {
-              historyFailure = error;
-            }
-            if (!agent.messages.length && !persisted.length && threadId === mainId) {
-              // Main chats created before Rich Threads kept their transcript in
-              // the legacy conversation record. Restore it when the cloud
-              // thread is empty; side chats never use this fallback.
-              try {
-                const { messages } = await api.request<{ messages: Message[] }>(
-                  "/api/conversation",
-                );
-                persisted = messages;
-              } catch (error) {
-                historyFailure ??= error;
-              }
-            }
-            if (!agent.messages.length && !persisted.length) {
-              const failure = historyFailure ?? connectionFailure;
-              if (failure) throw failure;
-            }
-            if (active && persisted.length) {
-              agent.setMessages(
-                mergePersistedThreadMessages(
-                  normalizeThreadMessages(persisted),
-                  normalizeThreadMessages(agent.messages),
-                ),
-              );
-            }
-            if (connectionFailure) {
-              setHistoryError(
-                t("chat.historyLoadError", {
-                  detail:
-                    connectionFailure instanceof Error
-                      ? connectionFailure.message
-                      : String(connectionFailure),
-                }),
-              );
-            }
-          }
-        } else {
-          const { messages } = await api.request<{ messages: Message[] }>("/api/conversation");
-          if (active) agent.setMessages(normalizeThreadMessages(messages));
+        let source: "thread" | "legacy" = richThreads ? "thread" : "legacy";
+        let page: ThreadHistoryPage = { messages: [], hasMore: false, before: null };
+        if (!richThreads || selection.existing || !initial) {
+          page = await api.request<ThreadHistoryPage>(
+            threadHistoryPagePath(richThreads ? threadId : undefined),
+          );
         }
-        if (active) setLoaded(true);
+        // Only old main chats can fall back to the pre-Rich-Threads transcript.
+        if (richThreads && !page.messages.length && threadId === mainId) {
+          page = await api.request<ThreadHistoryPage>(threadHistoryPagePath());
+          source = "legacy";
+        }
+        if (!active || generation !== historyGeneration.current) return;
+        historySource.current = source;
+        const persisted = normalizeThreadMessages(page.messages);
+        if (initial) {
+          agent.setMessages(persisted);
+          setFirstHistoryId(persisted[0]?.id ?? null);
+          setHistoryCursor(page.before);
+          setHasOlder(page.hasMore);
+          hydratedThread.current = threadId;
+        } else {
+          // Refresh the tail without dropping older pages the reader opened.
+          const savedById = new Map(persisted.map((message) => [message.id, message]));
+          agent.setMessages(
+            mergePersistedThreadMessages(
+              agent.messages.map((message) => savedById.get(message.id) ?? message),
+              persisted,
+            ),
+          );
+        }
+        setLoaded(true);
       } catch (e) {
         if (active) {
-          setLoaded(false);
+          if (initial) setLoaded(false);
+          setHistoryPositioned(true);
           setHistoryError(
             t("chat.historyLoadError", {
               detail: e instanceof Error ? e.message : String(e),
@@ -651,21 +668,72 @@ export function ChatScreen({
     void hydrate();
     return () => {
       active = false;
-      replay.unsubscribe();
-      if (richThreads) void agent.detachActiveRun().catch(() => {});
     };
-  }, [
-    agent,
-    agentId,
-    api,
-    copilotkit,
-    isReady,
-    historyAttempt,
-    mainId,
-    richThreads,
-    selection.existing,
-    threadId,
-  ]);
+  }, [agent, api, isReady, historyAttempt, mainId, richThreads, selection.existing, threadId]);
+  useEffect(() => {
+    if (!loaded || !initialScroll.current) return;
+    let reveal = 0;
+    const position = requestAnimationFrame(() => {
+      list.current?.scrollToEnd({ animated: false });
+      reveal = requestAnimationFrame(() => {
+        initialScroll.current = false;
+        setHistoryPositioned(true);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(position);
+      cancelAnimationFrame(reveal);
+    };
+  }, [loaded]);
+  useEffect(
+    () => () => {
+      void agent.detachActiveRun().catch(() => {});
+    },
+    [agent],
+  );
+  const loadOlder = useCallback(async () => {
+    if (
+      !loaded ||
+      !hasOlder ||
+      !historyCursor ||
+      olderRequest.current ||
+      initialScroll.current ||
+      prependAnchor.current
+    )
+      return;
+    const generation = historyGeneration.current;
+    olderRequest.current = true;
+    setLoadingOlder(true);
+    setOlderError(false);
+    try {
+      const page = await api.request<ThreadHistoryPage>(
+        threadHistoryPagePath(
+          historySource.current === "thread" ? threadId : undefined,
+          historyCursor,
+        ),
+      );
+      if (generation !== historyGeneration.current) return;
+      const earlier = normalizeThreadMessages(page.messages);
+      const nextFirstId = earlier[0]?.id ?? firstHistoryId;
+      const addsVisibleMessages = earlier.some(
+        (message) => message.role === "user" || message.role === "assistant",
+      );
+      if (addsVisibleMessages && nextFirstId && nextFirstId !== firstHistoryId)
+        prependAnchor.current = { ...scrollMetrics.current, firstMessageId: nextFirstId };
+      followLatest.current = false;
+      agent.setMessages(prependHistoryPage(earlier, agent.messages));
+      setFirstHistoryId(nextFirstId);
+      setHistoryCursor(page.before);
+      setHasOlder(page.hasMore);
+    } catch {
+      if (generation === historyGeneration.current) setOlderError(true);
+    } finally {
+      if (generation === historyGeneration.current) {
+        olderRequest.current = false;
+        setLoadingOlder(false);
+      }
+    }
+  }, [agent, api, firstHistoryId, hasOlder, historyCursor, loaded, threadId]);
   const saveHistory = useCallback(async () => {
     if (!richThreads) await api.request("/api/conversation", { messages: agent.messages }, "PUT");
     setSaveError("");
@@ -680,12 +748,31 @@ export function ChatScreen({
       setBusy(true);
       setError("");
       let firstTitle: string | null = null;
+      let contextReady = false;
       if (message) {
         if (richThreads && !agent.messages.some((m) => m.role === "user"))
           firstTitle = titleFrom(message.text);
         agent.addMessage({ id: message.id, role: "user", content: message.text });
       }
       try {
+        // Pagination controls presentation, not the model's context or legacy saves.
+        // Read full context only when submitting a turn, never to paint initial history.
+        if (
+          !richThreads ||
+          historySource.current === "legacy" ||
+          selection.existing ||
+          agent.messages.some((m) => m.role === "assistant")
+        ) {
+          const { messages: context } = await api.request<{ messages: Message[] }>(
+            richThreads && historySource.current === "thread"
+              ? threadHistoryPath(threadId)
+              : "/api/conversation",
+          );
+          agent.setMessages(
+            mergePersistedThreadMessages(normalizeThreadMessages(context), agent.messages),
+          );
+        }
+        contextReady = true;
         agent.setMessages(normalizeThreadMessages(agent.messages));
         await runConversationTurn(
           agentId,
@@ -709,7 +796,7 @@ export function ChatScreen({
       } finally {
         queuedTurn.current = false;
         try {
-          await saveHistory();
+          if (contextReady) await saveHistory();
         } catch (e) {
           queue.pause();
           setSaveError(t("chat.saveError", { detail: e instanceof Error ? e.message : String(e) }));
@@ -733,6 +820,7 @@ export function ChatScreen({
       richThreads,
       renameThread,
       threadId,
+      selection.existing,
       onThreadUsed,
     ],
   );
@@ -800,7 +888,7 @@ export function ChatScreen({
     const subscription = copilotkit.subscribe({
       onError: (event) => {
         if (event.context?.agentId && event.context.agentId !== agentId) return;
-        const during = { replaying: replaying.current > 0, queuedTurn: queuedTurn.current };
+        const during = { replaying: false, queuedTurn: queuedTurn.current };
         if (!showsRunError(event, during)) return;
         const failure = event.error instanceof Error ? event.error : new Error(String(event.error));
         setError(failure.message);
@@ -871,7 +959,7 @@ export function ChatScreen({
     },
     [api, refresh, refreshAgent],
   );
-  const messages = agent.messages || [];
+  const messages = loaded ? visibleHistoryWindow(agent.messages || [], firstHistoryId) : [];
   const latestPanelId = latestJevPanelId(messages, threadId);
   const latestUserIndex = messages.reduce(
     (last, message, index) => (message.role === "user" ? index : last),
@@ -950,9 +1038,9 @@ export function ChatScreen({
     .flatMap((m) => readableToolCalls(m))
     .filter((call) => call.function.name === "use_desktop")
     .at(-1)?.id;
-  const replying = busy || agent.isRunning;
+  const replying = busy || agent.isRunning || syncing;
   const renderedCount = visible.length + extraDrafts.length;
-  const wideEmpty = windowWidth >= 1180;
+  const wideEmpty = !hideHeader && windowWidth >= 1180;
   const emptySuggestions = [
     {
       icon: Target,
@@ -1006,7 +1094,7 @@ export function ChatScreen({
     : t("chat.localChatName");
   const headerState: ConversationHeaderState = primaryError
     ? "error"
-    : !loaded || !isReady || syncing
+    : !loaded || !isReady
       ? "working"
       : stream.state.phase === "reconnecting"
         ? "reconnecting"
@@ -1018,7 +1106,7 @@ export function ChatScreen({
       ? primaryError
       : !isReady
         ? t("chat.connecting")
-        : !loaded || syncing
+        : !loaded
           ? t("chat.loadingConversation")
           : headerState === "reconnecting"
             ? t("chat.reconnectingLiveReply")
@@ -1041,7 +1129,8 @@ export function ChatScreen({
   useEffect(() => {
     if (stream.state.gaps > streamGaps.current) streamNeedsHistoryRefresh.current = true;
     streamGaps.current = stream.state.gaps;
-    if (stream.state.phase === "reconnecting") streamNeedsHistoryRefresh.current = true;
+    if (stream.state.phase === "reconnecting" || stream.state.activeRunId !== null)
+      streamNeedsHistoryRefresh.current = true;
     // Tool cards and other non-text events also live in thread history. Wait for the
     // active run to settle before reconnecting the runtime, so the refresh cannot
     // detach a reply that is still streaming.
@@ -1059,7 +1148,10 @@ export function ChatScreen({
   return (
     <View style={wide && filesOpen ? { flex: 1, minWidth: 0, flexDirection: "row" } : { flex: 1 }}>
       {/* 主对话列：宽屏 + 产物栏展开时与右侧停靠栏左右分栏，其余情况独占整列。 */}
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <View
+        testID="chat-conversation-column"
+        style={{ flex: 1, minWidth: 0, minHeight: 0, position: "relative" }}
+      >
         <View
           accessibilityLiveRegion="polite"
           style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0 }}
@@ -1079,23 +1171,82 @@ export function ChatScreen({
           </View>
         )}
         <ScrollView
+          testID="chat-message-viewport"
           ref={list}
-          style={messageColumnStyle}
+          style={[messageColumnStyle, { opacity: historyPositioned ? 1 : 0 }]}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ gap: 13, paddingTop: 15, paddingBottom: 20, flexGrow: 1 }}
+          contentContainerStyle={{
+            gap: 13,
+            paddingTop: contentTopInset,
+            paddingBottom: floatingComposer ? 0 : contentBottomInset,
+            flexGrow: 1,
+          }}
           onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+            const previousY = scrollMetrics.current.y;
+            scrollViewportHeight.current = layoutMeasurement.height;
+            // Keep height and bottomInset paired with the last applied content layout.
+            scrollMetrics.current.y = contentOffset.y;
+            if (initialScroll.current || prependAnchor.current || pendingComposerResize.current)
+              return;
             const gap = contentSize.height - contentOffset.y - layoutMeasurement.height;
             const nearEnd = gap < 120;
             followLatest.current = nearEnd;
             setAwayFromLatest(renderedCount > 0 && gap > 400);
+            if (contentOffset.y < 160 && contentOffset.y < previousY && !olderError)
+              void loadOlder();
           }}
           scrollEventThrottle={100}
-          onContentSizeChange={() => {
-            if (active && renderedCount > 0 && followLatest.current)
+          onContentSizeChange={(_width, height) => {
+            scrollMetrics.current = {
+              ...scrollMetrics.current,
+              height,
+              bottomInset: contentBottomInset,
+            };
+            const resize = pendingComposerResize.current;
+            if (resize && contentBottomInset === resize.height + 20)
+              pendingComposerResize.current = null;
+            if (!loaded) return;
+            if (prependAnchor.current) {
+              const anchor = prependAnchor.current;
+              const y = restorePrependOffset(anchor, {
+                height,
+                bottomInset: contentBottomInset,
+                firstMessageId: firstHistoryId,
+              });
+              if (y === undefined) return;
+              prependAnchor.current = null;
+              scrollMetrics.current.y = y;
+              list.current?.scrollTo({ y, animated: false });
+            } else if (initialScroll.current) {
               list.current?.scrollToEnd({ animated: false });
+            } else if (active && renderedCount > 0 && (followLatest.current || resize?.following)) {
+              followLatest.current = true;
+              setAwayFromLatest(false);
+              list.current?.scrollToEnd({ animated: false });
+            } else if (active) {
+              const gap = height - scrollMetrics.current.y - scrollViewportHeight.current;
+              setAwayFromLatest(renderedCount > 0 && gap > 400);
+            }
           }}
           keyboardShouldPersistTaps="handled"
         >
+          {hasOlder && (
+            <View style={{ height: 34, justifyContent: "center", alignItems: "center" }}>
+              {loadingOlder ? (
+                <ActivityIndicator
+                  size="small"
+                  color={colors.faint}
+                  accessibilityLabel={t("chat.loadingEarlierMessages")}
+                />
+              ) : (
+                <Pressable accessibilityRole="button" onPress={() => void loadOlder()} hitSlop={8}>
+                  <Text style={{ color: olderError ? colors.primary : colors.muted, fontSize: 12 }}>
+                    {t(olderError ? "chat.retryEarlierMessages" : "chat.loadEarlierMessages")}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
           {!!historyError && (
             <>
               <ErrorNotice error={historyError} />
@@ -1110,7 +1261,8 @@ export function ChatScreen({
                 flexGrow: 1,
                 flexShrink: 0,
                 justifyContent: "center",
-                paddingVertical: wideEmpty ? 42 : 30,
+                paddingVertical: hideHeader ? 28 : wideEmpty ? 42 : 30,
+                paddingHorizontal: hideHeader ? 8 : 0,
               }}
             >
               <View
@@ -1124,28 +1276,32 @@ export function ChatScreen({
                 }}
               >
                 <View style={{ flex: 1, minWidth: 0, justifyContent: "center", gap: 16 }}>
-                  <View style={[s.row, { gap: 8 }]}>
-                    <View
-                      style={{
-                        width: 20,
-                        height: 1,
-                        backgroundColor: colors.primary,
-                      }}
-                    />
-                    <Text style={[typography.eyebrow, { color: colors.primaryStrong }]}>
-                      {emptyEyebrow ?? t("chat.emptyEyebrow")}
-                    </Text>
-                  </View>
+                  {hideHeader ? (
+                    <AgentOrb avatar={agentContext?.avatar ?? "orb"} size={73} />
+                  ) : (
+                    <View style={[s.row, { gap: 8 }]}>
+                      <View
+                        style={{
+                          width: 20,
+                          height: 1,
+                          backgroundColor: colors.primary,
+                        }}
+                      />
+                      <Text style={[typography.eyebrow, { color: colors.primaryStrong }]}>
+                        {emptyEyebrow ?? t("chat.emptyEyebrow")}
+                      </Text>
+                    </View>
+                  )}
                   <Text
                     accessibilityLabel={t("chat.emptyTitle")}
                     style={{
                       maxWidth: 560,
                       color: colors.heading,
-                      fontSize: wideEmpty ? 40 : 31,
-                      lineHeight: wideEmpty ? 54 : 43,
+                      fontSize: hideHeader ? 25 : wideEmpty ? 40 : 31,
+                      lineHeight: hideHeader ? 40 : wideEmpty ? 54 : 43,
                       fontWeight: "500",
                       letterSpacing: 0.2,
-                      fontFamily: fonts.serif,
+                      fontFamily: hideHeader ? fonts.sans : fonts.serif,
                     }}
                   >
                     {emptyTitleLead ?? t("chat.emptyTitleLead")}
@@ -1166,72 +1322,92 @@ export function ChatScreen({
                   >
                     {emptySubtitle ?? t("chat.emptySubtitle")}
                   </Text>
-                  <View style={[s.row, { gap: 7, marginTop: 4 }]}>
-                    <Sparkles size={13} color={colors.faint} />
-                    <Text style={[s.small, { color: colors.faint }]}>
-                      {t("chat.emptyFootnote")}
-                    </Text>
-                  </View>
+                  {!hideHeader && (
+                    <View style={[s.row, { gap: 7, marginTop: 4 }]}>
+                      <Sparkles size={13} color={colors.faint} />
+                      <Text style={[s.small, { color: colors.faint }]}>
+                        {t("chat.emptyFootnote")}
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 <View
                   style={{
                     width: wideEmpty ? 360 : "100%",
                     paddingLeft: wideEmpty ? 28 : 0,
-                    paddingTop: wideEmpty ? 0 : 18,
+                    paddingTop: hideHeader ? 0 : wideEmpty ? 0 : 18,
                     borderLeftWidth: wideEmpty ? 1 : 0,
                     borderLeftColor: colors.line,
-                    borderTopWidth: wideEmpty ? 0 : 1,
+                    borderTopWidth: hideHeader || wideEmpty ? 0 : 1,
                     borderTopColor: colors.line,
+                    ...(hideHeader
+                      ? { flexDirection: "row", flexWrap: "wrap", gap: 8 }
+                      : undefined),
                   }}
                 >
-                  <View style={[s.between, { paddingBottom: 8 }]}>
-                    <Text style={[typography.eyebrow, { color: colors.faint }]}>
-                      {t("chat.suggestionHeading")}
-                    </Text>
-                    <Text style={{ fontSize: 9, color: colors.lineStrong }}>01—06</Text>
-                  </View>
-                  {emptySuggestions.map((item, index) => (
-                    <Pressable
-                      key={item.text}
-                      accessibilityRole="button"
-                      onPress={item.action}
-                      style={({ pressed }) => ({
-                        minHeight: 47,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 11,
-                        paddingVertical: 10,
-                        borderTopWidth: 1,
-                        borderTopColor: colors.lineSoft,
-                        backgroundColor: pressed ? colors.surfaceRaised : "transparent",
-                      })}
-                    >
-                      <Text
-                        style={[
-                          s.metric,
-                          {
-                            width: 20,
-                            fontSize: 10,
-                            color: colors.faint,
-                          },
-                        ]}
-                      >
-                        {String(index + 1).padStart(2, "0")}
+                  {!hideHeader && (
+                    <View style={[s.between, { paddingBottom: 8 }]}>
+                      <Text style={[typography.eyebrow, { color: colors.faint }]}>
+                        {t("chat.suggestionHeading")}
                       </Text>
-                      <item.icon size={14} strokeWidth={1.65} color={colors.muted} />
-                      <Text
-                        style={{
-                          flex: 1,
-                          fontSize: 12,
-                          lineHeight: 18,
-                          color: colors.text,
-                        }}
+                      <Text style={{ fontSize: 9, color: colors.lineStrong }}>01—06</Text>
+                    </View>
+                  )}
+                  {(hideHeader ? emptySuggestions.slice(0, 2) : emptySuggestions).map(
+                    (item, index) => (
+                      <Pressable
+                        key={item.text}
+                        accessibilityRole="button"
+                        onPress={item.action}
+                        style={({ pressed }) => ({
+                          minHeight: 47,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 11,
+                          paddingVertical: 10,
+                          borderTopWidth: hideHeader ? 0 : 1,
+                          borderTopColor: colors.lineSoft,
+                          backgroundColor: pressed ? colors.surfaceRaised : "transparent",
+                          ...(hideHeader
+                            ? {
+                                borderWidth: 1,
+                                borderColor: colors.line,
+                                borderRadius: 22,
+                                paddingHorizontal: 12,
+                                minHeight: 40,
+                              }
+                            : undefined),
+                        })}
                       >
-                        {item.text}
-                      </Text>
-                      <ArrowUpRight size={13} color={colors.faint} />
-                    </Pressable>
-                  ))}
+                        {!hideHeader && (
+                          <Text
+                            style={[
+                              s.metric,
+                              {
+                                width: 20,
+                                fontSize: 10,
+                                color: colors.faint,
+                              },
+                            ]}
+                          >
+                            {String(index + 1).padStart(2, "0")}
+                          </Text>
+                        )}
+                        <item.icon size={14} strokeWidth={1.65} color={colors.muted} />
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontSize: 12,
+                            lineHeight: 18,
+                            color: colors.text,
+                          }}
+                        >
+                          {item.text}
+                        </Text>
+                        <ArrowUpRight size={13} color={colors.faint} />
+                      </Pressable>
+                    ),
+                  )}
                 </View>
               </View>
             </View>
@@ -1584,14 +1760,82 @@ export function ChatScreen({
               {error ? t("chat.retryResponse") : t("chat.retryLiveReply")}
             </Button>
           )}
+          {floatingComposer && (
+            <View
+              testID="chat-composer-clearance"
+              pointerEvents="none"
+              // The preceding 13px message gap completes the total bottom inset.
+              style={{ height: Math.max(0, contentBottomInset - 13) }}
+              onLayout={({ nativeEvent: { layout } }) => {
+                if (Math.abs(layout.height - (contentBottomInset - 13)) > 1) return;
+                const resize = pendingComposerResize.current;
+                if (!resize || contentBottomInset !== resize.height + 20) return;
+                // This also confirms short-chat layouts whose total height is unchanged.
+                pendingComposerResize.current = null;
+                scrollMetrics.current.bottomInset = contentBottomInset;
+                if (prependAnchor.current) return;
+                if (loaded && active && resize.following) {
+                  followLatest.current = true;
+                  setAwayFromLatest(false);
+                  list.current?.scrollToEnd({ animated: false });
+                } else {
+                  const gap =
+                    scrollMetrics.current.height -
+                    scrollMetrics.current.y -
+                    scrollViewportHeight.current;
+                  setAwayFromLatest(renderedCount > 0 && gap > 400);
+                }
+              }}
+            />
+          )}
         </ScrollView>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={[
-            conversationColumnStyle,
-            keyboardPadding > 0 && { paddingBottom: keyboardPadding },
-          ]}
+        {!historyPositioned && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: "40%",
+              alignSelf: "center",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={s.small}>{t("chat.loadingConversation")}</Text>
+          </View>
+        )}
+        <ComposerDock
+          floating={floatingComposer}
+          keyboardPadding={keyboardPadding}
+          onHeightChange={onComposerHeightChange}
         >
+          {awayFromLatest && (
+            <View
+              pointerEvents="box-none"
+              style={{
+                position: "absolute",
+                bottom: "100%",
+                left: 0,
+                right: 0,
+                paddingBottom: 10,
+                alignItems: "center",
+                zIndex: 2,
+              }}
+            >
+              <Button
+                small
+                icon={ArrowDown}
+                style={{ backgroundColor: `${colors.paper}E6`, ...shadow.card }}
+                onPress={() => {
+                  followLatest.current = true;
+                  setAwayFromLatest(false);
+                  list.current?.scrollToEnd({ animated: true });
+                }}
+              >
+                {t("chat.latestMessages")}
+              </Button>
+            </View>
+          )}
           <ErrorNotice error={saveError} />
           {!!saveError && (
             <Button
@@ -1672,34 +1916,11 @@ export function ChatScreen({
               )}
             </View>
           )}
-          <View style={conversationColumnStyle}>
-            {awayFromLatest && (
-              <View
-                pointerEvents="box-none"
-                style={{
-                  position: "absolute",
-                  bottom: "100%",
-                  left: 0,
-                  right: 0,
-                  paddingBottom: 10,
-                  alignItems: "center",
-                  zIndex: 2,
-                }}
-              >
-                <Button
-                  small
-                  icon={ArrowDown}
-                  style={{ backgroundColor: `${colors.paper}E6`, ...shadow.card }}
-                  onPress={() => {
-                    followLatest.current = true;
-                    setAwayFromLatest(false);
-                    list.current?.scrollToEnd({ animated: true });
-                  }}
-                >
-                  {t("chat.latestMessages")}
-                </Button>
-              </View>
-            )}
+          <View
+            pointerEvents={floatingComposer ? "box-none" : "auto"}
+            style={conversationColumnStyle}
+          >
+            {floatingComposer && <ComposerMatte />}
             <PromptComposer
               inputRef={composerInput}
               value={draft}
@@ -1715,8 +1936,9 @@ export function ChatScreen({
                     : (composerPlaceholder ?? t("chat.messagePlaceholder"))
               }
               accessibilityLabel={t("chat.messageLingWu")}
-              inputMinHeight={44}
-              inputMaxHeight={140}
+              inputMinHeight={hideHeader ? 38 : 44}
+              inputMaxHeight={hideHeader ? 104 : 140}
+              inline={hideHeader}
               dense
               tools={[
                 {
@@ -1743,15 +1965,14 @@ export function ChatScreen({
                   }
                 />
               }
-              modelSelector={<ComposerModelSelector disabled={replying} />}
               sendLabel={t("chat.sendMessage")}
               stopLabel={t("chat.stopReply")}
               busy={replying}
               submitDisabled={!loaded || !isReady}
-              style={[conversationColumnStyle, wide && { marginBottom: 18 }]}
+              style={[conversationColumnStyle, { marginBottom: hideHeader ? 12 : wide ? 18 : 0 }]}
             />
           </View>
-        </KeyboardAvoidingView>
+        </ComposerDock>
       </View>
       {picking && (
         <FilePickerSheet
@@ -1884,9 +2105,10 @@ function ArtifactsPanel({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: colors.modalShade,
           }}
-        />
+        >
+          <ModalBackdrop />
+        </Pressable>
       )}
       <View
         accessibilityViewIsModal={mode === "overlay"}

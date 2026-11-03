@@ -12,8 +12,8 @@ import {
   Modal,
   Platform,
   Pressable,
-  Text,
-  TextInput,
+  ScrollView,
+  StyleSheet,
   type TextStyle,
   useWindowDimensions,
   View,
@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import Svg, { Polyline } from "react-native-svg";
 import type { LingWuApi } from "./api";
+import { Text, TextInput } from "./app-text";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
   Activity,
@@ -58,6 +59,7 @@ import {
   type WatchlistSymbol,
 } from "./market";
 import { defaultCurrency, directionOf, formatPercent, formatPrice } from "./market-format";
+import { ModalOverlay } from "./modal-overlay";
 import { type InvestmentNote, loadNotes, useNotesState } from "./notes";
 import { QuoteCard } from "./quote-card";
 import { availabilityFromQuote, type QuoteAvailability, useQuotes } from "./quotes";
@@ -74,7 +76,9 @@ import {
   marketDirectionColor,
   Sheet,
   s,
+  shadow,
 } from "./ui";
+import { type WatchlistMenuAnchor, watchlistMenuPosition } from "./watchlist-menu-position";
 import { latestNoteForSymbol } from "./watchlist-symbol-view";
 import { useWorkspace } from "./workspace";
 
@@ -259,9 +263,10 @@ function SymbolCard({
   availability?: QuoteAvailability;
   onRetry?: () => void;
   onPress: () => void;
-  onMore?: () => void;
+  onMore?: (anchor: WatchlistMenuAnchor) => void;
 }) {
   const { t } = useTranslation();
+  const moreTrigger = useRef<View>(null);
   const { symbol, quote, alerts, unavailable } = item;
   const alert = alerts[0];
   const summary = availabilityFromQuote(quote, unavailable);
@@ -279,12 +284,15 @@ function SymbolCard({
       metaAction={
         onMore ? (
           <Pressable
+            ref={moreTrigger}
             accessibilityRole="button"
             accessibilityLabel={t("markets.symbolMore", { name: symbol.name })}
             hitSlop={10}
             onPress={(event) => {
               event.stopPropagation();
-              onMore();
+              moreTrigger.current?.measureInWindow((x, y, width, height) =>
+                onMore({ x, y, width, height }),
+              );
             }}
             style={({ pressed }) => ({
               width: 28,
@@ -542,31 +550,29 @@ function WatchTable({
 /** 卡片形态的「⋯」菜单：分析 / 从列表移除。 */
 function SymbolMenu({
   item,
+  anchor,
   onClose,
   onAnalyze,
   onRemove,
 }: {
   item: WatchlistSymbol;
+  anchor: WatchlistMenuAnchor;
   onClose: () => void;
   onAnalyze: () => void;
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
   return (
-    <Sheet
-      title={item.symbol.name}
-      subtitle={`${item.symbol.code} · ${item.symbol.market}`}
+    <WatchlistActionMenu
+      label={t("markets.symbolMore", { name: item.symbol.name })}
+      anchor={anchor}
+      testID="watchlist-symbol-menu"
       onClose={onClose}
-    >
-      <View style={{ gap: 10 }}>
-        <Button primary onPress={onAnalyze}>
-          {t("markets.watchlistAnalyze")}
-        </Button>
-        <Button danger onPress={onRemove}>
-          {t("markets.watchlistRemove")}
-        </Button>
-      </View>
-    </Sheet>
+      rows={[
+        { label: t("markets.watchlistAnalyze"), onPress: onAnalyze },
+        { label: t("markets.watchlistRemove"), danger: true, onPress: onRemove },
+      ]}
+    />
   );
 }
 
@@ -1014,7 +1020,7 @@ function ConfirmDialog({
   onConfirm: () => void;
 }) {
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onCancel}>
+    <ModalOverlay visible onRequestClose={onCancel}>
       <Pressable onPress={onCancel} style={s.modalShade}>
         <Pressable
           accessibilityViewIsModal
@@ -1033,71 +1039,125 @@ function ConfirmDialog({
           </View>
         </Pressable>
       </Pressable>
+    </ModalOverlay>
+  );
+}
+
+type WatchlistMenuAction = { label: string; danger?: boolean; onPress: () => void };
+
+/** Anchored action menus have a transparent outside-click target, never a visual mask. */
+function WatchlistActionMenu({
+  anchor,
+  label,
+  testID,
+  rows,
+  onClose,
+}: {
+  anchor: WatchlistMenuAnchor;
+  label: string;
+  testID: string;
+  rows: WatchlistMenuAction[];
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const viewport = useWindowDimensions();
+  const position = watchlistMenuPosition(anchor, viewport, {
+    width: 192,
+    height: rows.length * 44 + 2,
+  });
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
+      <View style={{ flex: 1 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("ui.closeDetails")}
+          onPress={onClose}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          testID={testID}
+          accessibilityViewIsModal
+          accessibilityRole="menu"
+          accessibilityLabel={label}
+          style={{
+            position: "absolute",
+            ...position,
+            backgroundColor: colors.paper,
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: 10,
+            overflow: "hidden",
+            ...shadow.card,
+          }}
+        >
+          <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled">
+            {rows.map((row, index) => (
+              <Pressable
+                key={row.label}
+                accessibilityRole="menuitem"
+                onPress={() => {
+                  onClose();
+                  row.onPress();
+                }}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 16,
+                  minHeight: 44,
+                  justifyContent: "center",
+                  borderTopWidth: index ? 1 : 0,
+                  borderTopColor: colors.line,
+                  backgroundColor: pressed ? colors.overlay1 : "transparent",
+                })}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[s.text, { color: row.danger ? colors.danger : colors.text }]}
+                >
+                  {row.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
     </Modal>
   );
 }
 
-/** 列表操作菜单（⋯）：编辑 / 删除。 */
+/** 列表操作菜单（⋯）：新建 / 编辑 / 删除。 */
 function ListMenu({
+  anchor,
   onNew,
   onEdit,
   onDelete,
   onClose,
 }: {
+  anchor: WatchlistMenuAnchor;
   onNew: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const rows: Array<{ label: string; danger?: boolean; onPress: () => void }> = [
+  const rows: WatchlistMenuAction[] = [
     { label: t("markets.watchlistNew"), onPress: onNew },
     { label: t("markets.watchlistEditAction"), onPress: onEdit },
     { label: t("markets.watchlistDeleteAction"), danger: true, onPress: onDelete },
   ];
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={s.modalShade}>
-        <Pressable
-          accessibilityViewIsModal
-          onPress={(event) => event.stopPropagation()}
-          style={{
-            position: "absolute",
-            top: 96,
-            right: 20,
-            minWidth: 168,
-            backgroundColor: colors.paper,
-            borderWidth: 1,
-            borderColor: colors.line,
-            borderRadius: 10,
-            overflow: "hidden",
-          }}
-        >
-          {rows.map((row, index) => (
-            <Pressable
-              key={row.label}
-              accessibilityRole="button"
-              onPress={() => {
-                onClose();
-                row.onPress();
-              }}
-              style={({ pressed }) => ({
-                paddingHorizontal: 16,
-                minHeight: 44,
-                justifyContent: "center",
-                borderTopWidth: index ? 1 : 0,
-                borderTopColor: colors.line,
-                backgroundColor: pressed ? colors.overlay1 : "transparent",
-              })}
-            >
-              <Text style={[s.text, { color: row.danger ? colors.danger : colors.text }]}>
-                {row.label}
-              </Text>
-            </Pressable>
-          ))}
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <WatchlistActionMenu
+      anchor={anchor}
+      label={t("markets.watchlistMore")}
+      testID="watchlist-list-menu"
+      rows={rows}
+      onClose={onClose}
+    />
   );
 }
 
@@ -1198,19 +1258,48 @@ function WatchlistSheet({
   );
 }
 
+/** Direct entry from the capability rail, reusing the watchlist management forms. */
+export function WatchlistAddSheet({ onClose }: { onClose: () => void }) {
+  const { api } = useWorkspace();
+  useWatchlistState();
+  const list = activeWatchlist();
+  return list ? (
+    <AddSymbolSheet
+      api={api}
+      list={list}
+      onAdd={(symbol) => addSymbols(api, list.id, [symbol])}
+      onClose={onClose}
+    />
+  ) : (
+    <WatchlistSheet
+      api={api}
+      mode="create"
+      onClose={onClose}
+      onSubmit={(name, symbols) => {
+        createWatchlist(api, { name, symbols });
+        onClose();
+      }}
+    />
+  );
+}
+
 export function WatchlistScreen() {
   const { api, notify, open, ask } = useWorkspace();
   const { t, locale } = useTranslation();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const sidebarWidth = useSidebarCollapsed() ? layout.sidebarCollapsed : layout.sidebar;
   const state = useWatchlistState();
   const notesState = useNotesState();
   const [filterQuery, setFilterQuery] = useState("");
   const [marketFilter, setMarketFilter] = useState<WatchlistFilter>("all");
   const [sheet, setSheet] = useState<"create" | "edit" | "add" | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const listMenuTrigger = useRef<View>(null);
+  const [listMenuAnchor, setListMenuAnchor] = useState<WatchlistMenuAnchor | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [menuFor, setMenuFor] = useState<WatchlistSymbol | null>(null);
+  const [menuFor, setMenuFor] = useState<{
+    item: WatchlistSymbol;
+    anchor: WatchlistMenuAnchor;
+  } | null>(null);
   const shimmer = useShimmer();
 
   useEffect(() => {
@@ -1228,6 +1317,11 @@ export function WatchlistScreen() {
   }, [api, locale]);
 
   const list = activeWatchlist();
+  useEffect(() => {
+    // A resized window or changed list invalidates the measured trigger coordinates.
+    setListMenuAnchor(null);
+    setMenuFor(null);
+  }, [width, height, list?.id]);
   const quoteSymbols = useMemo(
     () => (list?.symbols ?? []).map((entry) => entry.symbol.code),
     [list],
@@ -1386,11 +1480,17 @@ export function WatchlistScreen() {
         <Button small primary icon={Plus} style={{ minHeight: 44 }} onPress={() => setSheet("add")}>
           {t("markets.watchlistAddAction")}
         </Button>
-        <IconButton
-          icon={MoreHorizontal}
-          label={t("markets.watchlistMore")}
-          onPress={() => setMenuOpen(true)}
-        />
+        <View ref={listMenuTrigger} collapsable={false} testID="watchlist-list-menu-trigger">
+          <IconButton
+            icon={MoreHorizontal}
+            label={t("markets.watchlistMore")}
+            onPress={() =>
+              listMenuTrigger.current?.measureInWindow((x, y, width, height) =>
+                setListMenuAnchor({ x, y, width, height }),
+              )
+            }
+          />
+        </View>
       </View>
 
       <View style={[s.between, { gap: 12, flexWrap: "wrap" }]}>
@@ -1473,7 +1573,7 @@ export function WatchlistScreen() {
                   onRetry={retry}
                   style={{ width: "100%", flexGrow: 1 }}
                   onPress={() => openSymbol(item)}
-                  onMore={() => setMenuFor(item)}
+                  onMore={(anchor) => setMenuFor({ item, anchor })}
                 />
               </View>
             ))}
@@ -1561,16 +1661,18 @@ export function WatchlistScreen() {
       )}
       {!!menuFor && (
         <SymbolMenu
-          item={menuFor}
+          item={menuFor.item}
+          anchor={menuFor.anchor}
           onClose={() => setMenuFor(null)}
-          onAnalyze={() => analyzeSymbol(menuFor)}
-          onRemove={() => removeItem(menuFor)}
+          onAnalyze={() => analyzeSymbol(menuFor.item)}
+          onRemove={() => removeItem(menuFor.item)}
         />
       )}
-      {menuOpen && list && (
+      {listMenuAnchor && list && (
         <ListMenu
+          anchor={listMenuAnchor}
           onNew={() => setSheet("create")}
-          onClose={() => setMenuOpen(false)}
+          onClose={() => setListMenuAnchor(null)}
           onEdit={() => setSheet("edit")}
           onDelete={() => setConfirmDelete(true)}
         />

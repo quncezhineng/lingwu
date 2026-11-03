@@ -6,6 +6,7 @@ const reminderSchema = z.object({
   description: z.string().optional(),
   condition: z.enum(["change", "contains", "price_below"]),
   value: z.string().default(""),
+  currency: z.enum(["CNY", "HKD", "USD"]).optional(),
   intervalMinutes: z.number(),
   schedule: z.enum(["interval", "daily", "weekly"]).optional(),
   timeOfDay: z.string().nullable().optional(),

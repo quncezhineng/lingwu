@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
-import { Check, ChevronDown, Settings2 } from "./icons";
+import { Check, ChevronDown, Cpu, Settings2 } from "./icons";
 import { Button, colors, fonts, radius, Sheet, s, space } from "./ui";
 import { useWorkspace } from "./workspace";
 
-/** Compact picker shared by the workbench and chat composers. Credentials stay in My settings. */
-export function ComposerModelSelector({ disabled = false }: { disabled?: boolean }) {
+/** Model selection in Bot management. Credentials stay in My settings. */
+export function ModelSelector({
+  disabled = false,
+  onManage,
+}: {
+  disabled?: boolean;
+  onManage?: () => void;
+}) {
   const { workspace, api, refresh, notify, navigate, open } = useWorkspace();
   const { t } = useTranslation();
   const [current, setCurrent] = useState(workspace.runtime.model);
@@ -26,6 +33,7 @@ export function ComposerModelSelector({ disabled = false }: { disabled?: boolean
 
   function manage() {
     setExpanded(false);
+    onManage?.();
     navigate("account");
     open({ type: "model-settings" });
   }
@@ -54,53 +62,52 @@ export function ComposerModelSelector({ disabled = false }: { disabled?: boolean
       {busy ? (
         <ActivityIndicator size="small" color={colors.primary} />
       ) : (
-        <View
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: radius.full,
-            backgroundColor: colors.primary,
-          }}
-        />
+        <Cpu size={18} color={colors.primary} />
       )}
-      <Text
-        numberOfLines={1}
-        style={{
-          maxWidth: 190,
-          fontSize: 12,
-          lineHeight: 18,
-          fontWeight: "600",
-          color: colors.muted,
-          fontFamily: fonts.sans,
-        }}
-      >
-        {title}
-      </Text>
+      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+        <Text style={{ fontSize: 12, lineHeight: 18, fontWeight: "500", color: colors.text }}>
+          {t("modelSettings.model")}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{
+            fontSize: 11,
+            lineHeight: 18,
+            fontWeight: "400",
+            color: colors.muted,
+            fontFamily: fonts.sans,
+          }}
+        >
+          {title}
+        </Text>
+      </View>
       <ChevronDown size={12} color={colors.faint} />
     </>
   );
   const triggerStyle = {
-    minHeight: 40,
+    minHeight: 58,
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    gap: 7,
-    paddingHorizontal: 9,
-    borderRadius: radius.control,
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
     opacity: blocked ? 0.55 : 1,
   };
   return (
-    <View style={{ flexShrink: 1, minWidth: 0 }}>
+    <View style={{ width: "100%", minWidth: 0 }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("modelSettings.selectModel")}
         accessibilityValue={{ text: title }}
         accessibilityState={{ expanded, disabled: blocked, busy }}
         disabled={blocked}
-        hitSlop={8}
         onPress={() => setExpanded(true)}
         style={({ pressed }) => [
           triggerStyle,
-          { backgroundColor: pressed ? colors.overlay1 : "transparent" },
+          { backgroundColor: pressed ? colors.overlay1 : colors.paper },
         ]}
       >
         {content}

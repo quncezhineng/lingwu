@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { ActivityIndicator, AppState, Image, Text, View } from "react-native";
+import { ActivityIndicator, AppState, Image, View } from "react-native";
 import { z } from "zod";
 import type { BrowserSession } from "../../../packages/domain/src";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
 import { Check, Globe2, Hand, RotateCw } from "./icons";

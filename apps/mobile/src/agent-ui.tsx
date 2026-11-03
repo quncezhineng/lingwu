@@ -3,10 +3,8 @@ import {
   ActivityIndicator,
   Image,
   Linking,
-  Modal,
   Platform,
   Pressable,
-  Text,
   type TextStyle,
   useWindowDimensions,
   View,
@@ -22,14 +20,19 @@ import type {
   Goal,
   Idea,
   Monitor,
-  RunEvent,
+  MonitorCurrency,
 } from "../../../packages/domain/src/agent";
+import {
+  monitorPriceLabel,
+  resolveMonitorCurrency,
+} from "../../../packages/domain/src/monitor-currency";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text } from "./app-text";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
-import { fileKind, fileTypeName } from "./file-kind";
-import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
-import { localizeAgentName, runtimeLabel, statusLabel, tr } from "./i18n/translate";
+import { fileTypeName } from "./file-kind";
+import { activeLocaleTag, type TranslationFn, type TranslationKey, useTranslation } from "./i18n";
+import { localizeAgentName, statusLabel, tr } from "./i18n/translate";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -55,11 +58,11 @@ import {
   Users,
   X,
 } from "./icons";
+import { ModalOverlay } from "./modal-overlay";
 import { PageHeader } from "./page-header";
-import { PlanCard } from "./plan-card";
-import { ActivityScreen } from "./screens";
 import { StatusBadge, taskStatusTone } from "./status-badge";
-import { breakpoints, radius } from "./theme";
+import { hasInternalTaskText, presentTask, taskRequiresSetup } from "./task-presentation";
+import { breakpoints, fonts, radius } from "./theme";
 import { Toggle } from "./toggle";
 import {
   Button,
@@ -72,7 +75,6 @@ import {
   Field,
   LinkRow,
   Mascot,
-  resultSummary,
   SectionHeading,
   Sheet,
   s,
@@ -101,31 +103,27 @@ function errorText(e: unknown) {
 function activeTask(task: AgentTask) {
   return !["succeeded", "failed", "cancelled"].includes(task.status);
 }
-function isStructuredTaskError(value?: string | null) {
-  const trimmed = value?.trim();
-  if (!trimmed || !/^[[{]/.test(trimmed)) return false;
-  try {
-    JSON.parse(trimmed);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // 来源摘要的 Markdown 渲染：卡片本身空间很小，正文沿用 s.small 规格（11/17），
 // 标题逐级缩小并去掉默认下边框，段落与列表边距压缩，避免小卡片里出现大片留白。
-const evidenceMarkdownTextStyle: TextStyle = { color: colors.muted, fontSize: 11, lineHeight: 17 };
+const evidenceMarkdownTextStyle: TextStyle = {
+  color: colors.muted,
+  fontFamily: fonts.serif,
+  fontSize: 11,
+  lineHeight: 17,
+};
 const evidenceMarkdownStyle: Partial<MarkdownStyles> = {
   text: evidenceMarkdownTextStyle,
   paragraph: { marginTop: 0, marginBottom: 2 },
   list: { marginBottom: 2 },
   listUnorderedItem: { marginTop: 1 },
   listOrderedItem: { marginTop: 1 },
-  listUnorderedItemIcon: { marginLeft: 0, marginRight: 4, lineHeight: 17 },
-  listOrderedItemIcon: { marginLeft: 0, marginRight: 4, lineHeight: 17 },
+  listUnorderedItemIcon: { fontFamily: fonts.serif, marginLeft: 0, marginRight: 4, lineHeight: 17 },
+  listOrderedItemIcon: { fontFamily: fonts.serif, marginLeft: 0, marginRight: 4, lineHeight: 17 },
   listUnorderedItemText: { fontSize: 11, lineHeight: 17 },
   listOrderedItemText: { fontSize: 11, lineHeight: 17 },
   headingContainer: { marginTop: 3, marginBottom: 1 },
+  heading: { fontFamily: fonts.serif },
   heading1: { fontSize: 12, lineHeight: 17, color: colors.text },
   heading2: { fontSize: 12, lineHeight: 17, color: colors.text },
   heading3: { fontSize: 11, lineHeight: 17, color: colors.text },
@@ -179,17 +177,70 @@ export function AgentStatus() {
   if (data?.worker.running && !error) return null;
   return (
     <View style={{ gap: 8 }}>
-      <ErrorNotice error={error ? t("agent.updatesUnavailable", { error }) : ""} />
+      {!!error && <Text style={s.small}>{t("agent.taskLoadUnavailable")}</Text>}
       {!!error && (
         <Button small onPress={() => void refresh().catch(() => {})}>
           {t("agent.reconnectAgent")}
         </Button>
       )}
       {!data && !error && <ActivityIndicator color={colors.primary} />}
-      {data && !data.worker.running && <Text style={s.small}>{t("agent.workerOffline")}</Text>}
+      {data && !data.worker.running && <Text style={s.small}>{t("agent.taskContinueLater")}</Text>}
     </View>
   );
 }
+function taskDisplayLabel(view: ReturnType<typeof presentTask>, t: TranslationFn) {
+  if (view.statusOverride === "notCompleted") return t("agent.taskNotCompleted");
+  if (view.statusOverride === "retryWaiting") return t("agent.taskRetryWaiting");
+  if (view.statusOverride === "monitoring") return t("agent.taskMonitoring");
+  return statusLabel(view.status);
+}
+
+function TaskDisplayStatus({ view }: { view: ReturnType<typeof presentTask> }) {
+  const { t } = useTranslation();
+  return (
+    <StatusBadge
+      tone={
+        view.statusOverride === "monitoring"
+          ? "running"
+          : view.statusOverride === "retryWaiting"
+            ? "waiting"
+            : view.statusOverride
+              ? "paused"
+              : taskStatusTone(view.status)
+      }
+      label={taskDisplayLabel(view, t)}
+      style={{ borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
+    />
+  );
+}
+
+function TaskProgress({ view }: { view: ReturnType<typeof presentTask> }) {
+  const { t } = useTranslation();
+  if (!view.totalSteps) return null;
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={s.between}>
+        <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18 }}>
+          {t("agent.taskProgressTitle")}
+        </Text>
+        <Text style={{ color: colors.faint, fontSize: 12, fontVariant: ["tabular-nums"] }}>
+          {t("agent.planStepsProgress", { done: view.completedSteps, total: view.totalSteps })}
+        </Text>
+      </View>
+      <View style={{ height: 4, borderRadius: 4, backgroundColor: colors.lineSoft }}>
+        <View
+          style={{
+            height: 4,
+            borderRadius: 4,
+            backgroundColor: colors.primary,
+            width: `${Math.round((view.completedSteps / view.totalSteps) * 100)}%`,
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
 export function TaskCard({
   task,
   compact = false,
@@ -201,109 +252,79 @@ export function TaskCard({
 }) {
   const { t } = useTranslation();
   const { open } = useWorkspace();
-  const { width } = useWindowDimensions();
-  const narrow = width < breakpoints.mobile;
-  const done = task.plan.filter((step) => step.status === "succeeded").length;
-  const next = task.plan.find((step) => ["running", "waiting"].includes(step.status));
-  const waiting = ["waiting_input", "waiting_approval"].includes(task.status);
-  const localizedError = runtimeLabel(task.error);
-  const errorSummary = isStructuredTaskError(task.error)
-    ? t("agent.taskTechnicalError")
-    : localizedError;
-  const summary =
-    runtimeLabel(task.question) ||
-    errorSummary ||
-    resultSummary(runtimeLabel(task.result || next?.title || ""));
+  const view = presentTask(task);
+  const Icon = task.kind === "monitor" ? Bell : task.kind === "research" ? Sparkles : ListChecks;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t("agent.openTaskLabel", { title: task.title })}
+      accessibilityLabel={t("agent.openTaskLabel", { title: view.title })}
+      accessibilityHint={
+        view.attention
+          ? t(view.attention === "review" ? "agent.reviewRequested" : "agent.inputNeeded")
+          : taskDisplayLabel(view, t)
+      }
       onPress={() => {
         onOpen?.();
         open({ type: "task", taskId: task.id });
       }}
+      style={({ pressed }) => ({
+        padding: compact ? 12 : 14,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: colors.line,
+        borderRadius: 14,
+        backgroundColor: pressed ? colors.surfaceRaised : colors.paper,
+      })}
     >
-      <Card
-        style={{
-          padding: compact ? 14 : 16,
-          gap: 12,
-          borderRadius: 10,
-          backgroundColor: colors.paper,
-        }}
-      >
-        <View style={[s.row, { gap: 10 }]}>
-          <View
-            style={[
-              s.iconBox,
-              {
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                // 图标底座走中性面（surface）；等待态用语义浅底做小面积状态提示。
-                backgroundColor: waiting ? colors.orange : colors.surface,
-              },
-            ]}
-          >
-            <ListChecks size={18} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-            <Text numberOfLines={narrow ? 2 : 1} style={s.heading}>
-              {task.title}
-            </Text>
-            <View style={[s.between, { gap: 8 }]}>
-              <Text numberOfLines={1} style={[s.small, s.metric, { flex: 1 }]}>
-                {task.plan.length
-                  ? t("agent.planStepsProgress", { done, total: task.plan.length })
-                  : runtimeLabel(task.question) || errorSummary}
-              </Text>
-              {/* 移动端把徽标放进 meta 行，避免把标题挤成孤字 */}
-              {narrow && (
-                <StatusBadge
-                  tone={taskStatusTone(task.status)}
-                  label={statusLabel(task.status)}
-                  style={{ flexShrink: 0 }}
-                />
-              )}
-            </View>
-          </View>
-          {!narrow && (
-            <StatusBadge
-              tone={taskStatusTone(task.status)}
-              label={statusLabel(task.status)}
-              style={{ flexShrink: 0 }}
-            />
-          )}
-          <ChevronRight size={17} color={colors.muted} />
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 11 }}>
+        <View
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 11,
+            backgroundColor: colors.surfaceRaised,
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: 1,
+          }}
+        >
+          <Icon size={17} color={colors.primary} />
         </View>
-        {!!task.plan.length && (
-          <View style={{ height: 3, backgroundColor: colors.line, borderRadius: 3 }}>
-            <View
-              style={{
-                height: 3,
-                width: `${Math.round((done / task.plan.length) * 100)}%`,
-                backgroundColor: colors.primary,
-                borderRadius: 3,
-              }}
-            />
-          </View>
-        )}
-        {!!summary && (
-          <View
-            accessible={false}
-            pointerEvents="none"
-            style={{ maxHeight: compact ? 40 : 82, overflow: "hidden" }}
+        <View style={{ flex: 1, minWidth: 0, gap: 9 }}>
+          <Text
+            numberOfLines={2}
+            style={{
+              color: colors.text,
+              fontFamily: fonts.sans,
+              fontSize: compact ? 13 : 14,
+              lineHeight: 22,
+              fontWeight: "600",
+            }}
           >
-            <AssistantResponse content={summary} compact />
-          </View>
-        )}
-        {waiting && (
-          <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
-            {task.status === "waiting_approval"
-              ? t("agent.reviewRequested")
-              : t("agent.inputNeeded")}
+            {view.title}
           </Text>
-        )}
-      </Card>
+          <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            {view.attention ? (
+              <Text
+                style={{
+                  fontSize: 12,
+                  lineHeight: 20,
+                  color: colors.primaryStrong,
+                  fontWeight: "500",
+                }}
+              >
+                {t(view.attention === "review" ? "agent.reviewRequested" : "agent.inputNeeded")}
+              </Text>
+            ) : (
+              <TaskDisplayStatus view={view} />
+            )}
+            <Text style={{ color: colors.faint, fontSize: 11, lineHeight: 18 }}>
+              {stamp(view.updatedAt)}
+            </Text>
+          </View>
+        </View>
+        <ChevronRight size={15} color={colors.faint} />
+      </View>
     </Pressable>
   );
 }
@@ -358,14 +379,51 @@ export function AgentActivityScreen() {
   ) as Record<TaskFilter, number>;
   const tasks = all.filter((task) => matchesTaskFilter(task, filter));
   return (
-    <View style={{ gap: 20 }}>
+    <View style={{ gap: 10 }}>
       <AgentStatus />
       {/* 五个状态筛选在窄屏自然换行，避免横向滚动隐藏“已暂停”等选项。 */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 4 }}>
         {TASK_FILTERS.map(({ id, labelKey }) => (
-          <Button key={id} small primary={filter === id} onPress={() => setFilter(id)}>
-            {`${t(labelKey)} · ${counts[id]}`}
-          </Button>
+          <Pressable
+            key={id}
+            accessibilityRole="button"
+            accessibilityLabel={`${t(labelKey)} ${counts[id]}`}
+            accessibilityState={{ selected: filter === id }}
+            onPress={() => setFilter(id)}
+            style={({ pressed }) => ({
+              minHeight: 34,
+              paddingHorizontal: 8,
+              paddingVertical: 7,
+              borderRadius: 9,
+              backgroundColor:
+                filter === id ? colors.sky : pressed ? colors.surface : "transparent",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+            })}
+          >
+            <Text
+              style={{
+                fontFamily: fonts.sans,
+                fontSize: 12,
+                lineHeight: 18,
+                fontWeight: filter === id ? "600" : "400",
+                color: filter === id ? colors.primaryStrong : colors.muted,
+              }}
+            >
+              {t(labelKey)}
+            </Text>
+            <Text
+              style={{
+                fontSize: 11,
+                lineHeight: 18,
+                color: filter === id ? colors.primaryStrong : colors.faint,
+                fontVariant: ["tabular-nums"],
+              }}
+            >
+              {counts[id]}
+            </Text>
+          </Pressable>
         ))}
       </View>
       {tasks.map((task) => (
@@ -377,13 +435,6 @@ export function AgentActivityScreen() {
           title={t(filter === "all" ? "agent.activityEmptyTitle" : "agent.activityEmptyFiltered")}
           detail={t("agent.activityEmptyDetail")}
         />
-      )}
-      {/* 回执与审批记录只出现在「已完成」分区，作为任务的追溯资料 */}
-      {filter === "finished" && (
-        <>
-          <SectionHeading title={t("agent.reviewsReceipts")} />
-          <ActivityScreen />
-        </>
       )}
     </View>
   );
@@ -453,42 +504,32 @@ export function TaskDetail({ taskId }: { taskId: string }) {
   const { data, mutate } = useAgentWorkspace();
   const [detail, setDetail] = useState<{
     task: AgentTask;
-    events: RunEvent[];
     artifacts: AgentArtifact[];
     files: Artifact[];
     browsers: BrowserSession[];
   }>();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<"load" | "action" | "setup" | "">("");
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState("");
-  const [fieldJson, setFieldJson] = useState("");
-  const [showFieldJson, setShowFieldJson] = useState(false);
-  const [showTaskErrorDetail, setShowTaskErrorDetail] = useState(false);
   const [fields, setFields] = useState<Record<string, string | boolean>>({});
   const task = data?.tasks.find((item) => item.id === taskId) || detail?.task;
-  const localizedTaskError = runtimeLabel(task?.error);
-  const structuredTaskError = isStructuredTaskError(task?.error);
-  const milestone = data?.goals
-    .find((goal) => goal.id === task?.goalId)
-    ?.milestones.find((item) => item.id === task?.milestoneId);
+  const view = task ? presentTask(task) : undefined;
+  const needsSetup =
+    task && (task.status === "paused" || task.status === "failed")
+      ? taskRequiresSetup(task, data?.monitors)
+      : false;
   useEffect(() => {
     let active = true;
     void api
-      .request<{
-        task: AgentTask;
-        events: RunEvent[];
-        artifacts: AgentArtifact[];
-        files: Artifact[];
-        browsers: BrowserSession[];
-      }>(`/api/agent/tasks/${taskId}`)
+      .request<NonNullable<typeof detail>>(`/api/agent/tasks/${taskId}`)
       .then((result) => {
         if (active) {
           setDetail(result);
           setError("");
         }
       })
-      .catch((e) => {
-        if (active) setError(errorText(e));
+      .catch(() => {
+        if (active) setError("load");
       });
     return () => {
       active = false;
@@ -503,34 +544,17 @@ export function TaskDetail({ taskId }: { taskId: string }) {
         setAnswer("");
         setFields({});
       }
-    } catch (e) {
-      setError(errorText(e));
+    } catch (error) {
+      setError(
+        typeof error === "object" &&
+          error &&
+          "code" in error &&
+          error.code === "TASK_SETUP_REQUIRED"
+          ? "setup"
+          : "action",
+      );
     } finally {
       setBusy(false);
-    }
-  }
-  async function submitInput() {
-    try {
-      let parsed: Record<string, string | boolean> = fields;
-      if (fieldJson.trim()) {
-        const raw: unknown = JSON.parse(fieldJson);
-        if (
-          !raw ||
-          typeof raw !== "object" ||
-          Array.isArray(raw) ||
-          Object.values(raw).some(
-            (value) => typeof value !== "string" && typeof value !== "boolean",
-          )
-        )
-          throw new Error("Form fields must be a JSON object with text or true/false values.");
-        parsed = raw as Record<string, string | boolean>;
-      }
-      await act("input", {
-        answer: answer.trim() || t("agent.providedFields"),
-        fields: parsed,
-      });
-    } catch (e) {
-      setError(errorText(e));
     }
   }
   async function review() {
@@ -540,10 +564,13 @@ export function TaskDetail({ taskId }: { taskId: string }) {
       await refreshWorkspace();
       const snapshot = await api.request<typeof workspace>("/api/workspace");
       const action = snapshot.actions.find((item) => item.id === task?.actionId);
-      if (!action) throw new Error("This review is not available yet. Refresh and try again.");
+      if (!action) {
+        setError("action");
+        return;
+      }
       open({ type: "review", action });
-    } catch (e) {
-      setError(errorText(e));
+    } catch {
+      setError("action");
     } finally {
       setBusy(false);
     }
@@ -558,93 +585,133 @@ export function TaskDetail({ taskId }: { taskId: string }) {
           : "",
     )
     .filter(Boolean);
+  const artifacts = (data?.artifacts ?? detail?.artifacts ?? []).filter(
+    (artifact) => artifact.taskId === taskId && !hasInternalTaskText(artifact.title),
+  );
+  const files = detail?.files ?? [];
   return (
-    <Sheet
-      title={task?.title || t("agent.taskTitle")}
-      subtitle={
-        task
-          ? `${statusLabel(task.status)} · ${stamp(task.updatedAt)}`
-          : t("agent.loadingSavedProgress")
-      }
-      onClose={close}
-    >
-      <ErrorNotice error={error} />
-      {!task ? (
-        <ActivityIndicator color={colors.primary} />
-      ) : (
-        <View style={{ gap: 20 }}>
-          <Text selectable style={s.text}>
-            {task.prompt}
-          </Text>
-          {task.milestoneId && data && (
-            <Text style={s.muted}>
-              {milestone?.title
-                ? t("agent.milestoneTrackingNote", { title: milestone.title })
-                : t("agent.milestoneUnavailable")}
-            </Text>
+    <Sheet botLayout title={view?.title || t("agent.taskTitle")} onClose={close}>
+      {(needsSetup || !!error) && (
+        <Text
+          accessibilityRole="alert"
+          style={{ color: colors.muted, fontSize: 13, lineHeight: 21, marginBottom: 12 }}
+        >
+          {t(
+            needsSetup || error === "setup"
+              ? "agent.taskSetupRequired"
+              : error === "load"
+                ? "agent.taskLoadUnavailable"
+                : "agent.taskActionUnavailable",
           )}
-          <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-            {["queued", "running", "scheduled", "waiting_input", "waiting_approval"].includes(
-              task.status,
-            ) && (
-              <Button
-                small
-                icon={Pause}
-                busy={busy}
-                onPress={() => void act("control", { action: "pause" })}
-              >
-                {t("agent.pause")}
-              </Button>
-            )}
-            {task.status === "paused" && (
-              <Button
-                small
-                icon={Play}
-                busy={busy}
-                onPress={() => void act("control", { action: "resume" })}
-              >
-                {t("agent.resume")}
-              </Button>
-            )}
-            {task.status === "failed" && (
-              <Button
-                small
-                icon={RefreshCw}
-                busy={busy}
-                onPress={() => void act("control", { action: "retry" })}
-              >
-                {t("agent.retryTask")}
-              </Button>
-            )}
-            {activeTask(task) && (
-              <Button
-                small
-                danger
-                icon={X}
-                busy={busy}
-                onPress={() => void act("control", { action: "cancel" })}
-              >
-                {t("agent.cancelTask")}
-              </Button>
-            )}
+        </Text>
+      )}
+      {!task || !view ? (
+        !error && <ActivityIndicator color={colors.primary} />
+      ) : (
+        <View style={{ gap: 18 }}>
+          <View style={s.between}>
+            <TaskDisplayStatus view={view} />
+            <Text style={{ color: colors.faint, fontSize: 11, lineHeight: 18 }}>
+              {stamp(view.updatedAt)}
+            </Text>
           </View>
+          {(activeTask(task) || task.status === "failed") && (
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+              {["queued", "running", "scheduled", "waiting_input", "waiting_approval"].includes(
+                task.status,
+              ) && (
+                <Button
+                  small
+                  icon={Pause}
+                  busy={busy}
+                  onPress={() => void act("control", { action: "pause" })}
+                >
+                  {t("agent.pause")}
+                </Button>
+              )}
+              {task.status === "paused" && (
+                <Button
+                  small
+                  icon={Play}
+                  busy={busy}
+                  disabled={needsSetup || error === "setup"}
+                  onPress={() => void act("control", { action: "resume" })}
+                >
+                  {t("agent.resume")}
+                </Button>
+              )}
+              {task.status === "failed" && (
+                <Button
+                  small
+                  primary
+                  icon={RefreshCw}
+                  busy={busy}
+                  disabled={needsSetup || error === "setup"}
+                  onPress={() => void act("control", { action: "retry" })}
+                >
+                  {t("agent.retryTask")}
+                </Button>
+              )}
+              {activeTask(task) && (
+                <Button
+                  small
+                  icon={X}
+                  busy={busy}
+                  onPress={() => void act("control", { action: "cancel" })}
+                >
+                  {t("agent.cancelTask")}
+                </Button>
+              )}
+            </View>
+          )}
+          {!!view.totalSteps && (
+            <Card style={{ borderRadius: 14, padding: 14, backgroundColor: colors.surfaceRaised }}>
+              <TaskProgress view={view} />
+            </Card>
+          )}
           {task.status === "waiting_approval" && (
-            <Card style={{ gap: 12 }}>
-              <Text style={s.heading}>{t("agent.readyForReview")}</Text>
-              <Text style={s.muted}>{t("agent.reviewBeforeProceed")}</Text>
+            <Card style={{ gap: 10, borderRadius: 14, padding: 14 }}>
+              <Text
+                style={{
+                  color: colors.primaryStrong,
+                  fontSize: 14,
+                  lineHeight: 22,
+                  fontWeight: "600",
+                }}
+              >
+                {t("agent.readyForReview")}
+              </Text>
+              <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 22 }}>
+                {t("agent.reviewBeforeProceed")}
+              </Text>
               <Button primary busy={busy} onPress={() => void review()}>
                 {t("agent.reviewAction")}
               </Button>
             </Card>
           )}
           {task.status === "waiting_input" && (
-            <Card style={{ gap: 10 }}>
-              <Text style={s.heading}>
-                {runtimeLabel(task.question) || t("agent.detailNeeded")}
+            <Card style={{ gap: 12, borderRadius: 14, padding: 14 }}>
+              <Text
+                style={{
+                  color: colors.primaryStrong,
+                  fontSize: 14,
+                  lineHeight: 22,
+                  fontWeight: "600",
+                }}
+              >
+                {t("agent.inputNeeded")}
               </Text>
+              <AssistantResponse
+                content={view.question || t("agent.taskInputDescription")}
+                compact
+              />
               {fieldNames.map((name) =>
                 missing.some(
-                  (f) => typeof f === "object" && f && f.name === name && f.type === "checkbox",
+                  (field) =>
+                    typeof field === "object" &&
+                    field &&
+                    field.name === name &&
+                    field.type === "checkbox",
                 ) ? (
                   <CheckRow
                     key={name}
@@ -672,149 +739,97 @@ export function TaskDetail({ taskId }: { taskId: string }) {
                   placeholder={t("agent.addMissingDetails")}
                 />
               )}
-              {task.kind === "document" && !fieldNames.length && (
-                <>
-                  <Button small onPress={() => setShowFieldJson(!showFieldJson)}>
-                    {t("agent.formFieldValues")}
-                  </Button>
-                  {showFieldJson && (
-                    <Field
-                      label={t("agent.fieldsJsonLabel")}
-                      value={fieldJson}
-                      onChangeText={setFieldJson}
-                      multiline
-                      autoCapitalize="none"
-                      placeholder={'{"full_name":"Your name","consent":true}'}
-                    />
-                  )}
-                </>
-              )}
               <Button
                 primary
                 busy={busy}
-                disabled={!answer.trim() && !Object.keys(fields).length && !fieldJson.trim()}
-                onPress={() => void submitInput()}
+                disabled={!answer.trim() && !Object.keys(fields).length}
+                onPress={() =>
+                  void act("input", { answer: answer.trim() || t("agent.providedFields"), fields })
+                }
               >
                 {t("agent.continueTask")}
               </Button>
             </Card>
           )}
-          {!!task.plan.length && <PlanCard steps={task.plan} title={t("agent.plan")} />}
-          {!!task.result && (
-            <Card>
-              <AssistantResponse
-                content={task.result}
-                files={detail?.files?.length ? detail.files : workspace.files}
-                onOpenFile={(file) => open({ type: "file", file })}
-              />
-            </Card>
-          )}
-          {!!task.error &&
-            (structuredTaskError ? (
-              <Card
-                style={{
-                  gap: 10,
-                  borderColor: colors.errorSoft,
-                  backgroundColor: colors.errorSoft,
-                }}
+          {!!view.result && (
+            <View style={{ gap: 10 }}>
+              <Text
+                style={{ color: colors.heading, fontSize: 14, lineHeight: 22, fontWeight: "600" }}
               >
-                <Text style={[s.heading, { color: colors.danger }]}>
-                  {t("agent.taskTechnicalError")}
-                </Text>
-                <Text style={s.small}>{t("agent.taskTechnicalErrorDetail")}</Text>
-                <Button small onPress={() => setShowTaskErrorDetail((current) => !current)}>
-                  {t(showTaskErrorDetail ? "agent.hideErrorDetails" : "agent.showErrorDetails")}
-                </Button>
-                {showTaskErrorDetail && (
-                  <Text selectable style={[s.small, { lineHeight: 18 }]}>
-                    {task.error}
-                  </Text>
-                )}
-              </Card>
-            ) : (
-              <ErrorNotice error={localizedTaskError} />
-            ))}
-          {detail?.browsers?.map((browser) => (
-            <Card key={browser.id} style={{ gap: 10 }}>
-              <Text style={s.heading}>{browser.title || t("agent.agentBrowser")}</Text>
-              <Text style={s.small}>{browser.url}</Text>
-              {browser.status === "active" && browser.previewUrl && (
-                <Image
-                  accessibilityLabel={t("agent.agentBrowserPreview")}
-                  source={{ uri: api.url(browser.previewUrl) }}
-                  style={{ width: "100%", aspectRatio: 1.6, borderRadius: 10 }}
+                {t("agent.taskResultsTitle")}
+              </Text>
+              <Card style={{ borderRadius: 14, padding: 14 }}>
+                <AssistantResponse
+                  content={view.result}
+                  files={files.length ? files : workspace.files}
+                  onOpenFile={(file) => open({ type: "file", file })}
                 />
-              )}
-              <Button
-                small
-                busy={busy}
-                onPress={() => {
-                  setBusy(true);
-                  void (async () => {
-                    try {
-                      if (["running", "scheduled", "queued"].includes(task.status))
-                        await mutate(`/tasks/${taskId}/control`, { action: "pause" });
-                      open({ type: "browser", browser });
-                    } catch (error) {
-                      setError(errorText(error));
-                    } finally {
-                      setBusy(false);
-                    }
-                  })();
-                }}
-              >
-                {["running", "scheduled", "queued"].includes(task.status)
-                  ? t("agent.pauseAndOpenBrowser")
-                  : t("agent.openBrowser")}
-              </Button>
-            </Card>
-          ))}
-          {detail?.files?.map((file) => (
-            <LinkRow
-              key={file.id}
-              title={file.name}
-              detail={
-                fileKind(file) === "html"
-                  ? `${t("screens.filesWebPage")} · ${Math.max(1, Math.round(file.size / 1024))} KB`
-                  : fileKind(file) === "pdf"
-                    ? t("agent.pagesPdf", { count: file.pageCount })
-                    : `${fileTypeName(file)} · ${Math.max(1, Math.round(file.size / 1024))} KB`
-              }
-              icon={FileText}
-              onPress={() => open({ type: "file", file })}
-            />
-          ))}
-          {(
-            data?.artifacts.filter((artifact) => artifact.taskId === taskId) ||
-            detail?.artifacts ||
-            []
-          ).map((artifact) => (
-            <ArtifactCard key={artifact.id} artifact={artifact} />
-          ))}
-          {!!task.evidence.length && (
-            <View style={{ gap: 12 }}>
-              <Text style={s.heading}>{t("agent.sources")}</Text>
-              <EvidenceList items={task.evidence} />
+              </Card>
             </View>
           )}
-          <Text style={s.heading}>{t("agent.timeline")}</Text>
-          {detail?.events.map((event) => (
-            <View
-              key={event.id}
-              style={{ gap: 4, paddingLeft: 14, borderLeftWidth: 2, borderLeftColor: colors.line }}
-            >
-              <Text style={s.small}>
-                {stamp(event.date)} · {statusLabel(event.kind)}
-              </Text>
-              <Text style={s.text}>{runtimeLabel(event.title)}</Text>
-              <Text selectable style={s.muted}>
-                {isStructuredTaskError(event.detail)
-                  ? t("agent.taskTechnicalError")
-                  : runtimeLabel(event.detail)}
-              </Text>
+          {(!!files.length || !!artifacts.length) && (
+            <View style={{ gap: 10 }}>
+              {!view.result && (
+                <Text
+                  style={{ color: colors.heading, fontSize: 14, lineHeight: 22, fontWeight: "600" }}
+                >
+                  {t("agent.taskResultsTitle")}
+                </Text>
+              )}
+              {files.map((file) => (
+                <LinkRow
+                  key={file.id}
+                  title={file.name}
+                  detail={fileTypeName(file)}
+                  icon={FileText}
+                  onPress={() => open({ type: "file", file })}
+                />
+              ))}
+              {artifacts.map((artifact) => (
+                <ArtifactCard key={artifact.id} artifact={artifact} />
+              ))}
             </View>
-          ))}
-          {!detail?.events.length && <Text style={s.muted}>{t("agent.timelineEmpty")}</Text>}
+          )}
+          {detail?.browsers
+            ?.filter((browser) => browser.status === "active")
+            .map((browser) => (
+              <Card key={browser.id} style={{ gap: 10, borderRadius: 14, padding: 14 }}>
+                <Text style={{ fontSize: 14, lineHeight: 22, color: colors.heading }}>
+                  {t("agent.openBrowser")}
+                </Text>
+                {!!browser.previewUrl && (
+                  <Image
+                    accessibilityLabel={t("agent.agentBrowserPreview")}
+                    source={{ uri: api.url(browser.previewUrl) }}
+                    style={{ width: "100%", aspectRatio: 1.6, borderRadius: 10 }}
+                  />
+                )}
+                <Button
+                  small
+                  busy={busy}
+                  onPress={() => {
+                    setBusy(true);
+                    void (async () => {
+                      try {
+                        if (["running", "scheduled", "queued"].includes(task.status))
+                          await mutate(`/tasks/${taskId}/control`, { action: "pause" });
+                        open({ type: "browser", browser });
+                      } catch {
+                        setError("action");
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  {t(
+                    ["running", "scheduled", "queued"].includes(task.status)
+                      ? "agent.pauseAndOpenBrowser"
+                      : "agent.openBrowser",
+                  )}
+                </Button>
+              </Card>
+            ))}
         </View>
       )}
     </Sheet>
@@ -1714,7 +1729,7 @@ export function GoalsScreen({ embedded = false }: { embedded?: boolean }) {
     </View>
   );
 }
-function GoalForm({ onDone, category }: { onDone: () => void; category?: string }) {
+export function GoalForm({ onDone, category }: { onDone: () => void; category?: string }) {
   const { t } = useTranslation();
   const { mutate } = useAgentWorkspace();
   const [title, setTitle] = useState("");
@@ -1787,7 +1802,7 @@ function GoalForm({ onDone, category }: { onDone: () => void; category?: string 
     </Card>
   );
 }
-function GoalCard({ goal, onOpenTask }: { goal: Goal; onOpenTask?: () => void }) {
+export function GoalCard({ goal, onOpenTask }: { goal: Goal; onOpenTask?: () => void }) {
   const { t } = useTranslation();
   const { data, mutate, delegate } = useAgentWorkspace();
   const { open } = useWorkspace();
@@ -1958,7 +1973,7 @@ function monitorScheduleText(monitor: Monitor, t: ReturnType<typeof useTranslati
   return t("agent.checkingEvery", { minutes: monitor.intervalMinutes });
 }
 
-function MonitorForm({
+export function MonitorForm({
   monitor,
   template,
   onDone,
@@ -1977,6 +1992,9 @@ function MonitorForm({
   const [url, setUrl] = useState(monitor && !monitor.url.startsWith("sample:") ? monitor.url : "");
   const [condition, setCondition] = useState<Monitor["condition"]>(monitor?.condition ?? "change");
   const [value, setValue] = useState(monitor?.value ?? "");
+  const [currency, setCurrency] = useState<MonitorCurrency | undefined>(
+    monitor ? resolveMonitorCurrency(monitor) : "CNY",
+  );
   const [interval, setInterval] = useState(String(monitor?.intervalMinutes ?? 15));
   const [schedule, setSchedule] = useState<ReminderSchedule>(
     monitor?.schedule ?? template?.schedule ?? "interval",
@@ -2006,6 +2024,7 @@ function MonitorForm({
         url: sample ? "sample://availability" : url.trim(),
         condition,
         value,
+        ...(condition === "price_below" ? { currency } : {}),
         intervalMinutes: minutes,
         schedule,
         ...(schedule === "interval" ? {} : { timeOfDay }),
@@ -2068,6 +2087,30 @@ function MonitorForm({
           value={value}
           onChangeText={setValue}
         />
+      )}
+      {condition === "price_below" && (
+        <View style={{ gap: 9, marginBottom: 16 }}>
+          <Text style={s.small}>{t("agent.monitorCurrency")}</Text>
+          <View style={[s.row, { gap: 7, flexWrap: "wrap" }]}>
+            {(
+              [
+                { value: "CNY", label: "agent.currencyCny" },
+                { value: "HKD", label: "agent.currencyHkd" },
+                { value: "USD", label: "agent.currencyUsd" },
+              ] as const
+            ).map((item) => (
+              <Button
+                key={item.value}
+                small
+                primary={currency === item.value}
+                onPress={() => setCurrency(item.value)}
+              >
+                {t(item.label)}
+              </Button>
+            ))}
+          </View>
+          <Text style={s.small}>{t("agent.monitorCurrencyHint")}</Text>
+        </View>
       )}
       <Text style={[s.small, { marginBottom: 10 }]}>{t("agent.reminderTiming")}</Text>
       <View style={[s.row, { gap: 7, flexWrap: "wrap", marginBottom: 16 }]}>
@@ -2155,6 +2198,7 @@ function MonitorForm({
           !title.trim() ||
           (!sample && !url.trim()) ||
           (condition !== "change" && !value.trim()) ||
+          (condition === "price_below" && !currency) ||
           (schedule !== "interval" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(timeOfDay))
         }
         onPress={() => void save()}
@@ -2169,14 +2213,14 @@ function monitorConditionText(monitor: Monitor, t: ReturnType<typeof useTranslat
     ? t("agent.watchForPageChange")
     : monitor.condition === "contains"
       ? t("agent.watchForText", { value: monitor.value })
-      : t("agent.priceBelow", { value: monitor.value });
+      : t("agent.priceBelow", { value: monitorPriceLabel(monitor) });
 }
 
 /**
  * 盯盘卡片：图标 + 标题 + 条件 + 调度 + 开关 + 编辑/停止。
  * 开关直接暂停/恢复；停止需二次确认，停止后从列表移除（服务端暂无 DELETE）。
  */
-function MonitorRow({
+export function MonitorRow({
   monitor,
   onOpen,
   onEdit,
@@ -2312,7 +2356,13 @@ function MonitorRow({
   );
 }
 
-function MonitorCard({ monitor, onOpenTask }: { monitor: Monitor; onOpenTask?: () => void }) {
+export function MonitorCard({
+  monitor,
+  onOpenTask,
+}: {
+  monitor: Monitor;
+  onOpenTask?: () => void;
+}) {
   const { t } = useTranslation();
   const { mutate } = useAgentWorkspace();
   const [error, setError] = useState("");
@@ -2668,13 +2718,12 @@ export function AgentPersonalitySheet() {
         </View>
       </Sheet>
       {saved && (
-        <Modal transparent visible animationType="fade" onRequestClose={() => setSaved(false)}>
+        <ModalOverlay visible onRequestClose={() => setSaved(false)}>
           <View
             style={{
               flex: 1,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: colors.modalShade,
             }}
           >
             <View
@@ -2707,7 +2756,7 @@ export function AgentPersonalitySheet() {
               </Text>
             </View>
           </View>
-        </Modal>
+        </ModalOverlay>
       )}
     </>
   );

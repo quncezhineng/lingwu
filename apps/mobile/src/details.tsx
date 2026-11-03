@@ -1,16 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Linking,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Image, Linking, Platform, Pressable, View } from "react-native";
 import {
   type ActionProposal,
   type Artifact,
@@ -26,6 +17,7 @@ import {
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { ArchivedThreadsScreen } from "./account";
 import { AgentPersonalitySheet, DelegateSheet, NotificationsSheet, TaskDetail } from "./agent-ui";
+import { Text, TextInput } from "./app-text";
 import { artifactHasHtmlPreview, renderArtifactHtml } from "./artifact-html";
 import BrowserConsole from "./BrowserConsole";
 import { browserAddress, browserSite } from "./browser-address";

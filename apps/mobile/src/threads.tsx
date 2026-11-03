@@ -1,6 +1,7 @@
 import { useThreads } from "@copilotkit/react-native/headless";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, View } from "react-native";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { Archive, ChevronDown, ChevronUp, MessageCircle, Plus, Trash2 } from "./icons";
 import { Button, colors, ErrorNotice, Field, LinkRow, Sheet, s } from "./ui";

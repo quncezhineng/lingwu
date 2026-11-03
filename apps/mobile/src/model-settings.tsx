@@ -1,10 +1,11 @@
 import { createElement, useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, View } from "react-native";
 import {
   deepseekDefaults,
   type ModelSettings,
   type ModelSettingsInput,
 } from "../../../packages/domain/src/model-settings";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { ChevronDown } from "./icons";

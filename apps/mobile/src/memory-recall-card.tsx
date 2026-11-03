@@ -3,25 +3,33 @@ import {
   Linking,
   Platform,
   StyleSheet,
-  Text,
   type TextStyle,
   View,
 } from "react-native";
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
+import { Text } from "./app-text";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { useTranslation } from "./i18n";
 import { Brain } from "./icons";
 import { parseMemoryRecallResult, type RecalledMemory } from "./memory-recall-result";
-import { colors } from "./ui";
+import { colors, fonts } from "./ui";
 
 // 记忆卡片上的 Markdown 渲染：与正文沿用同一字号/行高，标题逐级缩小，
 // 链接使用品牌主色并保持 selectable，长文本记忆仍可整段复制。
-const memoryMarkdownTextStyle: TextStyle = { color: colors.text, fontSize: 14, lineHeight: 19 };
+const memoryMarkdownTextStyle: TextStyle = {
+  color: colors.text,
+  fontFamily: fonts.serif,
+  fontSize: 14,
+  lineHeight: 19,
+};
 const memoryMarkdownStyle: Partial<MarkdownStyles> = {
   text: memoryMarkdownTextStyle,
   paragraph: { marginTop: 0, marginBottom: 2 },
   list: { marginBottom: 2 },
+  listUnorderedItemIcon: { fontFamily: fonts.serif },
+  listOrderedItemIcon: { fontFamily: fonts.serif },
   headingContainer: { marginTop: 2, marginBottom: 1 },
+  heading: { fontFamily: fonts.serif },
   heading1: { fontSize: 15, lineHeight: 19, color: colors.text },
   heading2: { fontSize: 14, lineHeight: 19, color: colors.text },
   heading3: { fontSize: 13, lineHeight: 19, color: colors.text },

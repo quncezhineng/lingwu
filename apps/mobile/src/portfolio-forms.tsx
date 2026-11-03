@@ -2,8 +2,9 @@
  * 组合页表单：新建组合 / 重命名 / 手动添加或编辑持仓。
  */
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
 import type { LingWuApi } from "./api";
+import { Text, TextInput } from "./app-text";
 import { useTranslation } from "./i18n";
 import { Search } from "./icons";
 import { metaFor, type SymbolMeta, searchSymbols } from "./market";

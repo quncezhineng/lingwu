@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import type { ActionProposal, Artifact } from "../../../packages/domain/src";
 import type { AgentTask } from "../../../packages/domain/src/agent";
+import { Text } from "./app-text";
 import { activeLocaleTag, localizeAgentName, statusLabel, useTranslation } from "./i18n";
 import {
   AlertTriangle,

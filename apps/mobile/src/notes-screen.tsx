@@ -6,10 +6,12 @@
  * AI 结论区块固定附声明，页面底部统一 DisclaimerNote。
  */
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
+import { Text, TextInput } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { AlertTriangle, CalendarClock, Plus, Search, Target } from "./icons";
+import { ModalOverlay } from "./modal-overlay";
 import {
   CheckHistorySheet,
   ConfirmStatusSheet,
@@ -118,7 +120,7 @@ function SymbolFilterModal({
     `${symbol}`.toLowerCase().includes(query.trim().toLowerCase()),
   );
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+    <ModalOverlay visible onRequestClose={onClose}>
       <Pressable onPress={onClose} style={s.modalShade}>
         <Pressable
           accessibilityViewIsModal
@@ -175,7 +177,7 @@ function SymbolFilterModal({
           </View>
         </Pressable>
       </Pressable>
-    </Modal>
+    </ModalOverlay>
   );
 }
 

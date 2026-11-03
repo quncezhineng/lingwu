@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import type { Artifact, BrowserSession } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { ArtifactCard, TaskCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text } from "./app-text";
 import { BrowserThreadCard } from "./computer";
 import { fileKind, fileTypeName } from "./file-kind";
 import { useTranslation } from "./i18n";

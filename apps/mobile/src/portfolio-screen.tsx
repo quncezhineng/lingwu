@@ -9,12 +9,14 @@
  * 样本不足显示「数据不足」而不是 0。
  */
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Pressable, useWindowDimensions, View } from "react-native";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { AlertTriangle, CircleDollarSign, MoreHorizontal, Plus, RefreshCw, Upload } from "./icons";
 import { metaFor } from "./market";
 import { directionOf, formatPercent, formatPrice } from "./market-format";
+import { ModalOverlay } from "./modal-overlay";
 import {
   activePortfolio,
   addHolding,
@@ -927,7 +929,7 @@ function RowMenu({
 }) {
   const { t } = useTranslation();
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+    <ModalOverlay visible onRequestClose={onClose}>
       <Pressable onPress={onClose} style={s.modalShade}>
         <Pressable
           accessibilityViewIsModal
@@ -969,7 +971,7 @@ function RowMenu({
           </Pressable>
         </Pressable>
       </Pressable>
-    </Modal>
+    </ModalOverlay>
   );
 }
 
@@ -1229,7 +1231,7 @@ export function PortfolioScreen() {
         />
       )}
       {menuOpen && portfolio && (
-        <Modal transparent animationType="fade" visible onRequestClose={() => setMenuOpen(false)}>
+        <ModalOverlay visible onRequestClose={() => setMenuOpen(false)}>
           <Pressable onPress={() => setMenuOpen(false)} style={s.modalShade}>
             <Pressable
               accessibilityViewIsModal
@@ -1266,15 +1268,10 @@ export function PortfolioScreen() {
               </Pressable>
             </Pressable>
           </Pressable>
-        </Modal>
+        </ModalOverlay>
       )}
       {confirmDeletePortfolio && portfolio && (
-        <Modal
-          transparent
-          animationType="fade"
-          visible
-          onRequestClose={() => setConfirmDeletePortfolio(false)}
-        >
+        <ModalOverlay visible onRequestClose={() => setConfirmDeletePortfolio(false)}>
           <Pressable onPress={() => setConfirmDeletePortfolio(false)} style={s.modalShade}>
             <Pressable
               accessibilityViewIsModal
@@ -1311,7 +1308,7 @@ export function PortfolioScreen() {
               </View>
             </Pressable>
           </Pressable>
-        </Modal>
+        </ModalOverlay>
       )}
       {holdingForm && portfolio && (
         <HoldingFormSheet
@@ -1331,12 +1328,7 @@ export function PortfolioScreen() {
         />
       )}
       {confirmDeleteHolding && portfolio && (
-        <Modal
-          transparent
-          animationType="fade"
-          visible
-          onRequestClose={() => setConfirmDeleteHolding(undefined)}
-        >
+        <ModalOverlay visible onRequestClose={() => setConfirmDeleteHolding(undefined)}>
           <Pressable onPress={() => setConfirmDeleteHolding(undefined)} style={s.modalShade}>
             <Pressable
               accessibilityViewIsModal
@@ -1371,7 +1363,7 @@ export function PortfolioScreen() {
               </View>
             </Pressable>
           </Pressable>
-        </Modal>
+        </ModalOverlay>
       )}
       {importOpen && portfolio && (
         <ImportWizard

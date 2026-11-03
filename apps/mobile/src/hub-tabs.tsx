@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "./app-text";
 import { colors, fonts } from "./theme";
 
 export type HubTabItem<T extends string> = {

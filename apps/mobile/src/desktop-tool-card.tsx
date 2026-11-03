@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, AppState, Image, Platform, Text, View } from "react-native";
+import { ActivityIndicator, AppState, Image, Platform, View } from "react-native";
 import { z } from "zod";
 import type { ComputerSnapshot } from "../../../packages/domain/src/computer";
+import { Text } from "./app-text";
 import { useComputerDraft } from "./computer-drafts";
 import { DesktopStream } from "./desktop-stream";
 import { useTranslation } from "./i18n";

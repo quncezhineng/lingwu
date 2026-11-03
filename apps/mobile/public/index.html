@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <!-- 网站 logo / favicon：SVG 矢量清晰优先，PNG 兜底（public/favicon.png），apple-touch-icon 用于 iOS 主屏 -->
@@ -28,7 +28,14 @@
         margin: 0;
         background: #f8f8f8;
         color: #303030;
-        font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+        /* Keep the static entry shell in sync with src/font-family.ts. */
+        font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font-family: inherit;
       }
       /* These styles make the root element full-height */
       #root {

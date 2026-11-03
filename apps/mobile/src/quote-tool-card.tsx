@@ -4,7 +4,14 @@
  * 单标的走 compact 卡片；多标的按纵向列表展示。行情字段、七类错误与
  * stale/asOf 语义完全复用 QuoteCard / quotes.ts，不在对话里另造文案。
  */
-import { ActivityIndicator, Text, View } from "react-native";
+/**
+ * 对话内联行情卡片：渲染 `get_quote` 的 `quote` / `quotes[]`。
+ *
+ * 单标的走 compact 卡片；多标的按纵向列表展示。行情字段、七类错误与
+ * stale/asOf 语义完全复用 QuoteCard / quotes.ts，不在对话里另造文案。
+ */
+import { ActivityIndicator, View } from "react-native";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { metaFor } from "./market";
 import { QuoteCard } from "./quote-card";

@@ -3,13 +3,10 @@ import {
   ActivityIndicator,
   Image,
   type ImageSourcePropType,
-  Modal,
   Pressable,
   ScrollView,
   type StyleProp,
   StyleSheet,
-  Text,
-  TextInput,
   type TextInputProps,
   type TextStyle,
   useWindowDimensions,
@@ -17,11 +14,22 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { agentLayout } from "./agent-layout";
+import { Text, TextInput } from "./app-text";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
 import { ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
-import { breakpoints, colors, fonts, radius, space, statusColors, typography } from "./theme";
-import { useReducedMotion } from "./use-reduced-motion";
+import { ModalOverlay } from "./modal-overlay";
+import {
+  breakpoints,
+  colors,
+  fonts,
+  radius,
+  shadow,
+  space,
+  statusColors,
+  typography,
+} from "./theme";
 
 /**
  * 设计令牌统一由 `theme.ts` 提供，这里 re-export 以兼容既有 `from "./ui"` 引用。
@@ -136,7 +144,6 @@ export const s = StyleSheet.create({
   },
   modalShade: {
     flex: 1,
-    backgroundColor: colors.modalShade,
     justifyContent: "center",
     alignItems: "center",
     padding: space.lg,
@@ -148,6 +155,7 @@ export const s = StyleSheet.create({
     width: "100%",
     maxWidth: 760,
     maxHeight: "94%",
+    flexShrink: 1,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.line,
@@ -340,6 +348,7 @@ export function Sheet({
   small,
   fullscreen,
   dismissOnBackdrop = true,
+  botLayout = false,
 }: {
   title: string;
   /** 标题左侧装饰元素（如品牌 Logo），展示于标题文字之前。 */
@@ -352,45 +361,48 @@ export function Sheet({
   narrow?: boolean;
   /** 小型选择浮层：桌面端收窄，移动端保留左右留白。 */
   small?: boolean;
-  /** 全屏模式：弹窗铺满整个网页/屏幕（如研究产物详情），优先级最高。 */
+  /** 阅读模式：手机全屏，桌面使用大尺寸居中对话框（如研究产物详情）。 */
   fullscreen?: boolean;
   /** 点击弹窗外的深色背板区域时是否关闭弹窗，默认开启。 */
   dismissOnBackdrop?: boolean;
+  /** Bot workspace spacing; uses a bottom sheet only on compact screens. */
+  botLayout?: boolean;
 }) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const reducedMotion = useReducedMotion();
-  const compact = width < 600;
-  // 标题字号按 <760 收敛（弹层布局仍用 600 断点）
-  const mobileTitle = width < breakpoints.mobile;
+  const compact = width < breakpoints.mobile;
+  const bottomSheet = compact && !fullscreen;
+  const edgeToEdge = compact && fullscreen;
+  const mobileBotLayout = bottomSheet && botLayout;
   return (
-    <Modal
-      transparent
-      animationType={reducedMotion ? "none" : compact ? "slide" : "fade"}
-      visible
-      onRequestClose={onClose}
-    >
+    <ModalOverlay transition={bottomSheet ? "bottom" : "fade"} onRequestClose={onClose}>
       {/* 背板：点击深色区域关闭弹窗（dismissOnBackdrop 可关闭此行为） */}
       <Pressable
         onPress={dismissOnBackdrop ? onClose : undefined}
         style={[
           s.modalShade,
-          compact && !fullscreen && { padding: 0, justifyContent: "flex-end" },
-          fullscreen && { padding: 0, justifyContent: "center" },
+          !compact && { padding: space.xl },
+          bottomSheet && { padding: 0, justifyContent: "flex-end" },
+          edgeToEdge && { padding: 0 },
         ]}
       >
         {/* 弹窗面板：自身拦截点击，避免面板内点击冒泡到背板导致误关 */}
         <Pressable
+          testID="sheet-dialog"
           accessibilityViewIsModal
           onPress={(e) => e.stopPropagation()}
           style={[
             s.sheet,
+            !compact && {
+              maxHeight: Math.max(0, height - space.xl * 2),
+              borderRadius: 20,
+              ...shadow.sheet,
+            },
             wide && { maxWidth: 1050 },
             narrow && { maxWidth: 560 },
             small && { maxWidth: 440 },
-            compact &&
-              !fullscreen &&
+            bottomSheet &&
               small && {
                 width: Math.min(width - space.md * 2, 440),
                 maxHeight: "88%",
@@ -398,15 +410,27 @@ export function Sheet({
                 borderBottomLeftRadius: radius.sheet,
                 borderBottomRightRadius: radius.sheet,
               },
-            compact &&
-              !fullscreen &&
+            bottomSheet &&
               !small && {
                 borderBottomLeftRadius: 0,
                 borderBottomRightRadius: 0,
                 paddingBottom: Math.max(insets.bottom, 12),
                 maxHeight: "94%",
               },
-            fullscreen && {
+            mobileBotLayout && {
+              maxWidth: agentLayout.sheetMaxWidth,
+              maxHeight: "91%",
+              borderRadius: 28,
+              borderBottomLeftRadius: 0,
+              borderBottomRightRadius: 0,
+              borderBottomWidth: 0,
+            },
+            fullscreen &&
+              !compact && {
+                maxWidth: 1200,
+                height: "100%",
+              },
+            edgeToEdge && {
               width: "100%",
               height: "100%",
               maxWidth: "100%",
@@ -417,8 +441,9 @@ export function Sheet({
             },
           ]}
         >
-          {compact && !fullscreen && (
+          {bottomSheet && (
             <View
+              testID="sheet-drag-handle"
               style={{
                 alignSelf: "center",
                 width: 34,
@@ -436,6 +461,14 @@ export function Sheet({
                 padding: compact ? space.md : space.lg,
                 borderBottomWidth: 1,
                 borderBottomColor: colors.line,
+                flexShrink: 0,
+              },
+              mobileBotLayout && {
+                paddingTop: 11,
+                paddingBottom: 16,
+                paddingHorizontal: 20,
+                borderBottomWidth: 0,
+                minHeight: 61,
               },
             ]}
           >
@@ -446,10 +479,16 @@ export function Sheet({
                   numberOfLines={2}
                   style={[
                     s.title,
-                    mobileTitle && { fontSize: 22, lineHeight: 32 },
+                    compact && { fontSize: 22, lineHeight: 32 },
                     // 标题带品牌 Logo 时收紧字号，与左侧图形保持和谐。
                     titleIcon ? { fontSize: 18, lineHeight: 26 } : undefined,
-                    titleIcon && mobileTitle ? { fontSize: 17, lineHeight: 24 } : undefined,
+                    titleIcon && compact ? { fontSize: 17, lineHeight: 24 } : undefined,
+                    botLayout && {
+                      fontSize: compact ? 17 : 22,
+                      lineHeight: compact ? 26 : 32,
+                      fontFamily: fonts.sans,
+                      fontWeight: compact ? "500" : "600",
+                    },
                   ]}
                 >
                   {title}
@@ -460,19 +499,22 @@ export function Sheet({
             <IconButton icon={X} label={t("ui.closeDetails")} onPress={onClose} />
           </View>
           <ScrollView
+            testID="sheet-scroll-content"
             keyboardShouldPersistTaps="handled"
-            style={fullscreen ? { flex: 1 } : undefined}
+            style={[{ flexShrink: 1, minHeight: 0 }, fullscreen && { flex: 1 }]}
             contentContainerStyle={
               fullscreen
                 ? { flexGrow: 1, padding: compact ? space.md : space.lg }
-                : { padding: compact ? space.md : space.lg }
+                : mobileBotLayout
+                  ? { paddingHorizontal: 22, paddingBottom: 30 }
+                  : { padding: compact ? space.md : space.lg }
             }
           >
             {children}
           </ScrollView>
         </Pressable>
       </Pressable>
-    </Modal>
+    </ModalOverlay>
   );
 }
 export function CheckRow({

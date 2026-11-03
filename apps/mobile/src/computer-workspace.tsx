@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, AppState, Platform, Text, View } from "react-native";
+import { ActivityIndicator, AppState, Platform, View } from "react-native";
 import type { Artifact } from "../../../packages/domain/src";
 import type {
   ComputerCommand,
   ComputerDirectory,
   ComputerSnapshot,
 } from "../../../packages/domain/src/computer";
+import { Text } from "./app-text";
 import { useComputerDraft } from "./computer-drafts";
 import { DesktopStream } from "./desktop-stream";
 import { useTranslation } from "./i18n";

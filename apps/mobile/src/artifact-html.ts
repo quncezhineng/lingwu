@@ -10,6 +10,7 @@
  */
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { assistantMarkdown } from "./assistant-markdown";
+import { webFontFamily } from "./font-family";
 import { activeLocaleTag, statusLabel, tr } from "./i18n/translate";
 import { sandboxedDocument } from "./open-html-document";
 
@@ -264,7 +265,7 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
   * { box-sizing: border-box; }
   body {
     margin: 0; background: #EFF1F4; color: #0E1115;
-    font: 14px/1.6 -apple-system, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+    font: 14px/1.6 ${webFontFamily};
   }
   .page { max-width: 780px; margin: 24px auto; background: #FFFFFF; border: 1px solid #E7EAEF; border-radius: 14px; padding: 28px 32px; }
   .chip { display: inline-block; padding: 3px 10px; border-radius: 8px; background: #EDF3FF; color: #245FC4; font-size: 12px; font-weight: 600; }

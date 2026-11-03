@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
-import { ActivityIndicator, Linking, Text, View } from "react-native";
+import { ActivityIndicator, Linking, View } from "react-native";
 import { z } from "zod";
+import { Text } from "./app-text";
 import { BrowserRunContext } from "./browser-tool-card";
 import { useTranslation } from "./i18n";
 import { Search } from "./icons";

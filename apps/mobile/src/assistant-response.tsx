@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Linking, Platform, ScrollView, Text, type TextStyle, View } from "react-native";
+import { Animated, Linking, Platform, ScrollView, type TextStyle, View } from "react-native";
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import type { Artifact } from "../../../packages/domain/src";
+import { Text } from "./app-text";
 import {
   assistantMarkdown,
   inlineDocumentFileName,
@@ -11,18 +12,40 @@ import {
 import { findReferencedFile, markFileMentions } from "./chat-content";
 import { fileKind } from "./file-kind";
 import { tr } from "./i18n/translate";
+import { markdownCellTextStyle, markdownTableRules } from "./markdown-table";
 import { markdownPreviewDocument, openHtmlDocument } from "./open-html-document";
-import { colors, ErrorNotice } from "./ui";
+import { colors, ErrorNotice, fonts } from "./ui";
 
-const textStyle = { color: colors.text, fontSize: 16, lineHeight: 24 };
+const textStyle = { color: colors.text, fontFamily: fonts.sans, fontSize: 15, lineHeight: 25 };
 const style: Partial<MarkdownStyles> = {
   text: textStyle,
-  paragraph: { marginTop: 0, marginBottom: 6 },
-  list: { marginBottom: 6 },
-  headingContainer: { marginTop: 8, marginBottom: 4 },
-  heading1: { fontSize: 21, lineHeight: 27 },
-  heading2: { fontSize: 19, lineHeight: 25 },
-  heading3: { fontSize: 17, lineHeight: 23 },
+  paragraph: { marginTop: 0, marginBottom: 10 },
+  list: { marginBottom: 10 },
+  listUnorderedItem: { marginTop: 3, marginBottom: 1 },
+  listOrderedItem: { marginTop: 3, marginBottom: 1 },
+  listUnorderedItemIcon: { ...textStyle, marginLeft: 2, marginRight: 9 },
+  listOrderedItemIcon: { ...textStyle, marginLeft: 0, marginRight: 8, minWidth: 18 },
+  headingContainer: { marginTop: 18, marginBottom: 8 },
+  heading1Container: { paddingBottom: 0, borderBottomWidth: 0 },
+  heading2Container: { paddingBottom: 0, borderBottomWidth: 0 },
+  heading: { fontFamily: fonts.serif, fontWeight: "600", color: colors.text },
+  heading1: { fontSize: 22, lineHeight: 30 },
+  heading2: { fontSize: 20, lineHeight: 28 },
+  heading3: { fontSize: 17, lineHeight: 25 },
+  heading4: { fontSize: 16, lineHeight: 24 },
+  strong: { fontWeight: "600" },
+  blockquote: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.lineStrong,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 0,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: 5,
+    marginVertical: 10,
+  },
+  hr: { height: 1, backgroundColor: colors.line, marginVertical: 18 },
+  pre: { marginBottom: 0 },
   link: { color: colors.primaryStrong, textDecorationLine: "underline" },
   codeInline: {
     backgroundColor: colors.tertiary,
@@ -36,15 +59,21 @@ const style: Partial<MarkdownStyles> = {
   codeBlock: { backgroundColor: colors.tertiary, color: colors.text },
 };
 
-const compactTextStyle = { color: colors.text, fontSize: 13, lineHeight: 19 };
+const compactTextStyle = { ...textStyle, fontSize: 13, lineHeight: 20 };
 const compactStyle: Partial<MarkdownStyles> = {
+  ...style,
   text: compactTextStyle,
   paragraph: { marginTop: 0, marginBottom: 2 },
   list: { marginBottom: 2 },
+  listUnorderedItemIcon: { ...compactTextStyle, marginLeft: 2, marginRight: 7 },
+  listOrderedItemIcon: { ...compactTextStyle, marginLeft: 0, marginRight: 6, minWidth: 16 },
   headingContainer: { marginTop: 2, marginBottom: 1 },
   heading1: { fontSize: 15, lineHeight: 19 },
   heading2: { fontSize: 14, lineHeight: 19 },
   heading3: { fontSize: 13, lineHeight: 19 },
+  heading4: { fontSize: 13, lineHeight: 19 },
+  heading5: { fontSize: 13, lineHeight: 19 },
+  heading6: { fontSize: 13, lineHeight: 19 },
   link: { color: colors.primaryStrong, textDecorationLine: "underline" },
   codeInline: {
     backgroundColor: colors.tertiary,
@@ -154,11 +183,21 @@ export function AssistantResponse({
   );
   const rules = useMemo<RenderRules>(
     () => ({
-      textgroup: (node, children) => (
-        <Text key={node.key} selectable style={compact ? compactTextStyle : textStyle}>
-          {children}
-        </Text>
-      ),
+      ...markdownTableRules(compact),
+      textgroup: (node, children, parents) => {
+        const cell = parents.find((parent) => parent.type === "th" || parent.type === "td");
+        return (
+          <Text
+            key={node.key}
+            selectable
+            style={
+              cell ? markdownCellTextStyle(cell, compact) : compact ? compactTextStyle : textStyle
+            }
+          >
+            {children}
+          </Text>
+        );
+      },
       image: (node) => (
         <Text key={node.key} selectable style={{ color: colors.muted }}>
           {node.attributes.alt

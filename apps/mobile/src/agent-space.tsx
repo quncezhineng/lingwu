@@ -40,6 +40,7 @@ type AgentSpaceContextValue = {
   agents: AgentDefinition[];
   selection: SelectionLike;
   preferences: AgentUserPreferences;
+  loading: boolean;
   needsOnboarding: boolean;
   selectAgent: (id: string) => void;
   createAgent: (input: CreateAgentInput) => AgentDefinition;
@@ -115,8 +116,11 @@ export function AgentSpaceProvider({ children }: { children: ReactNode }) {
   }, [api, remoteReady, state]);
 
   const current = useMemo(
-    () => state.agents.find((agent) => agent.id === state.currentAgentId) ?? state.agents[0],
-    [state.agents, state.currentAgentId],
+    () =>
+      state.agents.find(
+        (agent) => agent.id === (state.onboardingDone ? state.currentAgentId : SYSTEM_AGENT_ID),
+      ) ?? state.agents[0],
+    [state.agents, state.currentAgentId, state.onboardingDone],
   );
 
   const selectAgent = useCallback((id: string) => {
@@ -268,7 +272,8 @@ export function AgentSpaceProvider({ children }: { children: ReactNode }) {
       agents: state.agents,
       selection,
       preferences: state.preferences,
-      needsOnboarding: !state.onboardingDone && current.id === SYSTEM_AGENT_ID,
+      loading: !remoteReady,
+      needsOnboarding: !state.onboardingDone,
       selectAgent,
       createAgent,
       updateAgent,
@@ -286,6 +291,7 @@ export function AgentSpaceProvider({ children }: { children: ReactNode }) {
       state,
       current,
       selection,
+      remoteReady,
       selectAgent,
       createAgent,
       updateAgent,

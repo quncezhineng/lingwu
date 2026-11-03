@@ -4,11 +4,10 @@ import {
   Linking,
   Pressable,
   ScrollView,
-  Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Text, TextInput } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
@@ -33,6 +32,7 @@ import {
   Trash2,
   X,
 } from "./icons";
+import { FilesScreen } from "./screens";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
 import { breakpoints, radius } from "./theme";
 import { appBrands, Button, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
@@ -735,7 +735,7 @@ function CategoryRail({
   );
 }
 
-export function CapabilityHubScreen() {
+export function CapabilityHubScreen({ mode = "page" }: { mode?: "page" | "embedded" } = {}) {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const { navigate, ask, workspace, api, refresh, notify, open } = useWorkspace();
@@ -987,7 +987,10 @@ export function CapabilityHubScreen() {
       title: t("agent.hubKnowledgeTitle"),
       detail: t("agent.hubKnowledgeDetail"),
       icon: FolderOpen,
-      onPress: () => navigate("files"),
+      onPress: () => {
+        if (mode === "embedded") selectType("workspace");
+        else navigate("files");
+      },
     },
   ];
 
@@ -1090,7 +1093,10 @@ export function CapabilityHubScreen() {
             <ShortcutCard
               key={shortcut.id}
               item={shortcut}
-              active={shortcut.id === typeFilter}
+              active={
+                shortcut.id === typeFilter ||
+                (shortcut.id === "knowledge" && typeFilter === "workspace")
+              }
               compact
             />
           ))}
@@ -1103,7 +1109,10 @@ export function CapabilityHubScreen() {
                 <ShortcutCard
                   key={shortcut.id}
                   item={shortcut}
-                  active={shortcut.id === typeFilter}
+                  active={
+                    shortcut.id === typeFilter ||
+                    (shortcut.id === "knowledge" && typeFilter === "workspace")
+                  }
                 />
               ))}
               {FILLER_KEYS.slice(0, shortcutColumns - row.length).map((key) => (
@@ -1114,171 +1123,175 @@ export function CapabilityHubScreen() {
         </View>
       )}
 
-      <View>
-        <View
-          style={{
-            minHeight: 40,
-            flexDirection: "row",
-            gap: 24,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.line,
-          }}
-        >
-          {(
-            [
-              ["marketplace", HUB_TAB_LABELS[typeFilter].marketplace],
-              ["mine", HUB_TAB_LABELS[typeFilter].mine],
-            ] as const
-          ).map(([id, labelKey]) => {
-            const active = tab === id;
-            return (
-              <Pressable
-                key={id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                onPress={() => {
-                  setTab(id);
-                  setCategory("all");
-                }}
-                style={{ justifyContent: "center", minHeight: 40 }}
-              >
-                <Text
-                  style={{
-                    color: active ? colors.primaryStrong : colors.muted,
-                    fontSize: 14,
-                    lineHeight: 20,
-                    fontWeight: active ? "600" : "400",
-                    fontFamily: fonts.sans,
+      {mode === "embedded" && typeFilter === "workspace" ? (
+        <FilesScreen />
+      ) : (
+        <View>
+          <View
+            style={{
+              minHeight: 40,
+              flexDirection: "row",
+              gap: 24,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.line,
+            }}
+          >
+            {(
+              [
+                ["marketplace", HUB_TAB_LABELS[typeFilter].marketplace],
+                ["mine", HUB_TAB_LABELS[typeFilter].mine],
+              ] as const
+            ).map(([id, labelKey]) => {
+              const active = tab === id;
+              return (
+                <Pressable
+                  key={id}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => {
+                    setTab(id);
+                    setCategory("all");
                   }}
+                  style={{ justifyContent: "center", minHeight: 40 }}
                 >
-                  {t(labelKey)}
-                </Text>
-                {active && (
-                  <View
+                  <Text
                     style={{
-                      position: "absolute",
-                      right: 0,
-                      bottom: -1,
-                      left: 0,
-                      height: 2,
-                      backgroundColor: colors.primary,
+                      color: active ? colors.primaryStrong : colors.muted,
+                      fontSize: 14,
+                      lineHeight: 20,
+                      fontWeight: active ? "600" : "400",
+                      fontFamily: fonts.sans,
                     }}
+                  >
+                    {t(labelKey)}
+                  </Text>
+                  {active && (
+                    <View
+                      style={{
+                        position: "absolute",
+                        right: 0,
+                        bottom: -1,
+                        left: 0,
+                        height: 2,
+                        backgroundColor: colors.primary,
+                      }}
+                    />
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={{ paddingTop: 16, gap: 14 }}>
+            {!useCategoryRail && searchField}
+
+            <View style={{ flexDirection: useCategoryRail ? "row" : "column", gap: 20 }}>
+              {useCategoryRail && (
+                <View style={{ width: 200, gap: 10 }}>
+                  {searchField}
+                  <CategoryRail
+                    category={category}
+                    counts={counts}
+                    onChange={setCategory}
+                    options={categoryOptions}
                   />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={{ paddingTop: 16, gap: 14 }}>
-          {!useCategoryRail && searchField}
-
-          <View style={{ flexDirection: useCategoryRail ? "row" : "column", gap: 20 }}>
-            {useCategoryRail && (
-              <View style={{ width: 200, gap: 10 }}>
-                {searchField}
+                </View>
+              )}
+              {!useCategoryRail && (
                 <CategoryRail
                   category={category}
                   counts={counts}
                   onChange={setCategory}
                   options={categoryOptions}
+                  horizontal
                 />
-              </View>
-            )}
-            {!useCategoryRail && (
-              <CategoryRail
-                category={category}
-                counts={counts}
-                onChange={setCategory}
-                options={categoryOptions}
-                horizontal
-              />
-            )}
-
-            <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
-              <View style={[s.between, { minHeight: 21 }]}>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 14,
-                    lineHeight: 20,
-                    fontWeight: "500",
-                    fontFamily: fonts.sans,
-                  }}
-                >
-                  {t(activeCategoryLabel)}
-                </Text>
-                <Text
-                  style={{
-                    color: colors.faint,
-                    fontSize: 11,
-                    lineHeight: 16,
-                    fontFamily: fonts.sans,
-                  }}
-                >
-                  {t(HUB_COUNT_LABELS[typeFilter], { count: visibleItems.length })}
-                </Text>
-              </View>
-
-              {visibleRows.length ? (
-                <View style={{ gap: 12 }}>
-                  {visibleRows.map((row) => (
-                    <View
-                      key={row[0].id}
-                      style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
-                    >
-                      {row.map((item) => (
-                        <CapabilityCard
-                          key={item.id}
-                          item={item}
-                          tab={tab}
-                          installBusy={installBusyId === item.id}
-                          onSetInstalled={(installed) =>
-                            void setCapabilityInstalled(item, installed)
-                          }
-                        />
-                      ))}
-                      {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
-                        <View key={key} style={{ flex: 1 }} />
-                      ))}
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <View
-                  style={{
-                    minHeight: 230,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderWidth: 1,
-                    borderColor: colors.line,
-                    borderRadius: radius.card,
-                    backgroundColor: colors.paper,
-                  }}
-                >
-                  <Empty
-                    icon={Search}
-                    title={t(
-                      showMineEmptyState
-                        ? HUB_MY_EMPTY_TITLE_LABELS[typeFilter]
-                        : HUB_EMPTY_TITLE_LABELS[typeFilter],
-                    )}
-                    detail={t(
-                      showMineEmptyState ? "agent.hubMyEmptyDetail" : "agent.hubNoMatchDetail",
-                    )}
-                  >
-                    {showMineEmptyState && (
-                      <Button small primary onPress={() => setTab("marketplace")}>
-                        {t("agent.hubBrowseMarketplace")}
-                      </Button>
-                    )}
-                  </Empty>
-                </View>
               )}
+
+              <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
+                <View style={[s.between, { minHeight: 21 }]}>
+                  <Text
+                    style={{
+                      color: colors.text,
+                      fontSize: 14,
+                      lineHeight: 20,
+                      fontWeight: "500",
+                      fontFamily: fonts.sans,
+                    }}
+                  >
+                    {t(activeCategoryLabel)}
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.faint,
+                      fontSize: 11,
+                      lineHeight: 16,
+                      fontFamily: fonts.sans,
+                    }}
+                  >
+                    {t(HUB_COUNT_LABELS[typeFilter], { count: visibleItems.length })}
+                  </Text>
+                </View>
+
+                {visibleRows.length ? (
+                  <View style={{ gap: 12 }}>
+                    {visibleRows.map((row) => (
+                      <View
+                        key={row[0].id}
+                        style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
+                      >
+                        {row.map((item) => (
+                          <CapabilityCard
+                            key={item.id}
+                            item={item}
+                            tab={tab}
+                            installBusy={installBusyId === item.id}
+                            onSetInstalled={(installed) =>
+                              void setCapabilityInstalled(item, installed)
+                            }
+                          />
+                        ))}
+                        {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
+                          <View key={key} style={{ flex: 1 }} />
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View
+                    style={{
+                      minHeight: 230,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderWidth: 1,
+                      borderColor: colors.line,
+                      borderRadius: radius.card,
+                      backgroundColor: colors.paper,
+                    }}
+                  >
+                    <Empty
+                      icon={Search}
+                      title={t(
+                        showMineEmptyState
+                          ? HUB_MY_EMPTY_TITLE_LABELS[typeFilter]
+                          : HUB_EMPTY_TITLE_LABELS[typeFilter],
+                      )}
+                      detail={t(
+                        showMineEmptyState ? "agent.hubMyEmptyDetail" : "agent.hubNoMatchDetail",
+                      )}
+                    >
+                      {showMineEmptyState && (
+                        <Button small primary onPress={() => setTab("marketplace")}>
+                          {t("agent.hubBrowseMarketplace")}
+                        </Button>
+                      )}
+                    </Empty>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      )}
 
       {configSheet && (
         <Sheet

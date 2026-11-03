@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { ArrowRight, Bell, X } from "./icons";
 import { Button, Card, colors, ErrorNotice, resultSummary, s } from "./ui";

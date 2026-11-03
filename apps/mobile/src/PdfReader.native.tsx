@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import Pdf from "react-native-pdf";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { ChevronLeft, ChevronRight, Minus, Plus } from "./icons";
 import { Button, colors, ErrorNotice, s } from "./ui";

@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Text,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -28,6 +27,7 @@ import {
   requestOtp,
   verifyOtp,
 } from "./src/api";
+import { Text } from "./src/app-text";
 import { CapabilityHubScreen } from "./src/capability-hub";
 import { ChatScreen, WorkspaceTools } from "./src/chat";
 import { ComputerDraftProvider } from "./src/computer-drafts";

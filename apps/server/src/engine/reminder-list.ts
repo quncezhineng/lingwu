@@ -1,4 +1,5 @@
 import type { AgentNotification, Monitor } from "../../../../packages/domain/src/agent.ts";
+import { resolveMonitorCurrency } from "../../../../packages/domain/src/monitor-currency.ts";
 
 const ALERT_LIMIT = 8;
 
@@ -17,6 +18,9 @@ export function reminderList(
         ...(monitor.description ? { description: monitor.description } : {}),
         condition: monitor.condition,
         value: monitor.value,
+        ...(monitor.condition === "price_below"
+          ? { currency: resolveMonitorCurrency(monitor) }
+          : {}),
         intervalMinutes: monitor.intervalMinutes,
         ...(monitor.schedule && monitor.schedule !== "interval"
           ? {

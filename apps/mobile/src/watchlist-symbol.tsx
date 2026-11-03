@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import {
   Bell,

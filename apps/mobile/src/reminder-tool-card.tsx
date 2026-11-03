@@ -1,4 +1,6 @@
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { monitorPriceLabel } from "../../../packages/domain/src/monitor-currency";
+import { Text } from "./app-text";
 import { activeLocaleTag, type TranslationFn, useTranslation } from "./i18n";
 import { Bell, Clock3 } from "./icons";
 import type { ReminderItem, ReminderResult } from "./reminder-result";
@@ -10,7 +12,7 @@ function conditionLabel(reminder: ReminderItem, t: TranslationFn): string {
     return t("tools.reminderConditionContains", { value: reminder.value });
   }
   if (reminder.condition === "price_below") {
-    return t("tools.reminderConditionPrice", { value: reminder.value });
+    return t("tools.reminderConditionPrice", { value: monitorPriceLabel(reminder) });
   }
   return t("tools.reminderConditionChange");
 }

@@ -1,4 +1,6 @@
-import { Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, View } from "react-native";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { PortfolioScreen } from "./portfolio-screen";
 import { colors } from "./ui";
@@ -7,11 +9,14 @@ import { useWorkspace } from "./workspace";
 
 /**
  * 自选与投资组合共用「我的自选」导航入口，在页面内通过页签切换。
- * 路由仍保留 watchlist / portfolio 两个 section，便于直达与页面标题联动。
+ * 页面模式联动 watchlist / portfolio 路由；内嵌模式只切换弹窗内的内容。
  */
-export function WatchlistHubScreen() {
+export function WatchlistHubScreen({ mode = "page" }: { mode?: "page" | "embedded" } = {}) {
   const { section, navigate } = useWorkspace();
   const { t } = useTranslation();
+  const [embeddedTab, setEmbeddedTab] = useState<"watchlist" | "portfolio">("watchlist");
+  const activeTab =
+    mode === "embedded" ? embeddedTab : section === "portfolio" ? "portfolio" : "watchlist";
   const tabs = [
     { id: "watchlist" as const, label: t("app.titleWatchlist") },
     { id: "portfolio" as const, label: t("app.titlePortfolio") },
@@ -28,14 +33,17 @@ export function WatchlistHubScreen() {
         }}
       >
         {tabs.map((tab) => {
-          const active = section === tab.id;
+          const active = activeTab === tab.id;
           return (
             <Pressable
               key={tab.id}
               accessibilityRole="tab"
               accessibilityLabel={tab.label}
               accessibilityState={{ selected: active }}
-              onPress={() => navigate(tab.id)}
+              onPress={() => {
+                if (mode === "embedded") setEmbeddedTab(tab.id);
+                else navigate(tab.id);
+              }}
               style={({ pressed }) => ({
                 minHeight: 44,
                 justifyContent: "center",
@@ -60,7 +68,7 @@ export function WatchlistHubScreen() {
         })}
       </View>
 
-      {section === "portfolio" ? <PortfolioScreen /> : <WatchlistScreen />}
+      {activeTab === "portfolio" ? <PortfolioScreen /> : <WatchlistScreen />}
     </View>
   );
 }

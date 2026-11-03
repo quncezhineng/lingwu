@@ -1,18 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  AppState,
-  Pressable,
-  Text,
-  type TextInput,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { ActivityIndicator, AppState, Pressable, useWindowDimensions, View } from "react-native";
 import Svg, { Polyline } from "react-native-svg";
 import type { AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text, type TextInput } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
-import { ComposerModelSelector } from "./composer-model-selector";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { greetingKeyForHour, userLocalHour } from "./greeting";
@@ -596,7 +588,6 @@ export function WorkbenchScreen() {
                   }
                 />
               }
-              modelSelector={<ComposerModelSelector />}
               sendLabel={t("workbench.sendAnalysis")}
             />
 

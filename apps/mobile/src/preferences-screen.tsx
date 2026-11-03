@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
 import {
   type AgentMemory,
   DEFAULT_MEMORY_CATEGORY,
@@ -7,6 +7,7 @@ import {
   type MemoryCategory,
 } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
+import { Text } from "./app-text";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
   Activity,
@@ -289,7 +290,7 @@ function MemoryEditorSheet({
   );
 }
 
-export function PreferencesScreen() {
+export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) {
   const { data, mutate, error: workspaceError } = useAgentWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
@@ -345,7 +346,7 @@ export function PreferencesScreen() {
   };
 
   const memories = data?.memories ?? [];
-  const columns = width >= breakpoints.desktop ? 2 : 1;
+  const columns = !embedded && width >= breakpoints.desktop ? 2 : 1;
 
   return (
     <View style={{ gap: 22 }}>
@@ -366,9 +367,11 @@ export function PreferencesScreen() {
               fontWeight: "600",
             }}
           >
-            {t("preferences.heroTitle")}
+            {t(embedded ? "agent.memory" : "preferences.heroTitle")}
           </Text>
-          <Text style={[s.muted, { lineHeight: 22 }]}>{t("preferences.heroDetail")}</Text>
+          {!embedded && (
+            <Text style={[s.muted, { lineHeight: 22 }]}>{t("preferences.heroDetail")}</Text>
+          )}
         </View>
         <Button
           primary

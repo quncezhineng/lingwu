@@ -1,13 +1,6 @@
 import { type ReactNode, useState } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "./app-text";
 import { type TranslationFn, useTranslation } from "./i18n";
 import {
   Activity,

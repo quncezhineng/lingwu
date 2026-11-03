@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Animated, Pressable, Text, View } from "react-native";
+import { Animated, Pressable, View } from "react-native";
+import { Text } from "./app-text";
 import { FileText } from "./icons";
 import { colors } from "./ui";
 

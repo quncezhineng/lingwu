@@ -2,9 +2,42 @@ import type { Message, ToolCall } from "@copilotkit/react-native/headless";
 
 export type ReadableToolCall = ToolCall;
 
+export const HISTORY_PAGE_SIZE = 30;
+export interface ThreadHistoryPage {
+  messages: Message[];
+  hasMore: boolean;
+  before: string | null;
+}
+
+export function threadHistoryPagePath(threadId?: string, before?: string | null) {
+  const path = threadId
+    ? `/api/conversation/threads/${encodeURIComponent(threadId)}/messages`
+    : "/api/conversation";
+  return `${path}?limit=${HISTORY_PAGE_SIZE}${before ? `&before=${encodeURIComponent(before)}` : ""}`;
+}
+
+/** Loading full model context must not expand the transcript's visible window. */
+export function visibleHistoryWindow(messages: readonly Message[], firstId: string | null) {
+  const start = firstId === null ? 0 : messages.findIndex((message) => message.id === firstId);
+  return start > 0 ? messages.slice(start) : messages;
+}
+
+export function prependHistoryPage(
+  earlier: readonly Message[],
+  current: readonly Message[],
+): Message[] {
+  // Full model context may already contain this page. Keep its chronological
+  // order instead of moving that page ahead of even older context.
+  if (earlier.length && current.some((message) => message.id === earlier[0].id)) {
+    const byId = new Map(earlier.map((message) => [message.id, message]));
+    return current.map((message) => byId.get(message.id) ?? message);
+  }
+  return mergePersistedThreadMessages(earlier, current);
+}
+
 /** Rich Threads store the authoritative transcript separately from live replay. */
 export function threadHistoryPath(threadId: string) {
-  return `/api/copilotkit/threads/${encodeURIComponent(threadId)}/messages`;
+  return `/api/conversation/threads/${encodeURIComponent(threadId)}/context`;
 }
 
 /**

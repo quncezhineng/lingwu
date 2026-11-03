@@ -1,59 +1,43 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
-  Text,
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AccountScreen } from "./account";
 import { AccountAvatar } from "./account-avatar";
+import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-header";
+import { agentLayout } from "./agent-layout";
 import { AgentOnboarding } from "./agent-onboarding";
 import { AgentOrb } from "./agent-orb";
-import { type AgentPanel, AgentSheets } from "./agent-sheets";
+import { AgentMoreContent, type AgentPanel, AgentSheets } from "./agent-sheets";
+import { AgentSideDrawer } from "./agent-side-drawer";
 import { useAgentSpace } from "./agent-space";
-import { AGENT_CAPABILITY_LABELS, type AgentDefinition } from "./agent-space-model";
-import { AgentStatus } from "./agent-ui";
-import { useAgentWorkspace } from "./agent-workspace";
+import type { AgentDefinition } from "./agent-space-model";
 import type { AccountProfile } from "./api";
+import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
 import { ChatScreen, WorkspaceTools } from "./chat";
+import { ColumnResizeHandle } from "./column-resize-handle";
+import { columnMaxWidth, desktopColumns } from "./desktop-columns";
 import { Details } from "./details";
 import { useTranslation } from "./i18n";
-import {
-  Bell,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Menu,
-  type MessageCircle,
-  MoreHorizontal,
-  Plus,
-  Settings2,
-  Sparkles,
-  Star,
-  X,
-} from "./icons";
+import { ChevronLeft, ChevronRight, Plus, Sparkles, X } from "./icons";
 import { PreferencesScreen } from "./preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./screens";
 import { TaskHubScreen } from "./task-hub";
 import { breakpoints } from "./theme";
 import { Toast, type ToastState } from "./toast";
 import { Button, colors, ErrorNotice, fonts, radius, s, space, typography } from "./ui";
+import { useDesktopColumns } from "./use-desktop-columns";
 import { WatchlistHubScreen } from "./watchlist-hub";
+import { WatchlistRail } from "./watchlist-rail";
 import { type Detail, useWorkspace } from "./workspace";
-
-const RAIL_WIDTH = 258;
-const CONTEXT_WIDTH = 296;
-
-function railCapabilityLabel(capability: string, locale: "en" | "zh-Hans") {
-  const labels = AGENT_CAPABILITY_LABELS[capability];
-  return labels ? labels[locale === "zh-Hans" ? "zh" : "en"] : capability;
-}
 
 function AgentListItem({
   agent,
@@ -70,9 +54,9 @@ function AgentListItem({
       accessibilityState={{ selected: active }}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 62,
-        paddingHorizontal: 10,
-        paddingVertical: 9,
+        minHeight: 72,
+        paddingHorizontal: 11,
+        paddingVertical: 13,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: active ? colors.accentLine : "transparent",
@@ -139,37 +123,47 @@ function AgentRail({
   return (
     <View
       style={{
-        width: compact ? "100%" : RAIL_WIDTH,
+        width: "100%",
         height: "100%",
-        paddingHorizontal: compact ? 18 : 18,
-        paddingTop: compact ? 26 : 24,
+        paddingHorizontal: compact ? 22 : 18,
+        paddingTop: compact ? 44 : 20,
         paddingBottom: 18,
-        borderRightWidth: compact ? 0 : 1,
+        borderRightWidth: 0,
         borderRightColor: colors.line,
-        backgroundColor: colors.sidebar,
+        backgroundColor: colors.surfaceRaised,
       }}
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, minHeight: 40 }}>
-        <Image
-          source={require("../assets/logo.png")}
-          resizeMode="contain"
-          accessible={false}
-          style={{ width: 34, height: 34, flexShrink: 0 }}
-        />
-        <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              color: colors.text,
-              fontSize: 21,
-              lineHeight: 38,
-              fontWeight: "600",
-              letterSpacing: 2,
-              fontFamily: fonts.serif,
-            }}
-          >
-            {t("common.agentName")}
-          </Text>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("agentSpace.backToChat")}
+          onPress={() => {
+            navigate("chat");
+            onClose?.();
+          }}
+          style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }}
+        >
+          <Image
+            source={require("../assets/logo.png")}
+            resizeMode="contain"
+            accessible={false}
+            style={{ width: 34, height: 34, flexShrink: 0 }}
+          />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 21,
+                lineHeight: 38,
+                fontWeight: "600",
+                letterSpacing: 2,
+                fontFamily: fonts.serif,
+              }}
+            >
+              {t("common.agentName")}
+            </Text>
+          </View>
+        </Pressable>
         {compact && (
           <Pressable
             accessibilityRole="button"
@@ -182,15 +176,11 @@ function AgentRail({
         )}
       </View>
 
-      <View style={{ marginTop: 29, gap: 7 }}>
-        <Text
-          style={[
-            typography.eyebrow,
-            { color: colors.faint, fontSize: 9, marginLeft: 8, marginBottom: 3 },
-          ]}
-        >
-          {t("agentSpace.myAgents")}
-        </Text>
+      <ScrollView
+        style={{ flex: 1, marginTop: 24 }}
+        contentContainerStyle={{ gap: 8, paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
         {agents.map((agent) => (
           <AgentListItem
             key={agent.id}
@@ -218,34 +208,7 @@ function AgentRail({
             {t("agentSpace.createAgent")}
           </Text>
         </Pressable>
-      </View>
-
-      <View style={{ flex: 1 }} />
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => onOpen("preferences")}
-        style={({ pressed }) => ({
-          paddingVertical: 13,
-          borderRadius: 13,
-          paddingHorizontal: 10,
-          backgroundColor: pressed ? colors.overlay1 : "transparent",
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10,
-          marginBottom: 6,
-        })}
-      >
-        <Settings2 size={17} color={colors.muted} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>
-            {t("agentSpace.preferences")}
-          </Text>
-          <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
-            {preferences.name || t("agentSpace.preferencesDetail")}
-          </Text>
-        </View>
-        <ChevronRight size={14} color={colors.faint} />
-      </Pressable>
+      </ScrollView>
       <Pressable
         accessibilityRole="button"
         onPress={() => onOpen("account")}
@@ -281,50 +244,102 @@ function AgentRail({
   );
 }
 
-function AgentDrawer({
-  visible,
+function CapabilityRail({
   onClose,
   onOpen,
+  compact = false,
 }: {
-  visible: boolean;
-  onClose: () => void;
+  onClose?: () => void;
   onOpen: (panel: AgentPanel) => void;
+  compact?: boolean;
 }) {
-  if (!visible) return null;
+  const { t } = useTranslation();
+  const { top: safeTop } = useSafeAreaInsets();
+  const drawerTop = Math.max(safeTop, 12);
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.modalShade, flexDirection: "row" }}>
+    <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.surfaceRaised }}>
+      {compact && (
         <View
-          style={{ width: "88%", maxWidth: 330, height: "100%", backgroundColor: colors.sidebar }}
+          style={{
+            minHeight: drawerTop + 44,
+            paddingTop: drawerTop,
+            paddingHorizontal: 18,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 10,
+          }}
         >
-          <AgentRail compact onClose={onClose} onOpen={onOpen} />
+          {onClose && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("ui.closeDetails")}
+              onPress={onClose}
+              style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center" }}
+            >
+              <X size={18} color={colors.muted} />
+            </Pressable>
+          )}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          onPress={onClose}
-          style={{ flex: 1 }}
+      )}
+      <ScrollView
+        style={{ flex: 1, minHeight: 0 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 18,
+          paddingTop: 20,
+          paddingBottom: 24,
+        }}
+      >
+        <WatchlistRail
+          onViewAll={() => onOpen("watchlist")}
+          onAdd={() => onOpen("watchlist-add")}
+          beforeOpenSymbol={onClose}
         />
-      </View>
-    </Modal>
+        <Text
+          style={{
+            marginTop: 30,
+            marginBottom: 18,
+            fontSize: 17,
+            fontFamily: fonts.serif,
+            fontWeight: "600",
+            color: colors.text,
+          }}
+        >
+          {t("agentSpace.more")}
+        </Text>
+        <AgentMoreContent onPanel={onOpen} compact={compact} showWatchlistLink={false} />
+      </ScrollView>
+    </View>
   );
 }
 
 function AgentHeader({
-  desktop,
   onMenu,
   onManage,
   onMore,
+  persistentNavigation = false,
 }: {
-  desktop: boolean;
   onMenu: () => void;
   onManage: () => void;
   onMore: () => void;
+  persistentNavigation?: boolean;
 }) {
   const { t } = useTranslation();
   const { current } = useAgentSpace();
   const { section, navigate } = useWorkspace();
-  const isChat = section === "chat";
+  if (section === "chat")
+    return (
+      <AgentFloatingHeader
+        name={current.name}
+        role={current.role}
+        avatar={current.avatar}
+        persistentNavigation={persistentNavigation}
+        onMenu={onMenu}
+        onManage={onManage}
+        onMore={onMore}
+      />
+    );
   const sectionTitle =
     section === "account"
       ? t("app.navAccount")
@@ -350,26 +365,21 @@ function AgentHeader({
   return (
     <View
       style={{
-        height: desktop ? 82 : 74,
-        paddingHorizontal: desktop ? 34 : 17,
+        height: agentLayout.headerHeight,
+        width: "100%",
+        maxWidth: agentLayout.columnMaxWidth,
+        alignSelf: "center",
+        paddingHorizontal: 17,
         flexDirection: "row",
         alignItems: "center",
-        borderBottomWidth: 1,
-        borderBottomColor: colors.lineSoft,
-        backgroundColor: `${colors.canvas}F7`,
+        backgroundColor: colors.canvas,
       }}
     >
-      <View style={{ width: desktop ? 52 : 48, alignItems: "flex-start" }}>
+      <View style={{ width: 48 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={
-            isChat && desktop
-              ? t("agentSpace.createAgent")
-              : isChat
-                ? t("agentSpace.chooseAgent")
-                : t("agentSpace.backToChat")
-          }
-          onPress={() => (isChat ? onMenu() : navigate("chat"))}
+          accessibilityLabel={t("agentSpace.backToChat")}
+          onPress={() => navigate("chat")}
           style={({ pressed }) => ({
             width: 43,
             height: 43,
@@ -381,315 +391,17 @@ function AgentHeader({
             borderColor: colors.lineSoft,
           })}
         >
-          {isChat && desktop ? (
-            <Plus size={20} color={colors.text} />
-          ) : isChat ? (
-            <Menu size={20} color={colors.text} />
-          ) : (
-            <ChevronLeft size={20} color={colors.text} />
-          )}
+          <ChevronLeft size={20} color={colors.text} />
         </Pressable>
       </View>
       <View style={{ flex: 1, alignItems: "center" }}>
-        {isChat ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("agentSpace.manageAgent")}
-            onPress={onManage}
-            style={({ pressed }) => ({
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              borderRadius: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 9,
-              backgroundColor: pressed ? colors.overlay1 : "transparent",
-            })}
-          >
-            <AgentOrb avatar={current.avatar} size={33} />
-            <View style={{ gap: 2 }}>
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontSize: 15,
-                  lineHeight: 20,
-                  fontWeight: "600",
-                  color: colors.text,
-                  letterSpacing: 0.4,
-                }}
-              >
-                {current.name}
-              </Text>
-              <Text numberOfLines={1} style={{ fontSize: 10, lineHeight: 14, color: colors.faint }}>
-                {current.role}
-              </Text>
-            </View>
-          </Pressable>
-        ) : (
-          <View style={{ alignItems: "center" }}>
-            <Text style={[typography.heading, { fontSize: 16 }]}>{sectionTitle}</Text>
-            <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
-              {t("agentSpace.globalNote")}
-            </Text>
-          </View>
-        )}
-      </View>
-      <View style={{ width: desktop ? 52 : 48, alignItems: "flex-end" }}>
-        {isChat && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("agentSpace.more")}
-            onPress={onMore}
-            style={({ pressed }) => ({
-              width: 43,
-              height: 43,
-              borderRadius: radius.full,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: pressed ? colors.overlay1 : colors.paper,
-              borderWidth: 1,
-              borderColor: colors.lineSoft,
-            })}
-          >
-            <MoreHorizontal size={21} color={colors.text} />
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
-
-function ContextButton({
-  icon: Icon,
-  title,
-  detail,
-  badge,
-  onPress,
-}: {
-  icon: typeof MessageCircle;
-  title: string;
-  detail?: string;
-  badge?: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: 53,
-        paddingHorizontal: 9,
-        paddingVertical: 9,
-        borderRadius: 12,
-        backgroundColor: pressed ? colors.overlay1 : "transparent",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-      })}
-    >
-      <View
-        style={{
-          width: 33,
-          height: 33,
-          borderRadius: 10,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: colors.surface,
-        }}
-      >
-        <Icon size={16} color={colors.muted} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Text numberOfLines={1} style={{ fontSize: 12, color: colors.text, fontWeight: "500" }}>
-          {title}
+        <Text style={[typography.heading, { fontSize: 16 }]}>{sectionTitle}</Text>
+        <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
+          {t("agentSpace.globalNote")}
         </Text>
-        {!!detail && (
-          <Text numberOfLines={1} style={{ fontSize: 9, color: colors.faint }}>
-            {detail}
-          </Text>
-        )}
       </View>
-      {badge ? (
-        <View
-          style={{
-            minWidth: 20,
-            height: 20,
-            borderRadius: 10,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: colors.tertiary,
-          }}
-        >
-          <Text style={{ fontSize: 9, color: colors.muted }}>{badge}</Text>
-        </View>
-      ) : (
-        <ChevronRight size={13} color={colors.faint} />
-      )}
-    </Pressable>
-  );
-}
-
-function AgentContextRail({ onOpen }: { onOpen: (panel: AgentPanel) => void }) {
-  const { t, locale } = useTranslation();
-  const { current } = useAgentSpace();
-  const { data } = useAgentWorkspace();
-  const activeTasks = (data?.tasks ?? []).filter(
-    (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
-  ).length;
-  const agentTasks = (data?.tasks ?? []).filter(
-    (task) => task.threadId === current.threadId || (!task.threadId && current.system),
-  );
-  return (
-    <View
-      style={{
-        width: CONTEXT_WIDTH,
-        borderLeftWidth: 1,
-        borderLeftColor: colors.line,
-        backgroundColor: colors.surfaceRaised,
-        paddingHorizontal: 15,
-        paddingTop: 25,
-        paddingBottom: 20,
-      }}
-    >
-      <Text style={[typography.eyebrow, { color: colors.faint, marginLeft: 9, marginBottom: 7 }]}>
-        {t("agentSpace.globalArea")}
-      </Text>
-      <ContextButton
-        icon={Star}
-        title={t("agentSpace.marketBrief")}
-        detail={t("agentSpace.marketBriefDetail")}
-        onPress={() => onOpen("brief")}
-      />
-      <ContextButton
-        icon={Sparkles}
-        title={t("agentSpace.insights")}
-        detail={t("agentSpace.insightsDetail")}
-        onPress={() => onOpen("insights")}
-      />
-      <ContextButton
-        icon={Star}
-        title={t("agentSpace.watchlist")}
-        detail={t("agentSpace.watchlistDetail")}
-        onPress={() => onOpen("watchlist")}
-      />
-      <ContextButton
-        icon={Clock3}
-        title={t("agentSpace.tasks")}
-        detail={t("agentSpace.tasksDetail")}
-        badge={activeTasks}
-        onPress={() => onOpen("tasks")}
-      />
-
-      <View
-        style={{
-          height: 1,
-          backgroundColor: colors.line,
-          marginHorizontal: 8,
-          marginVertical: 17,
-        }}
-      />
-      <Text style={[typography.eyebrow, { color: colors.faint, marginLeft: 9, marginBottom: 7 }]}>
-        {t("agentSpace.agentLearned", { name: current.name })}
-      </Text>
-      <ContextButton
-        icon={Bell}
-        title={t("agentSpace.scheduledTasks")}
-        detail={`${data?.monitors.filter((monitor) => monitor.status === "active").length ?? 0} · ${current.name}`}
-        onPress={() => onOpen("manage")}
-      />
-      <ContextButton
-        icon={Clock3}
-        title={t("agentSpace.taskHistory")}
-        detail={`${agentTasks.length} · ${current.name}`}
-        onPress={() => onOpen("tasks")}
-      />
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 6 }}>
-        {current.skills.slice(0, 4).map((capability) => (
-          <Pressable
-            key={capability}
-            accessibilityRole="button"
-            onPress={() => onOpen("capabilities")}
-            style={({ pressed }) => ({
-              width: "47.5%",
-              minHeight: 62,
-              padding: 9,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: colors.lineSoft,
-              backgroundColor: pressed ? colors.paper : "transparent",
-              gap: 6,
-            })}
-          >
-            <Sparkles size={14} color={colors.primary} />
-            <Text
-              numberOfLines={2}
-              style={{ fontSize: 10, lineHeight: 15, color: colors.muted, fontWeight: "500" }}
-            >
-              {railCapabilityLabel(capability, locale)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => onOpen("capabilities")}
-        style={{
-          minHeight: 34,
-          marginTop: 7,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 5,
-        }}
-      >
-        <Text style={{ fontSize: 10, color: colors.primaryStrong }}>
-          {t("agentSpace.allCapabilities")}
-        </Text>
-        <ChevronRight size={12} color={colors.primary} />
-      </Pressable>
-      <View style={{ flex: 1 }} />
-      <Text style={{ fontSize: 9, lineHeight: 16, color: colors.faint }}>
-        {t("agentSpace.globalNote")}
-      </Text>
+      <View style={{ width: 48 }} />
     </View>
-  );
-}
-
-function GlobalTaskPill({ onOpen }: { onOpen: () => void }) {
-  const { t } = useTranslation();
-  const { data } = useAgentWorkspace();
-  const active = (data?.tasks ?? []).filter(
-    (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
-  ).length;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onOpen}
-      style={({ pressed }) => ({
-        alignSelf: "center",
-        minHeight: 30,
-        marginTop: 6,
-        paddingHorizontal: 11,
-        borderRadius: radius.full,
-        backgroundColor: pressed ? colors.overlay1 : colors.surfaceRaised,
-        borderWidth: 1,
-        borderColor: colors.lineSoft,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-      })}
-    >
-      <View
-        style={{
-          width: 5,
-          height: 5,
-          borderRadius: 3,
-          backgroundColor: active ? colors.primary : colors.success,
-        }}
-      />
-      <Text style={{ fontSize: 9, color: colors.muted }}>
-        {active ? t("agentSpace.activeTasks", { count: active }) : t("agentSpace.noActiveTasks")}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -705,7 +417,9 @@ function SecondarySection({
   const content = (() => {
     switch (section) {
       case "account":
-        return <AccountScreen onSignOut={onSignOut} />;
+        return (
+          <AccountScreen onSignOut={onSignOut} onOpenPreferences={() => onOpen("preferences")} />
+        );
       case "preferences":
         return <PreferencesScreen />;
       case "watchlist":
@@ -768,12 +482,23 @@ export function AgentProductShell({
 }) {
   const { width } = useWindowDimensions();
   const desktop = width >= breakpoints.desktop;
-  const showContext = width >= 1180;
+  const [containerWidth, setContainerWidth] = useState(width);
+  const availableWidth = Math.floor(Math.min(width, containerWidth));
+  const threeColumns = Platform.OS === "web" && availableWidth >= desktopColumns.breakpoint;
+  const { widths: columnWidths, resize: resizeColumn } = useDesktopColumns(availableWidth);
   const { t } = useTranslation();
   const { section, close } = useWorkspace();
-  const { agents, current, selection, needsOnboarding, markThreadUsed } = useAgentSpace();
-  const [panel, setPanel] = useState<AgentPanel>();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { agents, current, selection, loading, needsOnboarding, markThreadUsed } = useAgentSpace();
+  const [panelStack, setPanelStack] = useState<AgentPanel[]>([]);
+  const panel = panelStack.at(-1);
+  const closePanel = useCallback(() => setPanelStack((stack) => stack.slice(0, -1)), []);
+  const dismissPanels = useCallback(() => setPanelStack([]), []);
+  const pushPanel = useCallback(
+    (next: AgentPanel) =>
+      setPanelStack((stack) => (stack.at(-1) === next ? stack : [...stack, next])),
+    [],
+  );
+  const [drawer, setDrawer] = useState<"agents" | "capabilities" | null>(null);
   const [mountedIds, setMountedIds] = useState<string[]>([current.id]);
 
   useEffect(() => {
@@ -781,16 +506,21 @@ export function AgentProductShell({
   }, [current.id]);
 
   useEffect(() => {
+    if (threeColumns) setDrawer(null);
+  }, [threeColumns]);
+
+  useEffect(() => {
     if (Platform.OS !== "web") return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (panel) setPanel(undefined);
-      else if (drawerOpen) setDrawerOpen(false);
+      // Each Modal owns Escape, including nested resource editors.
+      if (panel) return;
+      else if (drawer) setDrawer(null);
       else if (detail) close();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [close, detail, drawerOpen, panel]);
+  }, [close, detail, drawer, panel]);
 
   const mounted = useMemo(
     () =>
@@ -801,94 +531,151 @@ export function AgentProductShell({
   );
 
   const openPanel = (next: AgentPanel) => {
-    setDrawerOpen(false);
-    setPanel(next);
+    setDrawer(null);
+    setPanelStack([next]);
   };
+
+  // Account initialization is a separate screen: no navigation, chat or task controls
+  // mount until the first Agent is ready. Wait for saved progress before choosing a screen.
+  if (loading || needsOnboarding) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.canvas }} edges={["top", "bottom"]}>
+        {loading ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={s.muted}>{t("common.loading")}</Text>
+          </View>
+        ) : (
+          <AgentOnboarding />
+        )}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <>
       <WorkspaceTools />
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.canvas }} edges={["top", "bottom"]}>
-        <View style={{ flex: 1, flexDirection: "row", minHeight: 0 }}>
-          {desktop && <AgentRail onOpen={openPanel} />}
-          <View style={{ flex: 1, minWidth: 0 }}>
+        <View
+          onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+          style={{ flex: 1, flexDirection: "row", minHeight: 0 }}
+        >
+          {threeColumns && (
+            <>
+              <View style={{ width: columnWidths.left, flexShrink: 0, minHeight: 0 }}>
+                <AgentRail onOpen={openPanel} />
+              </View>
+              <ColumnResizeHandle
+                side="left"
+                width={columnWidths.left}
+                min={desktopColumns.left.min}
+                max={columnMaxWidth(availableWidth, columnWidths, "left")}
+                label={t("agentSpace.resizeAgentList")}
+                hint={t("agentSpace.resizeColumnHint")}
+                onResize={(value, finished) => resizeColumn("left", value, finished)}
+              />
+            </>
+          )}
+          <View testID="agent-main-column" style={{ flex: 1, minWidth: 0, position: "relative" }}>
             <AgentHeader
-              desktop={desktop}
-              onMenu={() => (desktop ? openPanel("create") : setDrawerOpen(true))}
+              onMenu={() => setDrawer("agents")}
               onManage={() => openPanel("manage")}
-              onMore={() => openPanel("more")}
+              onMore={() => setDrawer("capabilities")}
+              persistentNavigation={threeColumns}
             />
-            {section === "chat" && <GlobalTaskPill onOpen={() => openPanel("tasks")} />}
             <View style={{ flex: 1, minHeight: 0 }}>
               {section === "chat" ? (
-                needsOnboarding ? (
-                  <AgentOnboarding />
-                ) : (
-                  <>
-                    <ErrorNotice error={error} />
-                    {mounted.map((agent) => {
-                      const active = agent.id === current.id;
-                      return (
-                        <View
-                          key={agent.id}
-                          style={{
-                            display: active ? "flex" : "none",
-                            flex: 1,
-                            minHeight: 0,
-                            paddingHorizontal: desktop ? 24 : 17,
+                <>
+                  <ErrorNotice error={error} />
+                  {mounted.map((agent) => {
+                    const active = agent.id === current.id;
+                    return (
+                      <View
+                        key={agent.id}
+                        style={{
+                          display: active ? "flex" : "none",
+                          flex: 1,
+                          minHeight: 0,
+                          paddingHorizontal: threeColumns ? 18 : desktop ? 24 : 17,
+                        }}
+                      >
+                        <ChatScreen
+                          thread={
+                            active
+                              ? selection
+                              : {
+                                  id: agent.threadId,
+                                  existing: agent.system || agent.threadExists,
+                                }
+                          }
+                          active={active && section === "chat"}
+                          prompt={active ? prompt : undefined}
+                          hideHeader
+                          contentTopInset={floatingHeaderClearance()}
+                          agentContext={{
+                            name: agent.name,
+                            role: agent.role,
+                            persona: agent.persona,
+                            avatar: agent.avatar,
                           }}
-                        >
-                          <AgentStatus />
-                          <ChatScreen
-                            thread={
-                              active
-                                ? selection
-                                : {
-                                    id: agent.threadId,
-                                    existing: agent.system || agent.threadExists,
-                                  }
-                            }
-                            active={active && section === "chat"}
-                            prompt={active ? prompt : undefined}
-                            hideHeader
-                            agentContext={{
-                              name: agent.name,
-                              role: agent.role,
-                              persona: agent.persona,
-                            }}
-                            emptyEyebrow={t("agentSpace.welcomeEyebrow")}
-                            emptyTitleLead={t("agentSpace.welcomeTitle")}
-                            emptyTitleTail={t("agentSpace.welcomeTail")}
-                            emptySubtitle={t("agentSpace.welcomeSubtitle", {
-                              name: agent.name,
-                            })}
-                            composerPlaceholder={t("agentSpace.composer", {
-                              name: agent.name,
-                            })}
-                            onThreadUsed={() => markThreadUsed(agent.id)}
-                          />
-                        </View>
-                      );
-                    })}
-                  </>
-                )
+                          emptyEyebrow={t("agentSpace.welcomeEyebrow")}
+                          emptyTitleLead={t("agentSpace.welcomeTitle")}
+                          emptyTitleTail={t("agentSpace.welcomeTail")}
+                          emptySubtitle={t("agentSpace.welcomeSubtitle", {
+                            name: agent.name,
+                          })}
+                          composerPlaceholder={t("agentSpace.composer", {
+                            name: agent.name,
+                          })}
+                          onThreadUsed={() => markThreadUsed(agent.id)}
+                        />
+                      </View>
+                    );
+                  })}
+                </>
               ) : (
                 <SecondarySection onOpen={openPanel} onSignOut={onSignOut} />
               )}
             </View>
           </View>
-          {desktop && showContext && section === "chat" && <AgentContextRail onOpen={openPanel} />}
+          {threeColumns && (
+            <>
+              <ColumnResizeHandle
+                side="right"
+                width={columnWidths.right}
+                min={desktopColumns.right.min}
+                max={columnMaxWidth(availableWidth, columnWidths, "right")}
+                label={t("agentSpace.resizeCapabilities")}
+                hint={t("agentSpace.resizeColumnHint")}
+                onResize={(value, finished) => resizeColumn("right", value, finished)}
+              />
+              <View style={{ width: columnWidths.right, flexShrink: 0, minHeight: 0 }}>
+                <CapabilityRail onOpen={openPanel} />
+              </View>
+            </>
+          )}
         </View>
         <Toast toast={toast} onDismiss={clearToast} />
-        <AgentDrawer
-          visible={drawerOpen && !desktop}
-          onClose={() => setDrawerOpen(false)}
-          onOpen={openPanel}
-        />
+        {!threeColumns && drawer && (
+          <AgentSideDrawer
+            key={drawer}
+            side={drawer === "agents" ? "left" : "right"}
+            onClose={() => setDrawer(null)}
+            closeLabel={t("ui.closeDetails")}
+          >
+            {drawer === "agents" ? (
+              <AgentRail compact onOpen={openPanel} onClose={() => setDrawer(null)} />
+            ) : (
+              <CapabilityRail compact onOpen={openPanel} onClose={() => setDrawer(null)} />
+            )}
+          </AgentSideDrawer>
+        )}
         <AgentSheets
+          key={`${current.id}:${panel}`}
           panel={panel}
-          onClose={() => setPanel(undefined)}
-          onPanel={setPanel}
+          onClose={closePanel}
+          onDismiss={dismissPanels}
+          onPanel={pushPanel}
           onSignOut={onSignOut}
         />
         {detail && <Details detail={detail} />}

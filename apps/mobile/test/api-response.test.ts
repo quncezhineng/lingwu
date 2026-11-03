@@ -2,6 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readApiPayload } from "../src/api-response.ts";
 
+test("structured error codes survive decoding for actionable localized task messages", async () => {
+  const error = await readApiPayload(
+    new Response(
+      JSON.stringify({
+        error: "This reminder needs setup",
+        code: "TASK_SETUP_REQUIRED",
+      }),
+      { status: 409 },
+    ),
+  ).catch((error: unknown) => error);
+  assert.ok(error instanceof Error);
+  assert.equal((error as Error & { code: string }).code, "TASK_SETUP_REQUIRED");
+  assert.equal((error as Error & { status: number }).status, 409);
+});
+
 test("JSON responses pass through and server errors keep their message", async () => {
   assert.deepEqual(
     await readApiPayload(new Response(JSON.stringify({ mode: "sample" }), { status: 200 })),

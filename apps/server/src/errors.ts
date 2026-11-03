@@ -14,6 +14,7 @@ export class AppError extends Error {
       | 500
       | 502
       | 503 = 400,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "AppError";

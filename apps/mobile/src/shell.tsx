@@ -13,8 +13,6 @@ import {
   Pressable,
   type PressableProps,
   ScrollView,
-  Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -22,6 +20,7 @@ import type { Section } from "../../../packages/domain/src";
 import { AccountAvatar } from "./account-avatar";
 import { useAgentWorkspace } from "./agent-workspace";
 import type { AccountProfile } from "./api";
+import { Text, TextInput } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {

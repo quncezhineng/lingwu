@@ -8,16 +8,9 @@
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Linking,
-  Platform,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { ActivityIndicator, Linking, Platform, useWindowDimensions, View } from "react-native";
 import type { LingWuApi } from "./api";
+import { Text, TextInput } from "./app-text";
 import {
   type FinancialMetric,
   type FinancialReport,

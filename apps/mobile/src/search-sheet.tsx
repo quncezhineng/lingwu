@@ -1,8 +1,9 @@
 import { useThreads } from "@copilotkit/react-native/headless";
 import { useMemo, useState } from "react";
-import { Platform, TextInput, type TextStyle, View } from "react-native";
+import { Platform, type TextStyle, View } from "react-native";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
+import { TextInput } from "./app-text";
 import { fileSourceLabel } from "./file-library";
 import {
   type GlobalSearchKind,

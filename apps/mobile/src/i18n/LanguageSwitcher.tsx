@@ -6,8 +6,10 @@
  */
 
 import { useCallback, useRef, useState } from "react";
-import { Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, useWindowDimensions, View } from "react-native";
+import { Text } from "../app-text";
 import { Check, Languages, X } from "../icons";
+import { ModalOverlay } from "../modal-overlay";
 import { colors, shadow } from "../ui";
 import { useTranslation } from "./index";
 import { LOCALE_LABELS, type Locale } from "./types";
@@ -41,14 +43,13 @@ export function LanguagePicker({
   );
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+    <ModalOverlay visible={visible} onRequestClose={onClose}>
       <View
         style={{
           flex: 1,
           justifyContent: centered ? "center" : "flex-start",
           alignItems: centered ? "center" : "stretch",
           padding: centered ? 20 : 0,
-          backgroundColor: colors.modalShade,
         }}
       >
         <Pressable
@@ -157,7 +158,7 @@ export function LanguagePicker({
           })}
         </View>
       </View>
-    </Modal>
+    </ModalOverlay>
   );
 }
 

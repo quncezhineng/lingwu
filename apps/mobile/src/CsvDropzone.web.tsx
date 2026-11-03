@@ -1,6 +1,6 @@
 /** Web 拖拽/点击上传区（真实 DOM 事件，支持键盘 Enter/Space）。 */
 import { createElement, useState } from "react";
-import { Text } from "react-native";
+import { Text } from "./app-text";
 import type { PickedCsv } from "./csv-file";
 import { pickCsvFile } from "./csv-file";
 import { Upload } from "./icons";

@@ -41,3 +41,16 @@ test("malformed reminder results are rejected", () => {
     undefined,
   );
 });
+
+test("saved reminder currencies survive tool replay without being dropped", () => {
+  for (const currency of ["CNY", "HKD", "USD"] as const) {
+    const withCurrency = {
+      ...result,
+      reminders: result.reminders.map((item) => ({ ...item, currency })),
+    };
+    assert.equal(
+      parseReminderResult(JSON.stringify(withCurrency))?.reminders[0].currency,
+      currency,
+    );
+  }
+});

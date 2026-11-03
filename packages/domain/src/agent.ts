@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { CURRENCY_CODES, type MonitorCurrency } from "./monitor-currency.ts";
+
+export { CURRENCY_CODES, type MonitorCurrency } from "./monitor-currency.ts";
 
 export type TaskStatus =
   | "queued"
@@ -75,6 +78,8 @@ export interface Monitor {
   url: string;
   condition: "change" | "contains" | "price_below";
   value: string;
+  /** Currency of the threshold; no FX conversion is performed. Optional for legacy rules. */
+  currency?: MonitorCurrency;
   intervalMinutes: number;
   /** interval 按分钟轮询；daily / weekly 在指定时间运行。 */
   schedule?: "interval" | "daily" | "weekly";
@@ -176,6 +181,7 @@ export const monitorInputSchema = z
     url: z.url().max(4096),
     condition: z.enum(["change", "contains", "price_below"]).default("change"),
     value: z.string().max(300).default(""),
+    currency: z.enum(CURRENCY_CODES).optional(),
     intervalMinutes: z.number().int().min(1).max(10080).default(15),
     schedule: z.enum(["interval", "daily", "weekly"]).default("interval"),
     timeOfDay: z
@@ -279,8 +285,6 @@ export const priceAlertSchema = z.object({
 export type PriceAlert = z.infer<typeof priceAlertSchema>;
 
 // ─── P1 组合、持仓、笔记 ───
-
-export const CURRENCY_CODES = ["CNY", "USD", "HKD"] as const;
 
 /** 投资组合。base_currency 只用于展示口径；P1 不做汇率折算。 */
 export const portfolioSchema = z.object({

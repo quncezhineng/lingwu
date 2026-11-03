@@ -1,4 +1,5 @@
 import { assistantMarkdown } from "./assistant-markdown";
+import { webFontFamily } from "./font-family";
 
 const HTML_PREVIEW_CSP = [
   "default-src 'none'",
@@ -42,7 +43,7 @@ export function markdownPreviewDocument(markdown: string, title: string): string
 <title>${escapeHtml(title)}</title>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; background: #f4f3ef; color: #20201d; font: 16px/1.75 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  body { margin: 0; background: #f4f3ef; color: #20201d; font: 16px/1.75 ${webFontFamily}; }
   main { width: min(820px, calc(100% - 32px)); margin: 28px auto 64px; padding: 40px 48px; background: #fff; border: 1px solid #dedbd3; border-radius: 16px; box-shadow: 0 16px 50px rgba(42, 36, 24, .08); }
   h1, h2, h3, h4, h5, h6 { line-height: 1.35; color: #151512; }
   h1 { margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid #e8e4da; font-size: 30px; }

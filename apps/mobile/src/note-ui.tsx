@@ -3,8 +3,9 @@
  * 标的详情内嵌笔记区。
  */
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import type { LingWuApi } from "./api";
+import { Text, TextInput } from "./app-text";
 import { type TranslationFn, useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
@@ -24,6 +25,7 @@ import {
   Trash2,
 } from "./icons";
 import { metaFor, type SymbolMeta, searchSymbols } from "./market";
+import { ModalOverlay } from "./modal-overlay";
 import {
   createNote,
   deleteNote,
@@ -570,12 +572,7 @@ export function NoteEditorSheet({
       </View>
 
       {confirmDiscard && (
-        <Modal
-          transparent
-          animationType="fade"
-          visible
-          onRequestClose={() => setConfirmDiscard(false)}
-        >
+        <ModalOverlay visible onRequestClose={() => setConfirmDiscard(false)}>
           <Pressable onPress={() => setConfirmDiscard(false)} style={s.modalShade}>
             <Pressable
               accessibilityViewIsModal
@@ -593,7 +590,7 @@ export function NoteEditorSheet({
               </View>
             </Pressable>
           </Pressable>
-        </Modal>
+        </ModalOverlay>
       )}
     </Sheet>
   );
@@ -915,12 +912,7 @@ export function NoteDetailSheet({
       <DisclaimerNote />
 
       {confirmDelete && (
-        <Modal
-          transparent
-          animationType="fade"
-          visible
-          onRequestClose={() => setConfirmDelete(false)}
-        >
+        <ModalOverlay visible onRequestClose={() => setConfirmDelete(false)}>
           <Pressable onPress={() => setConfirmDelete(false)} style={s.modalShade}>
             <Pressable
               accessibilityViewIsModal
@@ -957,7 +949,7 @@ export function NoteDetailSheet({
               </View>
             </Pressable>
           </Pressable>
-        </Modal>
+        </ModalOverlay>
       )}
       {historyOpen && (
         <CheckHistorySheet api={api} note={note} onClose={() => setHistoryOpen(false)} />

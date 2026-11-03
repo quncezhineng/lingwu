@@ -1,5 +1,6 @@
-import { type StyleProp, Text, View, type ViewStyle } from "react-native";
+import { type StyleProp, View, type ViewStyle } from "react-native";
 import type { TaskStatus } from "../../../packages/domain/src/agent";
+import { Text } from "./app-text";
 import { colors, radius, statusColors, typography } from "./theme";
 
 /**

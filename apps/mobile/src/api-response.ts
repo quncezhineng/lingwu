@@ -17,8 +17,11 @@ export async function readApiPayload<T>(response: Response, fallback?: string): 
     const message =
       typeof error === "string" ? error : (fallback ?? `Request failed (${response.status})`);
     // 附上 HTTP 状态码，方便上层识别 401（令牌过期）并引导用户重新登录。
-    const failure = new Error(message) as Error & { status?: number };
+    const failure = new Error(message) as Error & { status?: number; code?: string };
     failure.status = response.status;
+    const code =
+      payload && typeof payload === "object" ? (payload as { code?: unknown }).code : undefined;
+    if (typeof code === "string") failure.code = code;
     throw failure;
   }
   // 204 / 空 body 是合法的成功响应（如 DELETE）：按「无内容」返回，而不是当成解析失败。
