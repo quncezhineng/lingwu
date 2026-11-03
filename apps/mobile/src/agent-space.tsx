@@ -13,12 +13,18 @@ import {
   type AgentAvatarId,
   type AgentDefinition,
   type AgentSkill,
+  type AgentSpaceRemoteLoad,
   type AgentSpaceState,
   type AgentTemplateId,
   type AgentUserPreferences,
+  agentSpaceCanPersist,
+  agentSpaceRemoteSettled,
+  agentSpaceStorageKey,
   createAgentFromTemplate,
   createCustomSkill,
+  DEFAULT_PREFERENCES,
   normalizeAgentSpace,
+  resolveRemoteAgentSpace,
   type SelectionLike,
   SYSTEM_AGENT_ID,
 } from "./agent-space-model";
@@ -48,6 +54,7 @@ type AgentSpaceContextValue = {
   deleteAgent: (id: string) => void;
   markThreadUsed: (id: string) => void;
   setPreferences: (patch: Partial<AgentUserPreferences>) => void;
+  resetPreferences: () => void;
   advanceOnboarding: (step: number) => void;
   completeOnboarding: () => void;
   finishOnboarding: (preferences: Partial<AgentUserPreferences>) => void;
@@ -62,8 +69,8 @@ type AgentSpaceContextValue = {
 
 const AgentSpaceContext = createContext<AgentSpaceContextValue | null>(null);
 
-function loadState(mainThreadId: string) {
-  const raw = readStorage(AGENT_SPACE_STORAGE_KEY);
+function loadState(storageKey: string, mainThreadId: string) {
+  const raw = readStorage(storageKey);
   if (!raw) return normalizeAgentSpace(undefined, mainThreadId);
   try {
     return normalizeAgentSpace(JSON.parse(raw), mainThreadId);
@@ -72,12 +79,24 @@ function loadState(mainThreadId: string) {
   }
 }
 
-export function AgentSpaceProvider({ children }: { children: ReactNode }) {
-  const { api } = useWorkspace();
+export function AgentSpaceProvider({
+  children,
+  accountScope,
+}: {
+  children: ReactNode;
+  /** Stable authenticated-session identity; unlike profile data it cannot lag behind login. */
+  accountScope?: string;
+}) {
+  const { api, workspace } = useWorkspace();
   const { mainId } = useLingWuThread();
-  const [state, setState] = useState<AgentSpaceState>(() => loadState(mainId));
-  const [remoteReady, setRemoteReady] = useState(false);
+  const storageKey =
+    agentSpaceStorageKey(accountScope ?? workspace.profile.email) ??
+    `${AGENT_SPACE_STORAGE_KEY}.anonymous`;
+  const [state, setState] = useState<AgentSpaceState>(() => loadState(storageKey, mainId));
+  const [stateStorageKey, setStateStorageKey] = useState(storageKey);
+  const [remoteLoad, setRemoteLoad] = useState<AgentSpaceRemoteLoad>();
   const remoteRequest = useRef(0);
+  const previousStorageKey = useRef(storageKey);
 
   // The server is the source of truth for the default thread id. Existing local
   // Agent data is normalized rather than discarded when that id becomes available.
@@ -86,34 +105,49 @@ export function AgentSpaceProvider({ children }: { children: ReactNode }) {
   }, [mainId]);
 
   useEffect(() => {
-    writeStorage(AGENT_SPACE_STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    if (previousStorageKey.current === storageKey) return;
+    previousStorageKey.current = storageKey;
+    setStateStorageKey(storageKey);
+    setState(loadState(storageKey, mainId));
+  }, [mainId, storageKey]);
+
+  useEffect(() => {
+    // A key change starts a new render before the effect above installs the new
+    // cache. Never write the previous account's in-memory state to the new key.
+    if (stateStorageKey !== storageKey) return;
+    writeStorage(storageKey, JSON.stringify(state));
+  }, [state, stateStorageKey, storageKey]);
 
   // Prefer the account's server copy so changing from mobile to web keeps the
-  // same Agents. Local state remains the offline/fallback copy.
+  // same Agents. Writes stay disabled until this exact request succeeds, so a
+  // slow or failed new-account load cannot upload stale cached Agents.
   useEffect(() => {
     const request = ++remoteRequest.current;
+    setRemoteLoad(undefined);
     void api
       .request<AgentSpaceState | null>("/api/agent-space")
       .then((remote) => {
         if (request !== remoteRequest.current) return;
-        if (remote) setState(normalizeAgentSpace(remote, mainId));
+        // A successful null is authoritative for a first-time account. Do not
+        // import a stale local cache from another account into a new workspace.
+        setState(resolveRemoteAgentSpace(remote, mainId));
+        setRemoteLoad({ storageKey, request, writable: true });
       })
       .catch(() => {
-        // A missing network must not block the local Agent workspace.
-      })
-      .finally(() => {
-        if (request === remoteRequest.current) setRemoteReady(true);
+        if (request !== remoteRequest.current) return;
+        // Keep the local workspace usable offline, but never PUT over a server
+        // state that has not been read successfully.
+        setRemoteLoad({ storageKey, request, writable: false });
       });
-  }, [api, mainId]);
+  }, [api, mainId, storageKey]);
 
   useEffect(() => {
-    if (!remoteReady) return;
+    if (!agentSpaceCanPersist(remoteLoad, storageKey, remoteRequest.current)) return;
     const timer = setTimeout(() => {
       void api.request("/api/agent-space", state, "PUT").catch(() => undefined);
     }, 250);
     return () => clearTimeout(timer);
-  }, [api, remoteReady, state]);
+  }, [api, remoteLoad, state, storageKey]);
 
   const current = useMemo(
     () =>
@@ -186,6 +220,10 @@ export function AgentSpaceProvider({ children }: { children: ReactNode }) {
       ...value,
       preferences: { ...value.preferences, ...patch },
     }));
+  }, []);
+
+  const resetPreferences = useCallback(() => {
+    setState((value) => ({ ...value, preferences: { ...DEFAULT_PREFERENCES } }));
   }, []);
 
   const advanceOnboarding = useCallback((step: number) => {
@@ -272,7 +310,7 @@ export function AgentSpaceProvider({ children }: { children: ReactNode }) {
       agents: state.agents,
       selection,
       preferences: state.preferences,
-      loading: !remoteReady,
+      loading: !agentSpaceRemoteSettled(remoteLoad, storageKey, remoteRequest.current),
       needsOnboarding: !state.onboardingDone,
       selectAgent,
       createAgent,
@@ -280,6 +318,7 @@ export function AgentSpaceProvider({ children }: { children: ReactNode }) {
       deleteAgent,
       markThreadUsed,
       setPreferences,
+      resetPreferences,
       advanceOnboarding,
       completeOnboarding,
       finishOnboarding,
@@ -291,13 +330,14 @@ export function AgentSpaceProvider({ children }: { children: ReactNode }) {
       state,
       current,
       selection,
-      remoteReady,
+      remoteLoad,
       selectAgent,
       createAgent,
       updateAgent,
       deleteAgent,
       markThreadUsed,
       setPreferences,
+      resetPreferences,
       advanceOnboarding,
       completeOnboarding,
       finishOnboarding,

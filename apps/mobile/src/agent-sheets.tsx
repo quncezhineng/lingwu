@@ -9,6 +9,7 @@ import {
   AGENT_TEMPLATES,
   type AgentAvatarId,
   type AgentTemplateId,
+  parsePreferenceFocus,
 } from "./agent-space-model";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
@@ -502,16 +503,22 @@ function AgentManagerSheet({
 
 function PreferencesSheet({ onClose }: { onClose: () => void }) {
   const { t, locale } = useTranslation();
-  const { preferences, setPreferences } = useAgentSpace();
+  const { preferences, setPreferences, resetPreferences } = useAgentSpace();
   const [name, setName] = useState(preferences.name);
   const [risk, setRisk] = useState(preferences.risk);
+  const [horizon, setHorizon] = useState(preferences.horizon);
   const [goal, setGoal] = useState(preferences.goal);
+  const [following, setFollowing] = useState(() =>
+    [...preferences.markets, ...preferences.areas].join(locale === "zh-Hans" ? "、" : ", "),
+  );
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const options = [
     ["稳健一些", "riskSteady"],
     ["均衡一些", "riskBalanced"],
     ["更积极一些", "riskActive"],
     ["还不确定", "riskUnsure"],
   ] as const;
+  const horizons = ["1—2年", "3年以上", "还不确定"] as const;
   return (
     <Sheet
       botLayout
@@ -547,6 +554,39 @@ function PreferencesSheet({ onClose }: { onClose: () => void }) {
           </Pressable>
         ))}
       </View>
+      <Text style={[s.small, { fontWeight: "600", color: colors.text, marginBottom: 8 }]}>
+        {t("agentSpace.horizonPreference")}
+      </Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
+        {horizons.map((value) => {
+          const selected = horizon === value;
+          return (
+            <Pressable
+              key={value}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => setHorizon(selected ? "" : value)}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: radius.full,
+                borderWidth: 1,
+                borderColor: selected ? colors.primary : colors.line,
+                backgroundColor: selected ? colors.sky : colors.paper,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: selected ? colors.primaryStrong : colors.muted,
+                }}
+              >
+                {value}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <Field
         label={t("agentSpace.goal")}
         value={goal}
@@ -554,20 +594,54 @@ function PreferencesSheet({ onClose }: { onClose: () => void }) {
         maxLength={120}
         multiline
       />
-      <Text style={[s.small, { color: colors.faint, marginBottom: 16 }]}>
-        {t("agentSpace.following")}:{" "}
-        {[...preferences.markets, ...preferences.areas].join(locale === "zh-Hans" ? "、" : ", ") ||
-          "—"}
-      </Text>
+      <Field
+        label={t("agentSpace.following")}
+        value={following}
+        onChangeText={setFollowing}
+        placeholder={t("agentSpace.followingPlaceholder")}
+        maxLength={600}
+      />
       <Button
         primary
         onPress={() => {
-          setPreferences({ name: name.trim(), risk, goal });
+          setPreferences({
+            name: name.trim(),
+            risk,
+            horizon,
+            goal,
+            ...parsePreferenceFocus(following),
+          });
           onClose();
         }}
       >
         {t("agentSpace.savePreferences")}
       </Button>
+      {confirmingClear ? (
+        <>
+          <Text style={[s.small, { textAlign: "center", marginTop: 14 }]}>
+            {t("agentSpace.clearPreferencesConfirm")}
+          </Text>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+            <Button
+              danger
+              style={{ flex: 1 }}
+              onPress={() => {
+                resetPreferences();
+                onClose();
+              }}
+            >
+              {t("agentSpace.clearPreferencesAction")}
+            </Button>
+            <Button style={{ flex: 1 }} onPress={() => setConfirmingClear(false)}>
+              {t("common.cancel")}
+            </Button>
+          </View>
+        </>
+      ) : (
+        <Button style={{ marginTop: 8 }} onPress={() => setConfirmingClear(true)}>
+          {t("agentSpace.clearPreferences")}
+        </Button>
+      )}
     </Sheet>
   );
 }

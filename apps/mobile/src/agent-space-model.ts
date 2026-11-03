@@ -58,8 +58,33 @@ export interface AgentSpaceState {
   onboardingStep: number;
 }
 
+export interface AgentSpaceRemoteLoad {
+  storageKey: string;
+  request: number;
+  /** Writes are allowed only after this exact request returned the server copy. */
+  writable: boolean;
+}
+
 export const SYSTEM_AGENT_ID = "system-agent";
 export const AGENT_SPACE_STORAGE_KEY = ["lingwu", "agent", "space", "v1"].join(".");
+
+function accountStorageHash(accountIdentity: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < accountIdentity.length; index += 1) {
+    hash ^= accountIdentity.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * Keep offline Agent data scoped to the signed-in account. The hash avoids
+ * writing the account email itself into browser storage keys.
+ */
+export function agentSpaceStorageKey(accountIdentity?: string | null) {
+  const identity = accountIdentity?.trim().toLowerCase();
+  return identity ? `${AGENT_SPACE_STORAGE_KEY}.${accountStorageHash(identity)}` : null;
+}
 
 export const AGENT_TEMPLATES: Record<
   Exclude<AgentTemplateId, "general">,
@@ -96,6 +121,25 @@ export const DEFAULT_PREFERENCES: AgentUserPreferences = {
   goal: "",
   horizon: "",
 };
+
+const PREFERENCE_MARKETS = new Set(["A股", "港股", "美股", "基金"]);
+
+export function parsePreferenceFocus(
+  value: string,
+): Pick<AgentUserPreferences, "markets" | "areas"> {
+  const items = [
+    ...new Set(
+      value
+        .split(/[、,，;；|\n]+/)
+        .map((item) => item.trim().slice(0, 40))
+        .filter(Boolean),
+    ),
+  ];
+  return {
+    markets: items.filter((item) => PREFERENCE_MARKETS.has(item)).slice(0, 30),
+    areas: items.filter((item) => !PREFERENCE_MARKETS.has(item)).slice(0, 30),
+  };
+}
 
 export const SYSTEM_AGENT_CAPABILITIES = [
   "quote",
@@ -282,6 +326,32 @@ export function normalizeAgentSpace(value: unknown, mainThreadId: string): Agent
   };
 }
 
+/**
+ * The server response is authoritative. In particular, `null` means this is a
+ * first-time account and must not inherit Agent data cached by anyone else.
+ */
+export function resolveRemoteAgentSpace(remote: unknown, mainThreadId: string): AgentSpaceState {
+  return remote
+    ? normalizeAgentSpace(remote, mainThreadId)
+    : normalizeAgentSpace(undefined, mainThreadId);
+}
+
+export function agentSpaceRemoteSettled(
+  remote: AgentSpaceRemoteLoad | undefined,
+  storageKey: string,
+  request: number,
+) {
+  return remote?.storageKey === storageKey && remote.request === request;
+}
+
+export function agentSpaceCanPersist(
+  remote: AgentSpaceRemoteLoad | undefined,
+  storageKey: string,
+  request: number,
+) {
+  return remote?.writable === true && agentSpaceRemoteSettled(remote, storageKey, request);
+}
+
 export function nextThreadId() {
   const cryptoApi = globalThis.crypto;
   if (!cryptoApi?.getRandomValues) {
@@ -351,4 +421,21 @@ export function onboardingSummary(preferences: AgentUserPreferences) {
     goal: preferences.goal || "先学习，再做判断",
     horizon: preferences.horizon,
   };
+}
+
+/**
+ * Converts only the answers explicitly supplied during onboarding into model
+ * context. Empty optional answers stay empty instead of becoming inferred facts.
+ */
+export function onboardingPreferenceContext(preferences: AgentUserPreferences) {
+  const facts = [
+    `preferred name: ${preferences.name || "Friend"}`,
+    `self-described investment style: ${preferences.risk || "not provided"}`,
+    `markets and focus areas: ${
+      [...preferences.markets, ...preferences.areas].filter(Boolean).join(", ") || "not restricted"
+    }`,
+    `stated goal: ${preferences.goal || "not provided"}`,
+  ];
+  if (preferences.horizon) facts.push(`stated time horizon: ${preferences.horizon}`);
+  return facts.join("; ");
 }

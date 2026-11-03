@@ -13,6 +13,7 @@
  * 登录成功后灵悟会签发自己的会话令牌，后续请求不再访问 Supabase，
  * 因此每个 API 请求都不会产生额外的网络往返。
  */
+import { randomUUID } from "node:crypto";
 import type { Config } from "./config.ts";
 import { AppError } from "./errors.ts";
 
@@ -43,7 +44,12 @@ export class SupabaseAuth {
   }
 
   /** 统一发起请求并把 Supabase 的错误转换成用户可读的 AppError。 */
-  private async request<T>(path: string, init: RequestInit, fallbackMessage: string): Promise<T> {
+  private async request<T>(
+    path: string,
+    init: RequestInit,
+    fallbackMessage: string,
+    preserveStatus = false,
+  ): Promise<T> {
     let response: Response;
     try {
       response = await fetch(this.endpoint(path), init);
@@ -56,7 +62,16 @@ export class SupabaseAuth {
       const body = (payload ?? {}) as SupabaseErrorBody;
       const detail =
         body.msg ?? body.message ?? body.error_description ?? body.error ?? body.code ?? "";
-      const status = response.status === 429 ? 429 : response.status === 409 ? 409 : 401;
+      const status =
+        response.status === 429
+          ? 429
+          : preserveStatus && response.status >= 400 && response.status < 500
+            ? (response.status as 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422)
+            : preserveStatus && response.status >= 500
+              ? 502
+              : response.status === 409
+                ? 409
+                : 401;
       throw new AppError(detail ? `${fallbackMessage} (${detail})` : fallbackMessage, status);
     }
     return payload as T;
@@ -167,6 +182,26 @@ export class SupabaseAuth {
     bio?: string;
     avatarUrl?: string;
   }> {
+    const row = await this.readProfileRow(userId);
+    if (!row) return {};
+    const avatarPath = row.avatar_url?.trim() || undefined;
+    return {
+      displayName: row.nickname?.trim() || undefined,
+      bio: row.bio?.trim() || undefined,
+      // 头像存在私有桶里，需要签名后才能被前端直接加载；签不到就退回首字母。
+      avatarUrl: avatarPath ? await this.signAvatarUrl(avatarPath) : undefined,
+    };
+  }
+
+  /** 读取原始档案行。调用方自行决定读失败要提示还是静默降级。 */
+  private async readProfileRow(userId: string): Promise<
+    | {
+        nickname?: string | null;
+        bio?: string | null;
+        avatar_url?: string | null;
+      }
+    | undefined
+  > {
     try {
       const response = await fetch(
         this.endpoint(
@@ -174,24 +209,115 @@ export class SupabaseAuth {
         ),
         { headers: this.jsonHeaders(this.serviceRoleKey) },
       );
-      if (!response.ok) return {};
+      if (!response.ok) return undefined;
       const rows = (await response.json()) as {
         nickname?: string | null;
         bio?: string | null;
         avatar_url?: string | null;
       }[];
-      const row = rows[0];
-      if (!row) return {};
-      const avatarPath = row.avatar_url?.trim() || undefined;
-      return {
-        displayName: row.nickname?.trim() || undefined,
-        bio: row.bio?.trim() || undefined,
-        // 头像存在私有桶里，需要签名后才能被前端直接加载；签不到就退回首字母。
-        avatarUrl: avatarPath ? await this.signAvatarUrl(avatarPath) : undefined,
-      };
+      return rows[0];
     } catch {
-      return {};
+      return undefined;
     }
+  }
+
+  /**
+   * 更新用户可编辑资料。
+   *
+   * 昵称、简介写入 user_profiles；头像先上传到私有桶，再把对象路径写入档案。
+   * 前端最终通过 readProfile 拿到重新签名后的头像地址。
+   */
+  async updateProfile(
+    userId: string,
+    input: {
+      nickname?: string;
+      bio?: string;
+      avatar?: { bytes: Uint8Array; mimeType: string };
+      removeAvatar?: boolean;
+    },
+  ): Promise<{ displayName?: string; bio?: string; avatarUrl?: string }> {
+    if (input.avatar && input.removeAvatar)
+      throw new AppError("Choose a new avatar or remove the current one, not both.", 422);
+
+    const previous = await this.readProfileRow(userId);
+    const avatarExtensions: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+    };
+    let avatarPath: string | null | undefined;
+    if (input.avatar) {
+      const extension = avatarExtensions[input.avatar.mimeType];
+      if (!extension) throw new AppError("Choose a JPG, PNG, WebP or GIF image.", 422);
+      if (!input.avatar.bytes.byteLength) throw new AppError("The selected image is empty.", 422);
+      if (input.avatar.bytes.byteLength > 5 * 1024 * 1024)
+        throw new AppError("Avatar images must be 5 MB or smaller.", 413);
+      avatarPath = `${userId}/${randomUUID()}.${extension}`;
+      await this.request(
+        `/storage/v1/object/user-avatars/${avatarPath}`,
+        {
+          method: "POST",
+          headers: {
+            ...this.jsonHeaders(this.serviceRoleKey),
+            "Content-Type": input.avatar.mimeType,
+            "x-upsert": "false",
+          },
+          body: new Blob([Uint8Array.from(input.avatar.bytes)], {
+            type: input.avatar.mimeType,
+          }),
+        },
+        "Could not upload your avatar.",
+        true,
+      );
+    } else if (input.removeAvatar) {
+      avatarPath = null;
+    }
+
+    const updates: Record<string, unknown> = {
+      id: userId,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.nickname !== undefined) updates.nickname = input.nickname.trim() || null;
+    if (input.bio !== undefined) updates.bio = input.bio.trim() || null;
+    if (avatarPath !== undefined) updates.avatar_url = avatarPath;
+    try {
+      await this.request(
+        "/rest/v1/user_profiles?on_conflict=id",
+        {
+          method: "POST",
+          headers: {
+            ...this.jsonHeaders(this.serviceRoleKey),
+            Prefer: "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify(updates),
+        },
+        "Could not save your profile.",
+        true,
+      );
+    } catch (error) {
+      if (avatarPath) await this.deleteAvatar(avatarPath);
+      throw error;
+    }
+    const previousAvatar = previous?.avatar_url?.trim();
+    if (previousAvatar?.startsWith(`${userId}/`) && previousAvatar !== avatarPath)
+      await this.deleteAvatar(previousAvatar);
+    return this.readProfile(userId);
+  }
+
+  /** 删除旧头像；清理失败不能回滚已经保存的新资料。 */
+  private async deleteAvatar(avatarPath: string): Promise<void> {
+    if (/^https?:\/\//i.test(avatarPath)) return;
+    const objectPath = avatarPath.replace(/^\/+/, "");
+    await this.request(
+      `/storage/v1/object/user-avatars/${objectPath}`,
+      {
+        method: "DELETE",
+        headers: this.jsonHeaders(this.serviceRoleKey),
+      },
+      "Could not remove the previous avatar.",
+      true,
+    ).catch(() => undefined);
   }
 
   /**

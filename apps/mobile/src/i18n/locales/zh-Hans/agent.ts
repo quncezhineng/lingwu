@@ -569,10 +569,15 @@ const agent = {
   "agentSpace.preferences": "称呼与投资偏好",
   "agentSpace.preferencesDetail": "用户级设置，所有 Agent 共用同一份偏好。",
   "agentSpace.userName": "怎么称呼你",
-  "agentSpace.risk": "投资偏好",
+  "agentSpace.risk": "投资风格",
+  "agentSpace.horizonPreference": "时间偏好（选填）",
   "agentSpace.goal": "投资目标",
   "agentSpace.following": "关注市场与领域",
+  "agentSpace.followingPlaceholder": "例如：美股、港股、科技、黄金",
   "agentSpace.savePreferences": "保存偏好",
+  "agentSpace.clearPreferences": "清空偏好",
+  "agentSpace.clearPreferencesConfirm": "清空称呼、投资风格、时间偏好与关注范围？此操作无法撤销。",
+  "agentSpace.clearPreferencesAction": "确认清空",
   "agentSpace.onboardingProgress": "认识一下 · {step}/5",
   "agentSpace.onboardingIntro":
     "你的第一个 Agent，已经准备好了。\n先给我起个名字，再选一个喜欢的形象吧。",
@@ -604,7 +609,29 @@ const agent = {
   "agentSpace.customGoalPlaceholder": "例如：每周复盘，减少情绪化判断",
   "agentSpace.horizon": "补充时间偏好（选填）",
   "agentSpace.finishOnboarding": "开始和 {name} 聊聊",
-  "agentSpace.onboardingFootnote": "你提供的信息可以随时修改，不会据此自动交易。",
+  "agentSpace.onboardingFootnote": "你的设置可以随时修改，仅用于提供更贴合的研究体验。",
+  "agentSpace.firstRunGreeting": "{name}，认识你很开心。我是 {agent}。",
+  "agentSpace.firstRunMemory": "我记下了：你偏好 {risk}，关注 {focus}，希望 {goal}。",
+  "agentSpace.firstRunHorizon": "你补充的时间偏好是 {horizon}。",
+  "agentSpace.firstRunClosing": "以后我会先讲重点，再给依据；还不清楚的地方，我们一起核对。",
+  "agentSpace.firstRunTrackLabel": "先整理一份跟踪清单",
+  "agentSpace.firstRunTrackPrompt":
+    "帮我从{focus}里挑出最值得持续跟踪的方向，并说明各自需要关注的变化。",
+  "agentSpace.firstRunLongTermLabel": "列一个长期研究路径",
+  "agentSpace.firstRunLongTermPrompt":
+    "围绕我关注的{focus}，帮我列一个适合长期积累的研究路径，先说第一步。",
+  "agentSpace.firstRunHabitLabel": "设计一套复盘习惯",
+  "agentSpace.firstRunHabitPrompt":
+    "结合我关注的{focus}，帮我设计一套简单、可持续的每周投研复盘习惯。",
+  "agentSpace.firstRunLearnLabel": "从一个小例子开始",
+  "agentSpace.firstRunLearnPrompt":
+    "先用一个小例子带我理解我关注的{focus}，再告诉我下一步可以研究什么。",
+  "agentSpace.firstRunFollowLabel": "梳理我的关注重点",
+  "agentSpace.firstRunFollowPrompt":
+    "结合我的目标“{goal}”和关注的{focus}，帮我梳理接下来最值得做的第一件事。",
+  "agentSpace.firstRunBriefLabel": "生成今日市场简报",
+  "agentSpace.firstRunBriefPrompt":
+    "基于我关注的{focus}，生成一份今天的市场简报，先讲最值得注意的三件事。",
   "agentSpace.welcomeEyebrow": "你的个人投研 Agent",
   "agentSpace.welcomeTitle": "把研究交给合适的 Agent。",
   "agentSpace.welcomeTail": "从今天最关心的问题开始。",

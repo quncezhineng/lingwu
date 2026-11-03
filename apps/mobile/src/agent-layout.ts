@@ -2,7 +2,7 @@
 export const agentLayout = {
   columnMaxWidth: 965,
   messageMaxWidth: 955,
-  onboardingMaxWidth: 418,
+  onboardingMaxWidth: 580,
   sheetMaxWidth: 480,
   drawerMaxWidth: 350,
   headerHeight: 74,

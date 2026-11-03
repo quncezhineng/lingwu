@@ -621,9 +621,15 @@ const agent = {
   "agentSpace.preferencesDetail": "User-level settings shared by every Agent in your workspace.",
   "agentSpace.userName": "What should Agents call you?",
   "agentSpace.risk": "Investment style",
+  "agentSpace.horizonPreference": "Time horizon · optional",
   "agentSpace.goal": "Investment goal",
   "agentSpace.following": "Markets and focus areas",
+  "agentSpace.followingPlaceholder": "e.g. US stocks, Hong Kong stocks, technology, gold",
   "agentSpace.savePreferences": "Save preferences",
+  "agentSpace.clearPreferences": "Clear preferences",
+  "agentSpace.clearPreferencesConfirm":
+    "Clear your name, investment preferences, time horizon and focus areas? This cannot be undone.",
+  "agentSpace.clearPreferencesAction": "Clear preferences",
   "agentSpace.onboardingProgress": "Getting acquainted · {step}/5",
   "agentSpace.onboardingIntro":
     "Your first Agent is ready.\nGive it a name and choose a look you like.",
@@ -656,7 +662,32 @@ const agent = {
   "agentSpace.customGoalPlaceholder": "For example: review weekly and reduce emotional decisions",
   "agentSpace.horizon": "Time horizon · optional",
   "agentSpace.finishOnboarding": "Start chatting with {name}",
-  "agentSpace.onboardingFootnote": "You can change this anytime. It will not trigger trades.",
+  "agentSpace.onboardingFootnote":
+    "You can change these settings anytime. They are only used to personalize your research experience.",
+  "agentSpace.firstRunGreeting": "It is good to meet you, {name}. I am {agent}.",
+  "agentSpace.firstRunMemory":
+    "I noted that your style is {risk}, your focus is {focus}, and your goal is {goal}.",
+  "agentSpace.firstRunHorizon": "Your time horizon is {horizon}.",
+  "agentSpace.firstRunClosing":
+    "I will lead with the key point, show the evidence, and flag anything we still need to verify.",
+  "agentSpace.firstRunTrackLabel": "Create a tracking list",
+  "agentSpace.firstRunTrackPrompt":
+    "From {focus}, choose the directions most worth tracking and explain what changes I should watch.",
+  "agentSpace.firstRunLongTermLabel": "Map a long-term path",
+  "agentSpace.firstRunLongTermPrompt":
+    "For the {focus} I follow, map a research path suited to long-term learning and start with the first step.",
+  "agentSpace.firstRunHabitLabel": "Design a review habit",
+  "agentSpace.firstRunHabitPrompt":
+    "For the {focus} I follow, design a simple weekly investment review habit I can sustain.",
+  "agentSpace.firstRunLearnLabel": "Start with an example",
+  "agentSpace.firstRunLearnPrompt":
+    "Use a short example to help me understand the {focus} I follow, then suggest what to study next.",
+  "agentSpace.firstRunFollowLabel": "Clarify my priorities",
+  "agentSpace.firstRunFollowPrompt":
+    "Given my goal, {goal}, and my focus, {focus}, help me identify the most useful first step.",
+  "agentSpace.firstRunBriefLabel": "Generate today's briefing",
+  "agentSpace.firstRunBriefPrompt":
+    "Using the {focus} I follow, generate a market briefing today and lead with the three most important developments.",
   "agentSpace.welcomeEyebrow": "Your personal research Agent",
   "agentSpace.welcomeTitle": "Give research to the right Agent.",
   "agentSpace.welcomeTail": "Start with today's most important question.",

@@ -2,11 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   AGENT_SPACE_STORAGE_KEY,
+  agentSpaceCanPersist,
+  agentSpaceRemoteSettled,
+  agentSpaceStorageKey,
   createAgentFromTemplate,
   createCustomSkill,
   createSystemAgent,
+  DEFAULT_PREFERENCES,
   normalizeAgentSpace,
+  onboardingPreferenceContext,
   onboardingSummary,
+  parsePreferenceFocus,
+  resolveRemoteAgentSpace,
   SYSTEM_AGENT_ID,
 } from "../src/agent-space-model.ts";
 
@@ -19,6 +26,80 @@ test("an empty Agent space gets exactly one system default Agent", () => {
   assert.equal(state.agents[0]?.system, true);
   assert.equal(state.agents[0]?.threadId, MAIN_THREAD);
   assert.equal(AGENT_SPACE_STORAGE_KEY, "lingwu.agent.space.v1");
+});
+
+test("local Agent caches are isolated by account without exposing the email", () => {
+  const alice = agentSpaceStorageKey("Alice@example.com");
+  const aliceAgain = agentSpaceStorageKey(" alice@example.com ");
+  const bob = agentSpaceStorageKey("bob@example.com");
+  assert.ok(alice);
+  assert.equal(alice, aliceAgain);
+  assert.notEqual(alice, bob);
+  assert.ok(alice.startsWith(`${AGENT_SPACE_STORAGE_KEY}.`));
+  assert.equal(alice.includes("alice"), false);
+  assert.equal(agentSpaceStorageKey(""), null);
+});
+
+test("session-scoped Agent caches change as soon as the login session changes", () => {
+  const firstSession = agentSpaceStorageKey("session-token-for-user-a");
+  const secondSession = agentSpaceStorageKey("session-token-for-user-b");
+  assert.ok(firstSession);
+  assert.notEqual(firstSession, secondSession);
+  assert.equal(firstSession.includes("session-token"), false);
+});
+
+test("an empty server workspace clears cached Agents and preferences for a new account", () => {
+  const cachedFinancialAgent = createAgentFromTemplate("custom", {
+    id: "cached-financial-agent",
+    threadId: "cached-financial-thread",
+    name: "财报 Agent",
+    role: "财报拆解员",
+    now: "2026-01-01T00:00:00.000Z",
+  });
+  const cachedState = normalizeAgentSpace(
+    {
+      currentAgentId: cachedFinancialAgent.id,
+      agents: [cachedFinancialAgent],
+      preferences: {
+        name: "luffy",
+        risk: "均衡一些",
+        markets: ["A股"],
+        areas: ["科技"],
+        goal: "持续跟踪重点标的",
+        horizon: "3年以上",
+      },
+      onboardingDone: true,
+    },
+    MAIN_THREAD,
+  );
+  assert.equal(cachedState.agents.length, 2);
+  assert.equal(cachedState.preferences.name, "luffy");
+
+  const freshState = resolveRemoteAgentSpace(null, MAIN_THREAD);
+  assert.equal(freshState.agents.length, 1);
+  assert.equal(freshState.agents[0]?.id, SYSTEM_AGENT_ID);
+  assert.equal(freshState.currentAgentId, SYSTEM_AGENT_ID);
+  assert.deepEqual(freshState.preferences, DEFAULT_PREFERENCES);
+  assert.equal(freshState.onboardingDone, false);
+  assert.equal(
+    freshState.agents.some((agent) => agent.name === "财报 Agent"),
+    false,
+  );
+});
+
+test("Agent data persists only after the matching server workspace was read successfully", () => {
+  const failedRead = {
+    storageKey: "account-a",
+    request: 2,
+    writable: false,
+  };
+  const savedRead = { ...failedRead, writable: true };
+  assert.equal(agentSpaceRemoteSettled(failedRead, "account-a", 2), true);
+  assert.equal(agentSpaceCanPersist(failedRead, "account-a", 2), false);
+  assert.equal(agentSpaceCanPersist(savedRead, "account-a", 2), true);
+  assert.equal(agentSpaceCanPersist(savedRead, "account-b", 2), false);
+  assert.equal(agentSpaceCanPersist(savedRead, "account-a", 3), false);
+  assert.equal(agentSpaceRemoteSettled(undefined, "account-a", 2), false);
 });
 
 test("a forged system flag cannot create a second system Agent", () => {
@@ -164,4 +245,41 @@ test("onboarding summary keeps global preferences readable in either locale", ()
     }).focus,
     "A股、科技",
   );
+});
+
+test("preference focus input separates known markets from focus areas", () => {
+  assert.deepEqual(parsePreferenceFocus("美股, 港股、科技，科技；黄金"), {
+    markets: ["美股", "港股"],
+    areas: ["科技", "黄金"],
+  });
+  assert.deepEqual(parsePreferenceFocus(""), { markets: [], areas: [] });
+});
+
+test("onboarding model context contains only explicitly supplied preferences", () => {
+  const context = onboardingPreferenceContext({
+    name: "Ada",
+    risk: "均衡一些",
+    markets: ["A股"],
+    areas: ["科技"],
+    goal: "建立投资习惯",
+    horizon: "",
+  });
+  assert.match(context, /preferred name: Ada/);
+  assert.match(context, /markets and focus areas: A股, 科技/);
+  assert.match(context, /stated goal: 建立投资习惯/);
+  assert.doesNotMatch(context, /time horizon/);
+});
+
+test("onboarding model context includes a supplied time horizon", () => {
+  const context = onboardingPreferenceContext({
+    name: "",
+    risk: "还不确定",
+    markets: [],
+    areas: [],
+    goal: "先学习，再做判断",
+    horizon: "3年以上",
+  });
+  assert.match(context, /preferred name: Friend/);
+  assert.match(context, /markets and focus areas: not restricted/);
+  assert.match(context, /stated time horizon: 3年以上/);
 });

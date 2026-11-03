@@ -10,10 +10,10 @@ import {
 } from "../src/desktop-columns.ts";
 
 test("invalid saved widths cannot escape the sidebar bounds", () => {
-  assert.deepEqual(normalizeColumnWidths(undefined), { left: 240, right: 260 });
+  assert.deepEqual(normalizeColumnWidths(undefined), { left: 240, right: 320 });
   assert.deepEqual(normalizeColumnWidths({ left: "340", right: Number.NaN }), {
     left: 240,
-    right: 260,
+    right: 320,
   });
   assert.deepEqual(normalizeColumnWidths({ left: -100, right: 10000 }), { left: 200, right: 400 });
 });

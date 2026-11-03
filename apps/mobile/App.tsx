@@ -97,6 +97,98 @@ export default function App() {
   );
 }
 
+const AUTH_CONCEPT_POINTS = [
+  { number: "01", titleKey: "app.authPointWorkspace" },
+  { number: "02", titleKey: "app.authPointFocus" },
+  { number: "03", titleKey: "app.authPointWorkflow" },
+] as const;
+
+/** 登录前的品牌叙事：桌面展开完整三点，移动端只保留精简开场。 */
+function AuthWelcome({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <View style={{ gap: compact ? 14 : 24 }}>
+      <View style={[s.row, { gap: 8 }]}>
+        <View
+          style={{
+            width: compact ? 14 : 18,
+            height: 1,
+            backgroundColor: colors.primary,
+          }}
+        />
+        <Text
+          style={[
+            typography.eyebrow,
+            {
+              color: colors.primaryStrong,
+              fontSize: compact ? 9 : 10,
+              lineHeight: compact ? 14 : 16,
+            },
+          ]}
+        >
+          {t("app.authConceptEyebrow")}
+        </Text>
+      </View>
+      <View style={{ gap: compact ? 8 : 12 }}>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: compact ? 27 : 40,
+            lineHeight: compact ? 39 : 52,
+            fontWeight: "500",
+            letterSpacing: compact ? 0.2 : 0.5,
+            fontFamily: fonts.serif,
+            maxWidth: 540,
+          }}
+        >
+          {t("app.authConceptTitleLead")}
+          {"\n"}
+          {t("app.authConceptTitle")}
+        </Text>
+        <Text
+          style={[
+            s.muted,
+            {
+              maxWidth: compact ? 360 : 500,
+              fontSize: compact ? 13 : 15,
+              lineHeight: compact ? 22 : 25,
+            },
+          ]}
+        >
+          {t("app.authConceptSubtitle")}
+        </Text>
+      </View>
+      {!compact && (
+        <View
+          style={{
+            gap: 12,
+            maxWidth: 500,
+            paddingTop: 18,
+            borderTopWidth: 1,
+            borderTopColor: colors.line,
+          }}
+        >
+          {AUTH_CONCEPT_POINTS.map((point) => (
+            <View key={point.number} style={{ flexDirection: "row", gap: 12 }}>
+              <Text
+                style={[
+                  typography.eyebrow,
+                  { minWidth: 22, color: colors.faint, fontSize: 9, lineHeight: 19 },
+                ]}
+              >
+                {point.number}
+              </Text>
+              <Text style={[typography.meta, { flex: 1, color: colors.text }]}>
+                {t(point.titleKey)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 /**
  * 登录入口。
  *
@@ -197,218 +289,180 @@ function Root() {
           runtimeUrl={`${API_URL}/api/copilotkit`}
           headers={{ Authorization: `Bearer ${token}` }}
         >
-          <WorkspaceApp token={token} onSignOut={signOut} />
+          <WorkspaceApp key={token} token={token} onSignOut={signOut} />
         </CopilotKitProvider>
       ) : (
-        <SafeAreaView
-          style={{
-            flex: 1,
-            backgroundColor: colors.canvas,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingHorizontal: wideAuth ? space.page : 24,
-            paddingVertical: 28,
-          }}
-        >
-          <View
-            style={{
-              width: "100%",
-              maxWidth: wideAuth ? 1020 : 440,
-              flexDirection: wideAuth ? "row" : "column",
-              alignItems: "stretch",
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.canvas }}>
+          <ScrollView
+            style={{ flex: 1, width: "100%" }}
+            contentContainerStyle={{
+              flexGrow: 1,
               justifyContent: "center",
-              gap: wideAuth ? 64 : 22,
+              alignItems: "center",
+              paddingHorizontal: wideAuth ? space.page : 24,
+              paddingVertical: 28,
             }}
+            keyboardShouldPersistTaps="handled"
           >
-            {wideAuth && (
-              <View
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  paddingVertical: 28,
-                  paddingRight: 44,
-                  borderRightWidth: 1,
-                  borderRightColor: colors.line,
-                  justifyContent: "space-between",
-                  gap: 54,
-                }}
-              >
-                <View style={[s.row, { gap: 10 }]}>
-                  <BrandMark size={32} />
-                  <Text
-                    style={{
-                      fontSize: 22,
-                      lineHeight: 30,
-                      fontWeight: "600",
-                      color: colors.text,
-                      letterSpacing: 2.4,
-                      fontFamily: fonts.serif,
-                    }}
-                  >
-                    {t("common.agentName")}
-                  </Text>
-                </View>
-                <View style={{ gap: 18 }}>
-                  <View style={[s.row, { gap: 8 }]}>
-                    <View
-                      style={{
-                        width: 18,
-                        height: 1,
-                        backgroundColor: colors.primary,
-                      }}
-                    />
-                    <Text style={[typography.eyebrow, { color: colors.primaryStrong }]}>
-                      PERSONAL INVESTMENT INTELLIGENCE
-                    </Text>
-                  </View>
-                  <Text
-                    style={{
-                      ...typography.display,
-                      color: colors.heading,
-                      maxWidth: 520,
-                    }}
-                  >
-                    {t("app.welcomeTitle")}
-                  </Text>
-                  <Text style={[s.muted, { maxWidth: 500 }]}>{t("app.welcomeSubtitle")}</Text>
-                </View>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-                  {[
-                    t("workbench.depthAnalysis"),
-                    t("workbench.myWatchlist"),
-                    t("app.personalInvestmentSpace"),
-                  ].map((item) => (
-                    <View
-                      key={item}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderWidth: 1,
-                        borderColor: colors.line,
-                        borderRadius: radius.control,
-                        backgroundColor: colors.paper,
-                      }}
-                    >
-                      <Text style={[s.small, { color: colors.muted }]}>{item}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
             <View
               style={{
-                width: wideAuth ? 390 : "100%",
-                maxWidth: 440,
-                alignSelf: wideAuth ? "center" : "auto",
-                gap: 22,
+                width: "100%",
+                maxWidth: wideAuth ? 1020 : 440,
+                flexDirection: wideAuth ? "row" : "column",
                 alignItems: "stretch",
+                justifyContent: "center",
+                gap: wideAuth ? 64 : 22,
               }}
             >
-              {!wideAuth && (
-                <View style={[s.row, { justifyContent: "center", gap: 9, marginBottom: 2 }]}>
-                  <BrandMark size={29} />
-                  <Text
-                    style={{
-                      fontSize: 20,
-                      fontWeight: "600",
-                      letterSpacing: 2.2,
-                      color: colors.text,
-                      fontFamily: fonts.serif,
-                    }}
-                  >
-                    {t("common.agentName")}
-                  </Text>
+              {wideAuth && (
+                <View
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    paddingVertical: 36,
+                    paddingRight: 48,
+                    borderRightWidth: 1,
+                    borderRightColor: colors.line,
+                    justifyContent: "space-between",
+                    gap: 54,
+                  }}
+                >
+                  <View style={[s.row, { gap: 10 }]}>
+                    <BrandMark size={32} />
+                    <Text
+                      style={{
+                        fontSize: 22,
+                        lineHeight: 30,
+                        fontWeight: "600",
+                        color: colors.text,
+                        letterSpacing: 2.4,
+                        fontFamily: fonts.serif,
+                      }}
+                    >
+                      {t("common.agentName")}
+                    </Text>
+                  </View>
+                  <AuthWelcome />
                 </View>
               )}
-              <Card style={{ padding: 22, borderRadius: radius.panel }}>
-                <View style={{ alignItems: "center", gap: 8, marginBottom: 20 }}>
-                  <Mascot size={wideAuth ? 52 : 60} />
-                  <Text
-                    style={{
-                      fontSize: 18,
-                      lineHeight: 26,
-                      fontWeight: "600",
-                      color: colors.text,
-                      textAlign: "center",
-                      fontFamily: fonts.serif,
-                    }}
-                  >
-                    {t(accountMode ? "app.signIn" : "app.openWorkspace")}
-                  </Text>
-                  <Text style={[s.small, { textAlign: "center", maxWidth: 300 }]}>
-                    {t("app.welcomeSubtitle")}
-                  </Text>
-                </View>
-                {authMode === null ? (
-                  <ActivityIndicator color={colors.primary} />
-                ) : (
-                  <>
-                    <ErrorNotice error={error} />
-                    {accountMode ? (
-                      <>
-                        <Field
-                          label={t("app.emailLabel")}
-                          value={email}
-                          onChangeText={setEmail}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          keyboardType="email-address"
-                          placeholder={t("app.emailPlaceholder")}
-                        />
-                        <Button busy={sendingCode} onPress={() => void sendCode()}>
-                          {t("app.sendCode")}
-                        </Button>
-                        {codeSent && (
-                          <Text style={[s.small, { textAlign: "center", marginTop: 10 }]}>
-                            {t("app.sendCodeSent")}
-                          </Text>
-                        )}
-                        <View style={{ marginTop: space.md }}>
+              <View
+                style={{
+                  width: wideAuth ? 390 : "100%",
+                  maxWidth: 440,
+                  alignSelf: wideAuth ? "center" : "auto",
+                  gap: 22,
+                  alignItems: "stretch",
+                }}
+              >
+                {!wideAuth && (
+                  <View style={{ gap: 18, marginBottom: 2 }}>
+                    <View style={[s.row, { justifyContent: "center", gap: 9 }]}>
+                      <BrandMark size={29} />
+                      <Text
+                        style={{
+                          fontSize: 20,
+                          fontWeight: "600",
+                          letterSpacing: 2.2,
+                          color: colors.text,
+                          fontFamily: fonts.serif,
+                        }}
+                      >
+                        {t("common.agentName")}
+                      </Text>
+                    </View>
+                    <AuthWelcome compact />
+                  </View>
+                )}
+                <Card style={{ padding: 22, borderRadius: radius.panel }}>
+                  <View style={{ alignItems: "center", gap: 8, marginBottom: 20 }}>
+                    <Mascot size={wideAuth ? 52 : 60} />
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        lineHeight: 26,
+                        fontWeight: "600",
+                        color: colors.text,
+                        textAlign: "center",
+                        fontFamily: fonts.serif,
+                      }}
+                    >
+                      {t(accountMode ? "app.signIn" : "app.openWorkspace")}
+                    </Text>
+                    <Text style={[s.small, { textAlign: "center", maxWidth: 300 }]}>
+                      {t("app.welcomeSubtitle")}
+                    </Text>
+                  </View>
+                  {authMode === null ? (
+                    <ActivityIndicator color={colors.primary} />
+                  ) : (
+                    <>
+                      <ErrorNotice error={error} />
+                      {accountMode ? (
+                        <>
                           <Field
-                            label={t("app.codeLabel")}
-                            value={code}
-                            onChangeText={setCode}
+                            label={t("app.emailLabel")}
+                            value={email}
+                            onChangeText={setEmail}
                             autoCapitalize="none"
                             autoCorrect={false}
-                            keyboardType="number-pad"
-                            placeholder={t("app.codePlaceholder")}
+                            keyboardType="email-address"
+                            placeholder={t("app.emailPlaceholder")}
                           />
-                        </View>
-                        <Button
-                          primary
-                          busy={busy}
-                          disabled={!code}
-                          onPress={() => void submitAccount()}
-                        >
-                          {t("app.signIn")}
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Field
-                          label={t("app.accessKeyLabel")}
-                          value={accessKey}
-                          onChangeText={setAccessKey}
-                          secureTextEntry
-                          placeholder={t("app.accessKeyPlaceholder")}
-                        />
-                        <Button
-                          primary
-                          busy={busy}
-                          onPress={() => void connect(accessKey || undefined)}
-                        >
-                          {t("app.openWorkspace")}
-                        </Button>
-                        <Text style={[s.small, { marginTop: 15, textAlign: "center" }]}>
-                          {t("app.localWorkspaceHint", { url: API_URL })}
-                        </Text>
-                      </>
-                    )}
-                  </>
-                )}
-              </Card>
+                          <Button busy={sendingCode} onPress={() => void sendCode()}>
+                            {t("app.sendCode")}
+                          </Button>
+                          {codeSent && (
+                            <Text style={[s.small, { textAlign: "center", marginTop: 10 }]}>
+                              {t("app.sendCodeSent")}
+                            </Text>
+                          )}
+                          <View style={{ marginTop: space.md }}>
+                            <Field
+                              label={t("app.codeLabel")}
+                              value={code}
+                              onChangeText={setCode}
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              keyboardType="number-pad"
+                              placeholder={t("app.codePlaceholder")}
+                            />
+                          </View>
+                          <Button
+                            primary
+                            busy={busy}
+                            disabled={!code}
+                            onPress={() => void submitAccount()}
+                          >
+                            {t("app.signIn")}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Field
+                            label={t("app.accessKeyLabel")}
+                            value={accessKey}
+                            onChangeText={setAccessKey}
+                            secureTextEntry
+                            placeholder={t("app.accessKeyPlaceholder")}
+                          />
+                          <Button
+                            primary
+                            busy={busy}
+                            onPress={() => void connect(accessKey || undefined)}
+                          >
+                            {t("app.openWorkspace")}
+                          </Button>
+                          <Text style={[s.small, { marginTop: 15, textAlign: "center" }]}>
+                            {t("app.localWorkspaceHint", { url: API_URL })}
+                          </Text>
+                        </>
+                      )}
+                    </>
+                  )}
+                </Card>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       )}
     </SafeAreaProvider>
@@ -439,6 +493,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
       profile: {
         name: accountName || snapshot.profile.name,
         email: account?.email?.trim() || snapshot.profile.email,
+        avatarUrl: account?.avatarUrl ?? undefined,
       },
     });
     setError("");
@@ -518,7 +573,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
       <AgentWorkspaceProvider>
         <ComputerDraftProvider key={token}>
           <ThreadsProvider>
-            <AgentSpaceProvider>
+            <AgentSpaceProvider accountScope={token}>
               <AgentProductShell
                 detail={detail}
                 toast={toast}

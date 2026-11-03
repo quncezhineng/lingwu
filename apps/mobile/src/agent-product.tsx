@@ -18,8 +18,11 @@ import { AgentOrb } from "./agent-orb";
 import { AgentMoreContent, type AgentPanel, AgentSheets } from "./agent-sheets";
 import { AgentSideDrawer } from "./agent-side-drawer";
 import { useAgentSpace } from "./agent-space";
-import type { AgentDefinition } from "./agent-space-model";
-import type { AccountProfile } from "./api";
+import {
+  type AgentDefinition,
+  onboardingPreferenceContext,
+  onboardingSummary,
+} from "./agent-space-model";
 import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
 import { ChatScreen, WorkspaceTools } from "./chat";
@@ -27,7 +30,7 @@ import { ColumnResizeHandle } from "./column-resize-handle";
 import { columnMaxWidth, desktopColumns } from "./desktop-columns";
 import { Details } from "./details";
 import { useTranslation } from "./i18n";
-import { ChevronLeft, ChevronRight, Plus, Sparkles, X } from "./icons";
+import { ChevronLeft, ChevronRight, Plus, X } from "./icons";
 import { PreferencesScreen } from "./preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./screens";
 import { TaskHubScreen } from "./task-hub";
@@ -83,7 +86,6 @@ function AgentListItem({
           {agent.role}
         </Text>
       </View>
-      {agent.system && <Sparkles size={13} color={colors.primary} />}
     </Pressable>
   );
 }
@@ -98,23 +100,9 @@ function AgentRail({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
-  const { agents, current, selectAgent, preferences } = useAgentSpace();
-  const { api, navigate, section } = useWorkspace();
-  const [accountAvatarUrl, setAccountAvatarUrl] = useState<string>();
-  useEffect(() => {
-    let active = true;
-    void api
-      .request<AccountProfile>("/api/auth/me")
-      .then((profile) => {
-        if (active) setAccountAvatarUrl(profile.avatarUrl ?? undefined);
-      })
-      .catch(() => {
-        // The account page owns the error state; the rail keeps its initial fallback.
-      });
-    return () => {
-      active = false;
-    };
-  }, [api, section]);
+  const { agents, current, selectAgent } = useAgentSpace();
+  const { navigate, workspace } = useWorkspace();
+  const accountNickname = workspace.profile.name.trim() || t("agentSpace.account");
   const choose = (agent: AgentDefinition) => {
     selectAgent(agent.id);
     navigate("chat");
@@ -225,15 +213,13 @@ function AgentRail({
         })}
       >
         <AccountAvatar
-          avatarUrl={accountAvatarUrl}
-          name={preferences.name || "L"}
+          avatarUrl={workspace.profile.avatarUrl}
+          name={accountNickname}
           size={31}
           borderRadius={10}
         />
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>
-            {preferences.name || t("agentSpace.account")}
-          </Text>
+          <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>{accountNickname}</Text>
           <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
             {t("agentSpace.account")}
           </Text>
@@ -488,7 +474,8 @@ export function AgentProductShell({
   const { widths: columnWidths, resize: resizeColumn } = useDesktopColumns(availableWidth);
   const { t } = useTranslation();
   const { section, close } = useWorkspace();
-  const { agents, current, selection, loading, needsOnboarding, markThreadUsed } = useAgentSpace();
+  const { agents, current, preferences, selection, loading, needsOnboarding, markThreadUsed } =
+    useAgentSpace();
   const [panelStack, setPanelStack] = useState<AgentPanel[]>([]);
   const panel = panelStack.at(-1);
   const closePanel = useCallback(() => setPanelStack((stack) => stack.slice(0, -1)), []);
@@ -529,6 +516,58 @@ export function AgentProductShell({
         .filter((agent): agent is AgentDefinition => Boolean(agent)),
     [agents, mountedIds],
   );
+
+  const firstRunWelcome = useMemo(() => {
+    if (!current.system || !preferences.goal) return undefined;
+    const summary = onboardingSummary(preferences);
+    const primary =
+      preferences.goal === "持续跟踪重点标的"
+        ? {
+            label: t("agentSpace.firstRunTrackLabel"),
+            prompt: t("agentSpace.firstRunTrackPrompt", { focus: summary.focus }),
+          }
+        : preferences.goal === "为长期积累做准备"
+          ? {
+              label: t("agentSpace.firstRunLongTermLabel"),
+              prompt: t("agentSpace.firstRunLongTermPrompt", { focus: summary.focus }),
+            }
+          : preferences.goal === "建立投资习惯"
+            ? {
+                label: t("agentSpace.firstRunHabitLabel"),
+                prompt: t("agentSpace.firstRunHabitPrompt", { focus: summary.focus }),
+              }
+            : preferences.goal === "先学习，再做判断"
+              ? {
+                  label: t("agentSpace.firstRunLearnLabel"),
+                  prompt: t("agentSpace.firstRunLearnPrompt", { focus: summary.focus }),
+                }
+              : {
+                  label: t("agentSpace.firstRunFollowLabel"),
+                  prompt: t("agentSpace.firstRunFollowPrompt", { focus: summary.focus }),
+                };
+    return {
+      greeting: t("agentSpace.firstRunGreeting", {
+        name: summary.name,
+        agent: current.name,
+      }),
+      summary: t("agentSpace.firstRunMemory", {
+        risk: summary.risk,
+        focus: summary.focus,
+        goal: summary.goal,
+      }),
+      horizon: summary.horizon
+        ? t("agentSpace.firstRunHorizon", { horizon: summary.horizon })
+        : undefined,
+      closing: t("agentSpace.firstRunClosing"),
+      actions: [
+        primary,
+        {
+          label: t("agentSpace.firstRunBriefLabel"),
+          prompt: t("agentSpace.firstRunBriefPrompt", { focus: summary.focus }),
+        },
+      ],
+    };
+  }, [current.name, current.system, preferences, t]);
 
   const openPanel = (next: AgentPanel) => {
     setDrawer(null);
@@ -617,7 +656,9 @@ export function AgentProductShell({
                             role: agent.role,
                             persona: agent.persona,
                             avatar: agent.avatar,
+                            userPreferences: onboardingPreferenceContext(preferences),
                           }}
+                          firstRunWelcome={agent.system ? firstRunWelcome : undefined}
                           emptyEyebrow={t("agentSpace.welcomeEyebrow")}
                           emptyTitleLead={t("agentSpace.welcomeTitle")}
                           emptyTitleTail={t("agentSpace.welcomeTail")}

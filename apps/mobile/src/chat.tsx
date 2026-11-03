@@ -92,7 +92,18 @@ import { breakpoints, typography } from "./theme";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
 import { type Selection, useLingWuThread } from "./threads";
 import { parseToolArguments, ToolStep, type ToolStepStatus } from "./tool-step";
-import { Button, Card, colors, dateLabel, Empty, ErrorNotice, fonts, s, shadow } from "./ui";
+import {
+  Button,
+  Card,
+  colors,
+  dateLabel,
+  Empty,
+  ErrorNotice,
+  fonts,
+  radius,
+  s,
+  shadow,
+} from "./ui";
 import { useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
@@ -467,6 +478,7 @@ export function ChatScreen({
   emptyTitleTail,
   emptySubtitle,
   composerPlaceholder,
+  firstRunWelcome,
   onThreadUsed,
 }: {
   prompt?: { id: number; text: string; attachmentIds?: readonly string[] };
@@ -476,12 +488,25 @@ export function ChatScreen({
   hideHeader?: boolean;
   /** Scrollable space before the first message when the shell overlays its navigation. */
   contentTopInset?: number;
-  agentContext?: { name: string; role: string; persona: string; avatar?: AgentAvatarId };
+  agentContext?: {
+    name: string;
+    role: string;
+    persona: string;
+    avatar?: AgentAvatarId;
+    userPreferences?: string;
+  };
   emptyEyebrow?: string;
   emptyTitleLead?: string;
   emptyTitleTail?: string;
   emptySubtitle?: string;
   composerPlaceholder?: string;
+  firstRunWelcome?: {
+    greeting: string;
+    summary: string;
+    horizon?: string;
+    closing: string;
+    actions: readonly { label: string; prompt: string }[];
+  };
   onThreadUsed?: () => void;
 }) {
   const { api, workspace: w, refresh, navigate, open, notify } = useWorkspace();
@@ -1277,7 +1302,10 @@ export function ChatScreen({
               >
                 <View style={{ flex: 1, minWidth: 0, justifyContent: "center", gap: 16 }}>
                   {hideHeader ? (
-                    <AgentOrb avatar={agentContext?.avatar ?? "orb"} size={73} />
+                    <AgentOrb
+                      avatar={agentContext?.avatar ?? "orb"}
+                      size={firstRunWelcome ? 48 : 73}
+                    />
                   ) : (
                     <View style={[s.row, { gap: 8 }]}>
                       <View
@@ -1340,21 +1368,21 @@ export function ChatScreen({
                     borderLeftColor: colors.line,
                     borderTopWidth: hideHeader || wideEmpty ? 0 : 1,
                     borderTopColor: colors.line,
-                    ...(hideHeader
-                      ? { flexDirection: "row", flexWrap: "wrap", gap: 8 }
-                      : undefined),
+                    ...(hideHeader ? { gap: 8 } : undefined),
                   }}
                 >
-                  {!hideHeader && (
-                    <View style={[s.between, { paddingBottom: 8 }]}>
-                      <Text style={[typography.eyebrow, { color: colors.faint }]}>
-                        {t("chat.suggestionHeading")}
-                      </Text>
-                      <Text style={{ fontSize: 9, color: colors.lineStrong }}>01—06</Text>
-                    </View>
-                  )}
-                  {(hideHeader ? emptySuggestions.slice(0, 2) : emptySuggestions).map(
-                    (item, index) => (
+                  <View style={[s.between, { paddingBottom: 8 }]}>
+                    <Text style={[typography.eyebrow, { color: colors.faint }]}>
+                      {t("chat.suggestionHeading")}
+                    </Text>
+                    <Text style={{ fontSize: 9, color: colors.lineStrong }}>01—06</Text>
+                  </View>
+                  <View
+                    style={
+                      hideHeader ? { flexDirection: "row", flexWrap: "wrap", gap: 8 } : undefined
+                    }
+                  >
+                    {emptySuggestions.map((item, index) => (
                       <Pressable
                         key={item.text}
                         accessibilityRole="button"
@@ -1370,6 +1398,8 @@ export function ChatScreen({
                           backgroundColor: pressed ? colors.surfaceRaised : "transparent",
                           ...(hideHeader
                             ? {
+                                flexBasis: windowWidth >= breakpoints.desktop ? "48%" : "100%",
+                                flexGrow: 1,
                                 borderWidth: 1,
                                 borderColor: colors.line,
                                 borderRadius: 22,
@@ -1406,7 +1436,73 @@ export function ChatScreen({
                         </Text>
                         <ArrowUpRight size={13} color={colors.faint} />
                       </Pressable>
-                    ),
+                    ))}
+                  </View>
+                  {firstRunWelcome && (
+                    <View
+                      style={{
+                        marginTop: 16,
+                        paddingHorizontal: 16,
+                        paddingVertical: 15,
+                        borderRadius: 18,
+                        borderTopLeftRadius: 5,
+                        borderWidth: 1,
+                        borderColor: colors.lineSoft,
+                        backgroundColor: colors.paper,
+                        gap: 8,
+                      }}
+                    >
+                      <View style={[s.row, { gap: 8 }]}>
+                        <AgentOrb avatar={agentContext?.avatar ?? "orb"} size={22} />
+                        <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
+                          {agentContext?.name ?? t("common.agentName")}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 12, lineHeight: 20, color: colors.text }}>
+                        {firstRunWelcome.greeting}
+                      </Text>
+                      <Text style={{ fontSize: 12, lineHeight: 20, color: colors.muted }}>
+                        {firstRunWelcome.summary}
+                        {firstRunWelcome.horizon ? ` ${firstRunWelcome.horizon}` : ""}
+                      </Text>
+                      <Text style={{ fontSize: 12, lineHeight: 20, color: colors.muted }}>
+                        {firstRunWelcome.closing}
+                      </Text>
+                      <View
+                        style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 }}
+                      >
+                        {firstRunWelcome.actions.map((action) => (
+                          <Pressable
+                            key={action.prompt}
+                            accessibilityRole="button"
+                            onPress={() => enqueue(action.prompt)}
+                            style={({ pressed }) => ({
+                              minHeight: 38,
+                              borderRadius: radius.full,
+                              borderWidth: 1,
+                              borderColor: colors.accentLine,
+                              backgroundColor: pressed ? colors.skyStrong : colors.sky,
+                              paddingHorizontal: 12,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 5,
+                            })}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                lineHeight: 17,
+                                color: colors.primaryStrong,
+                                fontWeight: "500",
+                              }}
+                            >
+                              {action.label}
+                            </Text>
+                            <ArrowUpRight size={12} color={colors.primaryStrong} />
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
                   )}
                 </View>
               </View>

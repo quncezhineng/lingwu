@@ -3,7 +3,7 @@ export const desktopColumns = {
   centerMin: 520,
   divider: 6,
   left: { min: 200, max: 340, initial: 240 },
-  right: { min: 220, max: 400, initial: 260 },
+  right: { min: 220, max: 400, initial: 320 },
 } as const;
 export type ColumnSide = "left" | "right";
 export type ColumnWidths = Record<ColumnSide, number>;

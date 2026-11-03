@@ -332,6 +332,49 @@ export async function createApp(
       expiresAt: session.expiresAt,
     });
   });
+  /** 更新头像、昵称与个人简介。 */
+  app.put("/api/auth/profile", async (c) => {
+    const session = await auth.profile(c.req.header("authorization"));
+    if (!accounts) throw new AppError("Profile editing requires an email account.", 400);
+    const body = await c.req.parseBody();
+    const nicknameRaw = body.nickname;
+    const nickname =
+      typeof nicknameRaw === "string" ? z.string().max(40).parse(nicknameRaw.trim()) : undefined;
+    if (nickname !== undefined && !nickname)
+      throw new AppError("Enter a nickname before saving.", 422);
+    const bioRaw = body.bio;
+    const bio = typeof bioRaw === "string" ? z.string().max(240).parse(bioRaw.trim()) : undefined;
+    const avatarFile = body.avatar;
+    const avatar = avatarFile instanceof File ? avatarFile : undefined;
+    const removeAvatar = body.removeAvatar === "true";
+    if (nickname === undefined && bio === undefined && !avatar && !removeAvatar)
+      throw new AppError("Change your profile before saving.", 422);
+    if (avatar) {
+      if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(avatar.type))
+        throw new AppError("Choose a JPG, PNG, WebP or GIF image.", 422);
+      if (avatar.size > 5 * 1024 * 1024)
+        throw new AppError("Avatar images must be 5 MB or smaller.", 413);
+    }
+    const profile = await accounts.updateProfile(session.owner, {
+      nickname,
+      bio,
+      removeAvatar,
+      avatar: avatar
+        ? { bytes: new Uint8Array(await avatar.arrayBuffer()), mimeType: avatar.type }
+        : undefined,
+    });
+    audit(session.owner, "profile_updated", c);
+    return c.json({
+      id: session.owner,
+      email: session.email ?? null,
+      displayName: profile.displayName ?? null,
+      bio: profile.bio ?? null,
+      avatarUrl: profile.avatarUrl ?? null,
+      authMode: "supabase",
+      mode: config.mode,
+      expiresAt: session.expiresAt,
+    });
+  });
   /** 退出登录：作废当前会话令牌（Supabase 侧账号不受影响）。 */
   app.post("/api/auth/signout", async (c) => {
     const profile = await auth.profile(c.req.header("authorization")).catch(() => undefined);

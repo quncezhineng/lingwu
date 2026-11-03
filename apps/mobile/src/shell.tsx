@@ -19,7 +19,6 @@ import {
 import type { Section } from "../../../packages/domain/src";
 import { AccountAvatar } from "./account-avatar";
 import { useAgentWorkspace } from "./agent-workspace";
-import type { AccountProfile } from "./api";
 import { Text, TextInput } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
@@ -213,10 +212,9 @@ export function BrandMark({ size = 28 }: { size?: number }) {
  * 分析记录统一留在工作台和分析任务页，不在侧栏重复展示。
  */
 export function Rail({ name }: { name: string }) {
-  const { section, navigate, open, api, workspace } = useWorkspace();
+  const { section, navigate, open, workspace } = useWorkspace();
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
-  const [accountAvatarUrl, setAccountAvatarUrl] = useState<string>();
   const collapsed = useSidebarCollapsed();
   const sidebarWidth = collapsed ? layout.sidebarCollapsed : SIDEBAR_WIDTH;
   const rail = useRef<View>(null);
@@ -244,21 +242,6 @@ export function Rail({ name }: { name: string }) {
     tooltipRequest.current += 1;
     setTooltip(undefined);
   }, [collapsed, section, height]);
-
-  useEffect(() => {
-    let active = true;
-    void api
-      .request<AccountProfile>("/api/auth/me")
-      .then((profile) => {
-        if (active) setAccountAvatarUrl(profile.avatarUrl ?? undefined);
-      })
-      .catch(() => {
-        // The account page owns the visible error state; the sidebar keeps its fallback.
-      });
-    return () => {
-      active = false;
-    };
-  }, [api]);
 
   const activeCount = (data?.tasks ?? []).filter(
     (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
@@ -491,7 +474,7 @@ export function Rail({ name }: { name: string }) {
               })}
             >
               <AccountAvatar
-                avatarUrl={accountAvatarUrl}
+                avatarUrl={workspace.profile.avatarUrl}
                 name={accountLabel}
                 size={28}
                 borderRadius={999}

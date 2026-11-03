@@ -755,7 +755,7 @@ export function CapabilityHubScreen({ mode = "page" }: { mode?: "page" | "embedd
   const contentWidth = Math.max(0, Math.min(width - railWidth, 1340) - pagePadding);
   const useCategoryRail = contentWidth >= 760;
   const gridWidth = contentWidth - (useCategoryRail ? 220 : 0);
-  const gridColumns = gridWidth >= 920 ? 4 : gridWidth >= 660 ? 3 : gridWidth >= 430 ? 2 : 1;
+  const gridColumns = gridWidth >= 660 ? 3 : gridWidth >= 430 ? 2 : 1;
   const shortcutsAsCarousel = contentWidth < 680;
   const shortcutColumns = contentWidth >= 1000 ? 4 : contentWidth >= 680 ? 3 : 2;
 

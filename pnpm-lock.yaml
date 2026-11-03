@@ -5572,11 +5572,14 @@ packages:
       react-native: "*"
 
   expo-blur@15.0.8:
-    resolution: {integrity: sha512-rWyE1NBRZEu9WD+X+5l7gyPRszw7n12cW3IRNAb5i6KFzaBp8cxqT5oeaphJapqURvcqhkOZn2k5EtBSbsuU7w==}
+    resolution:
+      {
+        integrity: sha512-rWyE1NBRZEu9WD+X+5l7gyPRszw7n12cW3IRNAb5i6KFzaBp8cxqT5oeaphJapqURvcqhkOZn2k5EtBSbsuU7w==,
+      }
     peerDependencies:
-      expo: '*'
-      react: '*'
-      react-native: '*'
+      expo: "*"
+      react: "*"
+      react-native: "*"
 
   expo-constants@18.0.14:
     resolution:

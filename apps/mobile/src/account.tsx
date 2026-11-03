@@ -1,6 +1,8 @@
 import { useThreads } from "@copilotkit/react-native/headless";
+import * as DocumentPicker from "expo-document-picker";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, View } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
+import { AccountAvatar } from "./account-avatar";
 import type { AccountProfile } from "./api";
 import { Text, TextInput } from "./app-text";
 import { filterArchivedThreads } from "./archived-threads";
@@ -15,16 +17,46 @@ import {
   Mail,
   MessageCircle,
   Monitor,
+  Pencil,
   RotateCcw,
   Search,
   Settings2,
   ShieldCheck,
   Trash2,
+  Upload,
   UserRound,
+  X,
 } from "./icons";
 import { useLingWuThread } from "./threads";
-import { Button, Card, colors, dateLabel, Empty, ErrorNotice, LinkRow, s, timeLabel } from "./ui";
+import {
+  Button,
+  Card,
+  colors,
+  dateLabel,
+  Empty,
+  ErrorNotice,
+  Field,
+  LinkRow,
+  s,
+  timeLabel,
+} from "./ui";
 import { useWorkspace } from "./workspace";
+
+const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
+const AVATAR_MIME_BY_EXTENSION: Record<string, string> = {
+  gif: "image/gif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+function avatarMimeType(asset: DocumentPicker.DocumentPickerAsset) {
+  const declared = asset.mimeType?.toLowerCase();
+  if (AVATAR_TYPES.includes(declared as (typeof AVATAR_TYPES)[number])) return declared;
+  const extension = asset.name.split(".").pop()?.toLowerCase() ?? "";
+  return AVATAR_MIME_BY_EXTENSION[extension];
+}
 
 /** 个人信息里的一行：图标 + 名称 + 取值。 */
 function ProfileRow({
@@ -271,9 +303,16 @@ export function AccountScreen({
   onOpenPreferences?: () => void;
 }) {
   const { t } = useTranslation();
-  const { api } = useWorkspace();
+  const { api, notify, refresh } = useWorkspace();
   const [profile, setProfile] = useState<AccountProfile>();
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [draftNickname, setDraftNickname] = useState("");
+  const [draftBio, setDraftBio] = useState("");
+  const [avatarAsset, setAvatarAsset] = useState<DocumentPicker.DocumentPickerAsset>();
+  const [removeAvatar, setRemoveAvatar] = useState(false);
   const load = useCallback(async () => {
     setError("");
     try {
@@ -285,6 +324,95 @@ export function AccountScreen({
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => {
+    const uri = avatarAsset?.uri;
+    if (Platform.OS !== "web" || !uri?.startsWith("blob:")) return;
+    return () => URL.revokeObjectURL(uri);
+  }, [avatarAsset]);
+
+  function beginEditing() {
+    setDraftNickname(profile?.displayName?.trim() || "");
+    setDraftBio(profile?.bio?.trim() || "");
+    setAvatarAsset(undefined);
+    setRemoveAvatar(false);
+    setEditError("");
+    setEditing(true);
+  }
+
+  function cancelEditing() {
+    setEditing(false);
+    setAvatarAsset(undefined);
+    setRemoveAvatar(false);
+    setEditError("");
+  }
+
+  async function chooseAvatar() {
+    setEditError("");
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [...AVATAR_TYPES],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset || !avatarMimeType(asset)) {
+        setEditError(t("app.profileAvatarInvalid"));
+        return;
+      }
+      if (asset.size !== undefined && asset.size > 5 * 1024 * 1024) {
+        setEditError(t("app.profileAvatarTooLarge"));
+        return;
+      }
+      setAvatarAsset(asset);
+      setRemoveAvatar(false);
+    } catch {
+      setEditError(t("app.profileAvatarPickFailed"));
+    }
+  }
+
+  async function saveProfile() {
+    if (!profile || saving) return;
+    const nickname = draftNickname.trim();
+    if (!nickname) {
+      setEditError(t("app.profileNicknameRequired"));
+      return;
+    }
+    setSaving(true);
+    setEditError("");
+    try {
+      const form = new FormData();
+      form.append("nickname", nickname);
+      form.append("bio", draftBio.trim());
+      if (removeAvatar) form.append("removeAvatar", "true");
+      if (avatarAsset) {
+        const mimeType = avatarMimeType(avatarAsset);
+        if (!mimeType) throw new Error(t("app.profileAvatarInvalid"));
+        if (Platform.OS === "web") {
+          if (!avatarAsset.file) throw new Error(t("app.profileAvatarPickFailed"));
+          form.append("avatar", avatarAsset.file, avatarAsset.name);
+        } else {
+          form.append("avatar", {
+            uri: avatarAsset.uri,
+            name: avatarAsset.name,
+            type: mimeType,
+          } as unknown as Blob);
+        }
+      }
+      const next = await api.request<AccountProfile>("/api/auth/profile", form, "PUT");
+      setProfile(next);
+      setEditing(false);
+      setAvatarAsset(undefined);
+      setRemoveAvatar(false);
+      notify(t("app.profileSaved"));
+      void refresh().catch(() => undefined);
+    } catch (reason) {
+      setEditError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (!profile && !error)
     return (
       <View style={{ alignItems: "center", padding: 40, gap: 13 }}>
@@ -299,12 +427,13 @@ export function AccountScreen({
         <Button onPress={() => void load()}>{t("common.tryAgain")}</Button>
       </View>
     );
-  const nickname = profile.displayName || t("app.profileUnset");
+  const nickname =
+    profile.displayName?.trim() || profile.email?.split("@")[0]?.trim() || t("app.profileUnset");
   const email = profile.email || t("app.profileUnset");
-  // 简介：来自 user_profiles.bio，未填写时显示占位文案。
-  const bio = profile.bio || t("app.profileUnset");
-  // 头像优先用 Supabase 里的头像地址，取不到再退回昵称/邮箱首字母。
-  const initial = (profile.displayName || profile.email || "?").trim().charAt(0).toUpperCase();
+  const bio = profile.bio?.trim() || t("app.profileUnset");
+  const displayedAvatar = removeAvatar
+    ? undefined
+    : (avatarAsset?.uri ?? profile.avatarUrl ?? undefined);
   // I8：接口缺少 expiresAt 时不能直接 toISOString（会抛错导致整页白屏）
   const expiresRaw = profile.expiresAt ? new Date(profile.expiresAt) : undefined;
   const expiresAt =
@@ -312,32 +441,99 @@ export function AccountScreen({
   return (
     <View style={{ gap: 20 }}>
       <Card style={{ alignItems: "center", gap: 8, paddingVertical: 20 }}>
-        <View
-          style={{
-            width: 60,
-            height: 60,
-            borderRadius: 999,
-            backgroundColor: colors.surface,
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-          }}
-        >
-          {profile.avatarUrl ? (
-            <Image source={{ uri: profile.avatarUrl }} style={{ width: 60, height: 60 }} />
-          ) : (
-            <Text style={{ fontSize: 24, fontWeight: "600", color: colors.primaryStrong }}>
-              {initial}
-            </Text>
-          )}
-        </View>
+        <AccountAvatar
+          avatarUrl={displayedAvatar}
+          name={draftNickname.trim() || nickname}
+          size={60}
+          borderRadius={999}
+        />
         <Text style={{ fontSize: 18, fontWeight: "600", color: colors.text }}>{nickname}</Text>
         <Text style={s.muted}>{bio}</Text>
+        <Button small icon={Pencil} onPress={beginEditing}>
+          {t("app.editProfile")}
+        </Button>
       </Card>
+      {editing && (
+        <Card style={{ gap: 14 }}>
+          <View style={[s.row, { gap: 14, alignItems: "flex-start" }]}>
+            <AccountAvatar
+              avatarUrl={displayedAvatar}
+              name={draftNickname.trim() || nickname}
+              size={66}
+              borderRadius={22}
+            />
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text style={[s.text, { fontWeight: "600" }]}>{t("app.profileAvatar")}</Text>
+              <Text style={s.small}>{t("app.profileAvatarHint")}</Text>
+              <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                <Button small icon={Upload} onPress={() => void chooseAvatar()}>
+                  {t("app.changeAvatar")}
+                </Button>
+                {(avatarAsset || profile.avatarUrl) && (
+                  <Button
+                    small
+                    icon={X}
+                    onPress={() => {
+                      setAvatarAsset(undefined);
+                      setRemoveAvatar(true);
+                    }}
+                  >
+                    {t("app.removeAvatar")}
+                  </Button>
+                )}
+              </View>
+            </View>
+          </View>
+          <View style={{ gap: 4 }}>
+            <Field
+              label={t("app.profileNickname")}
+              value={draftNickname}
+              onChangeText={setDraftNickname}
+              maxLength={40}
+              autoCapitalize="words"
+              placeholder={t("app.profileNickname")}
+            />
+            <Text style={[s.small, { marginTop: -10, marginBottom: 10 }]}>
+              {t("app.profileNicknameHint")}
+            </Text>
+          </View>
+          <View style={{ gap: 4 }}>
+            <Field
+              label={t("app.profileBio")}
+              value={draftBio}
+              onChangeText={setDraftBio}
+              maxLength={240}
+              multiline
+              autoCapitalize="sentences"
+              placeholder={t("app.profileBioPlaceholder")}
+              style={{ minHeight: 88 }}
+            />
+            <Text style={[s.small, { marginTop: -10, marginBottom: 10 }]}>
+              {t("app.profileBioHint")}
+            </Text>
+          </View>
+          <ErrorNotice error={editError} />
+          <View style={[s.row, { gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }]}>
+            <Button small disabled={saving} onPress={cancelEditing}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              small
+              primary
+              busy={saving}
+              disabled={!draftNickname.trim()}
+              onPress={() => void saveProfile()}
+            >
+              {t("app.profileSave")}
+            </Button>
+          </View>
+        </Card>
+      )}
       <View style={{ gap: 10 }}>
         <Text style={s.heading}>{t("app.profileDetails")}</Text>
         <Card style={{ paddingVertical: 4 }}>
           <ProfileRow icon={UserRound} label={t("app.profileNickname")} value={nickname} />
+          <ProfileRow divided icon={UserRound} label={t("app.profileBio")} value={bio} />
           <ProfileRow divided icon={Mail} label={t("app.emailLabel")} value={email} />
           <ProfileRow divided icon={IdCard} label={t("app.profileAccountId")} value={profile.id} />
           <ProfileRow

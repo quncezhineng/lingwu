@@ -192,7 +192,7 @@ export interface CapabilityInstall {
 }
 export interface Workspace {
   mode: WorkspaceMode;
-  profile: { name: string; email: string };
+  profile: { name: string; email: string; avatarUrl?: string };
   mail: Mail[];
   events: CalendarEvent[];
   files: Artifact[];
