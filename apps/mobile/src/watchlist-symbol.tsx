@@ -21,6 +21,7 @@ import { NoteDetailSheet, NoteEditorSheet } from "./note-ui";
 import { type InvestmentNote, loadNotes, useNotesState } from "./notes";
 import { availabilityFromQuote, useQuotes } from "./quotes";
 import { fetchLatestReport } from "./research";
+import { localizedSymbolName } from "./symbol-names";
 import { Button, colors, marketDirectionColor, Sheet, s, typography } from "./ui";
 import { latestInsightForSymbol, latestNoteForSymbol } from "./watchlist-symbol-view";
 import { useWorkspace } from "./workspace";
@@ -76,10 +77,12 @@ export function WatchlistSymbolSheet({
   quote?: Quote;
   watchlist: { id: string; name: string };
 }) {
-  const { api, ask, close, notify, open } = useWorkspace();
+  const { api, ask, close, notify, open, requestPriceReminder } = useWorkspace();
   const { data: agent } = useAgentWorkspace();
   const notesState = useNotesState();
   const { t } = useTranslation();
+  // 标题、助手提示里的公司名统一按站点语言展示。
+  const displayName = localizedSymbolName(symbol);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>("loading");
   const [editor, setEditor] = useState<"note" | "reason">();
   const [noteView, setNoteView] = useState<InvestmentNote>();
@@ -146,7 +149,7 @@ export function WatchlistSymbolSheet({
   const remove = () => {
     removeSymbol(api, watchlist.id, symbol.code);
     close();
-    notify(t("markets.watchlistRemoved", { name: symbol.name }), {
+    notify(t("markets.watchlistRemoved", { name: displayName }), {
       label: t("markets.watchlistUndo"),
       onPress: () => addSymbols(api, watchlist.id, [symbol]),
     });
@@ -155,7 +158,7 @@ export function WatchlistSymbolSheet({
   return (
     <>
       <Sheet
-        title={symbol.name}
+        title={displayName}
         subtitle={`${symbol.code} · ${labels.market} · ${labels.asset}`}
         narrow
         onClose={close}
@@ -393,7 +396,7 @@ export function WatchlistSymbolSheet({
               small
               icon={Bell}
               style={{ minHeight: 42 }}
-              onPress={() => openDetail("alerts")}
+              onPress={() => requestPriceReminder(symbol, quote)}
             >
               {t("markets.watchPopupSetAlert")}
             </Button>
@@ -405,7 +408,7 @@ export function WatchlistSymbolSheet({
                 close();
                 ask(
                   t("markets.watchlistAnalyzePrompt", {
-                    name: symbol.name,
+                    name: displayName,
                     code: symbol.code,
                   }),
                 );
@@ -441,7 +444,7 @@ export function WatchlistSymbolSheet({
           defaultType="RESEARCH"
           defaultSymbol={symbol.code}
           defaultTitle={
-            editor === "reason" ? t("markets.watchPopupReasonTitle", { name: symbol.name }) : ""
+            editor === "reason" ? t("markets.watchPopupReasonTitle", { name: displayName }) : ""
           }
           onClose={() => setEditor(undefined)}
           onSaved={() => {

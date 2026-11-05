@@ -40,6 +40,7 @@ import {
   updateNote,
   useNotesState,
 } from "./notes";
+import { localizedSymbolName } from "./symbol-names";
 import { Button, Chip, colors, DisclaimerNote, ErrorNotice, Sheet, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -189,7 +190,7 @@ export function NoteCard({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
-  const symbolName = metaFor(note.symbolCode).name;
+  const symbolName = localizedSymbolName(metaFor(note.symbolCode));
   return (
     <Pressable
       accessibilityRole="button"
@@ -293,7 +294,7 @@ function SymbolPicker({
         ]}
       >
         <Text style={[s.text, { flex: 1 }]}>
-          {value.code} · {value.name}
+          {value.code} · {localizedSymbolName(value)}
         </Text>
         <Button small style={{ minHeight: 36 }} onPress={() => onChange(undefined)}>
           {t("notes.changeSymbol")}
@@ -355,7 +356,7 @@ function SymbolPicker({
                   {result.code}
                 </Text>
                 <Text style={[s.muted, { flex: 1 }]} numberOfLines={1}>
-                  {result.name}
+                  {localizedSymbolName(result)}
                 </Text>
               </Pressable>
             ))
@@ -482,7 +483,7 @@ export function NoteEditorSheet({
       {initial ? (
         <View style={{ marginBottom: 14 }}>
           <Chip>
-            {initial.symbolCode} · {metaFor(initial.symbolCode).name}
+            {initial.symbolCode} · {localizedSymbolName(metaFor(initial.symbolCode))}
           </Chip>
         </View>
       ) : (
@@ -1013,9 +1014,11 @@ export function SymbolNotesSection({
     : symbolNotes;
 
   return (
-    <View style={{ gap: 8 }}>
-      <View style={[s.between, { flexWrap: "wrap", gap: 8, marginTop: 18, marginBottom: 2 }]}>
-        <Text style={[s.label, { color: colors.faint }]}>{t("notes.symbolNotesTitle")}</Text>
+    <View style={{ gap: 10 }}>
+      <View style={[s.between, { flexWrap: "wrap", gap: 10, minHeight: 34 }]}>
+        <Text style={{ fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.text }}>
+          {t("notes.symbolNotesTitle")}
+        </Text>
         <View style={[s.row, { gap: 10 }]}>
           <Button
             small

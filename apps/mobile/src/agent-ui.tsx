@@ -13,36 +13,33 @@ import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-ma
 import type { Artifact, BrowserSession } from "../../../packages/domain/src";
 import type {
   AgentArtifact,
-  AgentCommunication,
   AgentTask,
-  AgentTone,
   Evidence,
   Goal,
   Idea,
   Monitor,
   MonitorCurrency,
 } from "../../../packages/domain/src/agent";
-import {
-  monitorPriceLabel,
-  resolveMonitorCurrency,
-} from "../../../packages/domain/src/monitor-currency";
+import { resolveMonitorCurrency } from "../../../packages/domain/src/monitor-currency";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { fileTypeName } from "./file-kind";
 import { activeLocaleTag, type TranslationFn, type TranslationKey, useTranslation } from "./i18n";
-import { localizeAgentName, statusLabel, tr } from "./i18n/translate";
+import { statusLabel, tr } from "./i18n/translate";
 import {
+  Activity,
   ArrowRight,
   ArrowUpRight,
   Bell,
+  Brain,
   CalendarDays,
-  Check,
   ChevronRight,
   CircleDollarSign,
   Clock3,
   FileText,
+  Globe2,
   Heart,
   Lightbulb,
   ListChecks,
@@ -52,15 +49,19 @@ import {
   Plus,
   RefreshCw,
   Send,
+  ShieldCheck,
   Sparkles,
   Square,
+  Star,
   Target,
   Users,
   X,
 } from "./icons";
-import { ModalOverlay } from "./modal-overlay";
+import { monitorConditionText, monitorScheduleText, WEEKDAYS } from "./monitor-text";
+import { notificationExcerpt } from "./notification-text";
 import { PageHeader } from "./page-header";
 import { StatusBadge, taskStatusTone } from "./status-badge";
+import { localizedSymbolName } from "./symbol-names";
 import { hasInternalTaskText, presentTask, taskRequiresSetup } from "./task-presentation";
 import { breakpoints, fonts, radius } from "./theme";
 import { Toggle } from "./toggle";
@@ -74,12 +75,11 @@ import {
   ErrorNotice,
   Field,
   LinkRow,
-  Mascot,
   SectionHeading,
   Sheet,
   s,
 } from "./ui";
-import { useWorkspace } from "./workspace";
+import { type PriceReminderIntent, useWorkspace } from "./workspace";
 
 /**
  * 领域枚举值 -> 展示文案。
@@ -1113,159 +1113,217 @@ const GOAL_TEMPLATES: Record<string, GoalTemplate[]> = {
   ],
 };
 
-/*
- * 灵感页空态预置的投研灵感：每条展示一句动机，点击「开始这个」即委派
- * 一条通用研究任务并打开任务详情，与云端灵感的启动路径一致。
- */
-type IdeaSuggestion = {
+/* 灵感页的预置和云端建议都作为提示词进入当前 Agent 对话。 */
+type ResearchTemplate = {
   titleKey: TranslationKey;
-  reasonKey: TranslationKey;
+  descriptionKey: TranslationKey;
   promptKey: TranslationKey;
+  icon: typeof Target;
 };
-const IDEA_SUGGESTIONS: IdeaSuggestion[] = [
+const RESEARCH_TEMPLATES: ResearchTemplate[] = [
   {
-    titleKey: "agent.tplIdeaStockTitle",
-    reasonKey: "agent.tplIdeaStockReason",
-    promptKey: "agent.tplIdeaStockPrompt",
+    titleKey: "chat.suggestionHackerNews",
+    descriptionKey: "agent.templateTrendDescription",
+    promptKey: "agent.templateTrendPrompt",
+    icon: Target,
   },
   {
-    titleKey: "agent.tplIdeaBriefingTitle",
-    reasonKey: "agent.tplIdeaBriefingReason",
-    promptKey: "agent.tplIdeaBriefingPrompt",
-  },
-  {
-    titleKey: "agent.tplIdeaEarningsTitle",
-    reasonKey: "agent.tplIdeaEarningsReason",
+    titleKey: "chat.suggestionSummarize",
+    descriptionKey: "agent.templateEarningsDescription",
     promptKey: "agent.tplIdeaEarningsPrompt",
+    icon: FileText,
   },
   {
-    titleKey: "agent.tplIdeaRatesTitle",
-    reasonKey: "agent.tplIdeaRatesReason",
-    promptKey: "agent.tplIdeaRatesPrompt",
+    titleKey: "chat.suggestionDeepDive",
+    descriptionKey: "agent.templateDeepDiveDescription",
+    promptKey: "agent.tplIdeaStockPrompt",
+    icon: Sparkles,
   },
   {
-    titleKey: "agent.tplIdeaPeerTitle",
-    reasonKey: "agent.tplIdeaPeerReason",
+    titleKey: "chat.suggestionBriefing",
+    descriptionKey: "agent.templateBriefingDescription",
+    promptKey: "agent.tplIdeaBriefingPrompt",
+    icon: Lightbulb,
+  },
+  {
+    titleKey: "chat.suggestionPeerCompare",
+    descriptionKey: "agent.templatePeerDescription",
     promptKey: "agent.tplIdeaPeerPrompt",
+    icon: ListChecks,
+  },
+  {
+    titleKey: "chat.suggestionWatchWebsite",
+    descriptionKey: "agent.templateWatchDescription",
+    promptKey: "agent.templateWatchPrompt",
+    icon: Bell,
+  },
+  {
+    titleKey: "agent.templateRatesTitle",
+    descriptionKey: "agent.templateRatesDescription",
+    promptKey: "agent.templateRatesPrompt",
+    icon: CircleDollarSign,
+  },
+  {
+    titleKey: "agent.templateDividendTitle",
+    descriptionKey: "agent.templateDividendDescription",
+    promptKey: "agent.templateDividendPrompt",
+    icon: Star,
+  },
+  {
+    titleKey: "agent.templateFlowTitle",
+    descriptionKey: "agent.templateFlowDescription",
+    promptKey: "agent.templateFlowPrompt",
+    icon: Activity,
+  },
+  {
+    titleKey: "agent.templatePortfolioTitle",
+    descriptionKey: "agent.templatePortfolioDescription",
+    promptKey: "agent.templatePortfolioPrompt",
+    icon: Heart,
+  },
+  {
+    titleKey: "agent.templateMoatTitle",
+    descriptionKey: "agent.templateMoatDescription",
+    promptKey: "agent.templateMoatPrompt",
+    icon: ShieldCheck,
+  },
+  {
+    titleKey: "agent.templateIndustryTitle",
+    descriptionKey: "agent.templateIndustryDescription",
+    promptKey: "agent.templateIndustryPrompt",
+    icon: Globe2,
+  },
+  {
+    titleKey: "agent.templatePlanTitle",
+    descriptionKey: "agent.templatePlanDescription",
+    promptKey: "agent.templatePlanPrompt",
+    icon: CalendarDays,
+  },
+  {
+    titleKey: "agent.templateNotesTitle",
+    descriptionKey: "agent.templateNotesDescription",
+    promptKey: "agent.templateNotesPrompt",
+    icon: Brain,
+  },
+  {
+    titleKey: "agent.templateCatalystTitle",
+    descriptionKey: "agent.templateCatalystDescription",
+    promptKey: "agent.templateCatalystPrompt",
+    icon: Clock3,
   },
 ] as const;
 
-export function IdeasScreen() {
+export function IdeasScreen({ onUsePrompt }: { onUsePrompt?: () => void } = {}) {
   const { t } = useTranslation();
-  const { data, mutate, delegate } = useAgentWorkspace();
-  const { open } = useWorkspace();
-  const [busy, setBusy] = useState(false);
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  async function refreshIdeas() {
-    setBusy(true);
-    setError("");
-    try {
-      await mutate("/ideas/refresh", {});
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  // 预置灵感：直接委派一条研究任务并打开任务详情，与灵感卡片的「开始这个」行为一致。
-  async function startSuggestion(suggestion: (typeof IDEA_SUGGESTIONS)[number]) {
-    setBusyKey(suggestion.titleKey);
-    setError("");
-    try {
-      const task = await delegate({
-        title: t(suggestion.titleKey),
-        prompt: t(suggestion.promptKey),
-        kind: "agent",
-        input: {},
-      });
-      open({ type: "task", taskId: task.id });
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusyKey(null);
-    }
+  const { data } = useAgentWorkspace();
+  const { ask, navigate } = useWorkspace();
+  const { width } = useWindowDimensions();
+  function sendPromptToAgent(prompt: string) {
+    ask(prompt);
+    navigate("chat");
+    onUsePrompt?.();
   }
   const ideas = data?.ideas.filter((idea) => idea.status === "new") || [];
+  const threeColumns = width >= 720;
   return (
-    <View style={{ gap: 20 }}>
+    <View style={{ gap: 18 }}>
       <AgentStatus />
-      <View style={s.between}>
-        <Text style={s.small}>{t("agent.inspiredByApps")}</Text>
-        <Button small icon={RefreshCw} busy={busy} onPress={() => void refreshIdeas()}>
-          {t("agent.findIdeas")}
-        </Button>
-      </View>
-      <ErrorNotice error={error} />
-      {ideas.map((idea) => (
-        <IdeaCard key={idea.id} idea={idea} />
-      ))}
-      {!ideas.length && (
-        <>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 13,
-              borderWidth: 1,
-              borderColor: colors.line,
-              borderRadius: radius.card,
-              backgroundColor: colors.paper,
-            }}
-          >
-            <View
-              style={{
-                width: 34,
-                height: 34,
-                flexShrink: 0,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: radius.control,
-                backgroundColor: colors.sky,
-              }}
-            >
-              <Lightbulb size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text style={[s.heading, { fontSize: 15, lineHeight: 21 }]}>
-                {t("agent.ideasEmptyTitle")}
-              </Text>
-              <Text style={s.muted}>{t("agent.ideasEmptyDetail")}</Text>
-            </View>
-          </View>
-          <View style={{ gap: 0 }}>
-            <Text style={[s.small, { marginBottom: 6 }]}>{t("agent.ideaSuggestions")}</Text>
-            {IDEA_SUGGESTIONS.map((suggestion) => (
-              <View
-                key={suggestion.titleKey}
-                style={{
-                  paddingVertical: 14,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.line,
+      <View style={{ gap: 14 }}>
+        <View style={{ gap: 4 }}>
+          <SectionHeading title={t("agent.researchTemplates")} />
+          <Text style={s.muted}>{t("agent.researchTemplatesDetail")}</Text>
+        </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+          {RESEARCH_TEMPLATES.map((template, index) => {
+            const Icon = template.icon;
+            return (
+              <Pressable
+                key={template.titleKey}
+                accessibilityRole="button"
+                accessibilityLabel={t("agent.useResearchTemplate", {
+                  title: t(template.titleKey),
+                })}
+                onPress={() => {
+                  sendPromptToAgent(t(template.promptKey));
                 }}
+                style={({ pressed }) => ({
+                  flexBasis: threeColumns ? "31.5%" : "47%",
+                  flexGrow: threeColumns ? 1 : 0,
+                  minHeight: threeColumns ? 164 : 208,
+                  gap: threeColumns ? 10 : 12,
+                  padding: threeColumns ? 14 : 12,
+                  borderRadius: 17,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  backgroundColor: pressed ? colors.surfaceRaised : colors.paper,
+                })}
               >
-                <View style={s.row}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={[s.heading, { fontSize: 15, lineHeight: 21 }]}>
-                      {t(suggestion.titleKey)}
-                    </Text>
-                    <Text style={s.muted}>{t(suggestion.reasonKey)}</Text>
-                  </View>
-                  <Button
-                    small
-                    primary
-                    busy={busyKey === suggestion.titleKey}
-                    onPress={() => void startSuggestion(suggestion)}
+                <View style={[s.between, { alignItems: "center" }]}>
+                  <View
+                    style={{
+                      width: threeColumns ? 36 : 34,
+                      height: threeColumns ? 36 : 34,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: radius.control,
+                      backgroundColor: colors.sky,
+                    }}
                   >
-                    {t("agent.startThis")}
-                  </Button>
+                    <Icon size={threeColumns ? 18 : 17} color={colors.primary} />
+                  </View>
+                  <Text style={[s.metric, { color: colors.faint, fontSize: 10 }]}>
+                    {String(index + 1).padStart(2, "0")}
+                  </Text>
                 </View>
-              </View>
-            ))}
-          </View>
-        </>
+                <View style={{ flex: 1, gap: 5 }}>
+                  <Text
+                    style={[
+                      s.heading,
+                      {
+                        fontSize: threeColumns ? 14 : 13,
+                        lineHeight: threeColumns ? 20 : 18,
+                      },
+                    ]}
+                  >
+                    {t(template.titleKey)}
+                  </Text>
+                  <Text
+                    style={[
+                      s.muted,
+                      {
+                        fontSize: threeColumns ? 12 : 11,
+                        lineHeight: threeColumns ? 18 : 17,
+                      },
+                    ]}
+                  >
+                    {t(template.descriptionKey)}
+                  </Text>
+                </View>
+                <View style={[s.row, { justifyContent: "flex-end", gap: 5 }]}>
+                  <Text
+                    style={{
+                      color: colors.primaryStrong,
+                      fontSize: 11,
+                      fontWeight: "600",
+                      lineHeight: 17,
+                    }}
+                  >
+                    {t("agent.useTemplateAction")}
+                  </Text>
+                  <ArrowUpRight size={12} color={colors.primaryStrong} />
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+      {!!ideas.length && (
+        <View style={{ gap: 6 }}>
+          <SectionHeading title={t("agent.ideasForYou")} />
+          {ideas.map((idea) => (
+            <IdeaCard key={idea.id} idea={idea} onUsePrompt={onUsePrompt} />
+          ))}
+        </View>
       )}
       {(data?.ideas || [])
         .filter((idea) => idea.status === "accepted")
@@ -1295,21 +1353,26 @@ function TaskLink({ taskId, onOpen }: { taskId: string; onOpen?: () => void }) {
     </Button>
   );
 }
-function IdeaCard({ idea }: { idea: Idea }) {
+function IdeaCard({ idea, onUsePrompt }: { idea: Idea; onUsePrompt?: () => void }) {
   const { t } = useTranslation();
   const { mutate } = useAgentWorkspace();
-  const { open } = useWorkspace();
+  const { ask, navigate } = useWorkspace();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [prompt, setPrompt] = useState(idea.prompt);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function act(action: "accept" | "dismiss") {
+    if (action === "accept") {
+      ask(prompt.trim());
+      navigate("chat");
+      onUsePrompt?.();
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const result = await mutate<Idea>(`/ideas/${idea.id}`, { action, prompt });
-      if (result.taskId && action === "accept") open({ type: "task", taskId: result.taskId });
+      await mutate<Idea>(`/ideas/${idea.id}`, { action });
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -1381,7 +1444,15 @@ function IdeaCard({ idea }: { idea: Idea }) {
     </View>
   );
 }
-export function GoalsScreen({ embedded = false }: { embedded?: boolean }) {
+export function GoalsScreen({
+  embedded = false,
+  reminderIntent,
+  onReminderIntentHandled,
+}: {
+  embedded?: boolean;
+  reminderIntent?: PriceReminderIntent;
+  onReminderIntentHandled?: () => void;
+}) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const { open } = useWorkspace();
@@ -1391,11 +1462,24 @@ export function GoalsScreen({ embedded = false }: { embedded?: boolean }) {
   const [selectedMonitor, setSelectedMonitor] = useState<string>();
   const [editingMonitor, setEditingMonitor] = useState<string>();
   const [reminderTemplate, setReminderTemplate] = useState<(typeof REMINDER_TEMPLATES)[number]>();
+  const [priceReminder, setPriceReminder] = useState<PriceReminderIntent>();
   const [showAll, setShowAll] = useState(false);
-  const [activeTab, setActiveTab] = useState<"goals" | "reminders">("goals");
+  const [activeTab, setActiveTab] = useState<"goals" | "reminders">(
+    embedded ? "reminders" : "goals",
+  );
   const goal = data?.goals.find((item) => item.id === selectedGoal);
   const monitor = data?.monitors.find((item) => item.id === selectedMonitor);
   const monitorToEdit = data?.monitors.find((item) => item.id === editingMonitor);
+  useEffect(() => {
+    if (!reminderIntent) return;
+    setActiveTab("reminders");
+    setReminderTemplate(undefined);
+    setEditingMonitor(undefined);
+    setSelectedMonitor(undefined);
+    setPriceReminder(reminderIntent);
+    setAdding("Reminder");
+    onReminderIntentHandled?.();
+  }, [onReminderIntentHandled, reminderIntent]);
   // 已停止的盯盘不再出现在列表里（服务端无删除接口，停止即视为移除）。
   const monitors = (data?.monitors || []).filter((item) => item.status !== "stopped");
   return (
@@ -1413,6 +1497,7 @@ export function GoalsScreen({ embedded = false }: { embedded?: boolean }) {
                 icon={Plus}
                 onPress={() => {
                   setReminderTemplate(undefined);
+                  setPriceReminder(undefined);
                   setAdding("Reminder");
                 }}
               >
@@ -1531,6 +1616,7 @@ export function GoalsScreen({ embedded = false }: { embedded?: boolean }) {
                     accessibilityLabel={t(template.titleKey)}
                     onPress={() => {
                       setReminderTemplate(template);
+                      setPriceReminder(undefined);
                       setAdding("Reminder");
                     }}
                     style={({ pressed }) => ({
@@ -1590,6 +1676,7 @@ export function GoalsScreen({ embedded = false }: { embedded?: boolean }) {
                   icon={Plus}
                   onPress={() => {
                     setReminderTemplate(undefined);
+                    setPriceReminder(undefined);
                     setAdding("Reminder");
                   }}
                 >
@@ -1696,14 +1783,17 @@ export function GoalsScreen({ embedded = false }: { embedded?: boolean }) {
           onClose={() => {
             setAdding(undefined);
             setReminderTemplate(undefined);
+            setPriceReminder(undefined);
           }}
         >
           {adding === "Reminder" ? (
             <MonitorForm
               template={reminderTemplate}
+              priceReminder={priceReminder}
               onDone={() => {
                 setAdding(undefined);
                 setReminderTemplate(undefined);
+                setPriceReminder(undefined);
               }}
             />
           ) : (
@@ -1950,50 +2040,71 @@ const REMINDER_TEMPLATES: ReadonlyArray<{
   },
 ];
 
-const WEEKDAYS = [
-  { value: 1, labelKey: "agent.weekdayMonday" },
-  { value: 2, labelKey: "agent.weekdayTuesday" },
-  { value: 3, labelKey: "agent.weekdayWednesday" },
-  { value: 4, labelKey: "agent.weekdayThursday" },
-  { value: 5, labelKey: "agent.weekdayFriday" },
-  { value: 6, labelKey: "agent.weekdaySaturday" },
-  { value: 7, labelKey: "agent.weekdaySunday" },
-] as const satisfies ReadonlyArray<{ value: number; labelKey: TranslationKey }>;
-
-function monitorScheduleText(monitor: Monitor, t: ReturnType<typeof useTranslation>["t"]) {
-  if (monitor.schedule === "daily")
-    return t("agent.scheduleDailyAt", { time: monitor.timeOfDay ?? "09:00" });
-  if (monitor.schedule === "weekly") {
-    const weekday = WEEKDAYS.find((item) => item.value === (monitor.weekday ?? 5));
-    return t("agent.scheduleWeeklyAt", {
-      weekday: t(weekday?.labelKey ?? "agent.weekdayFriday"),
-      time: monitor.timeOfDay ?? "09:00",
-    });
-  }
-  return t("agent.checkingEvery", { minutes: monitor.intervalMinutes });
+function resolvePriceReminderCurrency({ symbol, quote }: PriceReminderIntent): MonitorCurrency {
+  const quoted = quote?.currency?.trim().toUpperCase();
+  if (quoted === "CNY" || quoted === "RMB" || quoted === "CNH") return "CNY";
+  if (quoted === "HKD") return "HKD";
+  if (quoted === "USD") return "USD";
+  const code = symbol.code.toUpperCase();
+  if (code.endsWith(".HK")) return "HKD";
+  if (code.endsWith(".SS") || code.endsWith(".SZ")) return "CNY";
+  if (symbol.market === "HK") return "HKD";
+  if (symbol.market === "US") return "USD";
+  return "CNY";
 }
 
 export function MonitorForm({
   monitor,
   template,
+  priceReminder,
   onDone,
 }: {
   monitor?: Monitor;
   template?: (typeof REMINDER_TEMPLATES)[number];
+  priceReminder?: PriceReminderIntent;
   onDone: () => void;
 }) {
   const { t } = useTranslation();
   const { workspace } = useWorkspace();
   const { mutate } = useAgentWorkspace();
-  const [title, setTitle] = useState(monitor?.title ?? (template ? t(template.titleKey) : ""));
-  const [description, setDescription] = useState(
-    monitor?.description ?? (template ? t(template.detailKey) : ""),
+  const priceReminderUrl = priceReminder
+    ? `https://finance.yahoo.com/quote/${encodeURIComponent(priceReminder.symbol.code)}`
+    : "";
+  const priceReminderCurrency = priceReminder
+    ? resolvePriceReminderCurrency(priceReminder)
+    : undefined;
+  const priceReminderName = priceReminder ? localizedSymbolName(priceReminder.symbol) : "";
+  const priceReminderValue = priceReminder?.quote
+    ? (priceReminder.quote.price * 0.95).toFixed(priceReminder.quote.price < 1 ? 4 : 2)
+    : "";
+  const [title, setTitle] = useState(
+    monitor?.title ??
+      (priceReminder
+        ? t("agent.priceReminderTitle", { name: priceReminderName })
+        : template
+          ? t(template.titleKey)
+          : ""),
   );
-  const [url, setUrl] = useState(monitor && !monitor.url.startsWith("sample:") ? monitor.url : "");
-  const [condition, setCondition] = useState<Monitor["condition"]>(monitor?.condition ?? "change");
-  const [value, setValue] = useState(monitor?.value ?? "");
+  const [description, setDescription] = useState(
+    monitor?.description ??
+      (priceReminder
+        ? t("agent.priceReminderDescription", {
+            name: priceReminderName,
+            code: priceReminder.symbol.code,
+          })
+        : template
+          ? t(template.detailKey)
+          : ""),
+  );
+  const [url, setUrl] = useState(
+    monitor && !monitor.url.startsWith("sample:") ? monitor.url : priceReminderUrl,
+  );
+  const [condition, setCondition] = useState<Monitor["condition"]>(
+    monitor?.condition ?? (priceReminder ? "price_below" : "change"),
+  );
+  const [value, setValue] = useState(monitor?.value ?? priceReminderValue);
   const [currency, setCurrency] = useState<MonitorCurrency | undefined>(
-    monitor ? resolveMonitorCurrency(monitor) : "CNY",
+    monitor ? resolveMonitorCurrency(monitor) : (priceReminderCurrency ?? "CNY"),
   );
   const [interval, setInterval] = useState(String(monitor?.intervalMinutes ?? 15));
   const [schedule, setSchedule] = useState<ReminderSchedule>(
@@ -2002,7 +2113,8 @@ export function MonitorForm({
   const [timeOfDay, setTimeOfDay] = useState(monitor?.timeOfDay ?? template?.timeOfDay ?? "15:30");
   const [weekday, setWeekday] = useState(monitor?.weekday ?? template?.weekday ?? 5);
   const [sample, setSample] = useState(
-    monitor?.url.startsWith("sample:") ?? (!!template && workspace.mode === "sample"),
+    monitor?.url.startsWith("sample:") ??
+      (!!template && !priceReminder && workspace.mode === "sample"),
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -2208,14 +2320,6 @@ export function MonitorForm({
     </Card>
   );
 }
-function monitorConditionText(monitor: Monitor, t: ReturnType<typeof useTranslation>["t"]) {
-  return monitor.condition === "change"
-    ? t("agent.watchForPageChange")
-    : monitor.condition === "contains"
-      ? t("agent.watchForText", { value: monitor.value })
-      : t("agent.priceBelow", { value: monitorPriceLabel(monitor) });
-}
-
 /**
  * 盯盘卡片：图标 + 标题 + 条件 + 调度 + 开关 + 编辑/停止。
  * 开关直接暂停/恢复；停止需二次确认，停止后从列表移除（服务端暂无 DELETE）。
@@ -2448,6 +2552,7 @@ export function NotificationsSheet() {
   const { data, mutate } = useAgentWorkspace();
   const { close, open } = useWorkspace();
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   async function read(id: string, taskId?: string) {
     try {
       await mutate(`/notifications/${id}/read`, {});
@@ -2456,37 +2561,64 @@ export function NotificationsSheet() {
       setError(errorText(e));
     }
   }
+  const unread = data?.notifications.filter((item) => !item.read).length || 0;
+  async function readAll() {
+    if (!unread || busy) return;
+    setBusy(true);
+    try {
+      await mutate("/notifications/read-all", {});
+      setError("");
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <Sheet
       title={t("agent.notificationsTitle")}
       subtitle={t("agent.notificationsSubtitle")}
+      headerAction={
+        <Button small quietBusy busy={busy} disabled={!unread} onPress={() => void readAll()}>
+          {t("agent.markAllRead")}
+        </Button>
+      }
       onClose={close}
     >
-      <View style={{ gap: 12 }}>
+      <View style={{ gap: 10 }}>
         <ErrorNotice error={error} />
         {data?.notifications.map((item) => (
           <Card
             key={item.id}
             style={{
-              gap: 8,
+              gap: 6,
+              padding: 14,
               // 未读通知用品牌浅蓝色底提示，已读回到白底。
               backgroundColor: item.read ? colors.paper : colors.sky,
               borderColor: item.read ? colors.line : colors.lineStrong,
             }}
           >
-            <View style={s.between}>
-              <Text style={s.heading}>{item.title}</Text>
+            <View style={[s.between, { gap: 10 }]}>
+              <Text numberOfLines={2} style={s.heading}>
+                {item.title}
+              </Text>
               {!item.read && <Chip>{t("agent.newChip")}</Chip>}
             </View>
-            <AssistantResponse content={item.body} compact />
-            <Text style={s.small}>{stamp(item.createdAt)}</Text>
-            <Button small onPress={() => void read(item.id, item.taskId)}>
-              {item.taskId
-                ? t("agent.viewTask")
-                : item.read
-                  ? t("agent.read")
-                  : t("agent.markRead")}
-            </Button>
+            {!!item.body.trim() && (
+              <Text numberOfLines={2} style={s.small}>
+                {notificationExcerpt(item.body)}
+              </Text>
+            )}
+            <View style={[s.between, { gap: 10 }]}>
+              <Text style={[s.small, s.metric]}>{stamp(item.createdAt)}</Text>
+              <Button small onPress={() => void read(item.id, item.taskId)}>
+                {item.taskId
+                  ? t("agent.viewTask")
+                  : item.read
+                    ? t("agent.read")
+                    : t("agent.markRead")}
+              </Button>
+            </View>
           </Card>
         ))}
         {!data?.notifications.length && (
@@ -2498,266 +2630,5 @@ export function NotificationsSheet() {
         )}
       </View>
     </Sheet>
-  );
-}
-/** 可挑选的照片头像枚举，与 assets/avatar1~6.png 一一对应。 */
-const AVATAR_OPTIONS = ["avatar1", "avatar2", "avatar3", "avatar4", "avatar5", "avatar6"] as const;
-const TONE_OPTIONS = [
-  "formal",
-  "casual",
-  "playful",
-  "concise",
-] as const satisfies readonly AgentTone[];
-const COMMUNICATION_OPTIONS = [
-  "short",
-  "detailed",
-  "bullets",
-] as const satisfies readonly AgentCommunication[];
-function normalizeAvatar(value?: string): string {
-  // 兼容旧版 sky/sand/lilac 等历史值，一律落入默认头像。
-  return AVATAR_OPTIONS.includes(value as (typeof AVATAR_OPTIONS)[number])
-    ? (value as string)
-    : "avatar1";
-}
-export function AgentPersonalitySheet() {
-  const { locale, t } = useTranslation();
-  const { width } = useWindowDimensions();
-  const { close } = useWorkspace();
-  const { data, mutate } = useAgentWorkspace();
-  const [name, setName] = useState(
-    localizeAgentName(data?.identity.name, data?.identity.nameCustomized),
-  );
-  const [nameCustomized, setNameCustomized] = useState(data?.identity.nameCustomized === true);
-  const [tagline, setTagline] = useState(data?.identity.tagline ?? "");
-  const [tone, setTone] = useState<AgentTone>(data?.identity.tone ?? "warm");
-  const [communication, setCommunication] = useState<AgentCommunication>(
-    data?.identity.communication ?? "short",
-  );
-  const [style, setStyle] = useState(data?.identity.style ?? "");
-  const [userName, setUserName] = useState(data?.identity.userName ?? "");
-  const [avatar, setAvatar] = useState(normalizeAvatar(data?.identity.avatar));
-  const [showChatUpdates, setShowChatUpdates] = useState(data?.identity.showChatUpdates !== false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const compact = width < 600;
-  const visibleTones: AgentTone[] = TONE_OPTIONS.includes(tone as (typeof TONE_OPTIONS)[number])
-    ? [...TONE_OPTIONS]
-    : [...TONE_OPTIONS, tone];
-  useEffect(() => {
-    if (data?.identity) {
-      setName(localizeAgentName(data.identity.name, data.identity.nameCustomized));
-      setNameCustomized(data.identity.nameCustomized === true);
-      setTagline(data.identity.tagline ?? "");
-      setTone(data.identity.tone);
-      setCommunication(data.identity.communication ?? "short");
-      setStyle(data.identity.style ?? "");
-      setUserName(data.identity.userName ?? "");
-      setAvatar(normalizeAvatar(data.identity.avatar));
-      setShowChatUpdates(data.identity.showChatUpdates !== false);
-    }
-  }, [
-    data?.identity.name,
-    data?.identity.nameCustomized,
-    data?.identity.tagline,
-    data?.identity.tone,
-    data?.identity.communication,
-    data?.identity.style,
-    data?.identity.userName,
-    data?.identity.avatar,
-    data?.identity.showChatUpdates,
-    locale,
-  ]);
-  // 保存成功后弹出「已保存」提示，短暂显示后自动关闭。
-  useEffect(() => {
-    if (!saved) return;
-    const timer = setTimeout(() => setSaved(false), 1600);
-    return () => clearTimeout(timer);
-  }, [saved]);
-  async function save() {
-    setBusy(true);
-    setError("");
-    try {
-      await mutate("/identity", {
-        name: name.trim(),
-        nameCustomized,
-        tagline: tagline.trim(),
-        tone,
-        communication,
-        style: style.trim(),
-        userName: userName.trim(),
-        avatar,
-        showChatUpdates,
-      });
-      setSaved(true);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <>
-      <Sheet
-        title={t("agent.personalityMemory")}
-        subtitle={t("agent.settingsSubtitle")}
-        onClose={close}
-      >
-        <View style={{ gap: 22 }}>
-          <Card style={{ gap: 14 }}>
-            <SectionHeading title={t("agent.yourAgent")} />
-            <View
-              style={[
-                s.row,
-                {
-                  gap: compact ? 4 : 8,
-                  justifyContent: "center",
-                  marginBottom: 6,
-                },
-              ]}
-            >
-              {AVATAR_OPTIONS.map((item) => (
-                <Pressable
-                  key={item}
-                  accessibilityRole="radio"
-                  accessibilityLabel={t("agent.avatarLabel", { name: statusLabel(item) })}
-                  accessibilityState={{ checked: avatar === item }}
-                  onPress={() => setAvatar(item)}
-                  style={{
-                    padding: compact ? 3 : 4,
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    borderColor: avatar === item ? colors.primary : colors.line,
-                    backgroundColor: avatar === item ? colors.surface : colors.paper,
-                  }}
-                >
-                  <Mascot size={compact ? 42 : 52} variant={item} />
-                </Pressable>
-              ))}
-            </View>
-            <Field
-              label={t("agent.nameLabel")}
-              value={name}
-              maxLength={80}
-              onChangeText={(value) => {
-                setName(value);
-                setNameCustomized(true);
-              }}
-            />
-            <Field
-              label={t("agent.taglineLabel")}
-              placeholder={t("agent.taglinePlaceholder")}
-              value={tagline}
-              maxLength={60}
-              onChangeText={setTagline}
-            />
-            <View style={{ gap: 8 }}>
-              <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
-                {t("agent.toneLabel")}
-              </Text>
-              <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-                {visibleTones.map((item) => (
-                  <Button key={item} small primary={tone === item} onPress={() => setTone(item)}>
-                    {statusLabel(item)}
-                  </Button>
-                ))}
-              </View>
-            </View>
-            <View style={{ gap: 8 }}>
-              <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
-                {t("agent.communicationLabel")}
-              </Text>
-              <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-                {COMMUNICATION_OPTIONS.map((item) => (
-                  <Button
-                    key={item}
-                    small
-                    primary={communication === item}
-                    onPress={() => setCommunication(item)}
-                  >
-                    {statusLabel(item)}
-                  </Button>
-                ))}
-              </View>
-            </View>
-            <Field
-              label={t("agent.styleLabel")}
-              placeholder={t("agent.stylePlaceholder")}
-              value={style}
-              maxLength={1000}
-              multiline
-              onChangeText={setStyle}
-              style={{ minHeight: 96 }}
-            />
-            <Field
-              label={t("agent.userNameLabel")}
-              placeholder={t("agent.userNamePlaceholder")}
-              value={userName}
-              maxLength={60}
-              onChangeText={setUserName}
-            />
-            <View>
-              <CheckRow
-                label={t("agent.showBackgroundUpdates")}
-                checked={showChatUpdates}
-                onPress={() => setShowChatUpdates(!showChatUpdates)}
-              />
-              <Text style={s.small}>{t("agent.activityFullRecord")}</Text>
-            </View>
-            <Button
-              primary
-              busy={busy}
-              quietBusy
-              disabled={!name.trim()}
-              onPress={() => void save()}
-            >
-              {t("agent.savePreferences")}
-            </Button>
-          </Card>
-          <ErrorNotice error={error} />
-        </View>
-      </Sheet>
-      {saved && (
-        <ModalOverlay visible onRequestClose={() => setSaved(false)}>
-          <View
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 10,
-                paddingVertical: 12,
-                paddingHorizontal: 20,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: colors.line,
-                backgroundColor: colors.paper,
-              }}
-            >
-              <View
-                style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: 999,
-                  backgroundColor: colors.success,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Check size={16} color={colors.onPrimary} />
-              </View>
-              <Text style={{ color: colors.text, fontSize: 15, fontWeight: "600" }}>
-                {t("agent.saved")}
-              </Text>
-            </View>
-          </View>
-        </ModalOverlay>
-      )}
-    </>
   );
 }

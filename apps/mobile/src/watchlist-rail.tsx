@@ -6,6 +6,7 @@ import { ArrowUpRight, Plus } from "./icons";
 import { activeWatchlist, loadWatchlists, useWatchlistState } from "./market";
 import { directionOf, formatPercent } from "./market-format";
 import { useQuotes } from "./quotes";
+import { localizedSymbolName, SYMBOL_MARKET_LABEL_KEYS } from "./symbol-names";
 import { colors, fonts, marketDirectionColor, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -118,11 +119,12 @@ export function WatchlistRail({
               : /\.HK$/i.test(item.symbol.code)
                 ? "HK"
                 : item.symbol.market;
+            const displayName = localizedSymbolName(item.symbol, locale);
             return (
               <Pressable
                 key={item.symbol.code}
                 accessibilityRole="button"
-                accessibilityLabel={`${item.symbol.name} ${item.symbol.code}`}
+                accessibilityLabel={`${displayName} ${item.symbol.code}`}
                 onPress={() => {
                   beforeOpenSymbol?.();
                   open({
@@ -155,13 +157,14 @@ export function WatchlistRail({
                       color: colors.text,
                     }}
                   >
-                    {item.symbol.name}
+                    {displayName}
                   </Text>
                   <Text
                     numberOfLines={1}
                     style={[s.metric, { fontSize: 11, lineHeight: 16, color: colors.faint }]}
                   >
-                    {item.symbol.code.replace(/\.(SS|SH|SZ|HK)$/i, "")} · {venue}
+                    {item.symbol.code.replace(/\.(SS|SH|SZ|HK)$/i, "")} ·{" "}
+                    {t(SYMBOL_MARKET_LABEL_KEYS[venue])}
                   </Text>
                 </View>
                 <View style={{ alignItems: "flex-end", flexShrink: 0, gap: 7 }}>

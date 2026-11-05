@@ -4,6 +4,7 @@ import {
   Image,
   type ImageSourcePropType,
   Pressable,
+  type PressableProps,
   ScrollView,
   type StyleProp,
   StyleSheet,
@@ -163,6 +164,37 @@ export const s = StyleSheet.create({
   /** 数据/度量数字：等宽字体 + tabular 数字，对齐 TraeWork 数值展示规范。 */
   metric: { fontVariant: ["tabular-nums"] as const, fontFamily: fonts.number },
 });
+/** 悬停/按下状态：RN 的类型只声明了 pressed，这里显式补上 hovered。 */
+export type HoverPressableState = { pressed: boolean; hovered: boolean };
+
+type HoverPressableProps = Omit<PressableProps, "style"> & {
+  style?: StyleProp<ViewStyle> | ((state: HoverPressableState) => StyleProp<ViewStyle>);
+};
+
+/**
+ * 带 hover 状态的可点击容器。
+ *
+ * react-native-web 的 Pressable 内部会算 hovered，但 RN 的类型没有暴露；
+ * 这里自行记录悬停状态再交给样式函数，原生触摸端 hovered 恒为 false。
+ */
+export function HoverPressable({ style, onHoverIn, onHoverOut, ...props }: HoverPressableProps) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <Pressable
+      {...props}
+      style={typeof style === "function" ? ({ pressed }) => style({ pressed, hovered }) : style}
+      onHoverIn={(event) => {
+        setHovered(true);
+        onHoverIn?.(event);
+      }}
+      onHoverOut={(event) => {
+        setHovered(false);
+        onHoverOut?.(event);
+      }}
+    />
+  );
+}
+
 export function Button({
   children,
   onPress,
@@ -341,6 +373,7 @@ export function Sheet({
   title,
   titleIcon,
   subtitle,
+  headerAction,
   children,
   onClose,
   wide,
@@ -354,6 +387,8 @@ export function Sheet({
   /** 标题左侧装饰元素（如品牌 Logo），展示于标题文字之前。 */
   titleIcon?: ReactNode;
   subtitle?: string;
+  /** 标题栏右侧操作（如「一键已读」），排在关闭按钮之前。 */
+  headerAction?: ReactNode;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
@@ -496,6 +531,7 @@ export function Sheet({
               </View>
               {!!subtitle && <Text style={s.muted}>{subtitle}</Text>}
             </View>
+            {!!headerAction && <View style={{ marginRight: 8 }}>{headerAction}</View>}
             <IconButton icon={X} label={t("ui.closeDetails")} onPress={onClose} />
           </View>
           <ScrollView

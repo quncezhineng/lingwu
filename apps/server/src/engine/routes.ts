@@ -12,6 +12,7 @@ import {
   MEMORY_CATEGORIES,
 } from "../../../../packages/domain/src/agent.ts";
 import { AppError } from "../errors.ts";
+import { markAllNotificationsRead } from "../notifications.ts";
 import { AGENT_COMMUNICATION_VALUES, AGENT_TONE_VALUES } from "./agent-persona.ts";
 import type { AgentService } from "./service.ts";
 
@@ -167,6 +168,10 @@ export function agentRoutes(service: AgentService): Hono<{ Variables: { owner: s
   app.get("/notifications", async (c) =>
     c.json(await service.db.list<AgentNotification>(c.get("owner"), "notifications")),
   );
+  app.post("/notifications/read-all", async (c) => {
+    const updated = await markAllNotificationsRead(service.db, c.get("owner"));
+    return c.json({ updated });
+  });
   app.post("/notifications/:id/read", async (c) => {
     const notification = await service.db.compareAndSwap<AgentNotification>(
       c.get("owner"),

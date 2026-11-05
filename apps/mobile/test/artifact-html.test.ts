@@ -44,3 +44,26 @@ test("non-HTML artifacts do not enable executable previews", () => {
   assert.equal(artifactHasHtmlPreview(value), false);
   assert.doesNotMatch(renderArtifactHtml(value), /<iframe/);
 });
+
+test("markdown 字段按正文排版渲染，而不是塞进深色代码块", () => {
+  const content = [
+    "# 每日市场简报",
+    "",
+    "1. **隔夜指数**数据暂不可用。",
+    "2. 自选标的异动：600519.SS -2.27%。",
+    "",
+    "> 数据不完整：部分指数暂不可用。",
+  ].join("\n");
+  const html = renderArtifactHtml(artifact({ content }));
+  assert.match(html, /<div class="markdown">/);
+  assert.match(html, /<h1>每日市场简报<\/h1>/);
+  assert.match(html, /<strong>隔夜指数<\/strong>/);
+  assert.match(html, /<blockquote>/);
+  assert.doesNotMatch(html, /<pre class="code"># 每日市场简报/);
+});
+
+test("非 Markdown 的多行文本仍用深色代码块展示", () => {
+  const html = renderArtifactHtml(artifact({ raw: "line one\nline two" }));
+  assert.match(html, /<pre class="code">line one/);
+  assert.doesNotMatch(html, /<div class="markdown">/);
+});

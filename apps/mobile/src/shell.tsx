@@ -13,8 +13,10 @@ import {
   Pressable,
   type PressableProps,
   ScrollView,
+  type StyleProp,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from "react-native";
 import type { Section } from "../../../packages/domain/src";
 import { AccountAvatar } from "./account-avatar";
@@ -48,7 +50,7 @@ import { relativeDate } from "./relative-date";
 import { toggleSidebar, useSidebarCollapsed } from "./sidebar-state";
 import { layout } from "./theme";
 import { useLingWuThread } from "./threads";
-import { Button, colors, ErrorNotice, fonts, Mascot, radius, s, shadow } from "./ui";
+import { Button, colors, ErrorNotice, fonts, radius, s, shadow } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 侧栏中的导航项：都对应一个页面，点击切换到对应 section。 */
@@ -93,10 +95,26 @@ const SidebarTooltipContext = createContext<{
   hide: () => void;
 }>({ show: () => {}, hide: () => {} });
 
+/** 侧栏按钮的样式函数除 pressed 外还能拿到 hovered（桌面端指针悬停）。 */
+type SidebarButtonState = { pressed: boolean; hovered: boolean };
+
+type SidebarButtonProps = Omit<PressableProps, "style"> & {
+  tip?: string;
+  style?: StyleProp<ViewStyle> | ((state: SidebarButtonState) => StyleProp<ViewStyle>);
+};
+
 /** 提示由侧栏根节点绘制，避免导航滚动区裁切；键盘聚焦时同样可见。 */
-function SidebarButton({ tip, onPress, ...props }: PressableProps & { tip?: string }) {
+function SidebarButton({
+  tip,
+  onPress,
+  onHoverIn,
+  onHoverOut,
+  style,
+  ...props
+}: SidebarButtonProps) {
   const anchor = useRef<View>(null);
   const tooltip = useContext(SidebarTooltipContext);
+  const [hovered, setHovered] = useState(false);
   const show = () => {
     if (tip && anchor.current) tooltip.show(tip, anchor.current);
   };
@@ -104,8 +122,17 @@ function SidebarButton({ tip, onPress, ...props }: PressableProps & { tip?: stri
     <Pressable
       {...props}
       ref={anchor}
-      onHoverIn={show}
-      onHoverOut={tooltip.hide}
+      style={typeof style === "function" ? ({ pressed }) => style({ pressed, hovered }) : style}
+      onHoverIn={(event) => {
+        setHovered(true);
+        onHoverIn?.(event);
+        show();
+      }}
+      onHoverOut={(event) => {
+        setHovered(false);
+        onHoverOut?.(event);
+        tooltip.hide();
+      }}
       onFocus={show}
       onBlur={tooltip.hide}
       onPress={(event) => {
@@ -211,8 +238,8 @@ export function BrandMark({ size = 28 }: { size?: number }) {
  * 桌面文本侧栏。导航上方是品牌与新建分析，底部保留助手状态、设置和账户入口。
  * 分析记录统一留在工作台和分析任务页，不在侧栏重复展示。
  */
-export function Rail({ name }: { name: string }) {
-  const { section, navigate, open, workspace } = useWorkspace();
+export function Rail() {
+  const { section, navigate, workspace } = useWorkspace();
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const collapsed = useSidebarCollapsed();
@@ -246,17 +273,9 @@ export function Rail({ name }: { name: string }) {
   const activeCount = (data?.tasks ?? []).filter(
     (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
   ).length;
-  const activeMonitorCount = (data?.monitors ?? []).filter(
-    (monitor) => monitor.status === "active",
-  ).length;
   const accountLabel = workspace.profile.name.trim() || t(ACCOUNT_NAV.labelKey);
   const accountActive =
     section === ACCOUNT_NAV.id || ["preferences", "apps", "connections"].includes(section);
-  const monitorStatus =
-    activeMonitorCount > 0
-      ? t("app.activeMonitors", { count: activeMonitorCount })
-      : t("app.noActiveMonitors");
-
   return (
     <SidebarTooltipContext.Provider value={{ show: showTooltip, hide: hideTooltip }}>
       <View
@@ -391,56 +410,6 @@ export function Rail({ name }: { name: string }) {
             borderTopColor: colors.line,
           }}
         >
-          <SidebarButton
-            tip={collapsed ? t("app.agentSettingsLabel", { name }) : undefined}
-            accessibilityRole="button"
-            accessibilityLabel={t("app.agentSettingsLabel", { name })}
-            onPress={() => open({ type: "personality" })}
-            style={({ pressed }) => ({
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: collapsed ? "center" : "flex-start",
-              gap: 10,
-              marginHorizontal: collapsed ? 0 : -4,
-              paddingHorizontal: collapsed ? 0 : 8,
-              paddingVertical: 8,
-              borderRadius: radius.control,
-              backgroundColor: pressed ? colors.overlay1 : "transparent",
-            })}
-          >
-            <View
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 15,
-                alignItems: "center",
-                justifyContent: "center",
-                borderWidth: 1,
-                borderColor: colors.line,
-                backgroundColor: colors.paper,
-              }}
-            >
-              <Mascot size={24} variant={data?.identity.avatar} background={colors.paper} />
-            </View>
-            {!collapsed && (
-              <View style={{ flex: 1, gap: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
-                  {t("app.agentWatching", { name })}
-                </Text>
-                <View style={[s.row, { gap: 5 }]}>
-                  <View
-                    style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: 3,
-                      backgroundColor: colors.success,
-                    }}
-                  />
-                  <Text style={{ fontSize: 10, color: colors.muted }}>{monitorStatus}</Text>
-                </View>
-              </View>
-            )}
-          </SidebarButton>
           <View
             style={{
               flexDirection: collapsed ? "column" : "row",
@@ -456,7 +425,7 @@ export function Rail({ name }: { name: string }) {
               accessibilityLabel={accountLabel}
               accessibilityState={{ selected: accountActive }}
               onPress={() => navigate(ACCOUNT_NAV.id)}
-              style={({ pressed }) => ({
+              style={({ pressed, hovered }) => ({
                 ...(collapsed ? { width: "100%" as const } : { flex: 1 }),
                 minWidth: 0,
                 minHeight: 38,
@@ -469,8 +438,10 @@ export function Rail({ name }: { name: string }) {
                 backgroundColor: accountActive
                   ? colors.skyStrong
                   : pressed
-                    ? colors.overlay1
-                    : "transparent",
+                    ? colors.overlay3
+                    : hovered
+                      ? colors.overlay2
+                      : "transparent",
               })}
             >
               <AccountAvatar
@@ -501,14 +472,18 @@ export function Rail({ name }: { name: string }) {
               tip={collapsed ? t("app.settingsLabel") : undefined}
               accessibilityRole="button"
               accessibilityLabel={t("app.settingsLabel")}
-              onPress={() => open({ type: "settings" })}
-              style={({ pressed }) => ({
+              onPress={() => navigate("settings")}
+              style={({ pressed, hovered }) => ({
                 width: 38,
                 height: 38,
                 alignItems: "center",
                 justifyContent: "center",
                 borderRadius: radius.control,
-                backgroundColor: pressed ? colors.overlay1 : "transparent",
+                backgroundColor: pressed
+                  ? colors.overlay3
+                  : hovered
+                    ? colors.overlay2
+                    : "transparent",
               })}
             >
               <Settings2 size={17} strokeWidth={1.7} color={colors.muted} />

@@ -64,6 +64,7 @@ import { type InvestmentNote, loadNotes, useNotesState } from "./notes";
 import { QuoteCard } from "./quote-card";
 import { availabilityFromQuote, type QuoteAvailability, useQuotes } from "./quotes";
 import { useSidebarCollapsed } from "./sidebar-state";
+import { localizedSymbolName } from "./symbol-names";
 import { breakpoints, layout, space } from "./theme";
 import {
   Button,
@@ -272,9 +273,10 @@ function SymbolCard({
   const summary = availabilityFromQuote(quote, unavailable);
   // 批量报价优先：加载/逐项错误都保留其状态，只有还没拿到 availability 时才回落 summary。
   const merged = availability ?? summary;
+  const displayName = localizedSymbolName(symbol);
   return (
     <QuoteCard
-      symbol={{ code: symbol.code, name: symbol.name, market: symbol.market }}
+      symbol={{ code: symbol.code, name: displayName, market: symbol.market }}
       availability={merged}
       size="standard"
       narrow
@@ -286,7 +288,7 @@ function SymbolCard({
           <Pressable
             ref={moreTrigger}
             accessibilityRole="button"
-            accessibilityLabel={t("markets.symbolMore", { name: symbol.name })}
+            accessibilityLabel={t("markets.symbolMore", { name: displayName })}
             hitSlop={10}
             onPress={(event) => {
               event.stopPropagation();
@@ -434,11 +436,12 @@ function WatchTable({
         const color = changePercent === undefined ? colors.muted : marketDirectionColor(direction);
         const labels = marketAndAssetLabel(item.symbol, t);
         const note = latestNoteForSymbol(notes, item.symbol.code);
+        const displayName = localizedSymbolName(item.symbol);
         return (
           <Pressable
             key={item.symbol.code}
             accessibilityRole="button"
-            accessibilityLabel={`${item.symbol.name} ${item.symbol.code}`}
+            accessibilityLabel={`${displayName} ${item.symbol.code}`}
             onPress={() => onOpen(item)}
             style={({ pressed }) => [
               s.row,
@@ -462,7 +465,7 @@ function WatchTable({
                   numberOfLines={1}
                   style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
                 >
-                  {item.symbol.name}
+                  {displayName}
                 </Text>
                 <Text numberOfLines={1} style={{ fontSize: 11, color: colors.faint }}>
                   {item.symbol.code}
@@ -564,7 +567,7 @@ function SymbolMenu({
   const { t } = useTranslation();
   return (
     <WatchlistActionMenu
-      label={t("markets.symbolMore", { name: item.symbol.name })}
+      label={t("markets.symbolMore", { name: localizedSymbolName(item.symbol) })}
       anchor={anchor}
       testID="watchlist-symbol-menu"
       onClose={onClose}
@@ -708,7 +711,7 @@ function SymbolSearch({
                       {symbol.code}
                     </Text>
                     <Text style={[s.muted, { fontSize: 12 }]} numberOfLines={1}>
-                      {symbol.name}
+                      {localizedSymbolName(symbol)}
                     </Text>
                   </View>
                   <View style={[s.chip, { backgroundColor: colors.surface }]}>
@@ -906,7 +909,7 @@ function AddSymbolSheet({
                       numberOfLines={1}
                       style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
                     >
-                      {symbol.name}
+                      {localizedSymbolName(symbol)}
                     </Text>
                     <Text numberOfLines={1} style={{ fontSize: 11, color: colors.faint }}>
                       {symbol.code} · {labels.market} · {labels.asset}
@@ -1235,7 +1238,7 @@ function WatchlistSheet({
           <Pressable
             key={symbol.code}
             accessibilityRole="button"
-            accessibilityLabel={`${symbol.code} ${symbol.name}`}
+            accessibilityLabel={`${symbol.code} ${localizedSymbolName(symbol)}`}
             onPress={() =>
               setSelected((current) => current.filter((item) => item.code !== symbol.code))
             }
@@ -1283,7 +1286,7 @@ export function WatchlistAddSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function WatchlistScreen() {
+export function WatchlistScreen({ embedded = false }: { embedded?: boolean } = {}) {
   const { api, notify, open, ask } = useWorkspace();
   const { t, locale } = useTranslation();
   const { width, height } = useWindowDimensions();
@@ -1349,7 +1352,7 @@ export function WatchlistScreen() {
   const analyzeSymbol = (item: WatchlistSymbol) => {
     ask(
       t("markets.watchlistAnalyzePrompt", {
-        name: item.symbol.name,
+        name: localizedSymbolName(item.symbol),
         code: item.symbol.code,
       }),
     );
@@ -1361,7 +1364,7 @@ export function WatchlistScreen() {
     if (!list) return;
     removeSymbol(api, list.id, item.symbol.code);
     setMenuFor(null);
-    notify(t("markets.watchlistRemoved", { name: item.symbol.name }), {
+    notify(t("markets.watchlistRemoved", { name: localizedSymbolName(item.symbol) }), {
       label: t("markets.watchlistUndo"),
       onPress: () => addSymbols(api, list.id, [item.symbol]),
     });
@@ -1391,10 +1394,11 @@ export function WatchlistScreen() {
       (item) =>
         matchesWatchFilter(item.symbol.market, marketFilter) &&
         (!needle ||
+          localizedSymbolName(item.symbol).toLowerCase().includes(needle) ||
           item.symbol.name.toLowerCase().includes(needle) ||
           item.symbol.code.toLowerCase().includes(needle)),
     );
-  }, [filterQuery, list, marketFilter]);
+  }, [filterQuery, list, marketFilter, locale]);
 
   if (state.status === "loading" && !state.lists.length) {
     return (
@@ -1493,25 +1497,27 @@ export function WatchlistScreen() {
         </View>
       </View>
 
-      <View style={[s.between, { gap: 12, flexWrap: "wrap" }]}>
-        <Text style={s.small}>
-          {t("markets.watchlistCaptionedCount", { count: list?.symbols.length ?? 0 })}
-        </Text>
-        <View style={[s.row, { gap: 6 }]}>
-          {state.source === "mock" ? (
-            <View style={[s.chip, { paddingVertical: 2 }]}>
-              <Text style={s.chipText}>{t("markets.watchlistSample")}</Text>
-            </View>
-          ) : null}
+      {!embedded ? (
+        <View style={[s.between, { gap: 12, flexWrap: "wrap" }]}>
           <Text style={s.small}>
-            {t(
-              state.source === "mock"
-                ? "markets.watchlistSampleCaption"
-                : "markets.watchlistLiveCaption",
-            )}
+            {t("markets.watchlistCaptionedCount", { count: list?.symbols.length ?? 0 })}
           </Text>
+          <View style={[s.row, { gap: 6 }]}>
+            {state.source === "mock" ? (
+              <View style={[s.chip, { paddingVertical: 2 }]}>
+                <Text style={s.chipText}>{t("markets.watchlistSample")}</Text>
+              </View>
+            ) : null}
+            <Text style={s.small}>
+              {t(
+                state.source === "mock"
+                  ? "markets.watchlistSampleCaption"
+                  : "markets.watchlistLiveCaption",
+              )}
+            </Text>
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View
         style={{
@@ -1625,7 +1631,7 @@ export function WatchlistScreen() {
           </Text>
         </View>
       </View>
-      <DisclaimerNote style={{ marginTop: 0, textAlign: "right" }} />
+      {!embedded ? <DisclaimerNote style={{ marginTop: 0, textAlign: "right" }} /> : null}
 
       {sheet === "create" && (
         <WatchlistSheet

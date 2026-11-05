@@ -25,7 +25,7 @@ import {
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { FileText, RefreshCw, Upload } from "./icons";
-import { Button, Card, Chip, colors, DisclaimerNote, ErrorNotice, s } from "./ui";
+import { Button, Card, Chip, colors, ErrorNotice, s } from "./ui";
 
 const METRIC_LABEL: Record<MetricKey, TranslationKey> = {
   revenue: "financials.revenue",
@@ -160,9 +160,11 @@ export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolC
     : [];
 
   return (
-    <View style={{ marginTop: 18, gap: 8 }}>
-      <View style={[s.between, { gap: 8, flexWrap: "wrap" }]}>
-        <Text style={[s.label, { color: colors.faint }]}>{t("financials.title")}</Text>
+    <View style={{ gap: 10 }}>
+      <View style={[s.between, { gap: 10, flexWrap: "wrap", minHeight: 34 }]}>
+        <Text style={{ fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.text }}>
+          {t("financials.title")}
+        </Text>
         {!!report && (
           <Button
             small
@@ -405,7 +407,6 @@ export function FinancialsSection({ api, symbolCode }: { api: LingWuApi; symbolC
           </View>
         </Card>
       )}
-      <DisclaimerNote />
     </View>
   );
 }

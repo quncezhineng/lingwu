@@ -69,10 +69,8 @@ import {
   FileText,
   FolderOpen,
   Lightbulb,
-  ListChecks,
   RotateCcw,
   Sparkles,
-  Target,
   Upload,
   X,
 } from "./icons";
@@ -478,6 +476,8 @@ export function ChatScreen({
   emptyTitleTail,
   emptySubtitle,
   composerPlaceholder,
+  showIdeasShortcut = false,
+  onOpenIdeas,
   firstRunWelcome,
   onThreadUsed,
 }: {
@@ -498,8 +498,11 @@ export function ChatScreen({
   emptyEyebrow?: string;
   emptyTitleLead?: string;
   emptyTitleTail?: string;
-  emptySubtitle?: string;
+  /** `null` hides the subtitle while leaving the default copy for other hosts. */
+  emptySubtitle?: string | null;
   composerPlaceholder?: string;
+  showIdeasShortcut?: boolean;
+  onOpenIdeas?: () => void;
   firstRunWelcome?: {
     greeting: string;
     summary: string;
@@ -1066,41 +1069,6 @@ export function ChatScreen({
   const replying = busy || agent.isRunning || syncing;
   const renderedCount = visible.length + extraDrafts.length;
   const wideEmpty = !hideHeader && windowWidth >= 1180;
-  const emptySuggestions = [
-    {
-      icon: Target,
-      text: t("chat.suggestionHackerNews"),
-      action: () => enqueue(t("chat.suggestionHackerNews")),
-    },
-    {
-      icon: FileText,
-      text: t("chat.suggestionSummarize"),
-      action: () => enqueue(t("chat.suggestionSummarize")),
-    },
-    {
-      icon: Sparkles,
-      text: t("chat.suggestionDeepDive"),
-      action: () => enqueue(t("chat.suggestionDeepDive")),
-    },
-    {
-      icon: Lightbulb,
-      text: t("chat.suggestionBriefing"),
-      action: () => enqueue(t("chat.suggestionBriefing")),
-    },
-    {
-      icon: ListChecks,
-      text: t("chat.suggestionPeerCompare"),
-      action: () => enqueue(t("chat.suggestionPeerCompare")),
-    },
-    {
-      icon: Target,
-      text: t("chat.suggestionWatchWebsite"),
-      action: () => {
-        enqueue(t("chat.suggestionWatchWebsite"));
-        navigate("goals");
-      },
-    },
-  ] as const;
   const latestVisible = visible[visible.length - 1];
   const latestVisibleText = latestVisible ? messageText(latestVisible) : "";
   const showingStreamText =
@@ -1295,7 +1263,7 @@ export function ChatScreen({
                   width: "100%",
                   maxWidth: 980,
                   alignSelf: "center",
-                  flexDirection: wideEmpty ? "row" : "column",
+                  flexDirection: wideEmpty && firstRunWelcome ? "row" : "column",
                   alignItems: "stretch",
                   gap: wideEmpty ? 54 : 26,
                 }}
@@ -1338,18 +1306,20 @@ export function ChatScreen({
                       {emptyTitleTail ?? t("chat.emptyTitleTail")}
                     </Text>
                   </Text>
-                  <Text
-                    style={[
-                      s.muted,
-                      {
-                        maxWidth: 540,
-                        fontSize: 13,
-                        lineHeight: 22,
-                      },
-                    ]}
-                  >
-                    {emptySubtitle ?? t("chat.emptySubtitle")}
-                  </Text>
+                  {emptySubtitle !== null && (
+                    <Text
+                      style={[
+                        s.muted,
+                        {
+                          maxWidth: 540,
+                          fontSize: 13,
+                          lineHeight: 22,
+                        },
+                      ]}
+                    >
+                      {emptySubtitle ?? t("chat.emptySubtitle")}
+                    </Text>
+                  )}
                   {!hideHeader && (
                     <View style={[s.row, { gap: 7, marginTop: 4 }]}>
                       <Sparkles size={13} color={colors.faint} />
@@ -1361,6 +1331,7 @@ export function ChatScreen({
                 </View>
                 <View
                   style={{
+                    display: firstRunWelcome ? undefined : "none",
                     width: wideEmpty ? 360 : "100%",
                     paddingLeft: wideEmpty ? 28 : 0,
                     paddingTop: hideHeader ? 0 : wideEmpty ? 0 : 18,
@@ -1371,77 +1342,9 @@ export function ChatScreen({
                     ...(hideHeader ? { gap: 8 } : undefined),
                   }}
                 >
-                  <View style={[s.between, { paddingBottom: 8 }]}>
-                    <Text style={[typography.eyebrow, { color: colors.faint }]}>
-                      {t("chat.suggestionHeading")}
-                    </Text>
-                    <Text style={{ fontSize: 9, color: colors.lineStrong }}>01—06</Text>
-                  </View>
-                  <View
-                    style={
-                      hideHeader ? { flexDirection: "row", flexWrap: "wrap", gap: 8 } : undefined
-                    }
-                  >
-                    {emptySuggestions.map((item, index) => (
-                      <Pressable
-                        key={item.text}
-                        accessibilityRole="button"
-                        onPress={item.action}
-                        style={({ pressed }) => ({
-                          minHeight: 47,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 11,
-                          paddingVertical: 10,
-                          borderTopWidth: hideHeader ? 0 : 1,
-                          borderTopColor: colors.lineSoft,
-                          backgroundColor: pressed ? colors.surfaceRaised : "transparent",
-                          ...(hideHeader
-                            ? {
-                                flexBasis: windowWidth >= breakpoints.desktop ? "48%" : "100%",
-                                flexGrow: 1,
-                                borderWidth: 1,
-                                borderColor: colors.line,
-                                borderRadius: 22,
-                                paddingHorizontal: 12,
-                                minHeight: 40,
-                              }
-                            : undefined),
-                        })}
-                      >
-                        {!hideHeader && (
-                          <Text
-                            style={[
-                              s.metric,
-                              {
-                                width: 20,
-                                fontSize: 10,
-                                color: colors.faint,
-                              },
-                            ]}
-                          >
-                            {String(index + 1).padStart(2, "0")}
-                          </Text>
-                        )}
-                        <item.icon size={14} strokeWidth={1.65} color={colors.muted} />
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 12,
-                            lineHeight: 18,
-                            color: colors.text,
-                          }}
-                        >
-                          {item.text}
-                        </Text>
-                        <ArrowUpRight size={13} color={colors.faint} />
-                      </Pressable>
-                    ))}
-                  </View>
                   {firstRunWelcome && (
                     <View
                       style={{
-                        marginTop: 16,
                         paddingHorizontal: 16,
                         paddingVertical: 15,
                         borderRadius: 18,
@@ -2052,6 +1955,15 @@ export function ChatScreen({
                   onPress: openFilePicker,
                 },
               ]}
+              cornerAction={
+                showIdeasShortcut
+                  ? {
+                      icon: Lightbulb,
+                      label: t("agentSpace.openIdeasPage"),
+                      onPress: onOpenIdeas ?? (() => navigate("ideas")),
+                    }
+                  : undefined
+              }
               attachments={
                 <ComposerAttachments
                   files={w.files}

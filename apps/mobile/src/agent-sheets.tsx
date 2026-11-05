@@ -25,6 +25,7 @@ import { useTranslation } from "./i18n";
 import {
   ChevronRight,
   Clock3,
+  Heart,
   type MessageCircle,
   Plus,
   Settings2,
@@ -34,9 +35,10 @@ import {
 } from "./icons";
 import { InsightCard } from "./insight-card";
 import { ModelSelector } from "./model-selector";
+import { PreferencesScreen } from "./preferences-screen";
 import { FilesScreen } from "./screens";
 import { TaskHubScreen } from "./task-hub";
-import { Button, colors, Field, radius, Sheet, s, typography } from "./ui";
+import { Button, colors, Field, HoverPressable, radius, Sheet, s, typography } from "./ui";
 import { WatchlistAddSheet } from "./watchlist";
 import { WatchlistHubScreen } from "./watchlist-hub";
 import { useWorkspace } from "./workspace";
@@ -51,6 +53,7 @@ export type AgentPanel =
   | "bot-goals-memory"
   | "create"
   | "preferences"
+  | "memory"
   | "watchlist"
   | "watchlist-add"
   | "tasks"
@@ -60,7 +63,7 @@ export type AgentPanel =
   | "capabilities"
   | "account";
 
-function PanelButton({
+export function PanelButton({
   icon: Icon,
   title,
   detail,
@@ -78,17 +81,23 @@ function PanelButton({
   compact?: boolean;
 }) {
   return (
-    <Pressable
+    <HoverPressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => ({
+      style={({ pressed, hovered }) => ({
         minHeight: 52,
         paddingHorizontal: 7,
         paddingVertical: 8,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: active ? colors.accentLine : "transparent",
-        backgroundColor: active ? colors.sky : pressed ? colors.surface : "transparent",
+        backgroundColor: active
+          ? colors.sky
+          : pressed
+            ? colors.overlay2
+            : hovered
+              ? colors.overlay1
+              : "transparent",
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
@@ -131,7 +140,7 @@ function PanelButton({
       ) : (
         <ChevronRight size={15} color={colors.faint} />
       )}
-    </Pressable>
+    </HoverPressable>
   );
 }
 
@@ -181,11 +190,18 @@ export function AgentMoreContent({
           detail={t("agentSpace.insightsDetail")}
           onPress={() => onPanel("insights")}
         />
+        <PanelButton
+          compact={compact}
+          icon={Heart}
+          title={t("app.navPreferences")}
+          detail={t("details.settingsPreferencesDetail")}
+          onPress={() => onPanel("memory")}
+        />
         {showWatchlistLink && (
           <PanelButton
             compact={compact}
             icon={Star}
-            title={t("agentSpace.watchlist")}
+            title={t("agentSpace.watchlistAndPortfolio")}
             detail={t("agentSpace.watchlistDetail")}
             onPress={() => onPanel("watchlist")}
           />
@@ -704,10 +720,16 @@ export function AgentSheets({
   if (panel === "bot-goals-memory") return <BotGoalsMemoryPage onClose={onDismiss} />;
   if (panel === "create") return <CreateAgentSheet onClose={onClose} onCreated={onClose} />;
   if (panel === "preferences") return <PreferencesSheet onClose={onClose} />;
+  if (panel === "memory")
+    return (
+      <Sheet botLayout title={t("agent.memory")} onClose={onClose} wide>
+        <PreferencesScreen embedded />
+      </Sheet>
+    );
   if (panel === "watchlist-add") return <WatchlistAddSheet onClose={onDismiss} />;
   if (panel === "watchlist")
     return (
-      <Sheet botLayout title={t("agentSpace.watchlist")} onClose={onClose} wide>
+      <Sheet botLayout title={t("agentSpace.watchlistAndPortfolio")} onClose={onClose} wide>
         <WatchlistHubScreen mode="embedded" />
       </Sheet>
     );

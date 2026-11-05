@@ -113,6 +113,62 @@ const agent = {
   "agent.findIdeas": "寻找灵感",
   "agent.ideasEmptyTitle": "给好研究留点空间",
   "agent.ideasEmptyDetail": "从你关注的行情、研报与数据源中寻找灵感，每条建议都会附上依据。",
+  "agent.researchTemplates": "研究模板",
+  "agent.researchTemplatesDetail": "选一个方向，直接用当前 Agent 开始研究。",
+  "agent.useResearchTemplate": "使用研究模板：{title}",
+  "agent.useTemplateAction": "用此提示",
+  "agent.templateTrendDescription":
+    "结合近 30 日价格、成交量与关键新闻，梳理趋势、支撑阻力和短期风险。",
+  "agent.templateTrendPrompt":
+    "分析目标股票近期的价格与成交量走势，识别当前趋势、关键支撑阻力位和主要风险，并结合近期新闻与公告解释异动。请先询问我要分析的股票代码。",
+  "agent.templateEarningsDescription": "拆解营收、利润、现金流与业绩指引，定位同比变化的关键驱动。",
+  "agent.templateDeepDiveDescription":
+    "从商业模式、财务质量、估值和风险四个维度，形成可复核的研究结论。",
+  "agent.templateBriefingDescription":
+    "汇总隔夜市场、宏观政策、财报日历，以及自选与持仓标的的最新动态。",
+  "agent.templatePeerDescription": "选取 3-5 家可比公司，从增长、利润率与估值倍数定位行业位置。",
+  "agent.templateWatchDescription": "设定价格或事件条件，持续跟踪变化，并在触发时提醒你。",
+  "agent.templateWatchPrompt":
+    "帮我设置一个盯盘任务。请先询问标的、触发条件和提醒方式，然后持续跟踪价格或关键事件，触发时附上当时的行情与来源。",
+  "agent.templateRatesTitle": "解读央行政策与利率变化",
+  "agent.templateRatesDescription": "串联利率、通胀与流动性数据，判断政策变化对估值和行业的影响。",
+  "agent.templateRatesPrompt":
+    "解读近期央行政策与利率变化：整理主要央行表态、利率曲线和通胀数据，分析流动性变化对不同资产与行业估值的影响，并给出需要继续跟踪的指标。",
+  "agent.templateDividendTitle": "筛选高股息与现金流标的",
+  "agent.templateDividendDescription": "结合股息率、分红持续性、自由现金流和负债质量做稳健筛选。",
+  "agent.templateDividendPrompt":
+    "筛选一组高股息与现金流稳健的标的：比较股息率、分红历史、自由现金流、资本开支和负债质量，排除一次性分红与盈利质量偏弱的公司，并输出候选清单与风险提示。",
+  "agent.templateFlowTitle": "捕捉放量与资金异动",
+  "agent.templateFlowDescription": "扫描成交量、换手率和价格异动，区分趋势启动与短期噪声。",
+  "agent.templateFlowPrompt":
+    "扫描近期出现成交量放大、换手率抬升和价格异动的股票，结合资金方向、新闻公告与行业表现，区分趋势启动和短期噪声，并列出最值得继续核验的标的。",
+  "agent.templatePortfolioTitle": "复盘组合收益与风险暴露",
+  "agent.templatePortfolioDescription":
+    "拆解收益来源、行业集中度、回撤与相关性，找出组合薄弱环节。",
+  "agent.templatePortfolioPrompt":
+    "复盘我的投资组合：拆分收益来源，计算行业与个股集中度、最大回撤、波动和相关性，识别主要风险暴露，并给出优先级明确的调整建议。请先询问我组合里的持仓与权重。",
+  "agent.templateMoatTitle": "拆解公司护城河与竞争优势",
+  "agent.templateMoatDescription": "从品牌、成本、网络效应、切换成本与资本效率验证竞争优势。",
+  "agent.templateMoatPrompt":
+    "拆解目标公司的护城河：从品牌、成本优势、网络效应、切换成本和资本效率逐项寻找证据，判断优势是否可持续，并指出可能削弱竞争力的关键风险。请先询问公司名称或代码。",
+  "agent.templateIndustryTitle": "跟踪行业景气与产业链变化",
+  "agent.templateIndustryDescription": "追踪价格、库存、订单和政策信号，定位产业链受益与承压环节。",
+  "agent.templateIndustryPrompt":
+    "跟踪一个行业的景气度与产业链变化：汇总价格、库存、订单、产能和政策信号，判断上下游受益与承压环节，并筛选值得深入研究的公司。请先询问行业或产业链范围。",
+  "agent.templatePlanTitle": "制定本周投研计划",
+  "agent.templatePlanDescription": "围绕自选、持仓和关键事件，安排本周研究优先级与检查清单。",
+  "agent.templatePlanPrompt":
+    "根据我的自选、持仓和本周市场日历制定投研计划：列出需要跟踪的财报、宏观数据与事件，安排每日研究与复盘任务，并给出明确的优先级和检查清单。",
+  "agent.templateNotesTitle": "整理调研纪要与核心观点",
+  "agent.templateNotesDescription": "把电话会、访谈或调研笔记整理成论点、证据、分歧和待验证问题。",
+  "agent.templateNotesPrompt":
+    "把电话会、访谈或调研材料整理成结构化纪要：提取核心观点、关键数据与原文证据，区分事实与管理层判断，列出分歧、风险和后续需要验证的问题。请先让我提供材料。",
+  "agent.templateCatalystTitle": "构建事件驱动观察清单",
+  "agent.templateCatalystDescription":
+    "围绕财报、政策、并购与产品发布，梳理催化剂、时间窗口和风险。",
+  "agent.templateCatalystPrompt":
+    "构建一个事件驱动的观察清单：识别未来一段时间的重要财报、政策、并购、产品发布和行业会议，评估每项事件的可能影响、时间窗口与失效条件，并标注需要持续跟踪的证据。",
+  "agent.ideasForYou": "来自你关注的线索",
   "agent.ideaSuggestions": "投研灵感",
   "agent.tplIdeaStockTitle": "深度研究一只股票",
   "agent.tplIdeaStockReason": "买入前先把基本面和估值看清楚，判断当前价格是否留有安全边际。",
@@ -172,6 +228,9 @@ const agent = {
   "agent.reminderTplFilingDetail": "关注持仓与自选标的的重要公告、财报和关键更新。",
   "agent.reminderTplWeeklyTitle": "每周自选回顾",
   "agent.reminderTplWeeklyDetail": "整理关注标的的变化、相关公告与待跟踪问题。",
+  "agent.priceReminderTitle": "{name}价格提醒",
+  "agent.priceReminderDescription":
+    "定时查看 {name}（{code}）的最新公开行情，价格低于目标价时提醒我。",
   "agent.monitorPageLabel": "公开页面 URL",
   "agent.saveChanges": "保存修改",
   "agent.invalidMonitorInterval": "检查间隔请填写 1 到 10080 分钟。",
@@ -299,6 +358,7 @@ const agent = {
   "agent.newChip": "新",
   "agent.read": "已读",
   "agent.markRead": "标为已读",
+  "agent.markAllRead": "一键已读",
   "agent.allCaughtUp": "都处理完了",
   "agent.notificationsEmptyDetail": "结果、重要的变更以及需要你补充信息的请求都会显示在这里。",
   "agent.searchApps": "搜索应用",
@@ -417,23 +477,6 @@ const agent = {
   "agent.shortcutNotesDetail": "买入/卖出理由、研究心得与论点追踪",
   "agent.shortcutMailDetail": "阅读邮件并准备回复",
   "agent.shortcutCalendarDetail": "日程与复核过的邀请",
-  "agent.personalityMemory": "性格与表达",
-  "agent.settingsSubtitle": "让智能体拥有自己的名字、语气和相处方式。",
-  "agent.yourAgent": "它的性格",
-  "agent.avatarLabel": "{name} 头像",
-  "agent.nameLabel": "名称",
-  "agent.taglineLabel": "一句话介绍",
-  "agent.taglinePlaceholder": "例如：你的一天，安排好了。",
-  "agent.toneLabel": "语气",
-  "agent.communicationLabel": "话说多少",
-  "agent.styleLabel": "还有什么想让它成为的样子",
-  "agent.stylePlaceholder": "例如：有点风趣。用公制单位。从不用 emoji。",
-  "agent.userNameLabel": "它怎么称呼你",
-  "agent.userNamePlaceholder": "名字或昵称",
-  "agent.showBackgroundUpdates": "在对话中显示后台更新",
-  "agent.activityFullRecord": "「任务」与「通知」始终保留完整记录，包括审批请求。",
-  "agent.savePreferences": "保存",
-  "agent.saved": "已保存",
   "agent.memory": "记忆",
   "agent.memoryDetail": "你可以查看、修正或遗忘的上下文。",
   "agent.rememberAboutMe": "记住关于我的一些事",
@@ -495,6 +538,8 @@ const agent = {
   "agentSpace.myAgents": "我的 Agent",
   "agentSpace.createAgent": "创建 Agent",
   "agentSpace.account": "个人账户",
+  "agentSpace.personalCenter": "个人中心",
+  "agentSpace.accountMenuSettingsDetail": "模型、工作区与账号设置",
   "agentSpace.systemAgent": "系统默认 Agent",
   "agentSpace.more": "更多能力",
   "agentSpace.resizeAgentList": "调整机器人列表宽度",
@@ -506,6 +551,7 @@ const agent = {
   "agentSpace.insights": "领悟卡",
   "agentSpace.insightsDetail": "汇总各 Agent 的结论与来源",
   "agentSpace.watchlist": "我的自选",
+  "agentSpace.watchlistAndPortfolio": "自选与组合",
   "agentSpace.watchlistDetail": "跨 Agent 共用同一份清单",
   "agentSpace.tasks": "任务",
   "agentSpace.tasksDetail": "汇总所有 Agent 的执行记录",
@@ -635,14 +681,11 @@ const agent = {
   "agentSpace.welcomeEyebrow": "你的个人投研 Agent",
   "agentSpace.welcomeTitle": "把研究交给合适的 Agent。",
   "agentSpace.welcomeTail": "从今天最关心的问题开始。",
-  "agentSpace.welcomeSubtitle":
-    "{name} 会保留独立的消息、草稿与技能配置。需要换一种专长时，再创建新的 Agent。",
   "agentSpace.composer": "发消息给 {name}…",
+  "agentSpace.openIdeasPage": "灵感页面",
   "agentSpace.ready": "随时可以开始",
   "agentSpace.noTasks": "还没有任务。回到对话，让 Agent 开始一次分析。",
   "agentSpace.noInsights": "还没有可汇总的领悟卡。完成一次研究后，结论会保留来源。",
-  "agentSpace.globalNote":
-    "全局内容由所有 Agent 共用；每个 Agent 有独立对话与技能配置。资料库、目标和记忆仍属于当前账户。",
   "agentSpace.sampleNote": "真实对话由当前模型与工作区能力执行；未连接的服务不会伪造结果。",
   "agentSpace.quickCapabilities": "常用能力",
 } satisfies Dictionary;

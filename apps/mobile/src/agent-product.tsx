@@ -15,7 +15,7 @@ import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-h
 import { agentLayout } from "./agent-layout";
 import { AgentOnboarding } from "./agent-onboarding";
 import { AgentOrb } from "./agent-orb";
-import { AgentMoreContent, type AgentPanel, AgentSheets } from "./agent-sheets";
+import { AgentMoreContent, type AgentPanel, AgentSheets, PanelButton } from "./agent-sheets";
 import { AgentSideDrawer } from "./agent-side-drawer";
 import { useAgentSpace } from "./agent-space";
 import {
@@ -23,23 +23,54 @@ import {
   onboardingPreferenceContext,
   onboardingSummary,
 } from "./agent-space-model";
+import { IdeasScreen } from "./agent-ui";
+import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
 import { ChatScreen, WorkspaceTools } from "./chat";
 import { ColumnResizeHandle } from "./column-resize-handle";
+import { ComputerScreen } from "./computer";
 import { columnMaxWidth, desktopColumns } from "./desktop-columns";
-import { Details } from "./details";
+import { Details, SettingsScreen } from "./details";
 import { useTranslation } from "./i18n";
-import { ChevronLeft, ChevronRight, Plus, X } from "./icons";
+import { LOCALE_LABELS } from "./i18n/types";
+import {
+  Bell,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleUserRound,
+  Languages,
+  Lightbulb,
+  LogOut,
+  Plus,
+  Search,
+  Settings2,
+  Star,
+  X,
+} from "./icons";
+import { ModalOverlay } from "./modal-overlay";
 import { PreferencesScreen } from "./preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./screens";
+import { GlobalSearchSheet } from "./search-sheet";
 import { TaskHubScreen } from "./task-hub";
 import { breakpoints } from "./theme";
 import { Toast, type ToastState } from "./toast";
-import { Button, colors, ErrorNotice, fonts, radius, s, space, typography } from "./ui";
+import {
+  Button,
+  colors,
+  ErrorNotice,
+  fonts,
+  HoverPressable,
+  IconButton,
+  radius,
+  s,
+  shadow,
+  space,
+  typography,
+} from "./ui";
 import { useDesktopColumns } from "./use-desktop-columns";
 import { WatchlistHubScreen } from "./watchlist-hub";
-import { WatchlistRail } from "./watchlist-rail";
 import { type Detail, useWorkspace } from "./workspace";
 
 function AgentListItem({
@@ -90,18 +121,307 @@ function AgentListItem({
   );
 }
 
+function AccountMenuRow({
+  icon: Icon,
+  title,
+  detail,
+  onPress,
+}: {
+  icon: typeof Settings2;
+  title: string;
+  detail?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        minHeight: 44,
+        paddingHorizontal: 9,
+        paddingVertical: 8,
+        borderRadius: 10,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 11,
+        backgroundColor: pressed ? colors.overlay1 : "transparent",
+      })}
+    >
+      <View
+        style={{
+          width: 30,
+          height: 30,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 8,
+          backgroundColor: colors.surfaceSoft,
+        }}
+      >
+        <Icon size={16} color={colors.text} strokeWidth={1.7} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 13, fontWeight: "500", color: colors.text }}>{title}</Text>
+        {!!detail && (
+          <Text numberOfLines={1} style={[s.small, { fontSize: 10, lineHeight: 15 }]}>
+            {detail}
+          </Text>
+        )}
+      </View>
+      <ChevronRight size={14} color={colors.faint} />
+    </Pressable>
+  );
+}
+
+/**
+ * 语言项：点击后在行右侧（抽屉里为下方）浮出语言小窗，选中即刻生效，
+ * 不再跳转到设置里的语言子页面；悬停不展开、也不给悬停底色。
+ */
+function LanguageMenuRow({ compact }: { compact: boolean }) {
+  const { locale, locales, setLocale, t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const current = LOCALE_LABELS[locale];
+
+  return (
+    <View style={{ zIndex: 20 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("common.language")}
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((value) => !value)}
+        style={({ pressed }) => ({
+          minHeight: 44,
+          paddingHorizontal: 9,
+          paddingVertical: 8,
+          borderRadius: 10,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 11,
+          backgroundColor: pressed ? colors.overlay1 : "transparent",
+        })}
+      >
+        <View
+          style={{
+            width: 30,
+            height: 30,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 8,
+            backgroundColor: colors.surfaceSoft,
+          }}
+        >
+          <Languages size={16} color={colors.text} strokeWidth={1.7} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.text }}>
+            {t("common.language")}
+          </Text>
+          <Text numberOfLines={1} style={[s.small, { fontSize: 10, lineHeight: 15 }]}>
+            {current.native}
+          </Text>
+        </View>
+        <ChevronRight size={14} color={colors.faint} />
+      </Pressable>
+      {open && (
+        <View
+          style={{
+            position: "absolute",
+            // 桌面窄栏时菜单左侧还有横向空间，小窗贴在行右侧浮出，避免遮住下面的设置项；
+            // 抽屉里空间不足，改为覆盖在下方选项上。
+            ...(compact ? { top: 44, left: 6 } : { top: 0, left: "100%" as const }),
+            width: 176,
+            padding: 6,
+            gap: 2,
+            zIndex: 30,
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: 14,
+            backgroundColor: colors.paper,
+            ...shadow.card,
+          }}
+        >
+          {locales.map((item) => {
+            const meta = LOCALE_LABELS[item];
+            const selected = item === locale;
+            return (
+              <HoverPressable
+                key={item}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={meta.english}
+                onPress={() => {
+                  setLocale(item);
+                  setOpen(false);
+                }}
+                style={({ pressed, hovered }) => ({
+                  minHeight: 34,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 7,
+                  borderRadius: 9,
+                  backgroundColor: selected
+                    ? colors.sky
+                    : pressed
+                      ? colors.overlay2
+                      : hovered
+                        ? colors.overlay1
+                        : "transparent",
+                })}
+              >
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 12,
+                    fontWeight: selected ? "600" : "500",
+                    color: colors.text,
+                  }}
+                >
+                  {meta.native}
+                </Text>
+                {selected && <Check size={13} color={colors.primary} />}
+              </HoverPressable>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function AccountMenu({
+  name,
+  email,
+  avatarUrl,
+  compact,
+  onClose,
+  onProfile,
+  onSettings,
+  onSignOut,
+}: {
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  compact: boolean;
+  onClose: () => void;
+  onProfile: () => void;
+  onSettings: () => void;
+  onSignOut: () => void;
+}) {
+  const { t } = useTranslation();
+  const { width } = useWindowDimensions();
+  const menuWidth = Math.min(compact ? 300 : 286, width - 32);
+  return (
+    <ModalOverlay transition="fade" backdrop="subtle" onRequestClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("ui.closeDetails")}
+          onPress={onClose}
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+          }}
+        />
+        <View
+          accessibilityViewIsModal
+          style={{
+            position: "absolute",
+            left: compact ? 16 : 18,
+            bottom: 82,
+            width: menuWidth,
+            padding: 8,
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: 17,
+            backgroundColor: colors.paper,
+            ...shadow.card,
+          }}
+        >
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 9,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 11,
+            }}
+          >
+            <AccountAvatar avatarUrl={avatarUrl} name={name} size={40} borderRadius={999} />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text
+                numberOfLines={1}
+                style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
+              >
+                {name}
+              </Text>
+              <Text numberOfLines={1} style={[s.small, { fontSize: 10, lineHeight: 15 }]}>
+                {email || t("app.profileUnset")}
+              </Text>
+            </View>
+          </View>
+          <View style={{ height: 1, marginVertical: 6, backgroundColor: colors.line }} />
+          <AccountMenuRow
+            icon={CircleUserRound}
+            title={t("app.profileDetails")}
+            onPress={onProfile}
+          />
+          <LanguageMenuRow compact={compact} />
+          <AccountMenuRow
+            icon={Settings2}
+            title={t("details.settingsTitle")}
+            detail={t("agentSpace.accountMenuSettingsDetail")}
+            onPress={onSettings}
+          />
+          <View style={{ height: 1, marginVertical: 6, backgroundColor: colors.line }} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("app.signOutLabel")}
+            onPress={onSignOut}
+            style={({ pressed }) => ({
+              minHeight: 42,
+              paddingHorizontal: 10,
+              borderRadius: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 11,
+              backgroundColor: pressed ? colors.errorSoft : "transparent",
+            })}
+          >
+            <LogOut size={16} color={colors.danger} strokeWidth={1.7} />
+            <Text style={{ flex: 1, fontSize: 13, fontWeight: "500", color: colors.danger }}>
+              {t("app.signOutLabel")}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </ModalOverlay>
+  );
+}
+
 function AgentRail({
   onOpen,
+  onSearch,
+  onSignOut,
   onClose,
   compact = false,
 }: {
   onOpen: (panel: AgentPanel) => void;
+  onSearch: () => void;
+  onSignOut: () => void;
   onClose?: () => void;
   compact?: boolean;
 }) {
   const { t } = useTranslation();
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const { agents, current, selectAgent } = useAgentSpace();
-  const { navigate, workspace } = useWorkspace();
+  const { navigate, open, workspace } = useWorkspace();
+  const { data: agentData } = useAgentWorkspace();
+  const unreadNotifications = (agentData?.notifications ?? []).filter((item) => !item.read).length;
   const accountNickname = workspace.profile.name.trim() || t("agentSpace.account");
   const choose = (agent: AgentDefinition) => {
     selectAgent(agent.id);
@@ -152,6 +472,14 @@ function AgentRail({
             </Text>
           </View>
         </Pressable>
+        <IconButton
+          icon={Search}
+          label={t("search.title")}
+          onPress={() => {
+            onClose?.();
+            onSearch();
+          }}
+        />
         {compact && (
           <Pressable
             accessibilityRole="button"
@@ -184,7 +512,7 @@ function AgentRail({
             minHeight: 46,
             paddingHorizontal: 12,
             borderRadius: 13,
-            backgroundColor: pressed ? colors.skyStrong : colors.sky,
+            backgroundColor: pressed ? colors.overlay1 : "transparent",
             flexDirection: "row",
             alignItems: "center",
             gap: 9,
@@ -197,35 +525,121 @@ function AgentRail({
           </Text>
         </Pressable>
       </ScrollView>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => onOpen("account")}
-        style={({ pressed }) => ({
-          paddingVertical: 13,
-          borderRadius: 13,
-          paddingHorizontal: 10,
-          backgroundColor: pressed ? colors.overlay1 : "transparent",
+      <View
+        style={{
           borderTopWidth: 1,
           borderTopColor: colors.line,
           flexDirection: "row",
           alignItems: "center",
-          gap: 10,
-        })}
+          gap: 4,
+        }}
       >
-        <AccountAvatar
-          avatarUrl={workspace.profile.avatarUrl}
+        <HoverPressable
+          accessibilityRole="button"
+          accessibilityLabel={t("agentSpace.personalCenter")}
+          onPress={() => setAccountMenuOpen(true)}
+          style={({ pressed, hovered }) => ({
+            flex: 1,
+            minWidth: 0,
+            paddingVertical: 13,
+            paddingLeft: 10,
+            paddingRight: 4,
+            borderRadius: 13,
+            backgroundColor: pressed ? colors.overlay3 : hovered ? colors.overlay2 : "transparent",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+          })}
+        >
+          <AccountAvatar
+            avatarUrl={workspace.profile.avatarUrl}
+            name={accountNickname}
+            size={31}
+            borderRadius={10}
+          />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>{accountNickname}</Text>
+            <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
+              {t("agentSpace.account")}
+            </Text>
+          </View>
+        </HoverPressable>
+        <HoverPressable
+          accessibilityRole="button"
+          accessibilityLabel={t("app.notificationsLabel", { count: unreadNotifications })}
+          onPress={() => {
+            onClose?.();
+            open({ type: "notifications" });
+          }}
+          style={({ pressed, hovered }) => ({
+            width: 36,
+            height: 36,
+            borderRadius: radius.control,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: pressed ? colors.overlay3 : hovered ? colors.overlay2 : "transparent",
+          })}
+        >
+          <View>
+            <Bell size={17} strokeWidth={1.7} color={colors.muted} />
+            {unreadNotifications > 0 && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: -3,
+                  right: -3,
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: colors.primary,
+                }}
+              />
+            )}
+          </View>
+        </HoverPressable>
+        <HoverPressable
+          accessibilityRole="button"
+          accessibilityLabel={t("app.settingsLabel")}
+          onPress={() => {
+            onClose?.();
+            navigate("settings");
+          }}
+          style={({ pressed, hovered }) => ({
+            width: 36,
+            height: 36,
+            borderRadius: radius.control,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: pressed ? colors.overlay3 : hovered ? colors.overlay2 : "transparent",
+          })}
+        >
+          <Settings2 size={17} strokeWidth={1.7} color={colors.muted} />
+        </HoverPressable>
+      </View>
+      {accountMenuOpen && (
+        <AccountMenu
           name={accountNickname}
-          size={31}
-          borderRadius={10}
+          email={workspace.profile.email}
+          avatarUrl={workspace.profile.avatarUrl}
+          compact={compact}
+          onClose={() => setAccountMenuOpen(false)}
+          onProfile={() => {
+            setAccountMenuOpen(false);
+            onClose?.();
+            navigate("account");
+          }}
+          onSettings={() => {
+            setAccountMenuOpen(false);
+            onClose?.();
+            navigate("settings");
+          }}
+          onSignOut={() => {
+            setAccountMenuOpen(false);
+            onClose?.();
+            onSignOut();
+          }}
         />
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>{accountNickname}</Text>
-          <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
-            {t("agentSpace.account")}
-          </Text>
-        </View>
-        <ChevronRight size={14} color={colors.faint} />
-      </Pressable>
+      )}
     </View>
   );
 }
@@ -277,11 +691,15 @@ function CapabilityRail({
           paddingBottom: 24,
         }}
       >
-        <WatchlistRail
-          onViewAll={() => onOpen("watchlist")}
-          onAdd={() => onOpen("watchlist-add")}
-          beforeOpenSymbol={onClose}
-        />
+        <View style={{ marginHorizontal: -7 }}>
+          <PanelButton
+            compact={compact}
+            icon={Star}
+            title={t("agentSpace.watchlistAndPortfolio")}
+            detail={t("agentSpace.watchlistDetail")}
+            onPress={() => onOpen("watchlist")}
+          />
+        </View>
         <Text
           style={{
             marginTop: 30,
@@ -337,17 +755,23 @@ function AgentHeader({
             ? t("app.titleNotes")
             : section === "watchlist" || section === "portfolio"
               ? t("app.navWatchlist")
-              : section === "activity" || section === "goals"
-                ? t("app.navActivity")
-                : section === "mail"
-                  ? t("app.titleMail")
-                  : section === "calendar"
-                    ? t("app.titleCalendar")
-                    : section === "browser"
-                      ? t("app.titleBrowser")
-                      : section === "apps" || section === "connections"
-                        ? t("app.navApps")
-                        : t("app.navChat");
+              : section === "ideas"
+                ? t("agentSpace.openIdeasPage")
+                : section === "activity" || section === "goals"
+                  ? t("app.navActivity")
+                  : section === "mail"
+                    ? t("app.titleMail")
+                    : section === "calendar"
+                      ? t("app.titleCalendar")
+                      : section === "browser"
+                        ? t("app.titleBrowser")
+                        : section === "computer"
+                          ? t("threads.agentComputer")
+                          : section === "apps" || section === "connections"
+                            ? t("app.navApps")
+                            : section === "settings"
+                              ? t("details.settingsTitle")
+                              : t("app.navChat");
   return (
     <View
       style={{
@@ -382,9 +806,6 @@ function AgentHeader({
       </View>
       <View style={{ flex: 1, alignItems: "center" }}>
         <Text style={[typography.heading, { fontSize: 16 }]}>{sectionTitle}</Text>
-        <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
-          {t("agentSpace.globalNote")}
-        </Text>
       </View>
       <View style={{ width: 48 }} />
     </View>
@@ -420,12 +841,18 @@ function SecondarySection({
       case "apps":
       case "connections":
         return <CapabilityHubScreen />;
+      case "settings":
+        return <SettingsScreen />;
       case "mail":
         return <MailScreen />;
       case "calendar":
         return <CalendarScreen />;
       case "browser":
         return <BrowserScreen />;
+      case "computer":
+        return <ComputerScreen />;
+      case "ideas":
+        return <IdeasScreen />;
       default:
         return (
           <View style={{ alignItems: "center", padding: 40, gap: 14 }}>
@@ -451,6 +878,98 @@ function SecondarySection({
   );
 }
 
+function IdeasOverlay({ onClose }: { onClose: () => void }) {
+  const { width, height } = useWindowDimensions();
+  const { t } = useTranslation();
+  const desktop = width >= breakpoints.desktop;
+  const panelWidth = Math.min(1180, Math.floor(width * (desktop ? 0.8 : 0.92)));
+  const panelHeight = Math.min(900, Math.floor(height * (desktop ? 0.8 : 0.9)));
+  return (
+    <ModalOverlay transition="fade" backdrop="subtle" onRequestClose={onClose}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: desktop ? 24 : 12,
+        }}
+      >
+        <View
+          style={{
+            width: panelWidth,
+            height: panelHeight,
+            maxWidth: "100%",
+            maxHeight: "100%",
+            overflow: "hidden",
+            borderRadius: desktop ? 24 : 20,
+            borderWidth: 1,
+            borderColor: colors.lineStrong,
+            backgroundColor: colors.canvas,
+            shadowColor: "#0b1b33",
+            shadowOpacity: 0.2,
+            shadowRadius: 36,
+            shadowOffset: { width: 0, height: 16 },
+          }}
+        >
+          <View
+            style={{
+              height: 58,
+              flexShrink: 0,
+              paddingHorizontal: 18,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.line,
+              backgroundColor: colors.paper,
+            }}
+          >
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: radius.control,
+                backgroundColor: colors.sky,
+              }}
+            >
+              <Lightbulb size={17} color={colors.primary} />
+            </View>
+            <Text style={[typography.heading, { flex: 1, fontSize: 16 }]}>
+              {t("agentSpace.openIdeasPage")}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("ui.closeDetails")}
+              onPress={onClose}
+              style={({ pressed }) => ({
+                width: 36,
+                height: 36,
+                borderRadius: radius.full,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: pressed ? colors.overlay1 : "transparent",
+              })}
+            >
+              <X size={18} color={colors.muted} />
+            </Pressable>
+          </View>
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: desktop ? 26 : 18,
+              paddingTop: 22,
+              paddingBottom: 34,
+            }}
+          >
+            <IdeasScreen onUsePrompt={onClose} />
+          </ScrollView>
+        </View>
+      </View>
+    </ModalOverlay>
+  );
+}
+
 export function AgentProductShell({
   detail,
   toast,
@@ -473,10 +992,12 @@ export function AgentProductShell({
   const threeColumns = Platform.OS === "web" && availableWidth >= desktopColumns.breakpoint;
   const { widths: columnWidths, resize: resizeColumn } = useDesktopColumns(availableWidth);
   const { t } = useTranslation();
-  const { section, close } = useWorkspace();
+  const { section, close, reminderIntent } = useWorkspace();
   const { agents, current, preferences, selection, loading, needsOnboarding, markThreadUsed } =
     useAgentSpace();
   const [panelStack, setPanelStack] = useState<AgentPanel[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [ideasOpen, setIdeasOpen] = useState(false);
   const panel = panelStack.at(-1);
   const closePanel = useCallback(() => setPanelStack((stack) => stack.slice(0, -1)), []);
   const dismissPanels = useCallback(() => setPanelStack([]), []);
@@ -495,6 +1016,12 @@ export function AgentProductShell({
   useEffect(() => {
     if (threeColumns) setDrawer(null);
   }, [threeColumns]);
+
+  useEffect(() => {
+    if (!reminderIntent) return;
+    setPanelStack([]);
+    setDrawer(null);
+  }, [reminderIntent]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
@@ -602,7 +1129,11 @@ export function AgentProductShell({
           {threeColumns && (
             <>
               <View style={{ width: columnWidths.left, flexShrink: 0, minHeight: 0 }}>
-                <AgentRail onOpen={openPanel} />
+                <AgentRail
+                  onOpen={openPanel}
+                  onSearch={() => setSearchOpen(true)}
+                  onSignOut={onSignOut}
+                />
               </View>
               <ColumnResizeHandle
                 side="left"
@@ -662,12 +1193,12 @@ export function AgentProductShell({
                           emptyEyebrow={t("agentSpace.welcomeEyebrow")}
                           emptyTitleLead={t("agentSpace.welcomeTitle")}
                           emptyTitleTail={t("agentSpace.welcomeTail")}
-                          emptySubtitle={t("agentSpace.welcomeSubtitle", {
-                            name: agent.name,
-                          })}
+                          emptySubtitle={null}
                           composerPlaceholder={t("agentSpace.composer", {
                             name: agent.name,
                           })}
+                          showIdeasShortcut
+                          onOpenIdeas={() => setIdeasOpen(true)}
                           onThreadUsed={() => markThreadUsed(agent.id)}
                         />
                       </View>
@@ -705,7 +1236,13 @@ export function AgentProductShell({
             closeLabel={t("ui.closeDetails")}
           >
             {drawer === "agents" ? (
-              <AgentRail compact onOpen={openPanel} onClose={() => setDrawer(null)} />
+              <AgentRail
+                compact
+                onOpen={openPanel}
+                onSearch={() => setSearchOpen(true)}
+                onSignOut={onSignOut}
+                onClose={() => setDrawer(null)}
+              />
             ) : (
               <CapabilityRail compact onOpen={openPanel} onClose={() => setDrawer(null)} />
             )}
@@ -719,6 +1256,8 @@ export function AgentProductShell({
           onPanel={pushPanel}
           onSignOut={onSignOut}
         />
+        {searchOpen && <GlobalSearchSheet onClose={() => setSearchOpen(false)} />}
+        {ideasOpen && <IdeasOverlay onClose={() => setIdeasOpen(false)} />}
         {detail && <Details detail={detail} />}
       </SafeAreaView>
     </>

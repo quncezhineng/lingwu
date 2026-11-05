@@ -22,6 +22,12 @@ export type ComposerTool = {
   active?: boolean;
 };
 
+export type ComposerCornerAction = {
+  icon: IconComponent;
+  label: string;
+  onPress: () => void;
+};
+
 export function PromptComposer({
   value,
   onChangeText,
@@ -32,6 +38,7 @@ export function PromptComposer({
   inputMinHeight = 68,
   inputMaxHeight = 150,
   tools = [],
+  cornerAction,
   attachments,
   sendLabel,
   stopLabel,
@@ -50,6 +57,7 @@ export function PromptComposer({
   inputMinHeight?: number;
   inputMaxHeight?: number;
   tools?: ComposerTool[];
+  cornerAction?: ComposerCornerAction;
   attachments?: ReactNode;
   sendLabel: string;
   stopLabel?: string;
@@ -74,6 +82,33 @@ export function PromptComposer({
   const action = () => {
     if (busy || canSubmit) onSubmit();
   };
+  const cornerButton = cornerAction ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={cornerAction.label}
+      hitSlop={6}
+      onPress={cornerAction.onPress}
+      style={({ pressed }) => ({
+        position: "absolute",
+        // Keep the shortcut fully above the composer instead of covering its input area.
+        top: -48,
+        right: 13,
+        zIndex: 20,
+        width: 38,
+        height: 38,
+        borderRadius: radius.full,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+        borderColor: pressed ? colors.primary : colors.line,
+        backgroundColor: pressed ? colors.sky : colors.paper,
+        transform: [{ scale: pressed ? 0.96 : 1 }],
+        ...shadow.card,
+      })}
+    >
+      <cornerAction.icon size={18} strokeWidth={1.8} color={colors.primaryStrong} />
+    </Pressable>
+  ) : null;
 
   const input = (
     <TextInput
@@ -168,6 +203,7 @@ export function PromptComposer({
       <View
         style={[
           {
+            position: "relative",
             backgroundColor: colors.paper,
             borderRadius: 29,
             borderWidth: 1,
@@ -179,6 +215,7 @@ export function PromptComposer({
           style,
         ]}
       >
+        {cornerButton}
         {attachments}
         <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6 }}>
           <View style={{ position: "relative", zIndex: 10 }}>
@@ -249,6 +286,7 @@ export function PromptComposer({
     <View
       style={[
         {
+          position: "relative",
           backgroundColor: colors.paper,
           borderRadius: dense ? radius.panel : radius.composer,
           borderWidth: 1,
@@ -259,6 +297,7 @@ export function PromptComposer({
         style,
       ]}
     >
+      {cornerButton}
       {attachments}
       {input}
       <View

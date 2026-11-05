@@ -7,6 +7,7 @@ export type Section =
   | "mail"
   | "calendar"
   | "browser"
+  | "computer"
   | "files"
   | "activity"
   | "connections"
@@ -17,6 +18,7 @@ export type Section =
   | "portfolio"
   | "notes"
   | "apps"
+  | "settings"
   | "account";
 export interface Mail {
   id: string;

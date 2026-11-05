@@ -24,6 +24,7 @@ import {
   type QuoteAvailability,
   type QuoteError,
 } from "./quotes";
+import { localizedSymbolName } from "./symbol-names";
 import { colors, marketDirectionColor, s } from "./ui";
 
 const ERROR_KEYS: Record<QuoteError, TranslationKey> = {
@@ -115,6 +116,8 @@ export function QuoteCard({
 }) {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
+  // 公司名跟随站点语言：中文界面显示中文名，表里没有的代码回退行情源名称。
+  const displayName = localizedSymbolName(symbol, locale);
   const shimmer = useShimmer();
   const [cardWidth, setCardWidth] = useState(0);
   const compactTime = width >= 360;
@@ -204,7 +207,7 @@ export function QuoteCard({
             {symbol.code}
           </Text>
           <Text style={[s.muted, { fontSize: 13 }]} numberOfLines={1}>
-            {symbol.name}
+            {displayName}
           </Text>
           <View
             style={{ borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 8, marginTop: 4 }}
@@ -369,7 +372,7 @@ export function QuoteCard({
           </View>
           <View style={s.between}>
             <Text style={[s.muted, { fontSize: 13, flex: 1 }]} numberOfLines={1}>
-              {symbol.name}
+              {displayName}
             </Text>
             {!!changeText && (
               <Text style={[s.metric, { fontSize: 11, color: dayColor }]}>
@@ -409,7 +412,7 @@ export function QuoteCard({
               {symbol.code}
             </Text>
             <Text style={[s.muted, { fontSize: 13, lineHeight: 19 }]} numberOfLines={1}>
-              {symbol.name}
+              {displayName}
             </Text>
           </View>
           <View style={{ flex: 1.5, alignItems: "flex-end", gap: 2 }}>
@@ -472,9 +475,10 @@ function accessibilityLabelOf(
   symbol: { code: string; name: string },
   t: (key: TranslationKey) => string,
 ) {
-  if (availability.status === "loading") return `${symbol.code} ${symbol.name}`;
+  const name = localizedSymbolName(symbol);
+  if (availability.status === "loading") return `${symbol.code} ${name}`;
   if (availability.status === "unavailable")
-    return `${symbol.code} ${symbol.name}, ${t("quotes.unavailable")}`;
+    return `${symbol.code} ${name}, ${t("quotes.unavailable")}`;
   const quote = availability.quote;
-  return `${symbol.code} ${symbol.name}, ${quote.price}, ${quote.changePercent ?? ""}`;
+  return `${symbol.code} ${name}, ${quote.price}, ${quote.changePercent ?? ""}`;
 }

@@ -306,6 +306,64 @@ test("notification reads do not load the full agent workspace", async (t) => {
   assert.ok(Array.isArray(await response.json()));
 });
 
+test("mark-all notifications reads every unread item for the owner only", async () => {
+  const owner = "local-user";
+  const before = await read<AgentNotification[]>("/notifications");
+  const previouslyUnread = before.filter((item) => !item.read);
+  const createdAt = new Date().toISOString();
+  const testNotices: AgentNotification[] = [
+    {
+      id: "bulk-read-test-1",
+      title: "Bulk read test 1",
+      body: "First unread notification",
+      createdAt,
+      read: false,
+    },
+    {
+      id: "bulk-read-test-2",
+      title: "Bulk read test 2",
+      body: "Second unread notification",
+      createdAt,
+      read: false,
+    },
+    {
+      id: "bulk-read-already-read",
+      title: "Already read",
+      body: "This item must not count as updated",
+      createdAt,
+      read: true,
+    },
+  ];
+  const otherOwnerNotice: AgentNotification = {
+    id: "bulk-read-other-owner",
+    title: "Another owner's notification",
+    body: "This must remain unread",
+    createdAt,
+    read: false,
+  };
+  for (const notice of testNotices) await db.put(owner, "notifications", notice);
+  await db.put("other-user", "notifications", otherOwnerNotice);
+
+  try {
+    assert.deepEqual(await read("/notifications/read-all", {}), {
+      updated: previouslyUnread.length + 2,
+    });
+    const after = await read<AgentNotification[]>("/notifications");
+    assert.ok(
+      after.filter((item) => item.id.startsWith("bulk-read-test-")).every((item) => item.read),
+    );
+    assert.deepEqual(await read("/notifications/read-all", {}), { updated: 0 });
+    assert.equal(
+      (await db.get<AgentNotification>("other-user", "notifications", otherOwnerNotice.id))?.read,
+      false,
+    );
+  } finally {
+    for (const notice of testNotices) await db.remove(owner, "notifications", notice.id);
+    for (const notice of previouslyUnread) await db.put(owner, "notifications", notice);
+    await db.remove("other-user", "notifications", otherOwnerNotice.id);
+  }
+});
+
 test("handling a task clears the notification that was waiting on the person", async () => {
   const owner = "local-user";
   const task = await read<AgentTask>("/tasks", { prompt: "Book a table" }, 201);

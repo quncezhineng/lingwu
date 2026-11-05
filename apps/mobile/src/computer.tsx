@@ -144,7 +144,8 @@ export function BrowserThreadCard({
   );
 }
 const tabIcons = { Browser: Globe2, Desktop: Monitor, Terminal, Files: FolderOpen } as const;
-export function ComputerSheet() {
+/** 智能体电脑的主体内容：既可放进浮层，也可作为独立页面渲染。 */
+function ComputerPanel() {
   const { workspace, api, refresh, close, open, navigate } = useWorkspace();
   const { t } = useTranslation();
   const [url, setUrl] = useState("");
@@ -203,129 +204,141 @@ export function ComputerSheet() {
     }
   }
   return (
+    <View style={{ gap: 20 }}>
+      {shown === "Browser" && (
+        <View
+          style={[
+            s.row,
+            {
+              gap: 12,
+              padding: 16,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: colors.paper,
+            },
+          ]}
+        >
+          <Monitor size={28} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={s.heading}>
+              {available ? t("computer.browserConnected") : t("computer.browserOffline")}
+            </Text>
+            <Text style={s.muted}>
+              {available
+                ? t("computer.browserConnectedDetail")
+                : t("computer.browserOfflineDetail")}
+            </Text>
+          </View>
+        </View>
+      )}
+      <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+        {tabs.map((item) => (
+          <Button
+            key={item}
+            primary={shown === item}
+            icon={tabIcons[item]}
+            onPress={() => setTab(item)}
+          >
+            {tabLabels[item]}
+          </Button>
+        ))}
+      </View>
+      <View style={{ display: shown === "Browser" ? "none" : "flex" }}>
+        <LinuxWorkspace tab={shown === "Browser" ? "Terminal" : shown} onSnapshot={onSnapshot} />
+      </View>
+      <ErrorNotice error={error} />
+      {shown === "Browser" ? (
+        <>
+          <View>
+            <Field
+              label={t("computer.websiteAddress")}
+              value={url}
+              onChangeText={setUrl}
+              placeholder="https://example.com"
+              autoCapitalize="none"
+              keyboardType="url"
+              onSubmitEditing={() => void create()}
+            />
+            <Button
+              primary
+              icon={Plus}
+              busy={busy}
+              disabled={!available || !url.trim()}
+              onPress={() => void create()}
+            >
+              {t("computer.openBrowserSession")}
+            </Button>
+          </View>
+          {[...workspace.browsers]
+            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+            .map((browser) => (
+              <BrowserThreadCard key={browser.id} browser={browser} fill />
+            ))}
+          {!workspace.browsers.length && <Text style={s.muted}>{t("computer.emptyBrowsers")}</Text>}
+          <Text style={s.small}>{t("computer.browsersNote")}</Text>
+        </>
+      ) : tab === "Files" ? (
+        <>
+          <Text style={s.heading}>{t("computer.documents")}</Text>
+          <Text style={s.small}>{t("computer.documentsDetail")}</Text>
+          {workspace.files.map((file) => (
+            <LinkRow
+              key={file.id}
+              icon={FileText}
+              title={file.name}
+              detail={
+                fileKind(file) === "html"
+                  ? t("screens.filesWebPage")
+                  : fileKind(file) === "pdf"
+                    ? t("computer.pdfPages", { count: file.pageCount })
+                    : fileTypeName(file)
+              }
+              onPress={() => open({ type: "file", file })}
+            />
+          ))}
+          <Button
+            icon={Plus}
+            onPress={() => {
+              close();
+              navigate("files");
+            }}
+          >
+            {t("computer.importDocument")}
+          </Button>
+        </>
+      ) : null}
+      <Button
+        small
+        icon={RefreshCw}
+        onPress={() =>
+          void refresh()
+            .then(() => setError(""))
+            .catch((e) => setError(String(e)))
+        }
+      >
+        {t("computer.refreshComputer")}
+      </Button>
+    </View>
+  );
+}
+
+/** 浮层形态：聊天等场景里就地打开智能体电脑。 */
+export function ComputerSheet() {
+  const { t } = useTranslation();
+  const { close } = useWorkspace();
+  return (
     <Sheet
       title={t("threads.agentComputer")}
       subtitle={t("computer.sheetSubtitle")}
       onClose={close}
     >
-      <View style={{ gap: 20 }}>
-        {shown === "Browser" && (
-          <View
-            style={[
-              s.row,
-              {
-                gap: 12,
-                padding: 16,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: colors.line,
-                backgroundColor: colors.paper,
-              },
-            ]}
-          >
-            <Monitor size={28} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.heading}>
-                {available ? t("computer.browserConnected") : t("computer.browserOffline")}
-              </Text>
-              <Text style={s.muted}>
-                {available
-                  ? t("computer.browserConnectedDetail")
-                  : t("computer.browserOfflineDetail")}
-              </Text>
-            </View>
-          </View>
-        )}
-        <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-          {tabs.map((item) => (
-            <Button
-              key={item}
-              primary={shown === item}
-              icon={tabIcons[item]}
-              onPress={() => setTab(item)}
-            >
-              {tabLabels[item]}
-            </Button>
-          ))}
-        </View>
-        <View style={{ display: shown === "Browser" ? "none" : "flex" }}>
-          <LinuxWorkspace tab={shown === "Browser" ? "Terminal" : shown} onSnapshot={onSnapshot} />
-        </View>
-        <ErrorNotice error={error} />
-        {shown === "Browser" ? (
-          <>
-            <View>
-              <Field
-                label={t("computer.websiteAddress")}
-                value={url}
-                onChangeText={setUrl}
-                placeholder="https://example.com"
-                autoCapitalize="none"
-                keyboardType="url"
-                onSubmitEditing={() => void create()}
-              />
-              <Button
-                primary
-                icon={Plus}
-                busy={busy}
-                disabled={!available || !url.trim()}
-                onPress={() => void create()}
-              >
-                {t("computer.openBrowserSession")}
-              </Button>
-            </View>
-            {[...workspace.browsers]
-              .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-              .map((browser) => (
-                <BrowserThreadCard key={browser.id} browser={browser} fill />
-              ))}
-            {!workspace.browsers.length && (
-              <Text style={s.muted}>{t("computer.emptyBrowsers")}</Text>
-            )}
-            <Text style={s.small}>{t("computer.browsersNote")}</Text>
-          </>
-        ) : tab === "Files" ? (
-          <>
-            <Text style={s.heading}>{t("computer.documents")}</Text>
-            <Text style={s.small}>{t("computer.documentsDetail")}</Text>
-            {workspace.files.map((file) => (
-              <LinkRow
-                key={file.id}
-                icon={FileText}
-                title={file.name}
-                detail={
-                  fileKind(file) === "html"
-                    ? t("screens.filesWebPage")
-                    : fileKind(file) === "pdf"
-                      ? t("computer.pdfPages", { count: file.pageCount })
-                      : fileTypeName(file)
-                }
-                onPress={() => open({ type: "file", file })}
-              />
-            ))}
-            <Button
-              icon={Plus}
-              onPress={() => {
-                close();
-                navigate("files");
-              }}
-            >
-              {t("computer.importDocument")}
-            </Button>
-          </>
-        ) : null}
-        <Button
-          small
-          icon={RefreshCw}
-          onPress={() =>
-            void refresh()
-              .then(() => setError(""))
-              .catch((e) => setError(String(e)))
-          }
-        >
-          {t("computer.refreshComputer")}
-        </Button>
-      </View>
+      <ComputerPanel />
     </Sheet>
   );
+}
+
+/** 页面形态：设置页等入口在中间栏整页显示，不再弹窗。 */
+export function ComputerScreen() {
+  return <ComputerPanel />;
 }

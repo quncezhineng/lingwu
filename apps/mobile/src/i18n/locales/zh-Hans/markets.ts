@@ -55,7 +55,7 @@ const markets = {
   "markets.watchlistCaptionedCount": "已关注 {count} 个标的",
   "markets.watchlistSampleCaption": "示例行情 · 非实时数据",
   "markets.watchlistLiveCaption": "工作区行情 · 按需刷新",
-  "markets.watchlistSaved": "自选列表会保存到你的工作区，并在工作台与 App 视图同步更新。",
+  "markets.watchlistSaved": "自选列表会保存到你的工作区并持续更新。",
   "markets.watchlistFilterEmptyTitle": "当前筛选下还没有自选标的",
   "markets.watchlistFilterEmptyDetail": "切换市场或搜索条件，也可以继续添加标的。",
   "markets.watchlistEmptyTitle": "还没有观察列表",

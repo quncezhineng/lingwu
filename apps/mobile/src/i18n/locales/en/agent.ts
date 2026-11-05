@@ -122,6 +122,72 @@ const agent = {
   "agent.ideasEmptyTitle": "Room for good research",
   "agent.ideasEmptyDetail":
     "Find ideas from the markets, reports and data sources you follow. Each suggestion includes its evidence.",
+  "agent.researchTemplates": "Research templates",
+  "agent.researchTemplatesDetail": "Choose a starting point and begin with your current Agent.",
+  "agent.useResearchTemplate": "Use research template: {title}",
+  "agent.useTemplateAction": "Use this prompt",
+  "agent.templateTrendDescription":
+    "Read 30-day price, volume and key news to map the trend, support, resistance and near-term risks.",
+  "agent.templateTrendPrompt":
+    "Analyze the target stock's recent price and volume action, identify the current trend, key support and resistance, and main risks, then explain moves using recent news and filings. Ask me for the ticker first.",
+  "agent.templateEarningsDescription":
+    "Break down revenue, profit, cash flow and guidance to explain what drove year-over-year changes.",
+  "agent.templateDeepDiveDescription":
+    "Review the business model, financial quality, valuation and risks to produce a verifiable research view.",
+  "agent.templateBriefingDescription":
+    "Summarize overnight markets, macro policy, the earnings calendar, and changes across your watchlist and holdings.",
+  "agent.templatePeerDescription":
+    "Select 3-5 peers and use growth, margins and valuation multiples to locate the target in its industry.",
+  "agent.templateWatchDescription":
+    "Set a price or event condition, keep tracking it, and notify you when the threshold is reached.",
+  "agent.templateWatchPrompt":
+    "Set up a market watch. Ask me for the symbol, trigger condition and notification preference, then keep tracking the price or key event and include current quotes and sources when triggered.",
+  "agent.templateRatesTitle": "Read central-bank policy and rates",
+  "agent.templateRatesDescription":
+    "Connect rates, inflation and liquidity data to assess impacts on valuations and sectors.",
+  "agent.templateRatesPrompt":
+    "Interpret recent central-bank policy and rate changes: summarize key statements, the yield curve and inflation data, assess how liquidity shifts affect asset classes and sector valuations, and list the indicators to keep tracking.",
+  "agent.templateDividendTitle": "Screen for dividends and cash flow",
+  "agent.templateDividendDescription":
+    "Screen for durable yields, free cash flow and balance-sheet quality, not one-off payouts.",
+  "agent.templateDividendPrompt":
+    "Screen a set of dividend and cash-flow candidates: compare yields, payout history, free cash flow, capital spending and liability quality, exclude one-off payouts and weak earnings, then return a shortlist with key risks.",
+  "agent.templateFlowTitle": "Spot volume and capital anomalies",
+  "agent.templateFlowDescription":
+    "Scan volume, turnover and price moves to separate a new trend from short-term noise.",
+  "agent.templateFlowPrompt":
+    "Scan for stocks with rising volume, turnover and unusual price moves. Use capital flow, news, filings and sector performance to separate new trends from short-term noise, then rank the names that most deserve verification.",
+  "agent.templatePortfolioTitle": "Review portfolio return and risk",
+  "agent.templatePortfolioDescription":
+    "Break down return drivers, concentration, drawdown and correlations to expose weak points.",
+  "agent.templatePortfolioPrompt":
+    "Review my portfolio: break down return drivers, calculate sector and single-name concentration, maximum drawdown, volatility and correlations, identify the main risk exposures, and suggest prioritized adjustments. Ask for my holdings and weights first.",
+  "agent.templateMoatTitle": "Test a company's competitive moat",
+  "agent.templateMoatDescription":
+    "Test brand, cost, network effects, switching costs and capital efficiency with evidence.",
+  "agent.templateMoatPrompt":
+    "Test the target company's moat: look for evidence across brand, cost advantage, network effects, switching costs and capital efficiency, judge whether the advantage is durable, and identify what could weaken it. Ask for the company name or ticker first.",
+  "agent.templateIndustryTitle": "Track industry and supply-chain shifts",
+  "agent.templateIndustryDescription":
+    "Follow prices, inventory, orders and policy signals to find winners and pressure points.",
+  "agent.templateIndustryPrompt":
+    "Track an industry's cycle and supply-chain changes: summarize prices, inventory, orders, capacity and policy signals, identify which upstream and downstream segments benefit or face pressure, and shortlist companies for deeper research. Ask for the industry first.",
+  "agent.templatePlanTitle": "Plan this week's research agenda",
+  "agent.templatePlanDescription":
+    "Prioritize research and checks around your holdings, watchlist and upcoming events.",
+  "agent.templatePlanPrompt":
+    "Build an investment research plan from my watchlist, holdings and this week's market calendar: list the earnings, macro data and events to follow, schedule daily research and review tasks, and set clear priorities and checkpoints.",
+  "agent.templateNotesTitle": "Turn research notes into key points",
+  "agent.templateNotesDescription":
+    "Turn calls, interviews or notes into theses, evidence, disagreements and open questions.",
+  "agent.templateNotesPrompt":
+    "Turn call transcripts, interviews or research notes into a structured summary: extract key points, data and source quotes, separate facts from management claims, and list disagreements, risks and questions to verify. Ask me for the material first.",
+  "agent.templateCatalystTitle": "Build an event-driven watchlist",
+  "agent.templateCatalystDescription":
+    "Map catalysts, timing and invalidation risks across earnings, policy and product events.",
+  "agent.templateCatalystPrompt":
+    "Build an event-driven watchlist: identify upcoming earnings, policy decisions, M&A, product launches and industry conferences, then assess each event's possible impact, timing and invalidation conditions, with the evidence to keep tracking.",
+  "agent.ideasForYou": "Signals you follow",
   "agent.ideaSuggestions": "Research ideas",
   "agent.tplIdeaStockTitle": "Deep-dive a stock",
   "agent.tplIdeaStockReason":
@@ -190,6 +256,9 @@ const agent = {
   "agent.reminderTplWeeklyTitle": "Weekly watchlist review",
   "agent.reminderTplWeeklyDetail":
     "Collect changes, relevant filings and open questions across the names you follow.",
+  "agent.priceReminderTitle": "{name} price alert",
+  "agent.priceReminderDescription":
+    "Check the latest public quote for {name} ({code}) and alert me when it falls below the target price.",
   "agent.monitorPageLabel": "Public page URL",
   "agent.saveChanges": "Save changes",
   "agent.invalidMonitorInterval": "Choose a check interval from 1 to 10080 minutes.",
@@ -328,6 +397,7 @@ const agent = {
   "agent.newChip": "New",
   "agent.read": "Read",
   "agent.markRead": "Mark read",
+  "agent.markAllRead": "Mark all read",
   "agent.allCaughtUp": "You're all caught up",
   "agent.notificationsEmptyDetail":
     "Results, meaningful changes and requests for your input will appear here.",
@@ -459,24 +529,6 @@ const agent = {
   "agent.shortcutNotesDetail": "Buy/sell reasons, research notes and thesis tracking",
   "agent.shortcutMailDetail": "Read messages and prepare replies",
   "agent.shortcutCalendarDetail": "Events and reviewed invitations",
-  "agent.personalityMemory": "Personality & expression",
-  "agent.settingsSubtitle": "Give your agent its own name, voice and way of relating.",
-  "agent.yourAgent": "Its personality",
-  "agent.avatarLabel": "{name} avatar",
-  "agent.nameLabel": "Name",
-  "agent.taglineLabel": "Tagline",
-  "agent.taglinePlaceholder": "For example: Your day, already planned.",
-  "agent.toneLabel": "Tone",
-  "agent.communicationLabel": "Response length",
-  "agent.styleLabel": "Anything else it should be like?",
-  "agent.stylePlaceholder": "For example: Be a little witty. Use metric units. Never use emoji.",
-  "agent.userNameLabel": "What should it call you?",
-  "agent.userNamePlaceholder": "Name or nickname",
-  "agent.showBackgroundUpdates": "Show background updates in chat",
-  "agent.activityFullRecord":
-    "Tasks and notifications always keep the full record, including requests for approval.",
-  "agent.savePreferences": "Save",
-  "agent.saved": "Saved",
   "agent.memory": "Memory",
   "agent.memoryDetail": "Context you can inspect, correct or forget.",
   "agent.rememberAboutMe": "Remember something about me",
@@ -539,6 +591,8 @@ const agent = {
   "agentSpace.myAgents": "My Agents",
   "agentSpace.createAgent": "Create Agent",
   "agentSpace.account": "Personal account",
+  "agentSpace.personalCenter": "Personal center",
+  "agentSpace.accountMenuSettingsDetail": "Models, workspace and account settings",
   "agentSpace.systemAgent": "System default Agent",
   "agentSpace.more": "More capabilities",
   "agentSpace.resizeAgentList": "Resize Agent list",
@@ -551,6 +605,7 @@ const agent = {
   "agentSpace.insights": "Insight cards",
   "agentSpace.insightsDetail": "Conclusions and sources across Agents",
   "agentSpace.watchlist": "My watchlist",
+  "agentSpace.watchlistAndPortfolio": "Watchlists & portfolios",
   "agentSpace.watchlistDetail": "One list shared across Agents",
   "agentSpace.tasks": "Tasks",
   "agentSpace.tasksDetail": "Execution records across all Agents",
@@ -691,15 +746,12 @@ const agent = {
   "agentSpace.welcomeEyebrow": "Your personal research Agent",
   "agentSpace.welcomeTitle": "Give research to the right Agent.",
   "agentSpace.welcomeTail": "Start with today's most important question.",
-  "agentSpace.welcomeSubtitle":
-    "{name} keeps independent messages, drafts and skill settings. Create another Agent when you need a different specialty.",
   "agentSpace.composer": "Message {name}…",
+  "agentSpace.openIdeasPage": "Ideas page",
   "agentSpace.ready": "Ready when you are",
   "agentSpace.noTasks": "No tasks yet. Return to chat and let an Agent start a piece of work.",
   "agentSpace.noInsights":
     "No insight cards yet. Completed research keeps its conclusion and source here.",
-  "agentSpace.globalNote":
-    "Global content is shared by every Agent. Messages and skill settings are independent per Agent; the library, goals and memory belong to the current account.",
   "agentSpace.sampleNote":
     "Live chat uses the configured model and workspace capabilities. Unconnected services never report fake results.",
   "agentSpace.quickCapabilities": "Quick capabilities",

@@ -5,6 +5,27 @@
 
 ## 变更记录
 
+### 2026-11-05 · 修复登录表单字段缺少 id 的控制台日志
+
+**背景**
+
+用户反馈移动端控制台出现 5 条日志（其中包含浏览器可访问性 issue：`A form field element should have an id or name attribute`，count: 2）。经浏览器实测（`http://localhost:8081`）确认，登录页的「邮箱」「验证码」两个输入框渲染为 `<input>` 时没有 `id`/`name` 属性，触发该 issue；「访问密钥」输入框同理（access-key 表单未展开时不可见）。
+
+**根因与处理**
+
+- [App.tsx](../apps/mobile/App.tsx)：登录表单的「邮箱」「验证码」「访问密钥」三个 `Field` 增加 `nativeID`（rn-web 会将其渲染为 DOM `id` 属性，原生端亦无损）：
+  - `auth-email` / `auth-code` / `auth-access-key`
+
+**排查结论（无代码改动）**
+
+- 用户选中的「个人中心」按钮（[agent-product.tsx](../apps/mobile/src/agent-product.tsx#L533) 的 `AgentRail`）及其周边组件（`AgentListItem`、`AccountMenu`、`LanguageMenuRow`、`AccountMenuRow`）逐一核查：`HoverPressable` 内部为纯 View/Image/Text，无嵌套 `accessibilityRole="button"`，无重复 key，结构合法。
+- 历史 5 条日志中「2× `net::ERR_ABORTED /api/agent`、`/api/workspace`」为浏览器正常的在途请求中断（3 秒轮询被新请求取代或切页取消），`catch(() => {})` 已静默处理，无需改动。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+- Chrome DevTools 实测：登录页两个输入框已带 `id="auth-email"` / `id="auth-code"`，`form field issue` 日志消失，控制台仅剩开发模式下的正常日志（React DevTools 提示与 Running application 信息）。
+
 ### 2026-11-01 · 移动端旁聊抽屉「应用与能力」图标与设置页对齐
 
 移动端左侧抽屉（旁聊）中「应用与能力」入口原先使用 `Settings2`（齿轮）图标，与设置面板内同名入口的 `Shapes` 图标不一致。本次将旁聊抽屉中的图标改为与设置页面一致的 `Shapes`，保持同一功能入口在全局的视觉一致性。

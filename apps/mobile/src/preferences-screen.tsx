@@ -358,19 +358,22 @@ export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) 
         }}
       >
         <View style={{ flex: 1, gap: 7 }}>
-          <Text
-            style={{
-              fontSize: width >= 760 ? 28 : 24,
-              lineHeight: width >= 760 ? 39 : 34,
-              color: colors.heading,
-              fontFamily: fonts.serif,
-              fontWeight: "600",
-            }}
-          >
-            {t(embedded ? "agent.memory" : "preferences.heroTitle")}
-          </Text>
+          {/* 嵌入浮层时标题由浮层提供，这里只保留新增按钮，避免标题重复。 */}
           {!embedded && (
-            <Text style={[s.muted, { lineHeight: 22 }]}>{t("preferences.heroDetail")}</Text>
+            <>
+              <Text
+                style={{
+                  fontSize: width >= 760 ? 28 : 24,
+                  lineHeight: width >= 760 ? 39 : 34,
+                  color: colors.heading,
+                  fontFamily: fonts.serif,
+                  fontWeight: "600",
+                }}
+              >
+                {t("preferences.heroTitle")}
+              </Text>
+              <Text style={[s.muted, { lineHeight: 22 }]}>{t("preferences.heroDetail")}</Text>
+            </>
           )}
         </View>
         <Button

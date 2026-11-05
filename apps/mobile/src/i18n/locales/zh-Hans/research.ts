@@ -35,7 +35,7 @@ const research = {
   "research.checkDedup": "24 小时内已提醒过，已去重。",
   "research.checkDisabled": "该提醒已关闭。",
   "research.checkQuoteUnavailable": "当前行情不可用。",
-  "research.noAlerts": "还没有该标的的价格提醒。",
+  "research.noAlerts": "还没有该标的的提醒，点上方「新建提醒」去设置。",
   "research.alertCreated": "提醒已创建。",
   "research.alertDeleted": "提醒已删除。",
   "research.alertSaved": "提醒已保存。",

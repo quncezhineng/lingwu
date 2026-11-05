@@ -16,7 +16,7 @@ import {
 } from "../../../packages/domain/src";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { ArchivedThreadsScreen } from "./account";
-import { AgentPersonalitySheet, DelegateSheet, NotificationsSheet, TaskDetail } from "./agent-ui";
+import { DelegateSheet, NotificationsSheet, TaskDetail } from "./agent-ui";
 import { Text, TextInput } from "./app-text";
 import { artifactHasHtmlPreview, renderArtifactHtml } from "./artifact-html";
 import BrowserConsole from "./BrowserConsole";
@@ -31,8 +31,6 @@ import { LanguagePicker } from "./i18n/LanguageSwitcher";
 import { statusLabel } from "./i18n/translate";
 import { LOCALE_LABELS } from "./i18n/types";
 import {
-  Archive,
-  Bot,
   CalendarDays,
   Check,
   ChevronDown,
@@ -46,7 +44,6 @@ import {
   ExternalLink,
   FileText,
   Globe2,
-  Heart,
   Languages,
   Mail as MailIcon,
   Monitor,
@@ -56,11 +53,9 @@ import {
   RotateCw,
   Save,
   Send,
-  Shapes,
   ShieldCheck,
   Sparkles,
   Star,
-  Target,
   Trash2,
   X,
 } from "./icons";
@@ -78,7 +73,6 @@ import { markdownPreviewDocument } from "./open-html-document";
 import PdfReader from "./PdfReader";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { SymbolDetailSheet } from "./symbol-detail";
-import { useLingWuThread } from "./threads";
 import {
   Button,
   Card,
@@ -114,8 +108,6 @@ export function Details({ detail }: { detail: Detail }) {
       />
     );
   if (detail.type === "notifications") return <NotificationsSheet />;
-  if (detail.type === "personality") return <AgentPersonalitySheet />;
-  if (detail.type === "settings") return <SettingsSheet />;
   if (detail.type === "archived") return <ArchivedThreadsDetail />;
   if (detail.type === "model-settings") return <ModelSettingsSheet />;
   if (detail.type === "mail") return <MailDetail mail={detail.mail} />;
@@ -127,12 +119,7 @@ export function Details({ detail }: { detail: Detail }) {
   if (detail.type === "insight") return <InsightDetail artifact={detail.artifact} />;
   if (detail.type === "symbol")
     return (
-      <SymbolDetailSheet
-        symbol={detail.symbol}
-        quote={detail.quote}
-        watchlist={detail.watchlist}
-        initialAlertForm={detail.focus === "alerts"}
-      />
+      <SymbolDetailSheet symbol={detail.symbol} quote={detail.quote} watchlist={detail.watchlist} />
     );
   if (detail.type === "watchlist-symbol")
     return (
@@ -171,10 +158,9 @@ export function Details({ detail }: { detail: Detail }) {
     </Sheet>
   );
 }
-function SettingsSheet() {
+export function SettingsScreen() {
   const { locale, t } = useTranslation();
-  const { close, open, navigate, workspace } = useWorkspace();
-  const { enabled: richThreads } = useLingWuThread();
+  const { open, navigate, workspace } = useWorkspace();
   const [languageOpen, setLanguageOpen] = useState(false);
   const currentLanguage = LOCALE_LABELS[locale];
   const activeModel = workspace.runtime.model
@@ -182,164 +168,100 @@ function SettingsSheet() {
       workspace.runtime.model.split("/").slice(1).join("/"))
     : t("modelSettings.notConfigured");
   return (
-    <Sheet
-      title={t("details.settingsTitle")}
-      subtitle={t("details.settingsSubtitle")}
-      onClose={close}
-    >
-      <View style={{ gap: 20 }}>
-        <View style={{ gap: 8 }}>
-          <Text style={s.label}>{t("details.settingsAgentHeading")}</Text>
-          <Card style={{ paddingVertical: 6 }}>
-            <LinkRow
-              icon={Bot}
-              title={t("agent.personalityMemory")}
-              detail={t("details.settingsPersonalityDetail")}
-              onPress={() => open({ type: "personality" })}
-            />
-          </Card>
-        </View>
-        <View style={{ gap: 8 }}>
-          <Text style={s.label}>{t("details.settingsModelHeading")}</Text>
-          <Card style={{ paddingVertical: 6 }}>
-            <LinkRow
-              icon={Cpu}
-              title={t("modelSettings.title")}
-              detail={activeModel}
-              onPress={() => open({ type: "model-settings" })}
-            />
-          </Card>
-        </View>
-        <View style={{ gap: 8 }}>
-          <Text style={s.label}>{t("details.settingsWorkspaceHeading")}</Text>
-          <Card style={{ paddingVertical: 6 }}>
-            <LinkRow
-              icon={Monitor}
-              title={t("threads.agentComputer")}
-              detail={t("computer.sheetSubtitle")}
-              onPress={() => {
-                close();
-                open({ type: "computer" });
-              }}
-            />
-            <LinkRow
-              icon={MailIcon}
-              title={t("app.titleMail")}
-              detail={t("app.subtitleMail")}
-              onPress={() => {
-                navigate("mail");
-                close();
-              }}
-            />
-            <LinkRow
-              icon={CalendarDays}
-              title={t("app.titleCalendar")}
-              detail={t("app.subtitleCalendar")}
-              onPress={() => {
-                navigate("calendar");
-                close();
-              }}
-            />
-            <LinkRow
-              icon={Target}
-              title={t("app.navWatchlist")}
-              detail={t("app.subtitleWatchlist")}
-              onPress={() => {
-                navigate("watchlist");
-                close();
-              }}
-            />
-            <LinkRow
-              icon={Heart}
-              title={t("app.navPreferences")}
-              detail={t("details.settingsPreferencesDetail")}
-              onPress={() => {
-                navigate("preferences");
-                close();
-              }}
-            />
-            <LinkRow
-              icon={Shapes}
-              title={t("app.navApps")}
-              detail={t("details.settingsAppsDetail")}
-              onPress={() => {
-                navigate("apps");
-                close();
-              }}
-            />
-          </Card>
-        </View>
-        <View style={{ gap: 8 }}>
-          <Text style={s.label}>{t("details.settingsAccountTitle")}</Text>
-          <Card style={{ paddingVertical: 6 }}>
-            <LinkRow
-              icon={CircleUserRound}
-              title={t("app.profileDetails")}
-              detail={t("details.settingsAccountDetail")}
-              onPress={() => {
-                navigate("account");
-                close();
-              }}
-            />
-          </Card>
-        </View>
-        <View style={{ gap: 8 }}>
-          <Text style={s.label}>{t("common.language")}</Text>
-          <Card style={{ padding: 0, overflow: "hidden" }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("common.currentLanguage", {
-                language: currentLanguage.english,
-              })}
-              accessibilityHint={t("common.changeLanguage")}
-              onPress={() => setLanguageOpen(true)}
-              style={({ pressed }) => [
-                s.row,
-                {
-                  width: "100%",
-                  gap: 14,
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderRadius: radius.card,
-                },
-                pressed && { backgroundColor: colors.overlay1 },
-              ]}
-            >
-              <View style={[s.iconBox, { backgroundColor: colors.surface }]}>
-                <Languages size={19} color={colors.text} />
-              </View>
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={[s.text, { fontWeight: "500" }]}>
-                  {t("details.settingsLanguageTitle")}
-                </Text>
-                <Text style={s.small}>{t("details.settingsLanguageDetail")}</Text>
-              </View>
-              <View style={[s.row, { gap: 6 }]}>
-                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
-                  {currentLanguage.short}
-                </Text>
-                <ChevronRight size={15} color={colors.muted} />
-              </View>
-            </Pressable>
-          </Card>
-        </View>
-        {richThreads && (
-          <View style={{ gap: 8 }}>
-            <Text style={s.label}>{t("app.conversationManagement")}</Text>
-            <Card style={{ paddingVertical: 6 }}>
-              <LinkRow
-                icon={Archive}
-                title={t("app.archivedConversations")}
-                detail={t("app.archivedConversationsDetail")}
-                onPress={() => open({ type: "archived" })}
-              />
-            </Card>
-          </View>
-        )}
-        <Text style={s.small}>{t("details.settingsPrivacy")}</Text>
-        <LanguagePicker visible={languageOpen} onClose={() => setLanguageOpen(false)} centered />
+    <View style={{ gap: 20 }}>
+      <View style={{ gap: 8 }}>
+        <Text style={s.label}>{t("details.settingsAccountTitle")}</Text>
+        <Card style={{ paddingVertical: 6 }}>
+          <LinkRow
+            icon={CircleUserRound}
+            title={t("app.profileDetails")}
+            detail={t("details.settingsAccountDetail")}
+            onPress={() => navigate("account")}
+          />
+        </Card>
       </View>
-    </Sheet>
+      <View style={{ gap: 8 }}>
+        <Text style={s.label}>{t("details.settingsModelHeading")}</Text>
+        <Card style={{ paddingVertical: 6 }}>
+          <LinkRow
+            icon={Cpu}
+            title={t("modelSettings.title")}
+            detail={activeModel}
+            onPress={() => open({ type: "model-settings" })}
+          />
+        </Card>
+      </View>
+      <View style={{ gap: 8 }}>
+        <Text style={s.label}>{t("common.language")}</Text>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("common.currentLanguage", {
+              language: currentLanguage.english,
+            })}
+            accessibilityHint={t("common.changeLanguage")}
+            onPress={() => setLanguageOpen(true)}
+            style={({ pressed }) => [
+              s.row,
+              {
+                width: "100%",
+                gap: 14,
+                paddingHorizontal: 16,
+                paddingVertical: 13,
+                borderRadius: radius.card,
+              },
+              pressed && { backgroundColor: colors.overlay1 },
+            ]}
+          >
+            <View style={[s.iconBox, { backgroundColor: colors.surface }]}>
+              <Languages size={19} color={colors.text} />
+            </View>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={[s.text, { fontWeight: "500" }]}>
+                {t("details.settingsLanguageTitle")}
+              </Text>
+              <Text style={s.small}>{t("details.settingsLanguageDetail")}</Text>
+            </View>
+            <View style={[s.row, { gap: 6 }]}>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>
+                {currentLanguage.short}
+              </Text>
+              <ChevronRight size={15} color={colors.muted} />
+            </View>
+          </Pressable>
+        </Card>
+      </View>
+      <View style={{ gap: 8 }}>
+        <Text style={s.label}>{t("details.settingsWorkspaceHeading")}</Text>
+        <Card style={{ paddingVertical: 6 }}>
+          <LinkRow
+            icon={Monitor}
+            title={t("threads.agentComputer")}
+            detail={t("computer.sheetSubtitle")}
+            onPress={() => {
+              open({ type: "computer" });
+            }}
+          />
+          <LinkRow
+            icon={MailIcon}
+            title={t("app.titleMail")}
+            detail={t("app.subtitleMail")}
+            onPress={() => {
+              navigate("mail");
+            }}
+          />
+          <LinkRow
+            icon={CalendarDays}
+            title={t("app.titleCalendar")}
+            detail={t("app.subtitleCalendar")}
+            onPress={() => {
+              navigate("calendar");
+            }}
+          />
+        </Card>
+      </View>
+      <LanguagePicker visible={languageOpen} onClose={() => setLanguageOpen(false)} centered />
+    </View>
   );
 }
 

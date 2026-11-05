@@ -17,8 +17,8 @@ type TaskHubTab = "tasks" | "reminders";
 export function TaskHubScreen({ initialTab }: { initialTab?: TaskHubTab } = {}) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
-  const { section } = useWorkspace();
-  const defaultTab = initialTab ?? (section === "goals" ? "reminders" : "tasks");
+  const { section, reminderIntent, clearReminderIntent } = useWorkspace();
+  const defaultTab = initialTab ?? (reminderIntent || section === "goals" ? "reminders" : "tasks");
   const [tab, setTab] = useState<TaskHubTab>(defaultTab);
 
   useEffect(() => {
@@ -46,7 +46,15 @@ export function TaskHubScreen({ initialTab }: { initialTab?: TaskHubTab } = {}) 
           { id: "reminders", label: t("app.taskHubReminders"), count: activeReminders },
         ]}
       />
-      {tab === "tasks" ? <AgentActivityScreen /> : <GoalsScreen embedded />}
+      {tab === "tasks" ? (
+        <AgentActivityScreen />
+      ) : (
+        <GoalsScreen
+          embedded
+          reminderIntent={reminderIntent}
+          onReminderIntentHandled={clearReminderIntent}
+        />
+      )}
     </View>
   );
 }

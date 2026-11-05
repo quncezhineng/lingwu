@@ -9,6 +9,7 @@ import { useTranslation } from "./i18n";
 import { Search } from "./icons";
 import { metaFor, type SymbolMeta, searchSymbols } from "./market";
 import { type Currency, type Holding, marketCurrency } from "./portfolio";
+import { localizedSymbolName } from "./symbol-names";
 import { Button, Chip, colors, ErrorNotice, Sheet, s } from "./ui";
 
 const CURRENCY_OPTIONS: Currency[] = ["CNY", "USD", "HKD"];
@@ -201,7 +202,7 @@ export function HoldingFormSheet({
           ]}
         >
           <Text style={[s.text, { flex: 1 }]}>
-            {symbol.code} · {symbol.name}
+            {symbol.code} · {localizedSymbolName(symbol)}
           </Text>
           <Button small onPress={() => setSymbol(undefined)} style={{ minHeight: 36 }}>
             {t("portfolio.changeSymbol")}
@@ -209,7 +210,8 @@ export function HoldingFormSheet({
         </View>
       ) : holding ? (
         <Text style={[s.text, { marginBottom: 14 }]}>
-          {holding.symbolCode} · {holding.name ?? ""}
+          {holding.symbolCode} ·{" "}
+          {localizedSymbolName({ code: holding.symbolCode, name: holding.name ?? "" })}
         </Text>
       ) : (
         <View style={{ marginBottom: 14 }}>

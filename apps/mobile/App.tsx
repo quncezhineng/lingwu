@@ -31,8 +31,8 @@ import { Text } from "./src/app-text";
 import { CapabilityHubScreen } from "./src/capability-hub";
 import { ChatScreen, WorkspaceTools } from "./src/chat";
 import { ComputerDraftProvider } from "./src/computer-drafts";
-import { Details } from "./src/details";
-import { I18nProvider, localizeAgentName, useTranslation } from "./src/i18n";
+import { Details, SettingsScreen } from "./src/details";
+import { I18nProvider, useTranslation } from "./src/i18n";
 import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
 import { Bell, Menu, Search, Settings2 } from "./src/icons";
@@ -62,7 +62,12 @@ import {
 } from "./src/ui";
 import { WatchlistHubScreen } from "./src/watchlist-hub";
 import { WorkbenchScreen } from "./src/workbench";
-import { type Detail, useWorkspace, WorkspaceContext } from "./src/workspace";
+import {
+  type Detail,
+  type PriceReminderIntent,
+  useWorkspace,
+  WorkspaceContext,
+} from "./src/workspace";
 
 /** 登录会话在本地持久化的键，刷新网页后据此恢复登录状态。 */
 const SESSION_KEY = "lingwu.session";
@@ -81,6 +86,7 @@ const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: T
     preferences: { titleKey: "app.titlePreferences", subtitleKey: "app.subtitlePreferences" },
     apps: { titleKey: "app.titleApps", subtitleKey: "app.subtitleApps" },
     account: { titleKey: "app.titleAccount", subtitleKey: "app.subtitleAccount" },
+    settings: { titleKey: "details.settingsTitle", subtitleKey: "details.settingsSubtitle" },
     connections: { titleKey: "app.titleConnections", subtitleKey: "app.subtitleConnections" },
     mail: { titleKey: "app.titleMail", subtitleKey: "app.subtitleMail" },
     calendar: { titleKey: "app.titleCalendar", subtitleKey: "app.subtitleCalendar" },
@@ -407,6 +413,7 @@ function Root() {
                             autoCorrect={false}
                             keyboardType="email-address"
                             placeholder={t("app.emailPlaceholder")}
+                            nativeID="auth-email"
                           />
                           <Button busy={sendingCode} onPress={() => void sendCode()}>
                             {t("app.sendCode")}
@@ -425,6 +432,7 @@ function Root() {
                               autoCorrect={false}
                               keyboardType="number-pad"
                               placeholder={t("app.codePlaceholder")}
+                              nativeID="auth-code"
                             />
                           </View>
                           <Button
@@ -444,6 +452,7 @@ function Root() {
                             onChangeText={setAccessKey}
                             secureTextEntry
                             placeholder={t("app.accessKeyPlaceholder")}
+                            nativeID="auth-access-key"
                           />
                           <Button
                             primary
@@ -474,6 +483,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   const [workspace, setWorkspace] = useState<Workspace>();
   const [section, setSection] = useState<Section>("chat");
   const [detail, setDetail] = useState<Detail>();
+  const [reminderIntent, setReminderIntent] = useState<PriceReminderIntent>();
   const [toast, setToast] = useState<ToastState>();
   const [error, setError] = useState("");
   const [prompt, setPrompt] = useState<{
@@ -531,6 +541,15 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   );
   const open = useCallback((next: Detail) => setDetail(next), []);
   const close = useCallback(() => setDetail(undefined), []);
+  const clearReminderIntent = useCallback(() => setReminderIntent(undefined), []);
+  const requestPriceReminder = useCallback(
+    (symbol: PriceReminderIntent["symbol"], quote?: PriceReminderIntent["quote"]) => {
+      setDetail(undefined);
+      setReminderIntent({ id: Date.now(), kind: "price", symbol, quote });
+      setSection("goals");
+    },
+    [],
+  );
   /** 退出登录：先让服务端作废令牌，再清空本地会话回到登录页。 */
   const signOut = useCallback(() => {
     void api.request("/api/auth/signout", {}).catch(() => undefined);
@@ -568,7 +587,20 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
     );
   return (
     <WorkspaceContext.Provider
-      value={{ workspace, api, section, navigate, refresh, open, close, notify, ask }}
+      value={{
+        workspace,
+        api,
+        section,
+        reminderIntent,
+        navigate,
+        refresh,
+        open,
+        close,
+        requestPriceReminder,
+        clearReminderIntent,
+        notify,
+        ask,
+      }}
     >
       <AgentWorkspaceProvider>
         <ComputerDraftProvider key={token}>
@@ -659,15 +691,6 @@ function WorkspaceShell({
   const pending =
     (data?.notifications.filter((n) => !n.read).length || 0) +
     workspace.actions.filter((a) => a.status === "awaiting_review").length;
-  // 服务端保存英文默认名 Xiao Wu，展示前按语言本地化为「小悟」或「Xiao Wu」。
-  const agentName = localizeAgentName(data?.identity.name, data?.identity.nameCustomized);
-  const activeMonitorCount = (data?.monitors ?? []).filter(
-    (monitor) => monitor.status === "active",
-  ).length;
-  const monitorStatus =
-    activeMonitorCount > 0
-      ? t("app.activeMonitors", { count: activeMonitorCount })
-      : t("app.noActiveMonitors");
   const title = titles[section] || titles.apps;
   const Screen =
     section === "today"
@@ -686,14 +709,16 @@ function WorkspaceShell({
                   ? IdeasScreen
                   : section === "preferences"
                     ? PreferencesScreen
-                    : CapabilityHubScreen;
+                    : section === "settings"
+                      ? SettingsScreen
+                      : CapabilityHubScreen;
   return (
     <>
       <WorkspaceTools />
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.canvas }} edges={["top", "bottom"]}>
         {/* 宽屏是「文本侧栏 + 工作区」，窄屏是单列加底部标签栏。 */}
         <View style={{ flex: 1, flexDirection: desktop ? "row" : "column" }}>
-          {desktop && <Rail name={agentName} />}
+          {desktop && <Rail />}
           {desktop && section === "chat" && <ChatsColumn />}
           <View style={{ flex: 1, minWidth: 0 }}>
             <View
@@ -728,70 +753,6 @@ function WorkspaceShell({
                     </View>
                   </View>
                   <View
-                    pointerEvents="box-none"
-                    style={{
-                      alignItems: "center",
-                      justifyContent: "center",
-                      height: 56,
-                    }}
-                  >
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t("app.agentSettingsLabel", { name: agentName })}
-                      onPress={() => open({ type: "personality" })}
-                      style={({ pressed }) => ({
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 10,
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        borderRadius: radius.control,
-                        backgroundColor: pressed ? colors.overlay1 : "transparent",
-                      })}
-                    >
-                      <View
-                        style={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: 15,
-                          alignItems: "center",
-                          justifyContent: "center",
-                          borderWidth: 1,
-                          borderColor: colors.line,
-                          backgroundColor: colors.paper,
-                        }}
-                      >
-                        <Mascot
-                          size={24}
-                          variant={data?.identity.avatar}
-                          background={colors.paper}
-                        />
-                      </View>
-                      <View style={{ gap: 1 }}>
-                        <Text
-                          numberOfLines={1}
-                          style={{ fontSize: 12, fontWeight: "600", color: colors.text }}
-                        >
-                          {t("app.agentWatching", { name: agentName })}
-                        </Text>
-                        <View style={[s.row, { gap: 5 }]}>
-                          <View
-                            style={{
-                              width: 5,
-                              height: 5,
-                              borderRadius: 3,
-                              backgroundColor: colors.success,
-                            }}
-                          />
-                          <Text numberOfLines={1} style={{ fontSize: 10, color: colors.muted }}>
-                            {monitorStatus}
-                          </Text>
-                        </View>
-                      </View>
-                    </Pressable>
-                  </View>
-                  <View
                     style={{
                       position: "absolute",
                       right: 0,
@@ -805,7 +766,7 @@ function WorkspaceShell({
                     <IconButton
                       icon={Settings2}
                       label={t("details.settingsTitle")}
-                      onPress={() => open({ type: "settings" })}
+                      onPress={() => navigate("settings")}
                     />
                     <View>
                       <IconButton

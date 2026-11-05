@@ -39,19 +39,28 @@ export type Detail =
   | { type: "delegate"; goalId?: string; milestoneId?: string }
   | { type: "notifications" }
   | { type: "computer" }
-  | { type: "personality" }
-  | { type: "settings" }
   | { type: "archived" }
   | { type: "model-settings" }
   | { type: "menu" };
+
+export interface PriceReminderIntent {
+  id: number;
+  kind: "price";
+  symbol: SymbolMeta;
+  quote?: Quote;
+}
+
 export interface WorkspaceContextValue {
   workspace: Workspace;
   api: LingWuApi;
   section: Section;
+  reminderIntent?: PriceReminderIntent;
   navigate: (section: Section) => void;
   refresh: () => Promise<void>;
   open: (detail: Detail) => void;
   close: () => void;
+  requestPriceReminder: (symbol: SymbolMeta, quote?: Quote) => void;
+  clearReminderIntent: () => void;
   notify: (message: string, action?: { label: string; onPress: () => void }) => void;
   ask: (prompt: string, attachmentIds?: readonly string[]) => void;
 }

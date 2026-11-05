@@ -25,3 +25,21 @@ export async function resolveTaskNotifications(db: Store, owner: string, taskId?
     );
   }
 }
+
+/** 「一键已读」：把该工作区的所有未读通知标记为已读，返回实际更新的条数。 */
+export async function markAllNotificationsRead(db: Store, owner: string) {
+  const notifications = await db.list<AgentNotification>(owner, "notifications");
+  let updated = 0;
+  for (const notification of notifications) {
+    if (notification.read) continue;
+    const next = await db.compareAndSwap<AgentNotification>(
+      owner,
+      "notifications",
+      notification.id,
+      { read: false },
+      { read: true },
+    );
+    if (next) updated++;
+  }
+  return updated;
+}

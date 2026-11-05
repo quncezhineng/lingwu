@@ -81,17 +81,29 @@ function highlightCode(source: string): string {
 }
 
 /**
+ * 判断长文本是不是 Markdown 源码：多行且出现标题 / 引用 / 列表 / 代码围栏 / 表格标记。
+ * 产物里的 `content`、`notes` 这类字段通常是模型写的 Markdown，需要排版而不是当成代码。
+ */
+const MARKDOWN_HINT_RE = /(^|\n)\s{0,3}(#{1,6}\s|>\s|[-*+]\s|\d+[.)]\s|```|\|)/;
+function looksLikeMarkdown(value: string): boolean {
+  return value.includes("\n") && MARKDOWN_HINT_RE.test(value);
+}
+
+/**
  * 标量值/对象 -> 展示 HTML。
  *
  * 默认（块级）：
- * - 多行或超长的字符串（代码/Markdown 面板数据）用深色代码块 + 基础语法高亮；
+ * - 多行的 Markdown 文本按正文排版渲染（标题、列表、引用、表格、代码块）；
+ * - 其它多行或超长字符串（代码/JSON）用深色代码块 + 基础语法高亮；
  * - 对象/数组用 JSON 代码块 + 语法高亮。
  * `inline = true` 时（表格单元格等场景）一律走转义后的行内纯文本，避免嵌套撑坏布局。
  */
 function text(value: unknown, inline = false): string {
   if (typeof value === "string") {
     if (!inline && (value.includes("\n") || value.length > 120)) {
-      return `<pre class="code">${highlightCode(value)}</pre>`;
+      return looksLikeMarkdown(value)
+        ? `<div class="markdown">${assistantMarkdown.render(value)}</div>`
+        : `<pre class="code">${highlightCode(value)}</pre>`;
     }
     return escapeHtml(value);
   }
@@ -274,18 +286,27 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
   .summary { margin: 0 0 22px; padding: 14px 16px; background: #EFF1F4; border-left: 3px solid #3A83F7; border-radius: 10px; color: #404040; }
   .summary > :first-child { margin-top: 0; }
   .summary > :last-child { margin-bottom: 0; }
-  .summary h1, .summary h2, .summary h3, .summary h4, .summary h5, .summary h6 { color: #0E1115; line-height: 1.4; margin: 18px 0 8px; }
-  .summary h1 { font-size: 20px; }
-  .summary h2 { font-size: 18px; }
-  .summary h3 { font-size: 16px; }
-  .summary p { margin: 0 0 10px; }
-  .summary ul, .summary ol { margin: 0 0 12px; padding-left: 22px; }
-  .summary li + li { margin-top: 4px; }
-  .summary a { color: #3A83F7; }
-  .summary blockquote { margin: 12px 0; padding: 4px 0 4px 14px; border-left: 3px solid #D5DBE3; color: #737373; }
-  .summary code { padding: 1px 5px; border-radius: 4px; background: #E7EAEF; color: #3A83F7; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .summary pre { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: #1F2430; color: #D7DAE0; overflow: auto; }
-  .summary pre code { padding: 0; background: transparent; color: inherit; }
+  .summary h1, .summary h2, .summary h3, .summary h4, .summary h5, .summary h6,
+  .markdown h1, .markdown h2, .markdown h3, .markdown h4, .markdown h5, .markdown h6 { color: #0E1115; line-height: 1.4; margin: 18px 0 8px; }
+  .summary h1, .markdown h1 { font-size: 20px; }
+  .summary h2, .markdown h2 { font-size: 18px; }
+  .summary h3, .markdown h3 { font-size: 16px; }
+  .summary p, .markdown p { margin: 0 0 10px; }
+  .summary ul, .summary ol, .markdown ul, .markdown ol { margin: 0 0 12px; padding-left: 22px; }
+  .summary li + li, .markdown li + li { margin-top: 4px; }
+  .summary a, .markdown a { color: #3A83F7; }
+  .summary blockquote, .markdown blockquote { margin: 12px 0; padding: 4px 0 4px 14px; border-left: 3px solid #D5DBE3; color: #737373; }
+  .summary code, .markdown code { padding: 1px 5px; border-radius: 4px; background: #E7EAEF; color: #3A83F7; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .summary pre, .markdown pre { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: #1F2430; color: #D7DAE0; overflow: auto; }
+  .summary pre code, .markdown pre code { padding: 0; background: transparent; color: inherit; }
+  .markdown { color: #404040; }
+  .markdown > :first-child { margin-top: 0; }
+  .markdown > :last-child { margin-bottom: 0; }
+  .markdown table { margin: 12px 0; }
+  .markdown th, .markdown td { padding: 7px 10px; }
+  .markdown hr { border: 0; border-top: 1px solid #E7EAEF; margin: 18px 0; }
+  .markdown strong { color: #0E1115; }
+  .markdown img { max-width: 100%; height: auto; border-radius: 8px; }
   .block { margin-top: 24px; }
   .block h2 { margin: 0 0 12px; padding-bottom: 6px; font-size: 16px; border-bottom: 1px solid #E7EAEF; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }

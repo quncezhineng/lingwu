@@ -36,7 +36,8 @@ const research = {
   "research.checkDedup": "Already notified in the last 24 hours.",
   "research.checkDisabled": "This alert is turned off.",
   "research.checkQuoteUnavailable": "Quote is unavailable right now.",
-  "research.noAlerts": "No price alerts for this symbol yet.",
+  "research.noAlerts":
+    "No reminders for this symbol yet. Use \u201cAdd alert\u201d above to create one.",
   "research.alertCreated": "Alert created.",
   "research.alertDeleted": "Alert deleted.",
   "research.alertSaved": "Alert saved.",

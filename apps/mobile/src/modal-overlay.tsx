@@ -20,25 +20,26 @@ const webBackdrop = {
 } as ViewStyle;
 
 /** A stationary backdrop, deliberately outside the animated content layer. */
-export function ModalBackdrop() {
+export function ModalBackdrop({ subtle = false }: { subtle?: boolean }) {
+  const backgroundColor = subtle ? "rgba(24,24,24,0.14)" : colors.modalShade;
   if (Platform.OS === "web")
     return (
       <View
         testID="modal-backdrop"
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, webBackdrop]}
+        style={[StyleSheet.absoluteFill, subtle ? { backgroundColor } : webBackdrop]}
       />
     );
   return (
     <BlurView
       testID="modal-backdrop"
       pointerEvents="none"
-      intensity={24}
+      intensity={subtle ? 8 : 24}
       tint="default"
       experimentalBlurMethod="dimezisBlurView"
       style={StyleSheet.absoluteFill}
     >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.modalShade }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor }]} />
     </BlurView>
   );
 }
@@ -49,11 +50,13 @@ export function ModalOverlay({
   visible = true,
   onRequestClose,
   transition = "fade",
+  backdrop = "dimmed",
 }: {
   children: ReactNode;
   visible?: boolean;
   onRequestClose: () => void;
   transition?: "bottom" | "fade" | "none";
+  backdrop?: "dimmed" | "subtle";
 }) {
   const { height } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
@@ -95,7 +98,7 @@ export function ModalOverlay({
       navigationBarTranslucent
     >
       <View style={{ flex: 1 }}>
-        <ModalBackdrop />
+        <ModalBackdrop subtle={backdrop === "subtle"} />
         <Animated.View
           testID="modal-content"
           style={[

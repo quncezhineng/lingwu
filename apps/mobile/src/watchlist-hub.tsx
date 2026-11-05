@@ -68,7 +68,11 @@ export function WatchlistHubScreen({ mode = "page" }: { mode?: "page" | "embedde
         })}
       </View>
 
-      {activeTab === "portfolio" ? <PortfolioScreen /> : <WatchlistScreen />}
+      {activeTab === "portfolio" ? (
+        <PortfolioScreen embedded={mode === "embedded"} />
+      ) : (
+        <WatchlistScreen embedded={mode === "embedded"} />
+      )}
     </View>
   );
 }

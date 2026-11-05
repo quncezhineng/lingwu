@@ -34,6 +34,7 @@ import { PromptComposer } from "./prompt-composer";
 import { availabilityFromQuote, useQuotes } from "./quotes";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { StatusBadge, statusToneColors, taskStatusTone } from "./status-badge";
+import { localizedSymbolName, SYMBOL_MARKET_LABEL_KEYS } from "./symbol-names";
 import { breakpoints } from "./theme";
 import {
   Button,
@@ -123,11 +124,12 @@ function WatchlistRail() {
             const quote = availability.status === "ready" ? availability.quote : undefined;
             const change = quote?.changePercent ?? item.quote?.changePercent ?? 0;
             const direction = change > 0 ? "up" : change < 0 ? "down" : "flat";
+            const displayName = localizedSymbolName(item.symbol, locale);
             return (
               <Pressable
                 key={item.symbol.code}
                 accessibilityRole="button"
-                accessibilityLabel={`${item.symbol.name} ${item.symbol.code}`}
+                accessibilityLabel={`${displayName} ${item.symbol.code}`}
                 onPress={() =>
                   open({
                     type: "symbol",
@@ -154,10 +156,10 @@ function WatchlistRail() {
                     numberOfLines={1}
                     style={{ fontSize: 12, fontWeight: "500", color: colors.text }}
                   >
-                    {item.symbol.name}
+                    {displayName}
                   </Text>
                   <Text numberOfLines={1} style={{ fontSize: 10, color: colors.faint }}>
-                    {item.symbol.code} · {item.symbol.market}
+                    {item.symbol.code} · {t(SYMBOL_MARKET_LABEL_KEYS[item.symbol.market])}
                   </Text>
                 </View>
                 <MiniTrend change={change} />

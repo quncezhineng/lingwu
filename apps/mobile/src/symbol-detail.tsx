@@ -1,7 +1,8 @@
 /**
  * F3 标的详情 + F4 深度研究交互（全屏 Sheet）。
  *
- * F3：行情概览、近期新闻（来自最新研报）、公告占位、价格提醒 CRUD（B6）、
+ * F3：行情概览、近期新闻（来自最新研报）、公告占位、价格提醒入口与列表
+ *     （新建统一在「任务 → 定时 → 提醒」完成，这里只列出该标的的提醒任务）、
  *     Agent 异动分析入口。
  * F4：POST /api/research 触发 → 轮询 /api/agent/tasks/:id 展示 4 步进度 →
  *     GET /api/research/:symbol 展示 6 模块研报 → 导出（Web 打印为 PDF）→ 追问。
@@ -9,15 +10,17 @@
  */
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Platform, Pressable, View } from "react-native";
-import type { AgentTask, RunEvent } from "../../../packages/domain/src/agent";
+import type { AgentTask, Monitor, RunEvent } from "../../../packages/domain/src/agent";
+import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
 import { FinancialsSection } from "./financials-card";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
   Check,
+  ChevronRight,
   CircleX,
   FileText,
   MessageCircle,
@@ -28,11 +31,11 @@ import {
 } from "./icons";
 import { type Quote, removeSymbol, type SymbolMeta } from "./market";
 import { directionOf, formatPercent } from "./market-format";
+import { monitorConditionText, monitorScheduleText } from "./monitor-text";
 import { SymbolNotesSection } from "./note-ui";
 import { setNotesIntent } from "./notes";
 import {
   checkPriceAlert,
-  createPriceAlert,
   deletePriceAlert,
   listPriceAlerts,
   type PriceAlertRecord,
@@ -50,6 +53,8 @@ import {
   researchReportDocument,
   startResearch,
 } from "./research";
+import { monitorsForSymbol } from "./symbol-monitors";
+import { localizedSymbolName } from "./symbol-names";
 import { Toggle } from "./toggle";
 import {
   Button,
@@ -117,6 +122,49 @@ function SectionLabel({ children }: { children: string }) {
     <Text style={[s.label, { color: colors.faint, marginTop: 18, marginBottom: 8 }]}>
       {children}
     </Text>
+  );
+}
+
+/** 详情页分区：统一标题层级与「标题 + 右侧操作」的排布。 */
+function DetailSection({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={[s.between, { minHeight: 34, gap: 10, flexWrap: "wrap" }]}>
+        <Text style={{ fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.text }}>
+          {title}
+        </Text>
+        {action}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/** 空态：浅底卡片承载说明文字，避免整页只有几行裸文本显得松散。 */
+function EmptyPanel({ text, action }: { text: string; action?: ReactNode }) {
+  return (
+    <View
+      style={{
+        gap: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: colors.line,
+        backgroundColor: colors.surface,
+      }}
+    >
+      <Text style={[s.small, { lineHeight: 20 }]}>{text}</Text>
+      {action}
+    </View>
   );
 }
 
@@ -193,6 +241,32 @@ function AlertRow({
         </View>
       )}
     </View>
+  );
+}
+
+/** 提醒任务行：标题 + 触发条件与频率，点击打开对应任务。 */
+function ReminderRow({ monitor, onOpen }: { monitor: Monitor; onOpen: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={monitor.title}
+      onPress={onOpen}
+      style={({ pressed }) => [
+        s.row,
+        { minHeight: 44, gap: 10, paddingVertical: 10, opacity: pressed ? 0.7 : 1 },
+      ]}
+    >
+      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+        <Text numberOfLines={1} style={[s.text, { fontSize: 14, fontWeight: "600" }]}>
+          {monitor.title}
+        </Text>
+        <Text numberOfLines={1} style={s.small}>
+          {monitorConditionText(monitor, t)} · {monitorScheduleText(monitor, t)}
+        </Text>
+      </View>
+      <ChevronRight size={14} color={colors.faint} />
+    </Pressable>
   );
 }
 
@@ -549,38 +623,29 @@ export function SymbolDetailSheet({
   symbol,
   quote,
   watchlist,
-  initialAlertForm = false,
 }: {
   symbol: SymbolMeta;
   quote?: Quote;
   watchlist?: { id: string; name: string };
-  initialAlertForm?: boolean;
 }) {
-  const { api, close, ask, navigate, notify, refresh } = useWorkspace();
+  const { api, close, ask, navigate, notify, open, refresh, requestPriceReminder } = useWorkspace();
   const { t } = useTranslation();
+  const { data: agentData } = useAgentWorkspace();
   const [alerts, setAlerts] = useState<PriceAlertRecord[]>();
   const [alertsError, setAlertsError] = useState("");
   const [alertBusyId, setAlertBusyId] = useState<string>();
   const [confirmDeleteId, setConfirmDeleteId] = useState<string>();
+  // 仅用于编辑已有价格提醒；新建统一走「任务 → 定时 → 提醒」。
   const [form, setForm] = useState<{
-    mode: "create" | "edit";
-    id?: string;
+    id: string;
     type: ThresholdType;
     threshold: string;
     interval: string;
     enabled: boolean;
-  } | null>(
-    initialAlertForm
-      ? {
-          mode: "create",
-          type: "PRICE_ABOVE",
-          threshold: "",
-          interval: "15",
-          enabled: true,
-        }
-      : null,
-  );
+  } | null>(null);
   const [formBusy, setFormBusy] = useState(false);
+  // 该标的的提醒任务：在「任务 → 定时 → 提醒」里创建，这里只负责列出。
+  const reminders = monitorsForSymbol(agentData?.monitors ?? [], symbol);
   const [report, setReport] = useState<ResearchReport>();
   const [reportError, setReportError] = useState("");
   const [task, setTask] = useState<AgentTask>();
@@ -802,24 +867,13 @@ export function SymbolDetailSheet({
     }
     setFormBusy(true);
     try {
-      if (form.mode === "edit" && form.id) {
-        await updatePriceAlert(api, form.id, {
-          threshold_type: form.type,
-          threshold_value: threshold,
-          interval_minutes: interval,
-          enabled: form.enabled,
-        });
-        notify(t("research.alertSaved"));
-      } else {
-        await createPriceAlert(api, {
-          symbol_code: symbol.code,
-          threshold_type: form.type,
-          threshold_value: threshold,
-          interval_minutes: interval,
-          enabled: form.enabled,
-        });
-        notify(t("research.alertCreated"));
-      }
+      await updatePriceAlert(api, form.id, {
+        threshold_type: form.type,
+        threshold_value: threshold,
+        interval_minutes: interval,
+        enabled: form.enabled,
+      });
+      notify(t("research.alertSaved"));
       setForm(null);
       await loadAlerts();
     } catch {
@@ -833,290 +887,318 @@ export function SymbolDetailSheet({
   const failed = task?.status === "failed";
 
   return (
-    <Sheet title={`${symbol.code} · ${symbol.name}`} onClose={close} fullscreen>
-      {/* 行情概览（统一 QuoteCard，standard） */}
-      <View style={{ marginBottom: 14 }}>
+    <Sheet title={`${symbol.code} · ${localizedSymbolName(symbol)}`} onClose={close} fullscreen>
+      {/* 阅读型版面：桌面端限制栏宽并居中，避免整页被拉得过宽、行距拥挤 */}
+      <View style={{ gap: 26, width: "100%", maxWidth: 840, alignSelf: "center" }}>
+        {/* 行情概览（统一 QuoteCard，standard） */}
         <QuoteCard
-          symbol={{ code: symbol.code, name: symbol.name, market: symbol.market }}
+          symbol={{
+            code: symbol.code,
+            name: localizedSymbolName(symbol),
+            market: symbol.market,
+          }}
           availability={availability}
           size="standard"
           onRetry={retry}
         />
-      </View>
 
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 6 }}>
-        <Button primary icon={Sparkles} busy={starting} onPress={() => void runResearch()}>
-          {starting ? t("research.starting") : t("research.start")}
-        </Button>
-        <Button
-          icon={MessageCircle}
-          onPress={() => {
-            close();
-            ask(t("research.askPrompt", { code: symbol.code }));
+        {/* 主操作：研究 / 追问是一等动作，移出移除列表这类破坏性操作 */}
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 10,
+            marginTop: -8,
           }}
         >
-          {t("research.askAgent")}
-        </Button>
-        <Button
-          small
-          icon={Plus}
-          hitSlop={6}
-          onPress={() =>
-            setForm({
-              mode: "create",
-              type: "PRICE_ABOVE",
-              threshold: "",
-              interval: "15",
-              enabled: true,
-            })
+          <Button primary icon={Sparkles} busy={starting} onPress={() => void runResearch()}>
+            {starting ? t("research.starting") : t("research.start")}
+          </Button>
+          <Button
+            icon={MessageCircle}
+            onPress={() => {
+              close();
+              ask(t("research.askPrompt", { code: symbol.code }));
+            }}
+          >
+            {t("research.askAgent")}
+          </Button>
+          {!!watchlist?.id && (
+            <Button
+              small
+              danger
+              icon={Trash2}
+              hitSlop={6}
+              onPress={() => {
+                removeSymbol(api, watchlist.id, symbol.code);
+                notify(t("research.removedFromList", { name: watchlist.name }));
+                close();
+              }}
+            >
+              {t("research.removeFromList", { name: watchlist.name })}
+            </Button>
+          )}
+        </View>
+
+        {!!researchError && <ErrorNotice error={t("research.startFailed")} />}
+        {failed && <ErrorNotice error={t("research.taskFailed")} />}
+
+        {(running || (task && task.status === "succeeded" && !report)) && task && (
+          <Card>
+            <SectionHeading title={t("research.progressTitle")} />
+            <ResearchProgress task={task} events={events} />
+          </Card>
+        )}
+
+        {/* 价格提醒：新建统一走「任务 → 定时 → 提醒」，这里列出该标的已设置的提醒任务 */}
+        <DetailSection
+          title={t("research.alertsSection")}
+          action={
+            <Button
+              small
+              icon={Plus}
+              hitSlop={6}
+              onPress={() => requestPriceReminder(symbol, quote)}
+            >
+              {t("research.addAlert")}
+            </Button>
           }
         >
-          {t("research.addAlert")}
-        </Button>
-        {!!watchlist?.id && (
-          <Button
-            small
-            danger
-            icon={Trash2}
-            hitSlop={6}
-            onPress={() => {
-              removeSymbol(api, watchlist.id, symbol.code);
-              notify(t("research.removedFromList", { name: watchlist.name }));
-              close();
-            }}
-          >
-            {t("research.removeFromList", { name: watchlist.name })}
-          </Button>
-        )}
-      </View>
-
-      {!!researchError && <ErrorNotice error={t("research.startFailed")} />}
-      {failed && <ErrorNotice error={t("research.taskFailed")} />}
-
-      {(running || (task && task.status === "succeeded" && !report)) && task && (
-        <Card style={{ marginTop: 14 }}>
-          <SectionHeading title={t("research.progressTitle")} />
-          <ResearchProgress task={task} events={events} />
-        </Card>
-      )}
-
-      {/* 价格提醒 */}
-      <SectionLabel>{t("research.alertsSection")}</SectionLabel>
-      {alertsError ? (
-        <View style={{ gap: 8 }}>
-          <ErrorNotice error={t("research.alertsError")} />
-          <Button small icon={RefreshCw} hitSlop={6} onPress={() => void loadAlerts()}>
-            {t("research.alertsRetry")}
-          </Button>
-        </View>
-      ) : alerts === undefined ? (
-        <ActivityIndicator color={colors.primary} />
-      ) : alerts.length ? (
-        <Card style={{ paddingVertical: 4 }}>
-          {alerts.map((alert) => (
-            <AlertRow
-              key={alert.id}
-              alert={alert}
-              busy={alertBusyId === alert.id}
-              confirming={confirmDeleteId === alert.id}
-              onToggle={(enabled) => void toggleAlert(alert, enabled)}
-              onCheck={() => void checkAlert(alert)}
-              onRequestDelete={() => setConfirmDeleteId(alert.id)}
-              onConfirmDelete={() => {
-                setConfirmDeleteId(undefined);
-                void removeAlert(alert);
-              }}
-              onCancelDelete={() => setConfirmDeleteId(undefined)}
-              onEdit={() =>
-                setForm({
-                  mode: "edit",
-                  id: alert.id,
-                  type: alert.threshold_type,
-                  threshold: String(alert.threshold_value),
-                  interval: String(alert.interval_minutes),
-                  enabled: alert.enabled,
-                })
-              }
-            />
-          ))}
-        </Card>
-      ) : (
-        <View style={{ gap: 8, alignItems: "flex-start" }}>
-          <Button
-            small
-            icon={Plus}
-            hitSlop={6}
-            onPress={() =>
-              setForm({
-                mode: "create",
-                type: "PRICE_ABOVE",
-                threshold: "",
-                interval: "15",
-                enabled: true,
-              })
-            }
-          >
-            {t("research.addAlert")}
-          </Button>
-          <Text style={s.muted}>{t("research.noAlerts")}</Text>
-        </View>
-      )}
-
-      {form && (
-        <Card style={{ marginTop: 12, gap: 12 }}>
-          <Text style={s.heading}>
-            {t(form.mode === "edit" ? "research.editAlert" : "research.addAlert")}
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {ALERT_TYPES.map((option) => {
-              const selected = form.type === option.id;
-              return (
-                <Pressable
-                  key={option.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => setForm({ ...form, type: option.id })}
-                  style={{
-                    paddingHorizontal: 12,
-                    minHeight: 34,
-                    justifyContent: "center",
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    borderColor: selected ? colors.primary : colors.line,
-                    backgroundColor: selected ? colors.sky : colors.paper,
+          {reminders.length ? (
+            <Card style={{ paddingVertical: 4 }}>
+              {reminders.map((monitor) => (
+                <ReminderRow
+                  key={monitor.id}
+                  monitor={monitor}
+                  onOpen={() => open({ type: "task", taskId: monitor.taskId })}
+                />
+              ))}
+            </Card>
+          ) : (
+            <EmptyPanel text={t("research.noAlerts")} />
+          )}
+          {alertsError ? (
+            <View style={{ gap: 8 }}>
+              <ErrorNotice error={t("research.alertsError")} />
+              <Button small icon={RefreshCw} hitSlop={6} onPress={() => void loadAlerts()}>
+                {t("research.alertsRetry")}
+              </Button>
+            </View>
+          ) : alerts?.length ? (
+            <Card style={{ paddingVertical: 4 }}>
+              {alerts.map((alert) => (
+                <AlertRow
+                  key={alert.id}
+                  alert={alert}
+                  busy={alertBusyId === alert.id}
+                  confirming={confirmDeleteId === alert.id}
+                  onToggle={(enabled) => void toggleAlert(alert, enabled)}
+                  onCheck={() => void checkAlert(alert)}
+                  onRequestDelete={() => setConfirmDeleteId(alert.id)}
+                  onConfirmDelete={() => {
+                    setConfirmDeleteId(undefined);
+                    void removeAlert(alert);
                   }}
+                  onCancelDelete={() => setConfirmDeleteId(undefined)}
+                  onEdit={() =>
+                    setForm({
+                      id: alert.id,
+                      type: alert.threshold_type,
+                      threshold: String(alert.threshold_value),
+                      interval: String(alert.interval_minutes),
+                      enabled: alert.enabled,
+                    })
+                  }
+                />
+              ))}
+            </Card>
+          ) : null}
+
+          {form && (
+            <Card style={{ gap: 12 }}>
+              <Text style={s.heading}>{t("research.editAlert")}</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {ALERT_TYPES.map((option) => {
+                  const selected = form.type === option.id;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      onPress={() => setForm({ ...form, type: option.id })}
+                      style={{
+                        paddingHorizontal: 12,
+                        minHeight: 34,
+                        justifyContent: "center",
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: selected ? colors.primary : colors.line,
+                        backgroundColor: selected ? colors.sky : colors.paper,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "600",
+                          color: selected ? colors.primary : colors.muted,
+                        }}
+                      >
+                        {t(option.labelKey)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
+                    {t("research.thresholdLabel")}
+                  </Text>
+                  <TextInput
+                    value={form.threshold}
+                    onChangeText={(text) => setForm({ ...form, threshold: text })}
+                    keyboardType="decimal-pad"
+                    placeholder={form.type === "CHANGE_PCT" ? "5" : "200"}
+                    placeholderTextColor={colors.faint}
+                    accessibilityLabel={t("research.thresholdLabel")}
+                    style={s.input}
+                  />
+                </View>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
+                    {t("research.intervalLabel")}
+                  </Text>
+                  <TextInput
+                    value={form.interval}
+                    onChangeText={(text) => setForm({ ...form, interval: text })}
+                    keyboardType="number-pad"
+                    placeholder="15"
+                    placeholderTextColor={colors.faint}
+                    accessibilityLabel={t("research.intervalLabel")}
+                    style={s.input}
+                  />
+                </View>
+              </View>
+              <View style={[s.between, { minHeight: 40 }]}>
+                <Text style={[s.text, { fontSize: 14 }]}>{t("research.enabled")}</Text>
+                <Toggle
+                  value={form.enabled}
+                  onValueChange={(enabled) => setForm({ ...form, enabled })}
+                  label={t("research.enabled")}
+                />
+              </View>
+              <View style={[s.row, { gap: 10 }]}>
+                <Button primary busy={formBusy} onPress={() => void submitForm()}>
+                  {t("research.save")}
+                </Button>
+                <Button onPress={() => setForm(null)}>{t("research.cancel")}</Button>
+              </View>
+            </Card>
+          )}
+        </DetailSection>
+
+        {/* 投资笔记（位于价格提醒之后、新闻之前） */}
+        <SymbolNotesSection
+          api={api}
+          symbolCode={symbol.code}
+          onOpenTheses={() => {
+            setNotesIntent({ tab: "theses", symbol: symbol.code });
+            close();
+            navigate("notes");
+          }}
+        />
+        {/* 财报解析（固定「对比上一期、未接一致预期」横幅） */}
+        <FinancialsSection api={api} symbolCode={symbol.code} />
+
+        {/* 近期新闻（来自最新研报） */}
+        <DetailSection
+          title={t("research.newsSection")}
+          action={
+            !!report?.news.length && (
+              <Button
+                small
+                icon={Sparkles}
+                busy={starting}
+                hitSlop={6}
+                onPress={() => void runResearch()}
+              >
+                {t("research.start")}
+              </Button>
+            )
+          }
+        >
+          {report?.news.length ? (
+            <Card style={{ paddingVertical: 2 }}>
+              {report.news.slice(0, 5).map((item, index) => (
+                <Pressable
+                  key={`detail-news-${item.url}`}
+                  accessibilityRole="link"
+                  onPress={() => void Linking.openURL(item.url)}
+                  style={({ pressed }) => [
+                    {
+                      paddingVertical: 11,
+                      gap: 3,
+                      borderTopWidth: index ? 1 : 0,
+                      borderTopColor: colors.line,
+                    },
+                    pressed && { opacity: 0.7 },
+                  ]}
                 >
                   <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "600",
-                      color: selected ? colors.primary : colors.muted,
-                    }}
+                    style={[s.text, { fontSize: 13, lineHeight: 20, color: colors.primaryStrong }]}
+                    numberOfLines={2}
                   >
-                    {t(option.labelKey)}
+                    {item.title}
                   </Text>
+                  {!!item.publishedAt && <Text style={s.small}>{item.publishedAt}</Text>}
                 </Pressable>
-              );
-            })}
-          </View>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <View style={{ flex: 1, gap: 6 }}>
-              <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
-                {t("research.thresholdLabel")}
-              </Text>
-              <TextInput
-                value={form.threshold}
-                onChangeText={(text) => setForm({ ...form, threshold: text })}
-                keyboardType="decimal-pad"
-                placeholder={form.type === "CHANGE_PCT" ? "5" : "200"}
-                placeholderTextColor={colors.faint}
-                accessibilityLabel={t("research.thresholdLabel")}
-                style={s.input}
-              />
-            </View>
-            <View style={{ flex: 1, gap: 6 }}>
-              <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
-                {t("research.intervalLabel")}
-              </Text>
-              <TextInput
-                value={form.interval}
-                onChangeText={(text) => setForm({ ...form, interval: text })}
-                keyboardType="number-pad"
-                placeholder="15"
-                placeholderTextColor={colors.faint}
-                accessibilityLabel={t("research.intervalLabel")}
-                style={s.input}
-              />
-            </View>
-          </View>
-          <View style={[s.between, { minHeight: 40 }]}>
-            <Text style={[s.text, { fontSize: 14 }]}>{t("research.enabled")}</Text>
-            <Toggle
-              value={form.enabled}
-              onValueChange={(enabled) => setForm({ ...form, enabled })}
-              label={t("research.enabled")}
+              ))}
+            </Card>
+          ) : (
+            <EmptyPanel
+              text={t("research.newsEmpty")}
+              action={
+                <Button
+                  small
+                  icon={Sparkles}
+                  busy={starting}
+                  hitSlop={6}
+                  onPress={() => void runResearch()}
+                >
+                  {t("research.runResearch")}
+                </Button>
+              }
             />
-          </View>
-          <View style={[s.row, { gap: 10 }]}>
-            <Button primary busy={formBusy} onPress={() => void submitForm()}>
-              {t("research.save")}
-            </Button>
-            <Button onPress={() => setForm(null)}>{t("research.cancel")}</Button>
-          </View>
-        </Card>
-      )}
+          )}
+        </DetailSection>
 
-      {/* 投资笔记（位于价格提醒之后、新闻之前） */}
-      <SymbolNotesSection
-        api={api}
-        symbolCode={symbol.code}
-        onOpenTheses={() => {
-          setNotesIntent({ tab: "theses", symbol: symbol.code });
-          close();
-          navigate("notes");
-        }}
-      />
-      {/* 财报解析（固定「对比上一期、未接一致预期」横幅） */}
-      <FinancialsSection api={api} symbolCode={symbol.code} />
+        {/* 公告占位 */}
+        <DetailSection title={t("research.filingsSection")}>
+          <EmptyPanel text={t("research.filingsEmpty")} />
+        </DetailSection>
 
-      {/* 近期新闻（来自最新研报） */}
-      <SectionLabel>{t("research.newsSection")}</SectionLabel>
-      {report?.news.length ? (
-        report.news.slice(0, 5).map((item) => (
-          <Pressable
-            key={`detail-news-${item.url}`}
-            accessibilityRole="link"
-            onPress={() => void Linking.openURL(item.url)}
-            style={({ pressed }) => [
-              { paddingVertical: 9, borderTopWidth: 1, borderTopColor: colors.line, gap: 2 },
-              pressed && { backgroundColor: colors.overlay1 },
-            ]}
-          >
-            <Text style={[s.text, { fontSize: 13, color: colors.primaryStrong }]} numberOfLines={2}>
-              {item.title}
-            </Text>
-            {!!item.publishedAt && <Text style={s.small}>{item.publishedAt}</Text>}
-          </Pressable>
-        ))
-      ) : (
-        <View style={{ gap: 8 }}>
-          <Text style={s.muted}>{t("research.newsEmpty")}</Text>
-          <Button
-            small
-            icon={Sparkles}
-            busy={starting}
-            hitSlop={6}
-            onPress={() => void runResearch()}
-          >
-            {t("research.runResearch")}
-          </Button>
-        </View>
-      )}
+        {/* 研报（F4）：放在 F3 内容之后，避免长表把提醒/新闻挤到折叠线下 */}
+        {report && (
+          <Card>
+            <SectionHeading title={t("research.reportTitle")} />
+            <ReportView
+              report={report}
+              onExport={() => void exportReport()}
+              onFollowUp={() => {
+                close();
+                ask(t("research.followUpPrompt", { code: symbol.code }));
+              }}
+              onRerun={() => void runResearch()}
+              rerunBusy={starting}
+            />
+          </Card>
+        )}
 
-      {/* 公告占位 */}
-      <SectionLabel>{t("research.filingsSection")}</SectionLabel>
-      <Text style={s.muted}>{t("research.filingsEmpty")}</Text>
+        {!!reportError && !report && <ErrorNotice error={t("research.loadFailed")} />}
 
-      {/* 研报（F4）：放在 F3 内容之后，避免长表把提醒/新闻挤到折叠线下 */}
-      {report && (
-        <Card style={{ marginTop: 14 }}>
-          <SectionHeading title={t("research.reportTitle")} />
-          <ReportView
-            report={report}
-            onExport={() => void exportReport()}
-            onFollowUp={() => {
-              close();
-              ask(t("research.followUpPrompt", { code: symbol.code }));
-            }}
-            onRerun={() => void runResearch()}
-            rerunBusy={starting}
-          />
-        </Card>
-      )}
-
-      {!!reportError && !report && <ErrorNotice error={t("research.loadFailed")} />}
-
-      <DisclaimerNote />
+        <DisclaimerNote />
+      </View>
     </Sheet>
   );
 }

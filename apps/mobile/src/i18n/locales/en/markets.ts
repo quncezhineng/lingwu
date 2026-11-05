@@ -57,8 +57,7 @@ const markets = {
   "markets.watchlistCaptionedCount": "Following {count} symbols",
   "markets.watchlistSampleCaption": "Sample quotes · not live",
   "markets.watchlistLiveCaption": "Workspace quotes · refreshed on demand",
-  "markets.watchlistSaved":
-    "Your watchlists are saved to this workspace and stay in sync across workbench and app views.",
+  "markets.watchlistSaved": "Your watchlist is saved to your workspace and kept up to date.",
   "markets.watchlistFilterEmptyTitle": "No watchlist symbols match this view",
   "markets.watchlistFilterEmptyDetail":
     "Change the market or search filters, or add another symbol.",
