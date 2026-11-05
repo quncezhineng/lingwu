@@ -130,7 +130,10 @@ export async function createApp(
         c.json({ error: "Request is too large; files must be 10 MB or smaller" }, 413),
     }),
   );
-  app.use("/api/*", rateLimit(Boolean(config.trustProxy)));
+  app.use(
+    "/api/*",
+    rateLimit(Boolean(config.trustProxy), { maxRequests: config.rateLimitMaxRequests }),
+  );
   app.onError((error, c) => {
     if (error instanceof z.ZodError)
       return c.json({ error: error.issues.map((i) => i.message).join("; ") }, 422);

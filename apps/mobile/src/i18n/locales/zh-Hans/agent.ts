@@ -679,7 +679,7 @@ const agent = {
   "agentSpace.firstRunBriefPrompt":
     "基于我关注的{focus}，生成一份今天的市场简报，先讲最值得注意的三件事。",
   "agentSpace.welcomeEyebrow": "你的个人投研 Agent",
-  "agentSpace.welcomeTitle": "把研究交给合适的 Agent。",
+  "agentSpace.welcomeTitle": "把研究交给合适的 Agent，",
   "agentSpace.welcomeTail": "从今天最关心的问题开始。",
   "agentSpace.composer": "发消息给 {name}…",
   "agentSpace.openIdeasPage": "灵感页面",

@@ -67,6 +67,8 @@ export interface Config {
   sessionTtlMs?: number;
   allowedOrigins: string[];
   trustProxy?: boolean;
+  /** 覆盖 /api/* 全局限流的每分钟请求数（默认 120）。 */
+  rateLimitMaxRequests?: number;
 }
 
 export type ComputerProvider = "docker" | "e2b-desktop";
@@ -206,6 +208,10 @@ export function readConfig(): Config {
     // Only trust X-Forwarded-For/X-Real-IP when the deployment is known to sit
     // behind a proxy that sets them; otherwise a direct caller can spoof them.
     trustProxy: process.env.TRUST_PROXY === "true",
+    rateLimitMaxRequests: positiveInt(
+      process.env.RATE_LIMIT_MAX_REQUESTS,
+      "RATE_LIMIT_MAX_REQUESTS",
+    ),
   };
   if (mode === "live" && !config.encryptionKey)
     throw new Error("Live mode requires TOKEN_ENCRYPTION_KEY (32-byte base64)");

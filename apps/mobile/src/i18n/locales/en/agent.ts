@@ -744,7 +744,7 @@ const agent = {
   "agentSpace.firstRunBriefPrompt":
     "Using the {focus} I follow, generate a market briefing today and lead with the three most important developments.",
   "agentSpace.welcomeEyebrow": "Your personal research Agent",
-  "agentSpace.welcomeTitle": "Give research to the right Agent.",
+  "agentSpace.welcomeTitle": "Give research to the right Agent,",
   "agentSpace.welcomeTail": "Start with today's most important question.",
   "agentSpace.composer": "Message {name}…",
   "agentSpace.openIdeasPage": "Ideas page",

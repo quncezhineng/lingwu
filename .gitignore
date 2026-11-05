@@ -22,4 +22,5 @@ artifacts/
 .pnpm-store
 .qoder
 .qoder-collab-runtime
+.codebuddy
 .omx
