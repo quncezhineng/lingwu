@@ -8,6 +8,7 @@ export const desktopColumns = {
 export type ColumnSide = "left" | "right";
 export type ColumnWidths = Record<ColumnSide, number>;
 export const COLUMN_WIDTHS_STORAGE_KEY = "lingwu:desktop-columns:v1";
+export const RIGHT_RAIL_COLLAPSED_STORAGE_KEY = "lingwu:right-rail-collapsed:v1";
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.round(value)));

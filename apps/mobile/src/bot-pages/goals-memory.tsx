@@ -8,10 +8,10 @@ import { useTranslation } from "../i18n";
 import { ChevronRight, Plus } from "../icons";
 import { PreferencesScreen } from "../preferences-screen";
 import { Button, colors, s } from "../ui";
-import { BotEmpty, BotPage, type BotPageProps } from "./shared";
+import { BotEmpty, BotInlineBack, BotPage, type BotPageProps } from "./shared";
 
 /** Account goals and memories are maintained here, independently of Bot identity. */
-export function BotGoalsMemoryPage({ onClose }: BotPageProps) {
+export function BotGoalsMemoryPage({ onClose, embedded }: BotPageProps) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const [tab, setTab] = useState<"goals" | "memories">("goals");
@@ -20,13 +20,23 @@ export function BotGoalsMemoryPage({ onClose }: BotPageProps) {
   const goal = data?.goals.find((item) => item.id === goalId);
   if (addingGoal)
     return (
-      <BotPage title={t("agent.createGoal")} onClose={() => setAddingGoal(false)}>
+      <BotPage
+        title={t("agent.createGoal")}
+        onClose={() => setAddingGoal(false)}
+        embedded={embedded}
+      >
+        {embedded && (
+          <BotInlineBack label={t("common.back")} onPress={() => setAddingGoal(false)} />
+        )}
         <GoalForm onDone={() => setAddingGoal(false)} />
       </BotPage>
     );
   if (goal)
     return (
-      <BotPage title={goal.title} onClose={() => setGoalId(undefined)}>
+      <BotPage title={goal.title} onClose={() => setGoalId(undefined)} embedded={embedded}>
+        {embedded && (
+          <BotInlineBack label={t("common.back")} onPress={() => setGoalId(undefined)} />
+        )}
         <GoalCard goal={goal} onOpenTask={() => setGoalId(undefined)} />
       </BotPage>
     );
@@ -35,6 +45,7 @@ export function BotGoalsMemoryPage({ onClose }: BotPageProps) {
       title={t("agentSpace.goalsMemory")}
       subtitle={t("agentSpace.sharedGoalsMemory")}
       onClose={onClose}
+      embedded={embedded}
     >
       <View style={{ gap: 16 }}>
         <HubTabs

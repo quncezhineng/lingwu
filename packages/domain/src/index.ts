@@ -19,6 +19,7 @@ export type Section =
   | "notes"
   | "apps"
   | "settings"
+  | "agent"
   | "account";
 export interface Mail {
   id: string;

@@ -312,6 +312,13 @@ export const PROJECT_ICONS: Record<string, IconDefinition> = {
       { tag: "path", d: "m14 9 3 3-3 3" },
     ],
   },
+  "panel-right": {
+    source: "project",
+    elements: [
+      { tag: "rect", x: 3, y: 3, width: 18, height: 18, rx: 2 },
+      { tag: "path", d: "M15 3v18" },
+    ],
+  },
   "panels-top-left": {
     source: "project",
     elements: [

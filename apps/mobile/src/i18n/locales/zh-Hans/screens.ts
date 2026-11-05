@@ -90,7 +90,8 @@ const screens = {
     "在上方打开一个会话，把浏览记录汇聚在一起。配置好浏览器工作进程后，即可显示实时预览。",
 
   // Files 文件
-  "screens.filesSubtitle": "每次分析的成果、每份上传的资料，都留在这里。",
+  "screens.filesSubtitle":
+    "统一管理分析生成的研究成果、上传文件、领悟卡与个人笔记，支持检索、下载和投入分析。",
   "screens.filesImport": "上传资料",
   "screens.libraryFiles": "文件",
   "screens.libraryInsights": "领悟卡",

@@ -26,7 +26,7 @@ import type { ActionProposal, Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
-import type { AgentAvatarId } from "./agent-space-model";
+import type { AgentAvatarId, AgentCommunication, AgentTone } from "./agent-space-model";
 import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text, type TextInput } from "./app-text";
@@ -102,7 +102,7 @@ import {
   s,
   shadow,
 } from "./ui";
-import { useWorkspace } from "./workspace";
+import { type ComposerPrompt, useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
 
@@ -481,7 +481,7 @@ export function ChatScreen({
   firstRunWelcome,
   onThreadUsed,
 }: {
-  prompt?: { id: number; text: string; attachmentIds?: readonly string[] };
+  prompt?: ComposerPrompt;
   thread?: Selection;
   active?: boolean;
   /** The Agent shell supplies the primary header, so the legacy thread header can be hidden. */
@@ -493,6 +493,12 @@ export function ChatScreen({
     role: string;
     persona: string;
     avatar?: AgentAvatarId;
+    /** 说话语气，取值来自 agent-space-model 的 AgentTone。 */
+    tone?: AgentTone;
+    /** 回答详略，取值来自 agent-space-model 的 AgentCommunication。 */
+    communication?: AgentCommunication;
+    /** 系统提示词（人设页「指令」），非空时随上下文注入。 */
+    instructions?: string;
     userPreferences?: string;
   };
   emptyEyebrow?: string;
@@ -526,8 +532,15 @@ export function ChatScreen({
   const { agent, isReady } = useAgent({ agentId, runtimeAgentId: "default", threadId });
   useAgentContext({
     description:
-      "The currently selected LingWu Agent. Its name, responsibility and persona define how it should work. This context does not grant access to resources owned by other Agents.",
-    value: agentContext ?? { name: "LingWu", role: "research assistant", persona: "" },
+      "The currently selected LingWu Agent. Its name, responsibility and persona define how it should work; tone and responseLength describe how it should speak. This context does not grant access to resources owned by other Agents.",
+    value: {
+      ...(agentContext ?? { name: "LingWu", role: "research assistant", persona: "" }),
+      ...(agentContext?.tone ? { tone: statusLabel(agentContext.tone) } : {}),
+      ...(agentContext?.communication
+        ? { responseLength: statusLabel(agentContext.communication) }
+        : {}),
+      ...(agentContext?.instructions ? { instructions: agentContext.instructions } : {}),
+    },
   });
   // A replayable mirror of the runtime's text events. The direct runtime transport
   // remains authoritative while attached; this channel repairs gaps and restores
@@ -907,8 +920,16 @@ export function ChatScreen({
     if (!busy && !agent.isRunning && outbox.pending.length) flush();
   }, [busy, agent.isRunning, outbox.pending.length, flush]);
   useEffect(() => {
-    if (!active || !prompt || !isReady || !loaded || !claimPrompt(prompt.id) || !prompt.text.trim())
+    if (!active || !prompt) return;
+    if (!prompt.text.trim()) return;
+    // draft 意图只预填输入框，等用户确认后再走 send，避免模板一点就开跑。
+    if (prompt.draft) {
+      if (!claimPrompt(prompt.id)) return;
+      setDraft(prompt.text);
+      composerInput.current?.focus();
       return;
+    }
+    if (!isReady || !loaded || !claimPrompt(prompt.id)) return;
     const files = w.files.filter((file) => prompt.attachmentIds?.includes(file.id));
     enqueue(promptWithAttachments(prompt.text, files));
   }, [active, prompt, isReady, loaded, enqueue, claimPrompt, w.files]);

@@ -9,7 +9,16 @@
 
 export type AgentTemplateId = "general" | "market" | "asset" | "custom";
 export type AgentAvatarId = "orb" | "bloom" | "moon" | "planet" | "cat";
+/** 说话语气（人设页「语气」）。取值与 i18n `status.*` 一一对应。 */
+export type AgentTone = "formal" | "casual" | "playful" | "concise" | "warm";
+/** 回答详略（人设页「话说多少」）。取值与 i18n `status.*` 一一对应。 */
+export type AgentCommunication = "short" | "detailed" | "bullets";
 export type SelectionLike = { id: string; existing: boolean };
+
+export const AGENT_TONES: readonly AgentTone[] = ["formal", "casual", "playful", "concise", "warm"];
+export const AGENT_COMMUNICATIONS: readonly AgentCommunication[] = ["short", "detailed", "bullets"];
+export const DEFAULT_AGENT_TONE: AgentTone = "warm";
+export const DEFAULT_AGENT_COMMUNICATION: AgentCommunication = "detailed";
 
 export interface AgentSkill {
   id: string;
@@ -31,6 +40,12 @@ export interface AgentDefinition {
   role: string;
   persona: string;
   avatar: AgentAvatarId;
+  /** 说话语气，参与对话上下文。 */
+  tone: AgentTone;
+  /** 回答详略，参与对话上下文。 */
+  communication: AgentCommunication;
+  /** 系统提示词（人设页「指令」）：每次对话前作为指令注入。 */
+  instructions: string;
   /** The system-created default Agent cannot be deleted. */
   system: boolean;
   /** True once the server has created or already knows this thread. */
@@ -191,6 +206,9 @@ export function createSystemAgent(
     role: "投研助理",
     persona: "清晰、耐心，先给结论，再说依据；不确定的地方明确说明。",
     avatar: "orb",
+    tone: DEFAULT_AGENT_TONE,
+    communication: DEFAULT_AGENT_COMMUNICATION,
+    instructions: "",
     system: true,
     threadExists: true,
     createdAt: now,
@@ -269,6 +287,11 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
     avatar: AVATARS.includes(value.avatar as AgentAvatarId)
       ? (value.avatar as AgentAvatarId)
       : defaults.avatar,
+    tone: AGENT_TONES.includes(value.tone as AgentTone) ? (value.tone as AgentTone) : defaults.tone,
+    communication: AGENT_COMMUNICATIONS.includes(value.communication as AgentCommunication)
+      ? (value.communication as AgentCommunication)
+      : defaults.communication,
+    instructions: stringValue(value.instructions).slice(0, 4000),
     system,
     threadExists: system || value.threadExists === true,
     createdAt: stringValue(value.createdAt, defaults.createdAt),
@@ -373,6 +396,9 @@ export function createAgentFromTemplate(
     role?: string;
     persona?: string;
     avatar?: AgentAvatarId;
+    tone?: AgentTone;
+    communication?: AgentCommunication;
+    instructions?: string;
     now?: string;
   } = {},
 ): AgentDefinition {
@@ -386,6 +412,9 @@ export function createAgentFromTemplate(
     role: (options.role ?? preset.role).trim().slice(0, 30) || preset.role,
     persona: (options.persona ?? preset.persona).trim().slice(0, 1000) || preset.persona,
     avatar: options.avatar ?? preset.avatar,
+    tone: options.tone ?? DEFAULT_AGENT_TONE,
+    communication: options.communication ?? DEFAULT_AGENT_COMMUNICATION,
+    instructions: options.instructions?.slice(0, 4000) ?? "",
     system: false,
     threadExists: false,
     createdAt: now,

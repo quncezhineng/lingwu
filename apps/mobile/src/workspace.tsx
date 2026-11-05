@@ -50,6 +50,14 @@ export interface PriceReminderIntent {
   quote?: Quote;
 }
 
+/** 从其他页面送进对话输入框的意图：draft 为真时只预填、由用户确认后再发送。 */
+export interface ComposerPrompt {
+  id: number;
+  text: string;
+  attachmentIds?: readonly string[];
+  draft?: boolean;
+}
+
 export interface WorkspaceContextValue {
   workspace: Workspace;
   api: LingWuApi;
@@ -63,6 +71,8 @@ export interface WorkspaceContextValue {
   clearReminderIntent: () => void;
   notify: (message: string, action?: { label: string; onPress: () => void }) => void;
   ask: (prompt: string, attachmentIds?: readonly string[]) => void;
+  /** 只把内容填进输入框、不自动发送，由用户确认后再发送。 */
+  prefillPrompt: (text: string) => void;
 }
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 export function useWorkspace() {

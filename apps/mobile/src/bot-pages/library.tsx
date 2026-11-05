@@ -6,12 +6,12 @@ import { LinkRow, SectionHeading } from "../ui";
 import { useWorkspace } from "../workspace";
 import { BotEmpty, BotPage, type BotPageProps, useBotResources } from "./shared";
 
-export function BotLibraryPage({ onClose }: BotPageProps) {
+export function BotLibraryPage({ onClose, embedded }: BotPageProps) {
   const { t } = useTranslation();
   const { artifacts, files } = useBotResources();
   const { open } = useWorkspace();
   return (
-    <BotPage title={t("agentSpace.library")} onClose={onClose}>
+    <BotPage title={t("agentSpace.library")} onClose={onClose} embedded={embedded}>
       <View style={{ gap: 12 }}>
         {!artifacts.length && !files.length && <BotEmpty>{t("agentSpace.libraryEmpty")}</BotEmpty>}
         {!!files.length && (

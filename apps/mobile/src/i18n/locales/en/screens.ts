@@ -91,7 +91,8 @@ const screens = {
     "Open a session above to keep your browsing together. Live previews appear when the browser worker is configured.",
 
   // Files 文件
-  "screens.filesSubtitle": "Keep every analysis output and uploaded document together.",
+  "screens.filesSubtitle":
+    "Manage research outputs, uploaded documents, insights and notes in one place, ready to search, download or add to analysis.",
   "screens.filesImport": "Upload document",
   "screens.libraryFiles": "Files",
   "screens.libraryInsights": "Insights",

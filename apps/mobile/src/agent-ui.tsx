@@ -369,11 +369,14 @@ function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
   }
 }
 
-export function AgentActivityScreen() {
+export function AgentActivityScreen({ scopedTasks }: { scopedTasks?: readonly AgentTask[] } = {}) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const [filter, setFilter] = useState<TaskFilter>("all");
-  const all = [...(data?.tasks ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  // 传入 scopedTasks 时以作用域为准（如「当前 Agent」）；否则回落全工作区任务。
+  const all = [...(scopedTasks ?? data?.tasks ?? [])].sort((a, b) =>
+    b.updatedAt.localeCompare(a.updatedAt),
+  );
   const counts = Object.fromEntries(
     TASK_FILTERS.map(({ id }) => [id, all.filter((task) => matchesTaskFilter(task, id)).length]),
   ) as Record<TaskFilter, number>;
@@ -1216,10 +1219,11 @@ const RESEARCH_TEMPLATES: ResearchTemplate[] = [
 export function IdeasScreen({ onUsePrompt }: { onUsePrompt?: () => void } = {}) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
-  const { ask, navigate } = useWorkspace();
+  const { prefillPrompt, navigate } = useWorkspace();
   const { width } = useWindowDimensions();
-  function sendPromptToAgent(prompt: string) {
-    ask(prompt);
+  /** 模板只预填输入框，用户确认后再发送，避免一点就自动开跑。 */
+  function fillPromptForAgent(prompt: string) {
+    prefillPrompt(prompt);
     navigate("chat");
     onUsePrompt?.();
   }
@@ -1244,7 +1248,7 @@ export function IdeasScreen({ onUsePrompt }: { onUsePrompt?: () => void } = {}) 
                   title: t(template.titleKey),
                 })}
                 onPress={() => {
-                  sendPromptToAgent(t(template.promptKey));
+                  fillPromptForAgent(t(template.promptKey));
                 }}
                 style={({ pressed }) => ({
                   flexBasis: threeColumns ? "31.5%" : "47%",

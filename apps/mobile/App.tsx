@@ -63,6 +63,7 @@ import {
 import { WatchlistHubScreen } from "./src/watchlist-hub";
 import { WorkbenchScreen } from "./src/workbench";
 import {
+  type ComposerPrompt,
   type Detail,
   type PriceReminderIntent,
   useWorkspace,
@@ -486,11 +487,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   const [reminderIntent, setReminderIntent] = useState<PriceReminderIntent>();
   const [toast, setToast] = useState<ToastState>();
   const [error, setError] = useState("");
-  const [prompt, setPrompt] = useState<{
-    id: number;
-    text: string;
-    attachmentIds?: readonly string[];
-  }>();
+  const [prompt, setPrompt] = useState<ComposerPrompt>();
   const refresh = useCallback(async () => {
     const [snapshot, account] = await Promise.all([
       api.request<Workspace>("/api/workspace"),
@@ -559,6 +556,11 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
     setPrompt({ id: Date.now(), text, attachmentIds });
     setSection("chat");
   }, []);
+  /** 语义与 ask 相反：只预填输入框，是否发送交由用户决定。 */
+  const prefillPrompt = useCallback((text: string) => {
+    setPrompt({ id: Date.now(), text, draft: true });
+    setSection("chat");
+  }, []);
   if (!workspace)
     return (
       <SafeAreaView
@@ -600,6 +602,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
         clearReminderIntent,
         notify,
         ask,
+        prefillPrompt,
       }}
     >
       <AgentWorkspaceProvider>
@@ -634,7 +637,7 @@ function WorkspaceShell({
   toast?: ToastState;
   clearToast: () => void;
   error: string;
-  prompt?: { id: number; text: string; attachmentIds?: readonly string[] };
+  prompt?: ComposerPrompt;
   onSignOut: () => void;
 }) {
   const { workspace, section, navigate, open, close } = useWorkspace();

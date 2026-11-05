@@ -127,10 +127,10 @@ const app = {
   "app.titleNotes": "Notes",
   "app.subtitleNotes": "Investment notes and thesis tracking.",
   "app.subtitleWatchlist":
-    "Keep the stocks and funds you follow together, ready to track and research.",
+    "Manage watchlists, holdings and portfolios in one workspace shared by every Agent.",
   "app.titleActivity": "Tasks",
   "app.subtitleActivity":
-    "Follow research in progress, items that need your input, key decisions and final results.",
+    "Manage tasks, progress and reminders across every Agent, and handle anything that needs your review.",
   "app.titleIdeas": "Ideas",
   "app.subtitleIdeas": "Next research steps, grounded in the markets and targets you follow.",
   "app.titleGoals": "Scheduled",
@@ -145,7 +145,7 @@ const app = {
   "app.moreHeading": "More",
   "app.destFilesDetail": "Documents, insights and notes",
   "app.destPreferencesDetail": "Goals, risk preferences and focus areas",
-  "app.destAppsDetail": "Apps, skills and data connections",
+  "app.destAppsDetail": "Extend research workflows, specialist skills and external connections",
   "app.destGoalsDetail": "Research goals and conditional reminders",
   "app.titleAccount": "Account",
   "app.subtitleAccount": "Review your profile, sign-in status and workspace details.",
@@ -303,7 +303,6 @@ const app = {
   "preferences.memoryHeading": "All memories",
   "preferences.count": "{count} memories",
   "preferences.toldOn": "You told me on {date}",
-  "preferences.contextTitle": "Understand your investment goals before analyzing.",
   "preferences.contextDetail":
     "LingWu uses these memories during analysis. You can edit or remove them at any time.",
   "preferences.deleteConfirmDetail": "LingWu will stop using this memory after deletion.",

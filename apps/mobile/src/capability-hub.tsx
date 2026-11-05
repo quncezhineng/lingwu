@@ -163,13 +163,6 @@ const HUB_MY_EMPTY_TITLE_LABELS: Record<CapabilityType, TranslationKey> = {
   workspace: "agent.hubNoMatchTitle",
 };
 
-const STATE_KEYS: Record<CapabilityState, TranslationKey> = {
-  ready: "agent.hubStateReady",
-  connected: "agent.hubStateConnected",
-  available: "agent.hubStateAvailable",
-  open: "agent.hubStateOpen",
-};
-
 const SKILL_CATEGORY_LABELS: Record<SkillCategory, TranslationKey> = {
   "market-macro": "agent.hubSkillCategoryMarketMacro",
   "company-fundamentals": "agent.hubSkillCategoryCompanyFundamentals",
@@ -371,7 +364,7 @@ function CapabilityAction({
   if (item.installed) {
     return (
       <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-        <ConnectedCapabilityBadge label={t("agent.hubStateConnected")} />
+        <ConnectedCapabilityBadge label={t("agent.hubStateInstalled")} />
         {tab === "mine" && !item.system && (
           <Pressable
             accessibilityRole="button"
@@ -426,7 +419,6 @@ function CapabilityCard({
   installBusy: boolean;
   onSetInstalled: (installed: boolean) => void;
 }) {
-  const { t } = useTranslation();
   return (
     <View
       style={{
@@ -516,7 +508,7 @@ function CapabilityCard({
               fontFamily: fonts.sans,
             }}
           >
-            {item.installed ? item.source : `${item.source} · ${t(STATE_KEYS[item.state])}`}
+            {item.source}
           </Text>
           <CapabilityAction
             item={item}

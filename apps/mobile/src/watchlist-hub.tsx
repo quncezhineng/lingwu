@@ -3,7 +3,7 @@ import { Pressable, View } from "react-native";
 import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { PortfolioScreen } from "./portfolio-screen";
-import { colors } from "./ui";
+import { colors, fonts } from "./theme";
 import { WatchlistScreen } from "./watchlist";
 import { useWorkspace } from "./workspace";
 
@@ -24,6 +24,12 @@ export function WatchlistHubScreen({ mode = "page" }: { mode?: "page" | "embedde
 
   return (
     <View style={{ gap: 16 }}>
+      <Text
+        numberOfLines={2}
+        style={{ fontFamily: fonts.sans, fontSize: 12, lineHeight: 20, color: colors.faint }}
+      >
+        {t("agentSpace.watchlistPageDescription")}
+      </Text>
       <View
         accessibilityLabel={`${t("app.titleWatchlist")} / ${t("app.titlePortfolio")}`}
         style={{

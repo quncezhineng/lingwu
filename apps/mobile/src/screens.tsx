@@ -1048,7 +1048,13 @@ type LibrarySection = "files" | "insights" | "notes";
  * 资料库承接三类内容：文件、收藏的领悟卡和个人笔记。
  * 文件区对齐 Demo 的来源/格式筛选与批量投入分析，同时只展示服务端真实文件。
  */
-export function FilesScreen({ initialSection = "files" }: { initialSection?: LibrarySection }) {
+export function FilesScreen({
+  initialSection = "files",
+  embedded = false,
+}: {
+  initialSection?: LibrarySection;
+  embedded?: boolean;
+}) {
   const { workspace: w, api, refresh, open, ask, notify } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
   const { t } = useTranslation();
@@ -1170,20 +1176,42 @@ export function FilesScreen({ initialSection = "files" }: { initialSection?: Lib
   }
   return (
     <View style={{ gap: 20 }}>
-      {/* N4：副标题一行，导入动作收进页头右侧 */}
-      <PageHeader
-        title={t("app.titleFiles")}
-        description={t("screens.filesSubtitle")}
-        compact={width < breakpoints.desktop}
-        actions={
-          section === "files" ? (
+      {embedded ? (
+        <View
+          style={{
+            flexDirection: compact ? "column" : "row",
+            alignItems: compact ? "stretch" : "center",
+            gap: 12,
+          }}
+        >
+          <Text style={[s.small, { flex: 1, lineHeight: 20 }]}>{t("screens.filesSubtitle")}</Text>
+          {section === "files" && (
             <Button primary small={compact} icon={Upload} busy={busy} onPress={() => void upload()}>
               {t(compact ? "screens.filesImportShort" : "screens.filesImport")}
             </Button>
-          ) : undefined
-        }
-        style={{ marginBottom: 0 }}
-      />
+          )}
+        </View>
+      ) : (
+        <PageHeader
+          title={t("app.titleFiles")}
+          description={t("screens.filesSubtitle")}
+          compact={width < breakpoints.desktop}
+          actions={
+            section === "files" ? (
+              <Button
+                primary
+                small={compact}
+                icon={Upload}
+                busy={busy}
+                onPress={() => void upload()}
+              >
+                {t(compact ? "screens.filesImportShort" : "screens.filesImport")}
+              </Button>
+            ) : undefined
+          }
+          style={{ marginBottom: 0 }}
+        />
+      )}
 
       <View
         style={{

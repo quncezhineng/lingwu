@@ -21,7 +21,7 @@ import {
   Target,
   Trash2,
 } from "./icons";
-import { breakpoints, colors, fonts } from "./theme";
+import { colors, fonts } from "./theme";
 import { Button, ErrorNotice, Field, Sheet, s } from "./ui";
 
 function errorText(error: unknown) {
@@ -299,6 +299,8 @@ export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  /** 卡片网格实际宽度：浮层/页面容器宽度不同，按它决定列数。 */
+  const [gridWidth, setGridWidth] = useState(0);
 
   const run = async (action: () => Promise<unknown>, success: string, rethrow = false) => {
     setBusy(true);
@@ -346,7 +348,10 @@ export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) 
   };
 
   const memories = data?.memories ?? [];
-  const columns = !embedded && width >= breakpoints.desktop ? 2 : 1;
+  // 记忆卡片：按容器实际宽度分列（宽浮层三列、页面两列、手机单列）。
+  const layoutWidth = gridWidth || width;
+  const columns = layoutWidth >= 860 ? 3 : layoutWidth >= 560 ? 2 : 1;
+  const cardWidth = columns === 3 ? "32%" : columns === 2 ? "48.8%" : "100%";
 
   return (
     <View style={{ gap: 22 }}>
@@ -358,8 +363,10 @@ export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) 
         }}
       >
         <View style={{ flex: 1, gap: 7 }}>
-          {/* 嵌入浮层时标题由浮层提供，这里只保留新增按钮，避免标题重复。 */}
-          {!embedded && (
+          {/* 嵌入浮层时只保留简介，标题由浮层提供，避免重复。 */}
+          {embedded ? (
+            <Text style={[s.small, { lineHeight: 20 }]}>{t("preferences.contextDetail")}</Text>
+          ) : (
             <>
               <Text
                 style={{
@@ -388,45 +395,21 @@ export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) 
         </Button>
       </View>
 
-      <View
-        style={[
-          s.row,
-          {
-            alignItems: "flex-start",
-            gap: 12,
-            padding: 16,
-            borderRadius: 10,
-            backgroundColor: colors.surfaceSoft,
-          },
-        ]}
-      >
-        <View
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 8,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: colors.paper,
-          }}
-        >
-          <Heart size={16} color={colors.primary} />
-        </View>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={[s.text, { fontWeight: "600" }]}>{t("preferences.contextTitle")}</Text>
-          <Text style={[s.small, { lineHeight: 20 }]}>{t("preferences.contextDetail")}</Text>
-        </View>
-      </View>
-
       <View style={s.between}>
         <Text style={s.heading}>{t("preferences.memoryHeading")}</Text>
         <Text style={s.small}>{t("preferences.count", { count: memories.length })}</Text>
       </View>
 
       {memories.length ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+        <View
+          onLayout={(event) => {
+            const next = Math.round(event.nativeEvent.layout.width);
+            setGridWidth((current) => (current === next ? current : next));
+          }}
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}
+        >
           {memories.map((memory) => (
-            <View key={memory.id} style={{ width: columns === 2 ? "48.8%" : "100%" }}>
+            <View key={memory.id} style={{ width: cardWidth }}>
               <MemoryCard
                 memory={memory}
                 onEdit={() => {

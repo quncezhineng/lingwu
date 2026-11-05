@@ -13,44 +13,32 @@ import {
 } from "./agent-space-model";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
-import { BotEditPage } from "./bot-pages/edit";
-import { BotGoalsMemoryPage } from "./bot-pages/goals-memory";
-import { BotHistoryPage } from "./bot-pages/history";
-import { BotLibraryPage } from "./bot-pages/library";
-import { useBotResources } from "./bot-pages/shared";
-import { BotSkillsPage } from "./bot-pages/skills";
 import { MarketBriefingCard } from "./briefing-card";
 import { CapabilityHubScreen } from "./capability-hub";
 import { useTranslation } from "./i18n";
 import {
   ChevronRight,
   Clock3,
+  FolderOpen,
   Heart,
   type MessageCircle,
   Plus,
-  Settings2,
+  Shapes,
   Sparkles,
   Star,
   Target,
 } from "./icons";
 import { InsightCard } from "./insight-card";
-import { ModelSelector } from "./model-selector";
 import { PreferencesScreen } from "./preferences-screen";
 import { FilesScreen } from "./screens";
 import { TaskHubScreen } from "./task-hub";
-import { Button, colors, Field, HoverPressable, radius, Sheet, s, typography } from "./ui";
+import { Button, colors, Field, HoverPressable, radius, Sheet, s } from "./ui";
 import { WatchlistAddSheet } from "./watchlist";
 import { WatchlistHubScreen } from "./watchlist-hub";
 import { useWorkspace } from "./workspace";
 
 export type AgentPanel =
   | "more"
-  | "manage"
-  | "bot-edit"
-  | "bot-library"
-  | "bot-skills"
-  | "bot-history"
-  | "bot-goals-memory"
   | "create"
   | "preferences"
   | "memory"
@@ -150,12 +138,13 @@ function SheetSection({ children }: { children: React.ReactNode }) {
 
 export function AgentMoreContent({
   onPanel,
+  onOpenApps,
   compact = true,
-  showWatchlistLink = true,
 }: {
   onPanel: (panel: AgentPanel) => void;
+  /** 应用与能力是独立页面，不走浮层：由调用方负责跳转。 */
+  onOpenApps: () => void;
   compact?: boolean;
-  showWatchlistLink?: boolean;
 }) {
   const { t, locale } = useTranslation();
   const { current } = useAgentSpace();
@@ -185,10 +174,25 @@ export function AgentMoreContent({
         />
         <PanelButton
           compact={compact}
-          icon={Sparkles}
-          title={t("agentSpace.insights")}
-          detail={t("agentSpace.insightsDetail")}
-          onPress={() => onPanel("insights")}
+          icon={Clock3}
+          title={t("agentSpace.tasks")}
+          detail={t("agentSpace.tasksDetail")}
+          badge={activeTasks.length}
+          onPress={() => onPanel("tasks")}
+        />
+        <PanelButton
+          compact={compact}
+          icon={Star}
+          title={t("agentSpace.watchlistAndPortfolio")}
+          detail={t("agentSpace.watchlistDetail")}
+          onPress={() => onPanel("watchlist")}
+        />
+        <PanelButton
+          compact={compact}
+          icon={FolderOpen}
+          title={t("app.navFiles")}
+          detail={t("app.destFilesDetail")}
+          onPress={() => onPanel("files")}
         />
         <PanelButton
           compact={compact}
@@ -197,25 +201,28 @@ export function AgentMoreContent({
           detail={t("details.settingsPreferencesDetail")}
           onPress={() => onPanel("memory")}
         />
-        {showWatchlistLink && (
-          <PanelButton
-            compact={compact}
-            icon={Star}
-            title={t("agentSpace.watchlistAndPortfolio")}
-            detail={t("agentSpace.watchlistDetail")}
-            onPress={() => onPanel("watchlist")}
-          />
-        )}
         <PanelButton
           compact={compact}
-          icon={Clock3}
-          title={t("agentSpace.tasks")}
-          detail={t("agentSpace.tasksDetail")}
-          badge={activeTasks.length}
-          onPress={() => onPanel("tasks")}
+          icon={Shapes}
+          title={t("app.navApps")}
+          detail={t("app.destAppsDetail")}
+          onPress={onOpenApps}
         />
       </SheetSection>
 
+      {!!capabilities.length && (
+        <Text
+          style={{
+            marginTop: 18,
+            marginBottom: 10,
+            fontSize: 13,
+            fontWeight: "600",
+            color: colors.muted,
+          }}
+        >
+          {t("agentSpace.agentCapabilities", { name: current.name })}
+        </Text>
+      )}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 9 }}>
         {capabilities.map((capability) => {
           const label = AGENT_CAPABILITY_LABELS[capability];
@@ -277,9 +284,16 @@ function AgentMoreSheet({
   onPanel: (panel: AgentPanel) => void;
 }) {
   const { t } = useTranslation();
+  const { navigate } = useWorkspace();
   return (
     <Sheet botLayout title={t("agentSpace.more")} onClose={onClose} wide>
-      <AgentMoreContent onPanel={onPanel} />
+      <AgentMoreContent
+        onPanel={onPanel}
+        onOpenApps={() => {
+          onClose();
+          navigate("apps");
+        }}
+      />
     </Sheet>
   );
 }
@@ -388,131 +402,6 @@ function CreateAgentSheet({ onClose, onCreated }: { onClose: () => void; onCreat
       >
         {t("agentSpace.createAction", { name: name.trim() || templateInfo?.name || "" })}
       </Button>
-    </Sheet>
-  );
-}
-
-function AgentManagerSheet({
-  onClose,
-  onPanel,
-  onDismiss,
-}: {
-  onClose: () => void;
-  onPanel: (panel: AgentPanel) => void;
-  onDismiss: () => void;
-}) {
-  const { t } = useTranslation();
-  const { current, data, tasks: agentTasks, artifacts: agentArtifacts, files } = useBotResources();
-  const libraryCount = agentArtifacts.length + files.length;
-  const skillCount = current.skills.length + current.customSkills.length;
-
-  return (
-    <Sheet botLayout title={current.name} onClose={onClose} narrow>
-      <View
-        style={{
-          paddingTop: 9,
-          gap: 15,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-          <AgentOrb avatar={current.avatar} size={58} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={[typography.heading, { fontSize: 18 }]}>{current.name}</Text>
-              {current.system && (
-                <View
-                  style={{
-                    paddingHorizontal: 7,
-                    paddingVertical: 3,
-                    borderRadius: radius.badge,
-                    backgroundColor: colors.sky,
-                  }}
-                >
-                  <Text style={{ fontSize: 9, color: colors.primaryStrong }}>
-                    {t("agentSpace.systemAgent")}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text style={[s.small, { marginTop: 3 }]}>{current.role}</Text>
-          </View>
-          <Button small icon={Settings2} onPress={() => onPanel("bot-edit")}>
-            {t("agent.edit")}
-          </Button>
-        </View>
-        <Text
-          style={[
-            s.muted,
-            {
-              fontSize: 11,
-              lineHeight: 22,
-              padding: 15,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: colors.accentLine,
-              backgroundColor: colors.sky,
-            },
-          ]}
-        >
-          {current.persona}
-        </Text>
-        <View
-          style={{
-            flexDirection: "row",
-            paddingHorizontal: 6,
-            paddingVertical: 15,
-            borderRadius: 17,
-            borderWidth: 1,
-            borderColor: colors.line,
-            backgroundColor: colors.paper,
-          }}
-        >
-          {(
-            [
-              ["tasks", String(data?.tasks.length ?? 0), t("agentSpace.tasks")],
-              ["bot-library", String(libraryCount), t("agentSpace.library")],
-              ["bot-skills", String(skillCount), t("agentSpace.skills")],
-            ] as const
-          ).map(([id, value, label], index) => (
-            <Pressable
-              key={id}
-              accessibilityRole="button"
-              accessibilityLabel={`${label} ${value}`}
-              onPress={() => onPanel(id)}
-              style={{
-                flex: 1,
-                minHeight: 56,
-                borderRightWidth: index < 2 ? 1 : 0,
-                borderRightColor: colors.line,
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 2,
-              }}
-            >
-              <Text style={[s.metric, { fontSize: 22, color: colors.primaryStrong }]}>{value}</Text>
-              <Text style={[s.small, { color: colors.faint }]}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={{ marginTop: 12, gap: 4 }}>
-        <SheetSection>
-          <PanelButton
-            icon={Clock3}
-            title={t("agentSpace.analysisHistory")}
-            detail={`${agentTasks.length} · ${current.name}`}
-            onPress={() => onPanel("bot-history")}
-          />
-          <PanelButton
-            icon={Target}
-            title={t("agentSpace.goalsMemory")}
-            detail={`${data?.goals.length ?? 0} · ${data?.memories.length ?? 0}`}
-            onPress={() => onPanel("bot-goals-memory")}
-          />
-        </SheetSection>
-        <ModelSelector onManage={onDismiss} />
-      </View>
     </Sheet>
   );
 }
@@ -709,15 +598,14 @@ export function AgentSheets({
 }) {
   const { t } = useTranslation();
   const { current } = useAgentSpace();
+  const { data } = useAgentWorkspace();
+  // 当前 Agent 的任务：与 selectBotResources 同一作用域（按发起线程过滤），
+  // 让「任务」计数与弹窗都只展示当下这个 Agent 的任务。
+  const agentTasks = (data?.tasks ?? []).filter(
+    (task) => task.threadId === current.threadId || (!task.threadId && current.system),
+  );
   if (!panel) return null;
   if (panel === "more") return <AgentMoreSheet onClose={onClose} onPanel={onPanel} />;
-  if (panel === "manage")
-    return <AgentManagerSheet onClose={onClose} onPanel={onPanel} onDismiss={onDismiss} />;
-  if (panel === "bot-edit") return <BotEditPage onClose={onClose} onDeleted={onDismiss} />;
-  if (panel === "bot-library") return <BotLibraryPage onClose={onDismiss} />;
-  if (panel === "bot-skills") return <BotSkillsPage onClose={onDismiss} />;
-  if (panel === "bot-history") return <BotHistoryPage onClose={onDismiss} />;
-  if (panel === "bot-goals-memory") return <BotGoalsMemoryPage onClose={onDismiss} />;
   if (panel === "create") return <CreateAgentSheet onClose={onClose} onCreated={onClose} />;
   if (panel === "preferences") return <PreferencesSheet onClose={onClose} />;
   if (panel === "memory")
@@ -735,14 +623,19 @@ export function AgentSheets({
     );
   if (panel === "tasks")
     return (
-      <Sheet botLayout title={t("agentSpace.tasks")} onClose={onDismiss} wide>
-        <TaskHubScreen initialTab="tasks" />
+      <Sheet
+        botLayout
+        title={`${t("agentSpace.tasks")} · ${current.name}`}
+        onClose={onDismiss}
+        wide
+      >
+        <TaskHubScreen initialTab="tasks" tasks={agentTasks} />
       </Sheet>
     );
   if (panel === "files")
     return (
       <Sheet botLayout title={t("agentSpace.library")} onClose={onClose} wide>
-        <FilesScreen />
+        <FilesScreen embedded />
       </Sheet>
     );
   if (panel === "insights") return <InsightsSheet onClose={onClose} />;

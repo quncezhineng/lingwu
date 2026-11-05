@@ -78,7 +78,7 @@ export function AgentFloatingHeader({
           <Pressable
             testID="agent-management-capsule"
             accessibilityRole="button"
-            accessibilityLabel={`${label}，${t("agentSpace.manageAgent")}`}
+            accessibilityLabel={`${label}，${t("agentSpace.agentDetails")}`}
             onPress={onManage}
             style={({ pressed }) => ({
               maxWidth: "100%",

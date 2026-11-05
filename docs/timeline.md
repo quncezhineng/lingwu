@@ -5,6 +5,76 @@
 
 ## 变更记录
 
+### 2026-11-05 · Agent「详情」改为左右分栏的独立页面
+
+**背景**
+
+用户反馈点击顶部 Agent 胶囊（`行情 Agent · 市场观察员`）弹出的「详情」浮层（`AgentManagerSheet`）承载内容过多，弹窗内层层跳转不易阅读。希望改成独立界面：左侧是功能选项，右侧是对应功能的设置内容。
+
+**处理**
+
+- [agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx)：新增 `AgentSettingsScreen`。宽屏为左栏（Agent 信息卡 + 人设 / 指令 / 能力 / 资料 / 分析记录 / 目标与记忆 / 模型）+ 右栏内容；列宽不足 760 时左栏收成横向分区条，避免挤压内容。分栏依据实际列宽（`onLayout`）而非窗口宽度，三栏布局下同样成立。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：胶囊 `onManage` 改为 `navigate("agent")`，主列在 `section === "agent"` 时渲染新页面；顶部标题映射为「Agent 详情」。
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：删除 `AgentManagerSheet` 及仅它能到达的 `manage` / `bot-*` 浮层分支与 `AgentPanel` 成员，避免遗留死代码。
+- [bot-pages/shared.tsx](../apps/mobile/src/bot-pages/shared.tsx) 及各页：`BotPage` 新增 `embedded`，为真时只渲染内容（标题由独立页面提供）；新增 `BotInlineBack` 给嵌套编辑态（技能编辑、新增目标、目标详情）提供返回入口。
+- [agent-floating-header.tsx](../apps/mobile/src/agent-floating-header.tsx)：胶囊无障碍标签由「管理」改为「Agent 详情」。
+- 新增文案：`agentSpace.agentDetails`、`agentSpace.changesSaved`（中英）。
+- [packages/domain/src/index.ts](../packages/domain/src/index.ts)：`Section` 增加 `"agent"`。
+
+**验证**
+
+- `pnpm typecheck`、`npx biome check` 通过。
+- `pnpm test`：967 项全部通过。
+
+### 2026-11-05 · 设置等次级页面内容宽度自适应整体区块
+
+**背景**
+
+用户反馈移动端「设置」等次级页面选中的内容区块（`SecondarySection`）宽度固定为 1050，不跟随整体区块宽度。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx#L907-L920)：`SecondarySection` 的 `ScrollView contentContainerStyle` 由 `maxWidth: 1050` 改为 `maxWidth: "100%"`，使内容始终跟随父级（主列，`columnMaxWidth: 965`）宽度，避免在窄视口下溢出、宽视口下与顶部区块宽度不一致。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
+### 2026-11-05 · 任务入口按当前 Agent 作用域统计与展示
+
+**背景**
+
+用户反馈左侧栏（Agent 管理面板，`AgentManagerSheet` 统计区）的「任务」区块：① 数字显示的是全局工作区任务数，而非当下 Agent 的任务数；② 点击后弹窗列出的是全部任务，而非当下 Agent 的任务。
+
+**处理**
+
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：
+  - `AgentManagerSheet` 任务格计数由 `data?.tasks.length` 改为 `agentTasks.length`（`useBotResources` 已按 `threadId` 过滤当前 Agent 的任务）。
+  - `AgentSheets` 计算与 `selectBotResources` 同口径的 `agentTasks` 过滤项（`task.threadId === current.threadId || (!task.threadId && current.system)`），「任务」弹窗改渲染 `TaskHubScreen tasks={agentTasks}`，标题追加当前 Agent 名。
+- [task-hub.tsx](../apps/mobile/src/task-hub.tsx)：`TaskHubScreen` 新增可选 `tasks` 作用域参数，`totalTasks` 计数与「任务」页均以该参数为准；未传时保持全工作区行为。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：`AgentActivityScreen` 新增可选 `scopedTasks` 参数，列表与各状态筛选计数基于该作用域，未传时回落全局。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+- 行为：任务格只显示当前 Agent 的任务数；点击「任务」在浮层内只列出当前 Agent 的任务（含全部 5 态筛选）。
+
+### 2026-11-05 · 移动端 Agent 列表隐藏角色简介、压缩区块高度
+
+**背景**
+
+用户反馈：① 移动端左侧栏 Agent 列表里，每个 Agent 名称下方的简介（`agent.role`，如「投研助理」）无需再显示；② 每个 Agent 区块高度可再调小。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：
+  - `AgentListItem` 移除角色简介文本行，仅保留 Agent 头像与名称。
+  - 区块高度压缩：`minHeight` 72 → 52，`paddingVertical` 13 → 6，头像 34 → 30，行高 19 → 17。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
 ### 2026-11-05 · 修复登录表单字段缺少 id 的控制台日志
 
 **背景**

@@ -6,7 +6,7 @@ import { Text } from "../app-text";
 import { useTranslation } from "../i18n";
 import { Check, Plus } from "../icons";
 import { Button, colors, Field, radius, SectionHeading, s } from "../ui";
-import { BotPage, type BotPageProps } from "./shared";
+import { BotInlineBack, BotPage, type BotPageProps } from "./shared";
 
 function SkillEditor({ skill, onClose }: { skill?: AgentSkill; onClose: () => void }) {
   const { t } = useTranslation();
@@ -58,7 +58,7 @@ function SkillEditor({ skill, onClose }: { skill?: AgentSkill; onClose: () => vo
   );
 }
 
-export function BotSkillsPage({ onClose }: BotPageProps) {
+export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
   const { t, locale } = useTranslation();
   const { current, toggleSkill } = useAgentSpace();
   const [editingSkill, setEditingSkill] = useState<AgentSkill | "new">();
@@ -67,7 +67,11 @@ export function BotSkillsPage({ onClose }: BotPageProps) {
       <BotPage
         title={t(editingSkill === "new" ? "agentSpace.createSkill" : "agentSpace.editSkill")}
         onClose={() => setEditingSkill(undefined)}
+        embedded={embedded}
       >
+        {embedded && (
+          <BotInlineBack label={t("common.back")} onPress={() => setEditingSkill(undefined)} />
+        )}
         <SkillEditor
           skill={editingSkill === "new" ? undefined : editingSkill}
           onClose={() => setEditingSkill(undefined)}
@@ -75,7 +79,7 @@ export function BotSkillsPage({ onClose }: BotPageProps) {
       </BotPage>
     );
   return (
-    <BotPage title={t("agentSpace.skills")} onClose={onClose}>
+    <BotPage title={t("agentSpace.skills")} onClose={onClose} embedded={embedded}>
       <View style={{ gap: 8 }}>
         <View style={[s.between, { marginBottom: 5 }]}>
           <Text style={s.heading}>{t("agentSpace.customSkills")}</Text>

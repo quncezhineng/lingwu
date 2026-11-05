@@ -377,6 +377,7 @@ export function Sheet({
   children,
   onClose,
   wide,
+  medium,
   narrow,
   small,
   fullscreen,
@@ -392,6 +393,8 @@ export function Sheet({
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  /** 中等浮层：比默认略宽，用于概览型设置面板。 */
+  medium?: boolean;
   /** 紧凑阅读浮层：用于单张领悟卡等短内容，避免桌面端出现过宽留白。 */
   narrow?: boolean;
   /** 小型选择浮层：桌面端收窄，移动端保留左右留白。 */
@@ -435,6 +438,7 @@ export function Sheet({
               ...shadow.sheet,
             },
             wide && { maxWidth: 1050 },
+            medium && { maxWidth: 680 },
             narrow && { maxWidth: 560 },
             small && { maxWidth: 440 },
             bottomSheet &&

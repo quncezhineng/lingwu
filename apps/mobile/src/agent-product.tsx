@@ -15,7 +15,8 @@ import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-h
 import { agentLayout } from "./agent-layout";
 import { AgentOnboarding } from "./agent-onboarding";
 import { AgentOrb } from "./agent-orb";
-import { AgentMoreContent, type AgentPanel, AgentSheets, PanelButton } from "./agent-sheets";
+import { AgentSettingsScreen } from "./agent-settings-screen";
+import { AgentMoreContent, type AgentPanel, AgentSheets } from "./agent-sheets";
 import { AgentSideDrawer } from "./agent-side-drawer";
 import { useAgentSpace } from "./agent-space";
 import {
@@ -43,10 +44,10 @@ import {
   Languages,
   Lightbulb,
   LogOut,
+  PanelRight,
   Plus,
   Search,
   Settings2,
-  Star,
   X,
 } from "./icons";
 import { ModalOverlay } from "./modal-overlay";
@@ -71,7 +72,7 @@ import {
 } from "./ui";
 import { useDesktopColumns } from "./use-desktop-columns";
 import { WatchlistHubScreen } from "./watchlist-hub";
-import { type Detail, useWorkspace } from "./workspace";
+import { type ComposerPrompt, type Detail, useWorkspace } from "./workspace";
 
 function AgentListItem({
   agent,
@@ -88,9 +89,9 @@ function AgentListItem({
       accessibilityState={{ selected: active }}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 72,
+        minHeight: 52,
         paddingHorizontal: 11,
-        paddingVertical: 13,
+        paddingVertical: 6,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: active ? colors.accentLine : "transparent",
@@ -100,21 +101,18 @@ function AgentListItem({
         gap: 11,
       })}
     >
-      <AgentOrb avatar={agent.avatar} size={34} />
-      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+      <AgentOrb avatar={agent.avatar} size={30} />
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           numberOfLines={1}
           style={{
             fontSize: 13,
-            lineHeight: 19,
+            lineHeight: 17,
             fontWeight: active ? "600" : "500",
             color: active ? colors.primaryStrong : colors.text,
           }}
         >
           {agent.name}
-        </Text>
-        <Text numberOfLines={1} style={[s.small, { fontSize: 10, color: colors.faint }]}>
-          {agent.role}
         </Text>
       </View>
     </Pressable>
@@ -644,16 +642,47 @@ function AgentRail({
   );
 }
 
+/** 右侧栏折叠/展开按钮：固定在栏位右上角，折叠后原位保留以便恢复。 */
+function RailToggleButton({
+  collapsed = false,
+  onPress,
+}: {
+  collapsed?: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <HoverPressable
+      accessibilityRole="button"
+      accessibilityLabel={t(collapsed ? "agentSpace.expandRail" : "agentSpace.collapseRail")}
+      onPress={onPress}
+      style={({ pressed, hovered }) => ({
+        width: 30,
+        height: 30,
+        borderRadius: 9,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: pressed ? colors.overlay2 : hovered ? colors.overlay1 : "transparent",
+      })}
+    >
+      <PanelRight size={17} color={colors.muted} />
+    </HoverPressable>
+  );
+}
+
 function CapabilityRail({
   onClose,
   onOpen,
+  onCollapse,
   compact = false,
 }: {
   onClose?: () => void;
   onOpen: (panel: AgentPanel) => void;
+  onCollapse?: () => void;
   compact?: boolean;
 }) {
   const { t } = useTranslation();
+  const { navigate } = useWorkspace();
   const { top: safeTop } = useSafeAreaInsets();
   const drawerTop = Math.max(safeTop, 12);
   return (
@@ -682,6 +711,20 @@ function CapabilityRail({
           )}
         </View>
       )}
+      {!compact && onCollapse && (
+        <View
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            zIndex: 2,
+            borderRadius: 9,
+            backgroundColor: colors.surfaceRaised,
+          }}
+        >
+          <RailToggleButton onPress={onCollapse} />
+        </View>
+      )}
       <ScrollView
         style={{ flex: 1, minHeight: 0 }}
         showsVerticalScrollIndicator={false}
@@ -691,18 +734,8 @@ function CapabilityRail({
           paddingBottom: 24,
         }}
       >
-        <View style={{ marginHorizontal: -7 }}>
-          <PanelButton
-            compact={compact}
-            icon={Star}
-            title={t("agentSpace.watchlistAndPortfolio")}
-            detail={t("agentSpace.watchlistDetail")}
-            onPress={() => onOpen("watchlist")}
-          />
-        </View>
         <Text
           style={{
-            marginTop: 30,
             marginBottom: 18,
             fontSize: 17,
             fontFamily: fonts.serif,
@@ -712,7 +745,14 @@ function CapabilityRail({
         >
           {t("agentSpace.more")}
         </Text>
-        <AgentMoreContent onPanel={onOpen} compact={compact} showWatchlistLink={false} />
+        <AgentMoreContent
+          onPanel={onOpen}
+          compact={compact}
+          onOpenApps={() => {
+            onClose?.();
+            navigate("apps");
+          }}
+        />
       </ScrollView>
     </View>
   );
@@ -745,33 +785,35 @@ function AgentHeader({
       />
     );
   const sectionTitle =
-    section === "account"
-      ? t("app.navAccount")
-      : section === "preferences"
-        ? t("agentSpace.preferences")
-        : section === "files"
-          ? t("app.navFiles")
-          : section === "notes"
-            ? t("app.titleNotes")
-            : section === "watchlist" || section === "portfolio"
-              ? t("app.navWatchlist")
-              : section === "ideas"
-                ? t("agentSpace.openIdeasPage")
-                : section === "activity" || section === "goals"
-                  ? t("app.navActivity")
-                  : section === "mail"
-                    ? t("app.titleMail")
-                    : section === "calendar"
-                      ? t("app.titleCalendar")
-                      : section === "browser"
-                        ? t("app.titleBrowser")
-                        : section === "computer"
-                          ? t("threads.agentComputer")
-                          : section === "apps" || section === "connections"
-                            ? t("app.navApps")
-                            : section === "settings"
-                              ? t("details.settingsTitle")
-                              : t("app.navChat");
+    section === "agent"
+      ? t("agentSpace.agentDetails")
+      : section === "account"
+        ? t("app.navAccount")
+        : section === "preferences"
+          ? t("agentSpace.preferences")
+          : section === "files"
+            ? t("app.navFiles")
+            : section === "notes"
+              ? t("app.titleNotes")
+              : section === "watchlist" || section === "portfolio"
+                ? t("app.navWatchlist")
+                : section === "ideas"
+                  ? t("agentSpace.openIdeasPage")
+                  : section === "activity" || section === "goals"
+                    ? t("app.navActivity")
+                    : section === "mail"
+                      ? t("app.titleMail")
+                      : section === "calendar"
+                        ? t("app.titleCalendar")
+                        : section === "browser"
+                          ? t("app.titleBrowser")
+                          : section === "computer"
+                            ? t("threads.agentComputer")
+                            : section === "apps" || section === "connections"
+                              ? t("app.navApps")
+                              : section === "settings"
+                                ? t("details.settingsTitle")
+                                : t("app.navChat");
   return (
     <View
       style={{
@@ -866,7 +908,7 @@ function SecondarySection({
     <ScrollView
       contentContainerStyle={{
         width: "100%",
-        maxWidth: 1050,
+        maxWidth: "100%",
         alignSelf: "center",
         paddingHorizontal: space.pageMobile,
         paddingTop: 22,
@@ -982,7 +1024,7 @@ export function AgentProductShell({
   toast?: ToastState;
   clearToast: () => void;
   error: string;
-  prompt?: { id: number; text: string; attachmentIds?: readonly string[] };
+  prompt?: ComposerPrompt;
   onSignOut: () => void;
 }) {
   const { width } = useWindowDimensions();
@@ -990,9 +1032,14 @@ export function AgentProductShell({
   const [containerWidth, setContainerWidth] = useState(width);
   const availableWidth = Math.floor(Math.min(width, containerWidth));
   const threeColumns = Platform.OS === "web" && availableWidth >= desktopColumns.breakpoint;
-  const { widths: columnWidths, resize: resizeColumn } = useDesktopColumns(availableWidth);
+  const {
+    widths: columnWidths,
+    resize: resizeColumn,
+    railCollapsed,
+    toggleRail,
+  } = useDesktopColumns(availableWidth);
   const { t } = useTranslation();
-  const { section, close, reminderIntent } = useWorkspace();
+  const { section, close, reminderIntent, navigate } = useWorkspace();
   const { agents, current, preferences, selection, loading, needsOnboarding, markThreadUsed } =
     useAgentSpace();
   const [panelStack, setPanelStack] = useState<AgentPanel[]>([]);
@@ -1149,7 +1196,7 @@ export function AgentProductShell({
           <View testID="agent-main-column" style={{ flex: 1, minWidth: 0, position: "relative" }}>
             <AgentHeader
               onMenu={() => setDrawer("agents")}
-              onManage={() => openPanel("manage")}
+              onManage={() => navigate("agent")}
               onMore={() => setDrawer("capabilities")}
               persistentNavigation={threeColumns}
             />
@@ -1187,6 +1234,9 @@ export function AgentProductShell({
                             role: agent.role,
                             persona: agent.persona,
                             avatar: agent.avatar,
+                            tone: agent.tone,
+                            communication: agent.communication,
+                            instructions: agent.instructions,
                             userPreferences: onboardingPreferenceContext(preferences),
                           }}
                           firstRunWelcome={agent.system ? firstRunWelcome : undefined}
@@ -1205,27 +1255,42 @@ export function AgentProductShell({
                     );
                   })}
                 </>
+              ) : section === "agent" ? (
+                <AgentSettingsScreen />
               ) : (
                 <SecondarySection onOpen={openPanel} onSignOut={onSignOut} />
               )}
             </View>
           </View>
-          {threeColumns && (
-            <>
-              <ColumnResizeHandle
-                side="right"
-                width={columnWidths.right}
-                min={desktopColumns.right.min}
-                max={columnMaxWidth(availableWidth, columnWidths, "right")}
-                label={t("agentSpace.resizeCapabilities")}
-                hint={t("agentSpace.resizeColumnHint")}
-                onResize={(value, finished) => resizeColumn("right", value, finished)}
-              />
-              <View style={{ width: columnWidths.right, flexShrink: 0, minHeight: 0 }}>
-                <CapabilityRail onOpen={openPanel} />
+          {threeColumns &&
+            (railCollapsed ? (
+              <View
+                style={{
+                  width: 44,
+                  flexShrink: 0,
+                  alignItems: "center",
+                  paddingTop: 10,
+                  backgroundColor: colors.canvas,
+                }}
+              >
+                <RailToggleButton collapsed onPress={toggleRail} />
               </View>
-            </>
-          )}
+            ) : (
+              <>
+                <ColumnResizeHandle
+                  side="right"
+                  width={columnWidths.right}
+                  min={desktopColumns.right.min}
+                  max={columnMaxWidth(availableWidth, columnWidths, "right")}
+                  label={t("agentSpace.resizeCapabilities")}
+                  hint={t("agentSpace.resizeColumnHint")}
+                  onResize={(value, finished) => resizeColumn("right", value, finished)}
+                />
+                <View style={{ width: columnWidths.right, flexShrink: 0, minHeight: 0 }}>
+                  <CapabilityRail onOpen={openPanel} onCollapse={toggleRail} />
+                </View>
+              </>
+            ))}
         </View>
         <Toast toast={toast} onDismiss={clearToast} />
         {!threeColumns && drawer && (

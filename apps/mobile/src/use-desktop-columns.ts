@@ -4,6 +4,7 @@ import {
   type ColumnSide,
   fitColumnWidths,
   normalizeColumnWidths,
+  RIGHT_RAIL_COLLAPSED_STORAGE_KEY,
   resizeColumn,
 } from "./desktop-columns";
 import { readStorage, writeStorage } from "./i18n/storage";
@@ -14,6 +15,10 @@ function loadWidths() {
   } catch {
     return normalizeColumnWidths(undefined);
   }
+}
+
+function loadRailCollapsed() {
+  return readStorage(RIGHT_RAIL_COLLAPSED_STORAGE_KEY) === "1";
 }
 export function useDesktopColumns(available: number) {
   const [preferred, setPreferred] = useState(loadWidths);
@@ -29,5 +34,13 @@ export function useDesktopColumns(available: number) {
     },
     [available],
   );
-  return { widths, resize };
+  const [railCollapsed, setRailCollapsed] = useState(loadRailCollapsed);
+  const toggleRail = useCallback(() => {
+    setRailCollapsed((current) => {
+      const next = !current;
+      writeStorage(RIGHT_RAIL_COLLAPSED_STORAGE_KEY, next ? "1" : "0");
+      return next;
+    });
+  }, []);
+  return { widths, resize, railCollapsed, toggleRail };
 }

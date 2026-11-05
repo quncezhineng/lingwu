@@ -72,6 +72,7 @@ export const ICON_KEYS = {
   MousePointerClick: "mouse-pointer-click",
   PanelLeftClose: "panel-left-close",
   PanelLeftOpen: "panel-left-open",
+  PanelRight: "panel-right",
   PanelsTopLeft: "panels-top-left",
   Pause: "circle-pause",
   Pencil: "pen-line",

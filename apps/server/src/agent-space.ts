@@ -27,6 +27,10 @@ const agentSchema = z
     role: z.string().trim().min(1).max(30),
     persona: z.string().trim().min(1).max(1000),
     avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]),
+    // 人设页的说话风格与「指令」提示词；旧客户端没有这些字段，保持可选。
+    tone: z.enum(["formal", "casual", "playful", "concise", "warm"]).optional(),
+    communication: z.enum(["short", "detailed", "bullets"]).optional(),
+    instructions: z.string().max(4000).optional(),
     system: z.boolean(),
     threadExists: z.boolean(),
     createdAt: timestamp,
