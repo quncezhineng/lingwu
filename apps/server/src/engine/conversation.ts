@@ -18,6 +18,7 @@ import {
 import { calendarRangeSchema } from "../../../../packages/domain/src/index.ts";
 import { jevActionPrefix, parseJevAction } from "../../../../packages/domain/src/jev.ts";
 import type { BatchQuoteItem } from "../../../../packages/integrations/src/market-data.ts";
+import { agentModelForThread } from "../agent-space.ts";
 import { computerInstructions, computerTools } from "../computer-tools.ts";
 import type { Config } from "../config.ts";
 import { createJevAdapter, type JevAdapter } from "../jev/adapter.ts";
@@ -67,10 +68,16 @@ export class ConversationAgent extends AbstractAgent {
     });
   }
   run(input: RunAgentInput): Observable<BaseEvent> {
-    return from(this.service.db.get<AgentIdentity>(this.owner, "agent-settings", "identity")).pipe(
-      mergeMap((identity) =>
+    return from(
+      Promise.all([
+        this.service.db.get<AgentIdentity>(this.owner, "agent-settings", "identity"),
+        // 每个 Agent 可以指定自己的模型；未指定时按用户默认模型解析。
+        agentModelForThread(this.service.db, this.owner, input.threadId),
+      ]),
+    ).pipe(
+      mergeMap(([identity, agentModel]) =>
         this.config.agentBackend === "model"
-          ? from(this.service.workspace.models.resolve(this.owner)).pipe(
+          ? from(this.service.workspace.models.resolve(this.owner, agentModel)).pipe(
               mergeMap((model) => this.runInternal(input, false, model, identity)),
             )
           : this.runInternal(input, false, undefined, identity),

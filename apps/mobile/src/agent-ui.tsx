@@ -369,14 +369,12 @@ function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
   }
 }
 
-export function AgentActivityScreen({ scopedTasks }: { scopedTasks?: readonly AgentTask[] } = {}) {
+export function AgentActivityScreen() {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const [filter, setFilter] = useState<TaskFilter>("all");
-  // 传入 scopedTasks 时以作用域为准（如「当前 Agent」）；否则回落全工作区任务。
-  const all = [...(scopedTasks ?? data?.tasks ?? [])].sort((a, b) =>
-    b.updatedAt.localeCompare(a.updatedAt),
-  );
+  // 任务为全局视图：汇总所有 Agent 的全部任务。
+  const all = [...(data?.tasks ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const counts = Object.fromEntries(
     TASK_FILTERS.map(({ id }) => [id, all.filter((task) => matchesTaskFilter(task, id)).length]),
   ) as Record<TaskFilter, number>;

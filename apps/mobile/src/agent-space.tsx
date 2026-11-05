@@ -176,20 +176,22 @@ export function AgentSpaceProvider({
   const updateAgent = useCallback((id: string, patch: Partial<AgentDefinition>) => {
     setState((value) => ({
       ...value,
-      agents: value.agents.map((agent) =>
-        agent.id === id
-          ? {
-              ...agent,
-              ...patch,
-              id: agent.id,
-              threadId: agent.threadId,
-              system: agent.system,
-              name: (patch.name ?? agent.name).trim().slice(0, 20) || agent.name,
-              role: (patch.role ?? agent.role).trim().slice(0, 30) || agent.role,
-              persona: (patch.persona ?? agent.persona).trim().slice(0, 1000) || agent.persona,
-            }
-          : agent,
-      ),
+      agents: value.agents.map((agent) => {
+        if (agent.id !== id) return agent;
+        const next: AgentDefinition = {
+          ...agent,
+          ...patch,
+          id: agent.id,
+          threadId: agent.threadId,
+          system: agent.system,
+          name: (patch.name ?? agent.name).trim().slice(0, 20) || agent.name,
+          role: (patch.role ?? agent.role).trim().slice(0, 30) || agent.role,
+          persona: (patch.persona ?? agent.persona).trim().slice(0, 1000) || agent.persona,
+        };
+        // 没有专属模型时不写字段：留空代表跟随工作区默认模型，服务端 schema 也不接受空字符串。
+        if (!next.model?.trim()) delete next.model;
+        return next;
+      }),
     }));
   }, []);
 

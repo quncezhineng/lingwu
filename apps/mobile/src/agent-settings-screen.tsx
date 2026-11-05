@@ -47,8 +47,8 @@ const TABS: ReadonlyArray<{
  */
 export function AgentSettingsScreen() {
   const { t } = useTranslation();
-  const { current } = useAgentSpace();
-  const { navigate, notify } = useWorkspace();
+  const { current, updateAgent } = useAgentSpace();
+  const { navigate, notify, workspace } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
   const [tab, setTab] = useState<AgentSettingsTab>("profile");
   // 三栏布局下内容列远窄于窗口，用实际列宽而不是窗口宽度决定左右分栏。
@@ -58,6 +58,11 @@ export function AgentSettingsScreen() {
   const active = TABS.find((item) => item.id === tab) ?? TABS[0];
 
   const notifySaved = () => notify(t("agentSpace.changesSaved"));
+  // 「跟随默认模型」需要显式写出默认模型名，否则用户看不出实际会用到哪个版本。
+  const defaultModelLabel = workspace.runtime.model
+    ? (workspace.runtime.modelLabels?.[workspace.runtime.model] ??
+      workspace.runtime.model.split("/").slice(1).join("/"))
+    : t("modelSettings.notConfigured");
 
   const content = (() => {
     switch (tab) {
@@ -74,8 +79,15 @@ export function AgentSettingsScreen() {
       case "model":
         return (
           <View style={{ gap: space.sm }}>
-            <Text style={[s.muted, { lineHeight: 21 }]}>{t("agent.hubModelDetail")}</Text>
-            <ModelSelector />
+            <Text style={[s.muted, { lineHeight: 21 }]}>{t("agentSpace.modelHint")}</Text>
+            <ModelSelector
+              value={current.model}
+              onSelect={(model) => {
+                updateAgent(current.id, { model });
+                notifySaved();
+              }}
+              inheritLabel={t("agentSpace.modelFollowDefault", { model: defaultModelLabel })}
+            />
           </View>
         );
       default:

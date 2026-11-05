@@ -11,7 +11,7 @@ import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
 import { ConversationAgent } from "../apps/server/src/engine/conversation.ts";
 import { modelProviders } from "../apps/server/src/models.ts";
-import type { ModelSettings } from "../packages/domain/src/model-settings.ts";
+import type { ModelLibrary, ModelSettings } from "../packages/domain/src/model-settings.ts";
 import { decryptSecret } from "../packages/integrations/src/vault.ts";
 
 const gateway = createServer(async (request, response) => {
@@ -131,6 +131,9 @@ beforeEach(async () => {
   for (const owner of ["alice", "bob"]) {
     await db.remove(owner, "credentials", "model:deepseek");
     await db.remove(owner, "settings", "model");
+    await db.remove(owner, "agent-settings", "space");
+    await db.remove(owner, "model-library", "deepseek-v4-pro");
+    await db.remove(owner, "model-library", "deepseek-flash");
   }
 });
 after(async () => {
@@ -316,6 +319,215 @@ test("chat and delegated work actually use the owner's key, URL and model withou
     "both chat and task use the personal configuration",
   );
   assert.equal(config.model, "deepseek/deepseek-v4-pro");
+});
+
+test("an Agent's own model and version drive its chat and background tasks", async () => {
+  await save();
+  const agentThread = randomUUID();
+  const otherThread = randomUUID();
+  const space = (threadId: string) => ({
+    version: 1,
+    currentAgentId: "agent-a",
+    agents: [
+      {
+        id: "system-agent",
+        threadId: "main-thread",
+        template: "general",
+        name: "小悟",
+        role: "投研助理",
+        persona: "先给结论，再说依据。",
+        avatar: "orb",
+        system: true,
+        threadExists: true,
+        createdAt: new Date(0).toISOString(),
+        skills: [],
+        customSkills: [],
+      },
+      {
+        id: "agent-a",
+        threadId,
+        template: "market",
+        name: "行情 Agent",
+        role: "市场观察员",
+        persona: "专注行情和重要变化。",
+        avatar: "bloom",
+        system: false,
+        threadExists: true,
+        createdAt: new Date(0).toISOString(),
+        skills: [],
+        customSkills: [],
+        model: "deepseek/deepseek-v4-pro",
+      },
+    ],
+    preferences: { name: "", risk: "", markets: [], areas: [], goal: "", horizon: "" },
+    onboardingDone: true,
+    onboardingStep: 4,
+  });
+  const stored = await request(alice, "PUT", space(agentThread), "/api/agent-space");
+  assert.equal(stored.status, 200, await stored.clone().text());
+
+  const run = (threadId: string) =>
+    new Promise<string>((resolve, reject) => {
+      const events: unknown[] = [];
+      new ConversationAgent(config, server.agent, "alice")
+        .run({
+          threadId,
+          runId: randomUUID(),
+          messages: [{ id: randomUUID(), role: "user", content: "Say hello" }],
+          state: {},
+          tools: [],
+          context: [],
+          forwardedProps: {},
+        })
+        .subscribe({
+          next: (event) => events.push(event),
+          error: reject,
+          complete: () => resolve(JSON.stringify(events)),
+        });
+    });
+  const replies = await Promise.all([run(agentThread), run(otherThread)]);
+  for (const reply of replies) assert.match(reply, /Personal model reply/);
+  const task = await server.agent.createTask(
+    "alice",
+    { prompt: "Complete the sample task" },
+    undefined,
+    false,
+    agentThread,
+  );
+  await server.agent.worker.tick();
+  const finished = await server.agent.getTask("alice", task.id);
+  assert.equal(finished.status, "succeeded", finished.error ?? finished.question);
+
+  const calls = requests.filter((request) => request.path === "/v1/chat/completions");
+  const agentCalls = calls.filter((call) => call.body?.model === "deepseek-v4-pro");
+  // 使用专属模型的线程（对话 + 该线程发起的任务）都用 Agent 选的版本，其余线程仍用默认模型。
+  assert.equal(agentCalls.length, 2);
+  assert.ok(calls.some((call) => call.body?.model === "deepseek-flash"));
+  assert.ok(calls.every((call) => call.key === `Bearer ${key}`));
+});
+
+test("model library lists built-ins and lets owners maintain custom models", async () => {
+  const library = (await (
+    await request(alice, "GET", undefined, "/api/model/library")
+  ).json()) as ModelLibrary;
+  assert.equal(library.canConfigure, true);
+  assert.ok(library.builtin.some((entry) => entry.spec === "deepseek/deepseek-flash"));
+  assert.ok(library.builtin.every((entry) => entry.builtin && entry.enabled));
+  assert.deepEqual(library.custom, []);
+
+  const added = await request(
+    alice,
+    "PUT",
+    { model: "deepseek-v4-pro", label: "自建 V4", baseUrl, apiKey: "sk-custom-private" },
+    "/api/model/library",
+  );
+  assert.equal(added.status, 200, await added.clone().text());
+  const created = (await added.json()) as ModelLibrary;
+  const custom = created.custom.find((entry) => entry.spec === "custom/deepseek-v4-pro");
+  assert.ok(custom);
+  assert.equal(custom.label, "自建 V4");
+  assert.equal(custom.provider, "custom");
+  assert.equal(custom.enabled, true);
+  assert.equal(custom.baseUrl, baseUrl);
+  assert.equal(custom.hasApiKey, true);
+  // 密钥写后不可读：响应里不能出现明文。
+  assert.equal(JSON.stringify(created).includes("sk-custom-private"), false);
+
+  // 自定义模型立即可用，并且用自己的端点与密钥解析。
+  const resolved = await server.workspace.models.resolve("alice", "custom/deepseek-v4-pro");
+  assert.equal(resolved.model, "custom/deepseek-v4-pro");
+  assert.equal(resolved.connection?.baseUrl, baseUrl);
+  assert.equal(resolved.connection?.apiKey, "sk-custom-private");
+  const choices = await server.workspace.models.choices("alice");
+  assert.deepEqual(choices.find((choice) => choice.provider === "custom")?.models, [
+    "custom/deepseek-v4-pro",
+  ]);
+  const snapshot = await server.workspace.snapshot("alice");
+  assert.equal(snapshot.runtime.modelLabels?.["custom/deepseek-v4-pro"], "自建 V4");
+
+  // 停用后不再出现在可选列表，解析回落到默认模型；重新启用可恢复。
+  const off = await request(
+    alice,
+    "PATCH",
+    { model: "deepseek-v4-pro", enabled: false },
+    "/api/model/library",
+  );
+  assert.equal(off.status, 200);
+  assert.equal(((await off.json()) as ModelLibrary).custom[0]?.enabled, false);
+  assert.equal(
+    (await server.workspace.models.choices("alice")).some((choice) => choice.provider === "custom"),
+    false,
+  );
+  assert.equal(
+    (await server.workspace.models.resolve("alice", "custom/deepseek-v4-pro")).model,
+    config.model,
+  );
+  await request(alice, "PATCH", { model: "deepseek-v4-pro", enabled: true }, "/api/model/library");
+
+  // 也可以把自定义模型设为默认模型，删除时一并清理这条选择。
+  const selected = await request(alice, "POST", { model: "custom/deepseek-v4-pro" }, "/api/model");
+  assert.equal(selected.status, 200, await selected.clone().text());
+  const removed = await request(
+    alice,
+    "DELETE",
+    undefined,
+    "/api/model/library?model=deepseek-v4-pro",
+  );
+  assert.equal(removed.status, 200, await removed.clone().text());
+  assert.deepEqual(((await removed.json()) as ModelLibrary).custom, []);
+  assert.equal((await server.workspace.models.resolve("alice")).model, config.model);
+});
+
+test("provider presets discover models and add them in one batch", async () => {
+  const discovered = await request(
+    alice,
+    "POST",
+    { baseUrl, apiKey: "sk-batch-key" },
+    "/api/model/library/discover",
+  );
+  assert.equal(discovered.status, 200, await discovered.clone().text());
+  assert.deepEqual(((await discovered.json()) as { models: string[] }).models.sort(), [
+    "deepseek-flash",
+    "deepseek-v4-pro",
+  ]);
+
+  const added = await request(
+    alice,
+    "POST",
+    {
+      baseUrl,
+      apiKey: "sk-batch-key",
+      models: ["deepseek-flash", "deepseek-v4-pro"],
+      provider: "DeepSeek",
+    },
+    "/api/model/library/batch",
+  );
+  assert.equal(added.status, 200, await added.clone().text());
+  const library = (await added.json()) as ModelLibrary;
+  assert.deepEqual(library.custom.map((entry) => entry.spec).sort(), [
+    "custom/deepseek-flash",
+    "custom/deepseek-v4-pro",
+  ]);
+  assert.ok(library.custom.every((entry) => entry.providerLabel === "DeepSeek"));
+  assert.ok(library.custom.every((entry) => entry.enabled && entry.hasApiKey));
+  assert.equal(JSON.stringify(library).includes("sk-batch-key"), false);
+  assert.equal(
+    (await server.workspace.models.resolve("alice", "custom/deepseek-flash")).connection?.apiKey,
+    "sk-batch-key",
+  );
+
+  // 端点没声明的模型不允许写入，避免保存一个用不了的配置。
+  const rejected = await request(
+    alice,
+    "POST",
+    { baseUrl, apiKey: "sk-batch-key", models: ["not-a-real-model"] },
+    "/api/model/library/batch",
+  );
+  assert.equal(rejected.status, 422, await rejected.clone().text());
+  assert.equal(
+    ((await rejected.json()) as { error: string }).error,
+    "modelSettings.modelUnavailable",
+  );
 });
 
 test("personal settings work without a server model key", async () => {

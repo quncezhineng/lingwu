@@ -5,6 +5,7 @@ import { defineTool } from "@copilotkit/runtime/v2";
 import { z } from "zod";
 import type { AgentIdentity, AgentTask } from "../../../../packages/domain/src/agent.ts";
 import { emailDraftSchema, eventDraftSchema } from "../../../../packages/domain/src/index.ts";
+import { agentModelForThread } from "../agent-space.ts";
 import { computerInstructions, computerTools } from "../computer-tools.ts";
 import { searchDescription, searchInputSchema, searchInstructions } from "../search.ts";
 import { agentIdentityGuidance } from "./agent-persona.ts";
@@ -19,7 +20,11 @@ export async function executeModelTask(
   ctx: TaskContext,
 ): Promise<Partial<AgentTask>> {
   const config = service.config;
-  const model = await service.workspace.models.resolve(owner);
+  // 任务沿用发起它的 Agent 的模型；Agent 未指定时回落到用户默认模型。
+  const model = await service.workspace.models.resolve(
+    owner,
+    await agentModelForThread(service.db, owner, initial.threadId),
+  );
   const browserConfigured = !!(config.workerUrl && config.workerToken);
   if (!model.model)
     return {

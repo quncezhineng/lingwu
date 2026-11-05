@@ -4,6 +4,53 @@ import type { Dictionary } from "../../types";
 const app = {
   "modelSettings.providerUnavailable":
     "This provider is not enabled. Choose a provider from the list.",
+  "modelSettings.managerTitle": "Model management",
+  "modelSettings.managerSubtitle":
+    "Add more models with an API key. Built-in models default to stable versions.",
+  "modelSettings.managerHint":
+    "Built-in models come from the server and are read-only. Custom models are yours to maintain.",
+  "modelSettings.addModel": "Add model",
+  "modelSettings.addModelHint":
+    "Pick a provider, paste an API key, then choose which of its models to enable.",
+  "modelSettings.customModelEntry": "Custom model",
+  "modelSettings.backToProviders": "Back to providers",
+  "modelSettings.readModels": "Load available models",
+  "modelSettings.providerKeyHint":
+    "Keys are stored encrypted on your account and never shown again.",
+  "modelSettings.selectedCount": "{count} models selected",
+  "modelSettings.selectAll": "Select all",
+  "modelSettings.clearSelection": "Clear selection",
+  "modelSettings.addSelectedModels": "Add {count} models",
+  "modelSettings.modelsAdded": "Added {count} models",
+  "modelSettings.noneFound":
+    "No models found. Check the base URL and key, or add a custom model manually.",
+  "modelSettings.cannotConfigure":
+    "This deployment has no credential encryption, so custom models cannot be saved. Built-in models still work.",
+  "modelSettings.editModel": "Edit model",
+  "modelSettings.removeModel": "Remove model",
+  "modelSettings.removeModelNote":
+    "Once removed, this model disappears from model pickers and Agents using it fall back to the default model.",
+  "modelSettings.enableModel": "Enable model",
+  "modelSettings.modelId": "Model ID",
+  "modelSettings.modelIdPlaceholder": "e.g. deepseek-v4-flash",
+  "modelSettings.modelLabel": "Display name",
+  "modelSettings.modelLabelPlaceholder": "Defaults to the model ID",
+  "modelSettings.baseUrl": "Base URL",
+  "modelSettings.customHint":
+    "Works with OpenAI Chat Completions compatible endpoints. The address and model are verified before saving; keys are encrypted and never shown again.",
+  "modelSettings.saveModel": "Save model",
+  "modelSettings.colModel": "Model",
+  "modelSettings.colProvider": "Provider",
+  "modelSettings.colActions": "Actions",
+  "modelSettings.groupBuiltin": "Built-in",
+  "modelSettings.groupCustom": "Custom",
+  "modelSettings.customProvider": "Custom (OpenAI Compatible)",
+  "modelSettings.libraryEmpty": "No custom models yet. Add one to get started.",
+  "modelSettings.modelAdded": "Added {model}",
+  "modelSettings.modelUpdated": "Updated {model}",
+  "modelSettings.modelRemoved": "Removed {model}",
+  "modelSettings.modelEnabled": "Enabled {model}",
+  "modelSettings.modelDisabled": "Disabled {model}",
   "modelSettings.model": "Model",
   "modelSettings.provider": "Provider",
   "modelSettings.title": "Model connection",
@@ -19,6 +66,7 @@ const app = {
   "modelSettings.scope":
     "Applies only to your account, for new chat turns and newly executed background tasks.",
   "modelSettings.current": "Current model: {model}",
+  "modelSettings.followsWorkspaceSelection": "Matches the workspace default model",
   "modelSettings.notConfigured": "No model configured",
   "modelSettings.setupUnavailable":
     "Personal model settings are unavailable. Ask your administrator to enable the model backend and credential encryption.",

@@ -123,6 +123,31 @@ test("a forged system flag cannot create a second system Agent", () => {
   assert.equal(state.agents.find((agent) => agent.id === SYSTEM_AGENT_ID)?.threadId, MAIN_THREAD);
 });
 
+test("each Agent keeps its own model and drops unusable values", () => {
+  const state = normalizeAgentSpace(
+    {
+      currentAgentId: "flash-agent",
+      agents: [
+        {
+          ...createAgentFromTemplate("market", { id: "flash-agent", threadId: "flash-thread" }),
+          model: "deepseek/deepseek-flash",
+        },
+        {
+          ...createAgentFromTemplate("custom", { id: "broken-agent", threadId: "broken-thread" }),
+          model: "not a model id",
+        },
+      ],
+      onboardingDone: true,
+    },
+    MAIN_THREAD,
+  );
+  const flash = state.agents.find((agent) => agent.id === "flash-agent");
+  const broken = state.agents.find((agent) => agent.id === "broken-agent");
+  assert.equal(flash?.model, "deepseek/deepseek-flash");
+  // 非法取值退化为「跟随默认模型」，字段本身不落盘，避免服务端 schema 拒绝。
+  assert.equal(broken && "model" in broken, false);
+});
+
 test("normalization is idempotent across repeated persisted loads", () => {
   const first = normalizeAgentSpace(
     {

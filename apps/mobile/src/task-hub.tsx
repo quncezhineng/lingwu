@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import type { AgentTask } from "../../../packages/domain/src/agent";
 import { AgentActivityScreen, GoalsScreen } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
@@ -14,15 +13,9 @@ type TaskHubTab = "tasks" | "reminders";
 /**
  * 把「动态」和「目标与提醒」收拢成同一任务中心。
  * 原有执行、审批、目标与条件提醒能力不变，只减少一级导航入口。
+ * 任务为全局视图：汇总所有 Agent 的全部任务。
  */
-export function TaskHubScreen({
-  initialTab,
-  tasks,
-}: {
-  initialTab?: TaskHubTab;
-  /** 传入时仅展示这些任务（用于「当前 Agent」作用域，如 Agent 管理页的任务弹窗）。 */
-  tasks?: readonly AgentTask[];
-} = {}) {
+export function TaskHubScreen({ initialTab }: { initialTab?: TaskHubTab } = {}) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const { section, reminderIntent, clearReminderIntent } = useWorkspace();
@@ -33,8 +26,7 @@ export function TaskHubScreen({
     setTab(defaultTab);
   }, [defaultTab]);
 
-  // 传入 tasks 时以代理作用域为准；否则回落到全工作区任务。
-  const totalTasks = tasks?.length ?? data?.tasks.length ?? 0;
+  const totalTasks = data?.tasks.length ?? 0;
   const activeReminders = (data?.monitors ?? []).filter(
     (monitor) => monitor.status !== "stopped",
   ).length;
@@ -56,7 +48,7 @@ export function TaskHubScreen({
         ]}
       />
       {tab === "tasks" ? (
-        <AgentActivityScreen scopedTasks={tasks} />
+        <AgentActivityScreen />
       ) : (
         <GoalsScreen
           embedded

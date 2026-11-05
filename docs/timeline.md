@@ -5,6 +5,197 @@
 
 ## 变更记录
 
+### 2026-11-06 · 任务弹窗改为全局视图（汇总所有 Agent 的任务）
+
+**背景**
+
+用户反馈右侧栏的任务弹窗此前按当前 Agent 作用域展示（标题为「任务 · 交易 Agent」），需要改为全局任务，汇总所有 Agent 的全部任务，并去掉标题中的 Agent 名称。
+
+**处理**
+
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx#L618-L624)：`panel === "tasks"` 的 `Sheet` 标题改为「任务」（去掉 `· Agent 名`），`TaskHubScreen` 不再传入按 Agent 过滤的 `agentTasks`，删除该过滤计算。
+- [task-hub.tsx](../apps/mobile/src/task-hub.tsx)：移除 `tasks` 可选参数，计数与列表统一回落全工作区任务。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx#L372-L377)：`AgentActivityScreen` 移除 `scopedTasks` 参数，直接使用全局 `data.tasks`。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
+### 2026-11-06 · 添加模型服务商预设改用国内版（智谱 / MiniMax / Kimi）
+
+**背景**
+
+用户反馈「添加模型」服务商列表中 Z.ai、MiniMax Global、Kimi Global 三个预设用的是国际版端点，需要全部切换为国内版。
+
+**处理**
+
+- [model-settings.tsx](../apps/mobile/src/model-settings.tsx#L53-L73)：`PROVIDER_PRESETS` 中三处预设切换为国内版——
+  - 智谱：`https://open.bigmodel.cn/api/paas/v4`（原 z.ai）
+  - MiniMax：`https://api.minimaxi.com/v1`（原 minimax.io，去掉 Global 后缀）
+  - Kimi：`https://api.moonshot.cn/v1`（原 moonshot.ai，去掉 Global 后缀）
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
+### 2026-11-06 · 提示条（Toast）去掉前后图标
+
+**背景**
+
+用户反馈提示条左右两侧的图标（前置对勾、右侧关闭）不需要显示，只保留正文文字。
+
+**处理**
+
+- [toast.tsx](../apps/mobile/src/toast.tsx)：移除前置对勾图标与右侧关闭按钮，仅显示提示文字；不可撤销动作仍以文字按钮展示。同时清理不再使用的 `icon` prop 与图标导入。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
+### 2026-11-06 · 提示条（Toast）提升到页面最上层
+
+**背景**
+
+用户反馈在「模型管理」弹窗内切换「启用」开关时，「已启用 / 已停用」的提示没有显示在页面最上层——因为弹窗使用 RN `Modal`（portal 渲染在页面顶层），而提示条只是普通绝对定位，被弹窗遮挡不可见。
+
+**处理**
+
+- [toast.tsx](../apps/mobile/src/toast.tsx)：`Toast` 改用透明 `Modal` 渲染（`transparent` + `animationType="none"`），提示天然浮在所有弹窗之上；外层容器 `pointerEvents="box-none"` 保证透明区域不拦截点击。全局所有 `notify` 提示（含模型启停、删除、归档等）均受益。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
+### 2026-11-06 · 选择模型面板去掉「跟随默认」区块，改为在默认模型上打勾
+
+**背景**
+
+用户反馈「选择模型」面板顶部的「跟随默认模型 · X / 与工作区的默认模型保持一致」区块多余，希望未选择模型时直接在列表里勾中工作区默认的那一条。
+
+**处理**
+
+- [model-selector.tsx](../apps/mobile/src/model-selector.tsx)：删除面板顶部「跟随默认模型」卡片；新增 `checkedModel = 当前选择 ?? 工作区默认模型`，列表按它打勾，因此未指定专属模型的 Agent 会显示默认模型被选中；点击已生效的默认项不产生变更（避免多存一条与默认相同的选择）。触发按钮仍显示「跟随默认模型 · X」，便于看出实际生效的版本。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）、biome 通过。
+
+### 2026-11-06 · 「添加模型」改为服务商选择 → 填写密钥 → 勾选模型
+
+**背景**
+
+用户希望添加模型时先看到常见服务商（Google、OpenAI、DeepSeek、Anthropic、xAI、Z.ai、MiniMax Global、Kimi Global）以及「自定义模型」入口，点进去填写 API Key 后能配置该服务商下的模型。
+
+**处理**
+
+- [model-settings.tsx](../apps/mobile/src/model-settings.tsx)：新增 `AddModelSheet`——第一步按截图布局列出「自定义模型」（通栏）与 8 个服务商（两列卡片，字母标记代替品牌素材，避免引入商标）；第二步 `ProviderModelForm` 填写 API Key 与 Base URL（预设各家的 OpenAI 兼容地址，可改），点「读取可用模型」进入勾选列表（全选 / 取消全选 / 计数），再批量添加；「自定义模型」仍走原有的单模型表单（可手填模型 ID）。
+- [model-settings.ts](../apps/server/src/model-settings.ts)：把 `/models` 拉取从 `verify()` 抽成 `fetchModels()`（统一错误映射、不回传厂商报文）；新增 `discover()` 与 `saveCustomBatch()`——同一端点只校验一次即可写入多个模型，记录 `provider` 供列表展示「服务商」，端点没声明的模型仍拒绝写入。
+- [app.ts](../apps/server/src/app.ts)：新增 `POST /api/model/library/discover`、`POST /api/model/library/batch`。
+- [packages/domain/src/model-settings.ts](../packages/domain/src/model-settings.ts)：新增 `ModelDiscoveryResult`、`CustomModelBatchInput`。
+- 模型列表「服务商」列改为显示添加时选择的服务商名，纯自定义模型仍显示「自定义（OpenAI Compatible）」。
+- 新增文案 11 条（中英）。
+
+**验证**
+
+- 新增测试：`discover` 返回端点声明的模型；`batch` 一次写入两个模型且 `providerLabel` 为 DeepSeek、响应不含明文密钥、`resolve` 使用批量的密钥；未声明的模型 ID 返回 422。
+- `pnpm typecheck`、biome、`pnpm test`（971 项）全部通过。
+
+**遗留说明**
+
+- 预设地址都是各家 OpenAI Chat Completions 兼容端点；Anthropic 官方端点不兼容该协议，需要换成兼容网关地址才能读取模型。
+
+### 2026-11-05 · 添加模型弹窗移除服务商地址副标题
+
+**背景**
+
+用户反馈「添加模型」选择服务商后，表单页标题下方显示的服务商地址（如 `https://api.anthropic.com/v1`）无需展示。
+
+**处理**
+
+- [model-settings.tsx](../apps/mobile/src/model-settings.tsx#L633)：`AddModelSheet` 服务商表单的 `Sheet` 移除 `subtitle={preset.baseUrl}`，标题只保留服务商名称。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
+### 2026-11-05 · 模型管理弹窗移除顶部说明文案
+
+**背景**
+
+用户反馈「模型管理」（`ModelSettingsSheet`）弹窗顶部的说明区块（「内置模型来自服务端配置…」+「当前模型：xxx」）不需要显示。
+
+**处理**
+
+- [model-settings.tsx](../apps/mobile/src/model-settings.tsx#L425-L426)：删除弹窗内顶部的两行说明（`modelSettings.managerHint` 提示语与 `modelSettings.current` 当前模型），弹窗直接以「添加模型」按钮与模型列表开头。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
+### 2026-11-05 · 模型管理弹窗宽度收窄
+
+**背景**
+
+用户反馈「模型管理」（`ModelSettingsSheet`）弹窗过宽。原 `wide` 宽度（`maxWidth: 1050`）经两轮反馈最终收窄至约一半。
+
+**处理**
+
+- [model-settings.tsx](../apps/mobile/src/model-settings.tsx#L545-L550)：`ModelSettingsSheet` 的 `Sheet` 由 `wide`（1050px）改为 `small`（440px，约为原宽 42%），紧凑居中展示；内置/自定义分组列表与「服务商」列在窄宽下仍可完整显示。
+
+**验证**
+
+- `npx tsc --noEmit`（apps/mobile）通过。
+
+### 2026-11-05 · 「大模型连接」改为「模型管理」：内置只读 + 自定义模型
+
+**背景**
+
+用户希望「大模型连接」页面像模型列表那样呈现：服务端内置模型（含 DeepSeek）以表格只读列出，同时允许用户自己添加模型（地址 + API Key），并能编辑、删除、启停。
+
+**处理**
+
+- [packages/domain/src/model-settings.ts](../packages/domain/src/model-settings.ts)：新增 `ModelLibraryEntry` / `ModelLibrary` / `CustomModelInput`；自定义模型规格为 `custom/<model-id>`（含版本号，本身就是模型 ID）。
+- [model-settings.ts](../apps/server/src/model-settings.ts)：新增模型库能力——`library()`（内置目录 + 自定义列表，密钥只回 `hasApiKey`）、`saveCustom()`（保存前用 `/models` 校验地址与模型，密钥加密且留空沿用）、`setCustomEnabled()`（只切开关，不重新校验网络）、`removeCustom()`（同时清理指向它的默认选择）；`choices()` / `customLabels()` 让自定义模型进入选模型列表与展示名；`resolve()` 支持 `custom/` 规格并优先使用记录里的端点与密钥，停用/缺失时回落默认模型；`read()` 避免读到 `custom/` 时报「厂商不可用」。
+- [app.ts](../apps/server/src/app.ts)：新增 `GET/PUT/PATCH/DELETE /api/model/library`。
+- [workspace.ts](../apps/server/src/workspace.ts)：`modelLabels` 合并账号自定义模型名。
+- [model-settings.tsx](../apps/mobile/src/model-settings.tsx)：整页重做为「模型管理」——说明文案 + 「添加模型」+ 三列表格（模型 / 服务商 / 操作），「内置」「自定义」两组可折叠；内置行只读显示「–」，自定义行提供编辑、删除（二次确认）与启停开关；窄屏把服务商并入模型名下方；新增/编辑表单含模型 ID、显示名称、Base URL、API Key、保存前校验。
+- [model-selector.tsx](../apps/mobile/src/model-selector.tsx)、[screens.tsx](../apps/mobile/src/screens.tsx)：自定义模型分组标题按语言渲染。
+- 新增文案约 30 条（中英）。
+
+**验证**
+
+- 新增测试：模型库仅回内置 + 空自定义；`PUT` 添加后 `hasApiKey` 为真且响应不含明文密钥；自定义模型可被 `resolve` 解析为自身 baseUrl/key；停用后从 `choices` 消失且解析回落默认；删除后记录清空并清理默认选择。
+- `pnpm typecheck`、biome、`pnpm test`（970 项）全部通过。
+
+**遗留说明**
+
+- 自定义模型仅支持 OpenAI Chat Completions 兼容端点；保存前需要该端点提供 `GET /models`。
+- 内置模型是否出现取决于部署配置的厂商密钥；仍支持历史上已保存的个人厂商密钥。
+
+### 2026-11-05 · 每个 Agent 可以选择自己的模型与版本
+
+**背景**
+
+用户希望「Agent 详情 → 模型」能按 Agent 分别选择模型与版本号，而不是所有 Agent 共用账号级的默认模型。
+
+**处理**
+
+- [agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)：`AgentDefinition` 新增可选 `model`（`provider/model-id`）；`normalizeAgent` 校验取值，非法或空值不写字段（= 跟随工作区默认模型），保证规范化前后键集合一致。
+- [agent-space.tsx](../apps/mobile/src/agent-space.tsx)：`updateAgent` 清空模型时删除字段，避免空字符串被服务端 schema 拒绝。
+- [model-selector.tsx](../apps/mobile/src/model-selector.tsx)：新增受控模式（`value` / `onSelect` / `inheritLabel`）。不传 `onSelect` 时仍是原来的账号级模型切换；传入后由调用方保存，并在列表首部提供「跟随默认模型 · 当前默认」一项。
+- [agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx)：模型分区绑定当前 Agent 的 `model`，选择后写入该 Agent。
+- [packages/../agent-space.ts](../apps/server/src/agent-space.ts)：持久化 schema 接受可选 `model`（同模型 ID 字符集与长度上限）；新增 `agentModelForThread`，按 `threadId` 反查 Agent 的专属模型。
+- [model-settings.ts](../apps/server/src/model-settings.ts)：`resolve(owner, requested?)` 支持本次请求指定模型——命中用户个人密钥走个人连接，命中服务端密钥走服务端连接，不可用时回落到用户默认模型。
+- [conversation.ts](../apps/server/src/engine/conversation.ts)、[engine/model.ts](../apps/server/src/engine/model.ts)：对话按 `input.threadId`、任务按 `task.threadId` 解析所属 Agent 的模型，因此该 Agent 的对话与其发起的后台任务使用同一模型版本。
+- 新增文案：`agentSpace.modelFollowDefault`、`agentSpace.modelHint`、`modelSettings.followsWorkspaceSelection`（中英）。
+
+**验证**
+
+- `pnpm typecheck`、`npx biome check` 通过。
+- 新增 `tests/model-settings.test.ts`：通过 `PUT /api/agent-space` 写入带 `model` 的 Agent，断言该线程的对话与该线程发起的任务都使用 `deepseek-v4-pro`，其他线程仍用默认 `deepseek-flash`，且密钥不串号。
+- 新增 `apps/mobile/test/agent-space.test.ts`：专属模型被保留、非法取值退化为跟随默认。
+- `pnpm test`：969 项全部通过。
+
 ### 2026-11-05 · Agent「详情」改为左右分栏的独立页面
 
 **背景**

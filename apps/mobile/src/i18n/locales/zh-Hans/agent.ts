@@ -577,6 +577,9 @@ const agent = {
   "agentSpace.manageAgent": "管理",
   "agentSpace.agentDetails": "Agent 详情",
   "agentSpace.changesSaved": "已保存。",
+  "agentSpace.modelFollowDefault": "跟随默认模型 · {model}",
+  "agentSpace.modelHint":
+    "选择后，这个 Agent 的对话与后台任务都会使用该模型及版本；不选则跟随工作区默认模型。",
   "agentSpace.persona": "职责与人设",
   "agentSpace.editPersona": "编辑人设",
   "agentSpace.resources": "Agent 资源",

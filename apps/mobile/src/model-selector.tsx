@@ -6,27 +6,49 @@ import { Check, ChevronDown, Cpu, Settings2 } from "./icons";
 import { Button, colors, fonts, radius, Sheet, s, space } from "./ui";
 import { useWorkspace } from "./workspace";
 
-/** Model selection in Bot management. Credentials stay in My settings. */
+/**
+ * 模型选择入口。凭据始终在「我的设置」里维护。
+ *
+ * 默认写回用户自己的模型选择；传入 `onSelect` 后改为受控模式，
+ * 由调用方保存（例如把它存成某个 Agent 的专属模型）。
+ */
 export function ModelSelector({
   disabled = false,
   onManage,
+  value,
+  onSelect,
+  inheritLabel,
 }: {
   disabled?: boolean;
   onManage?: () => void;
+  /** 受控模式的当前模型；不传表示跟随默认模型。 */
+  value?: string;
+  /** 受控模式的选择回调；`undefined` 表示恢复跟随默认模型。 */
+  onSelect?: (model?: string) => void;
+  /** 受控模式下「跟随默认模型」这一项的文案。 */
+  inheritLabel?: string;
 }) {
   const { workspace, api, refresh, notify, navigate, open } = useWorkspace();
   const { t } = useTranslation();
-  const [current, setCurrent] = useState(workspace.runtime.model);
+  const controlled = Boolean(onSelect);
+  const [userModel, setUserModel] = useState(workspace.runtime.model);
   const [busy, setBusy] = useState(false);
   const [pendingModel, setPendingModel] = useState<string>();
   const [expanded, setExpanded] = useState(false);
   const options = workspace.runtime.modelOptions ?? [];
   const label = (model: string) =>
     workspace.runtime.modelLabels?.[model] ?? (model.split("/").slice(1).join("/") || model);
-  const title = current ? label(current) : t("modelSettings.selectModel");
+  const current = controlled ? value : userModel;
+  // 没有单独指定模型时，实际使用的就是工作区默认模型，列表里把那一条打勾。
+  const checkedModel = current ?? workspace.runtime.model;
+  const title = current
+    ? label(current)
+    : controlled && inheritLabel
+      ? inheritLabel
+      : t("modelSettings.selectModel");
   const blocked = disabled || busy;
 
-  useEffect(() => setCurrent(workspace.runtime.model), [workspace.runtime.model]);
+  useEffect(() => setUserModel(workspace.runtime.model), [workspace.runtime.model]);
   useEffect(() => {
     if (disabled) setExpanded(false);
   }, [disabled]);
@@ -38,13 +60,21 @@ export function ModelSelector({
     open({ type: "model-settings" });
   }
 
-  async function select(model: string) {
-    if (!model || model === current || blocked) return;
+  async function select(model?: string) {
+    if (blocked) return;
+    if (controlled) {
+      // 未指定专属模型时默认项已经是当前选择，点它不产生变化。
+      if (model === value || (value === undefined && model === checkedModel)) return;
+      setExpanded(false);
+      onSelect?.(model);
+      return;
+    }
+    if (!model || model === userModel) return;
     setBusy(true);
     setPendingModel(model);
     try {
       const result = await api.request<{ model: string }>("/api/model", { model });
-      setCurrent(result.model);
+      setUserModel(result.model);
       setExpanded(false);
       notify(t("screens.connectionsModelSwitched", { model: label(result.model) }));
       // The saved selection is authoritative even if refreshing other workspace data fails.
@@ -119,7 +149,9 @@ export function ModelSelector({
           subtitle={
             current
               ? t("modelSettings.current", { model: title })
-              : t("modelSettings.noConfiguredModels")
+              : controlled && inheritLabel
+                ? inheritLabel
+                : t("modelSettings.noConfiguredModels")
           }
           onClose={() => setExpanded(false)}
         >
@@ -132,7 +164,9 @@ export function ModelSelector({
               options.map((provider) => (
                 <View key={provider.provider} style={{ gap: 7 }}>
                   <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
-                    {provider.label}
+                    {provider.provider === "custom"
+                      ? t("modelSettings.customProvider")
+                      : provider.label}
                   </Text>
                   <View
                     style={{
@@ -144,7 +178,7 @@ export function ModelSelector({
                     }}
                   >
                     {provider.models.map((model, index) => {
-                      const selected = model === current;
+                      const selected = model === checkedModel;
                       const pending = pendingModel === model;
                       return (
                         <Pressable

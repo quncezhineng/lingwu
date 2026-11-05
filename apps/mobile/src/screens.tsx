@@ -2118,7 +2118,11 @@ export function ConnectionsScreen({ query = "" }: { query?: string }) {
               {modelOptions.length ? (
                 modelOptions.map((choice) => (
                   <View key={choice.provider} style={{ gap: 8 }}>
-                    <Text style={s.small}>{choice.label}</Text>
+                    <Text style={s.small}>
+                      {choice.provider === "custom"
+                        ? t("modelSettings.customProvider")
+                        : choice.label}
+                    </Text>
                     <View style={[s.row, { gap: 7, flexWrap: "wrap" }]}>
                       {choice.models.map((spec) => {
                         const current = spec === w.runtime.model;

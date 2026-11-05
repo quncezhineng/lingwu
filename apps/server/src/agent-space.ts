@@ -31,6 +31,14 @@ const agentSchema = z
     tone: z.enum(["formal", "casual", "playful", "concise", "warm"]).optional(),
     communication: z.enum(["short", "detailed", "bullets"]).optional(),
     instructions: z.string().max(4000).optional(),
+    // 每个 Agent 可以选择不同模型（含版本号）；缺省时跟随用户当前的默认模型。
+    model: z
+      .string()
+      .trim()
+      .min(1)
+      .max(150)
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/)
+      .optional(),
     system: z.boolean(),
     threadExists: z.boolean(),
     createdAt: timestamp,
@@ -101,3 +109,24 @@ export const agentSpaceSchema = z
   });
 
 export type PersistedAgentSpace = z.infer<typeof agentSpaceSchema>;
+
+/**
+ * 线程所属 Agent 的专属模型。
+ *
+ * Agent 的模型选择随 Agent 空间一起保存，所以对话与任务只按 threadId 就能拿到；
+ * 未设置（或还没有保存过 Agent 空间）时返回 undefined，由调用方回落到默认模型。
+ */
+export async function agentModelForThread(
+  db: { get: <T>(owner: string, kind: string, id: string) => Promise<T | null> },
+  owner: string,
+  threadId?: string | null,
+): Promise<string | undefined> {
+  const id = threadId?.trim();
+  if (!id) return undefined;
+  const saved = await db.get<PersistedAgentSpace & { id: string }>(
+    owner,
+    "agent-settings",
+    "space",
+  );
+  return saved?.agents.find((agent) => agent.threadId === id)?.model;
+}

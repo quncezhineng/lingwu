@@ -46,6 +46,8 @@ export interface AgentDefinition {
   communication: AgentCommunication;
   /** 系统提示词（人设页「指令」）：每次对话前作为指令注入。 */
   instructions: string;
+  /** 这个 Agent 专用的模型（`provider/model-id`，含版本号）；留空表示跟随工作区默认模型。 */
+  model?: string;
   /** The system-created default Agent cannot be deleted. */
   system: boolean;
   /** True once the server has created or already knows this thread. */
@@ -251,6 +253,14 @@ function normalizeSkill(value: unknown): AgentSkill | undefined {
   };
 }
 
+/** 模型标识：`provider/model-id`，与服务端模型目录的取值范围一致。 */
+const MODEL_SPEC = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,149}$/;
+
+function normalizeAgentModel(value: unknown) {
+  const spec = stringValue(value).trim();
+  return MODEL_SPEC.test(spec) ? spec : undefined;
+}
+
 function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition | undefined {
   if (!isRecord(value)) return undefined;
   const id = stringValue(value.id);
@@ -275,7 +285,7 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
         skills: [...AGENT_TEMPLATES.custom.skills],
       };
   const skills = stringArray(value.skills).filter((skill) => skill in AGENT_CAPABILITY_LABELS);
-  return {
+  const agent: AgentDefinition = {
     ...defaults,
     id,
     // A system Agent always uses the server's canonical main thread.
@@ -302,6 +312,10 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
           .filter((skill): skill is AgentSkill => Boolean(skill))
       : [],
   };
+  // 没有专属模型时不写字段：键不存在才等于「跟随默认模型」，也让持久化前后保持一致。
+  const model = normalizeAgentModel(value.model);
+  if (model) agent.model = model;
+  return agent;
 }
 
 function normalizePreferences(value: unknown): AgentUserPreferences {

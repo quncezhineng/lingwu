@@ -404,7 +404,8 @@ export class WorkspaceService {
         richThreads: true,
         model: model.model,
         modelSource: model.source,
-        modelLabels: this.models.labels(),
+        // 自定义模型的展示名按账号存，内置模型沿用厂商标签。
+        modelLabels: { ...this.models.labels(), ...(await this.models.customLabels(owner)) },
         // Only the model backend reads MODEL; sample and AG-UI runtimes are not switchable.
         modelOptions: await this.models.choices(owner),
       },

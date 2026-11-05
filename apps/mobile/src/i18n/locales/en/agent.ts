@@ -632,6 +632,9 @@ const agent = {
   "agentSpace.manageAgent": "Manage",
   "agentSpace.agentDetails": "Agent details",
   "agentSpace.changesSaved": "Saved.",
+  "agentSpace.modelFollowDefault": "Use the default model · {model}",
+  "agentSpace.modelHint":
+    "This Agent's chats and background tasks use the selected model and version. Leave it unset to follow the workspace default.",
   "agentSpace.persona": "Role & persona",
   "agentSpace.editPersona": "Edit persona",
   "agentSpace.resources": "Agent resources",

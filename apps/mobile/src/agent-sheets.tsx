@@ -598,12 +598,6 @@ export function AgentSheets({
 }) {
   const { t } = useTranslation();
   const { current } = useAgentSpace();
-  const { data } = useAgentWorkspace();
-  // 当前 Agent 的任务：与 selectBotResources 同一作用域（按发起线程过滤），
-  // 让「任务」计数与弹窗都只展示当下这个 Agent 的任务。
-  const agentTasks = (data?.tasks ?? []).filter(
-    (task) => task.threadId === current.threadId || (!task.threadId && current.system),
-  );
   if (!panel) return null;
   if (panel === "more") return <AgentMoreSheet onClose={onClose} onPanel={onPanel} />;
   if (panel === "create") return <CreateAgentSheet onClose={onClose} onCreated={onClose} />;
@@ -623,13 +617,9 @@ export function AgentSheets({
     );
   if (panel === "tasks")
     return (
-      <Sheet
-        botLayout
-        title={`${t("agentSpace.tasks")} · ${current.name}`}
-        onClose={onDismiss}
-        wide
-      >
-        <TaskHubScreen initialTab="tasks" tasks={agentTasks} />
+      <Sheet botLayout title={t("agentSpace.tasks")} onClose={onDismiss} wide>
+        {/* 任务为全局视图：汇总所有 Agent 的全部任务，不按当前 Agent 过滤。 */}
+        <TaskHubScreen initialTab="tasks" />
       </Sheet>
     );
   if (panel === "files")

@@ -493,6 +493,34 @@ export async function createApp(
       throw new AppError("This deployment does not run a switchable model backend", 400);
     return c.json(await workspace.models.select(c.get("owner"), body.model));
   });
+  /** 「模型管理」：内置模型目录 + 用户自定义模型。 */
+  app.get("/api/model/library", async (c) =>
+    c.json(await workspace.models.library(c.get("owner"))),
+  );
+  app.put("/api/model/library", async (c) =>
+    c.json(await workspace.models.saveCustom(c.get("owner"), await c.req.json())),
+  );
+  app.post("/api/model/library/discover", async (c) =>
+    c.json(await workspace.models.discover(c.get("owner"), await c.req.json())),
+  );
+  app.post("/api/model/library/batch", async (c) =>
+    c.json(await workspace.models.saveCustomBatch(c.get("owner"), await c.req.json())),
+  );
+  app.patch("/api/model/library", async (c) => {
+    const body = z
+      .object({
+        model: z.string().trim().min(1).max(150),
+        enabled: z.boolean(),
+      })
+      .parse(await c.req.json());
+    return c.json(
+      await workspace.models.setCustomEnabled(c.get("owner"), body.model, body.enabled),
+    );
+  });
+  app.delete("/api/model/library", async (c) => {
+    const model = z.string().trim().min(1).max(150).parse(c.req.query("model"));
+    return c.json(await workspace.models.removeCustom(c.get("owner"), model));
+  });
   app.route("/api/agent", agentRoutes(agent));
   app.route("/api/watchlists", watchlistRoutes(agent));
   app.route("/api/symbols", symbolRoutes(agent));
