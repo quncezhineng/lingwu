@@ -1,68 +1,21 @@
 import { useRef, useState } from "react";
 import { Modal, Pressable, useWindowDimensions, View } from "react-native";
 import { useAgentSpace } from "../agent-space";
-import type { AgentSkill } from "../agent-space-model";
+import type { AgentDefinition, AgentSkill } from "../agent-space-model";
 import { Text, TextInput } from "../app-text";
 import { MySkillDetailSheet, SkillDetailSheet } from "../capability-hub";
 import { useTranslation } from "../i18n";
 import { Download, Plus, Search } from "../icons";
 import { type SkillCatalogEntry, skillCatalog } from "../skill-catalog";
+import { SkillEditor } from "../skill-editor";
+import { findSkillCopy, skillTargetAgents, toggleSkillShare } from "../skill-sharing";
 import { StatusBadge } from "../status-badge";
-import { Button, colors, Field, radius, s, shadow } from "../ui";
+import { Button, colors, radius, s, shadow } from "../ui";
+import { useWorkspace } from "../workspace";
 import { BotInlineBack, BotPage, type BotPageProps } from "./shared";
 
 /** 技能库一次渲染的条数，避免把 180+ 条目录一次铺进页面。 */
 const LIBRARY_PAGE_SIZE = 40;
-
-function SkillEditor({ skill, onClose }: { skill?: AgentSkill; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { current, saveSkill } = useAgentSpace();
-  const [name, setName] = useState(() => skill?.name ?? t("agentSpace.skillSampleName"));
-  const [purpose, setPurpose] = useState(
-    () => skill?.purpose ?? t("agentSpace.skillSamplePurpose"),
-  );
-  const [instructions, setInstructions] = useState(
-    () => skill?.instructions ?? t("agentSpace.skillSampleInstructions"),
-  );
-  const [outputFormat, setOutputFormat] = useState(
-    () => skill?.outputFormat ?? t("agentSpace.skillSampleOutput"),
-  );
-  return (
-    <View style={{ gap: 2 }}>
-      <Field label={t("agentSpace.skillName")} value={name} onChangeText={setName} maxLength={40} />
-      <Field
-        label={t("agentSpace.skillPurpose")}
-        value={purpose}
-        onChangeText={setPurpose}
-        maxLength={120}
-      />
-      <Field
-        label={t("agentSpace.skillInstructions")}
-        value={instructions}
-        onChangeText={setInstructions}
-        maxLength={4000}
-        multiline
-      />
-      <Field
-        label={t("agentSpace.skillOutput")}
-        value={outputFormat}
-        onChangeText={setOutputFormat}
-        maxLength={800}
-        multiline
-      />
-      <Button
-        primary
-        disabled={!name.trim() || !instructions.trim()}
-        onPress={() => {
-          saveSkill(current.id, { name, purpose, instructions, outputFormat }, skill?.id);
-          onClose();
-        }}
-      >
-        {t("agentSpace.saveSkill")}
-      </Button>
-    </View>
-  );
-}
 
 /**
  * 技能库：从技能目录里挑技能安装到当前 Agent。
@@ -272,7 +225,8 @@ function SkillActionMenu({
 
 export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
   const { t, locale } = useTranslation();
-  const { current, deleteSkill } = useAgentSpace();
+  const { agents: agentList, current, deleteSkill, saveSkill } = useAgentSpace();
+  const { notify } = useWorkspace();
   const [editingSkill, setEditingSkill] = useState<AgentSkill | "new">();
   const [adding, setAdding] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<SkillMenuAnchor>();
@@ -290,6 +244,24 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
     addButtonRef.current?.measureInWindow((x, y, width, height) => {
       setMenuAnchor({ x, y, width, height });
     });
+  };
+
+  /** 自建技能可添加到的其它 Agent（排除当前 Agent 自己）。 */
+  const shareTargets = viewingCustom ? skillTargetAgents(agentList, current.id) : [];
+  const shareAddedIds = viewingCustom
+    ? shareTargets.filter((agent) => findSkillCopy(agent, viewingCustom)).map((agent) => agent.id)
+    : [];
+
+  /** 「添加到智能体」：与「应用与能力 → 我的技能」共用同一套判定与切换逻辑。 */
+  const toggleSkillInAgent = (agent: AgentDefinition) => {
+    if (!viewingCustom) return;
+    const action = toggleSkillShare({ saveSkill, deleteSkill }, agent, viewingCustom);
+    notify(
+      t(action === "added" ? "agent.skillInstalledToast" : "agent.skillUninstalledToast", {
+        title: viewingCustom.name,
+        agent: agent.name,
+      }),
+    );
   };
 
   if (editingSkill)
@@ -318,8 +290,8 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
   return (
     <BotPage title={t("agentSpace.skills")} onClose={onClose} embedded={embedded}>
       <View style={{ gap: 8 }}>
-        <View style={[s.between, { marginBottom: 5 }]}>
-          <Text style={s.heading}>{t("agentSpace.mySkills")}</Text>
+        {/* 标题随精简移除，「+」入口右对齐保留。 */}
+        <View style={{ alignItems: "flex-end", marginBottom: 5 }}>
           <View ref={addButtonRef} collapsable={false}>
             <Pressable
               accessibilityRole="button"
@@ -430,6 +402,9 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
         <MySkillDetailSheet
           title={viewingCustom.name}
           skill={viewingCustom}
+          agents={shareTargets}
+          addedAgentIds={shareAddedIds}
+          onToggleAdd={toggleSkillInAgent}
           onClose={() => setViewingCustom(undefined)}
           footer={
             <Button

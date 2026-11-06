@@ -76,6 +76,8 @@ export const s = StyleSheet.create({
     fontFamily: fonts.sans,
   },
   field: { gap: 6, marginBottom: space.sm },
+  /** 表单字段标签：12/18 w500，供 Field 与自定义字段（如带预览的输入区）共用。 */
+  fieldLabel: { fontSize: 12, lineHeight: 18, fontWeight: "500", color: colors.text },
   /** 按钮：control 圆角 + 1px 描边，默认高度 36（small 30），触控可达 44。 */
   button: {
     flexDirection: "row",
@@ -300,9 +302,7 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={s.field}>
-      <Text style={{ fontSize: 12, lineHeight: 18, fontWeight: "500", color: colors.text }}>
-        {label}
-      </Text>
+      <Text style={s.fieldLabel}>{label}</Text>
       <TextInput
         placeholderTextColor={colors.faint}
         accessibilityLabel={label}

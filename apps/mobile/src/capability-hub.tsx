@@ -1,9 +1,11 @@
 import { type ReactNode, useState } from "react";
 import { Linking, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import Markdown from "react-native-markdown-renderer";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition, AgentSkill } from "./agent-space-model";
 import { Text, TextInput } from "./app-text";
+import { assistantMarkdown } from "./assistant-markdown";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
@@ -21,38 +23,33 @@ import {
   type IconComponent,
   Link2,
   Mail,
+  Plus,
   Search,
   ShieldCheck,
   Sparkles,
   Target,
   X,
 } from "./icons";
+import { instructionsMarkdownStyle } from "./instructions-markdown";
 import { FilesScreen } from "./screens";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
+import { SkillEditor } from "./skill-editor";
+import {
+  collectSharedSkills,
+  findSkillCopy,
+  type SharedSkillEntry,
+  skillTargetAgents,
+  toggleSkillShare,
+} from "./skill-sharing";
 import { StatusBadge, type StatusTone } from "./status-badge";
 import { breakpoints, radius } from "./theme";
-import {
-  appBrands,
-  Button,
-  Chip,
-  colors,
-  Empty,
-  fonts,
-  SectionHeading,
-  Sheet,
-  s,
-  serviceBrands,
-} from "./ui";
+import { appBrands, Button, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
 import { useWorkspace } from "./workspace";
 
 type CapabilityType = "plugins" | "skills" | "connectors" | "workspace";
 type ConfigSheet = "openbot";
-/** 「我的技能」条目：用户在某 Agent 下自建的技能，带来源 Agent 标注。 */
-type MySkillEntry = {
-  skill: AgentSkill;
-  agentId: string;
-  agentName: string;
-};
+/** 「我的技能」条目：用户自建的技能，附带它所在的 Agent（定义见 skill-sharing）。 */
+type MySkillEntry = SharedSkillEntry;
 type CapabilityCategoryId =
   | "research"
   | "analysis"
@@ -119,6 +116,17 @@ const CATEGORY_OPTIONS_BY_TYPE: Record<CapabilityType, CategoryOption[]> = {
 };
 
 const FILLER_KEYS = ["a", "b", "c", "d", "e", "f"] as const;
+
+/** 空状态容器：与卡片同描边、同圆角的纸面框，目录与「我的技能」共用。 */
+const EMPTY_STATE_BOX = {
+  minHeight: 230,
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1,
+  borderColor: colors.line,
+  borderRadius: radius.card,
+  backgroundColor: colors.paper,
+} as const;
 
 const TYPE_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.pluginsHeading",
@@ -542,6 +550,54 @@ function AgentInstallRow({
 }
 
 /**
+ * 智能体选择面板：技能详情弹层的「添加到智能体」视图。
+ *
+ * 目录技能（安装到智能体）与自建技能（添加到智能体）共用这一版式，
+ * 只有「是否已持有」的判定方式不同，由调用方通过 `isAdded` 传入。
+ */
+function AgentPickerPanel({
+  agents,
+  isAdded,
+  onToggle,
+}: {
+  agents: AgentDefinition[];
+  isAdded: (agent: AgentDefinition) => boolean;
+  onToggle: (agent: AgentDefinition) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={{ gap: 12 }}>
+      <Text style={s.small}>{t("agent.skillInstallHint")}</Text>
+      {agents.length ? (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: radius.field,
+            overflow: "hidden",
+          }}
+        >
+          {agents.map((agent, index) => (
+            <AgentInstallRow
+              key={agent.id}
+              agent={agent}
+              installed={isAdded(agent)}
+              first={index === 0}
+              onPress={() => onToggle(agent)}
+            />
+          ))}
+        </View>
+      ) : (
+        <Text style={s.small}>{t("agent.skillShareNoTargets")}</Text>
+      )}
+      <Text style={[s.small, { color: colors.faint }]}>
+        {t("agent.skillInstallSummary", { count: agents.filter(isAdded).length })}
+      </Text>
+    </View>
+  );
+}
+
+/**
  * 技能目录条目的详情弹层。
  *
  * 传入 `agents` 与 `onToggleInstall` 时才提供「安装到智能体」入口；
@@ -569,9 +625,6 @@ export function SkillDetailSheet({
   const primaryTitle = locale === "zh-Hans" ? skill.titleZh : skill.titleEn;
   const secondaryTitle = locale === "zh-Hans" ? skill.titleEn : skill.titleZh;
   const installable = Boolean(agents && onToggleInstall);
-  const installedCount = (agents ?? []).filter((agent) =>
-    agent.installedSkills.includes(skill.id),
-  ).length;
 
   return (
     <Sheet
@@ -592,30 +645,11 @@ export function SkillDetailSheet({
       }
     >
       {installable && installing ? (
-        <View style={{ gap: 12 }}>
-          <Text style={s.small}>{t("agent.skillInstallHint")}</Text>
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: colors.line,
-              borderRadius: radius.field,
-              overflow: "hidden",
-            }}
-          >
-            {(agents ?? []).map((agent, index) => (
-              <AgentInstallRow
-                key={agent.id}
-                agent={agent}
-                installed={agent.installedSkills.includes(skill.id)}
-                first={index === 0}
-                onPress={() => onToggleInstall?.(agent)}
-              />
-            ))}
-          </View>
-          <Text style={[s.small, { color: colors.faint }]}>
-            {t("agent.skillInstallSummary", { count: installedCount })}
-          </Text>
-        </View>
+        <AgentPickerPanel
+          agents={agents ?? []}
+          isAdded={(agent) => agent.installedSkills.includes(skill.id)}
+          onToggle={(agent) => onToggleInstall?.(agent)}
+        />
       ) : (
         <View style={{ gap: 18 }}>
           <View style={[s.row, { gap: 11 }]}>
@@ -690,44 +724,82 @@ export function SkillDetailSheet({
  * 用户自建技能的只读详情。
  *
  * 「应用与能力 → 我的技能」与 Agent 详情的技能页共用这一版式，
- * 传入 `footer` 可追加场景专属操作（如编辑）。
+ * 传入 `footer` 可追加场景专属操作（如编辑）；
+ * 传入 `agents` 与 `onToggleAdd` 时在右上角提供「添加到智能体」。
  */
 export function MySkillDetailSheet({
   title,
   subtitle,
   skill,
   footer,
+  agents,
+  addedAgentIds,
+  onToggleAdd,
   onClose,
 }: {
   title: string;
   subtitle?: string;
-  skill: Pick<AgentSkill, "purpose" | "instructions" | "outputFormat" | "version">;
+  skill: Pick<AgentSkill, "name" | "purpose" | "instructions" | "outputFormat" | "version">;
   footer?: ReactNode;
+  /** 可添加到的智能体（不含技能来源 Agent）。传入即展示「添加到智能体」入口。 */
+  agents?: AgentDefinition[];
+  /** 已持有该技能的智能体 id，用于行内「已添加」标记与计数。 */
+  addedAgentIds?: string[];
+  /** 切换某个智能体是否持有该技能。 */
+  onToggleAdd?: (agent: AgentDefinition) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const [adding, setAdding] = useState(false);
+  const shareable = Boolean(agents && onToggleAdd);
   return (
-    <Sheet title={title} subtitle={subtitle} onClose={onClose} narrow>
-      <View style={{ gap: 16 }}>
-        <View style={{ gap: 4 }}>
-          <Text style={s.label}>{t("agentSpace.skillPurpose")}</Text>
-          <Text style={s.text}>{skill.purpose}</Text>
+    <Sheet
+      title={shareable && adding ? t("agent.skillInstallTitle") : title}
+      subtitle={shareable && adding ? title : subtitle}
+      onClose={onClose}
+      narrow
+      headerAction={
+        shareable ? (
+          <Button
+            small
+            icon={adding ? ArrowLeft : Download}
+            onPress={() => setAdding((value) => !value)}
+          >
+            {adding ? t("common.back") : t("agent.skillInstallAction")}
+          </Button>
+        ) : undefined
+      }
+    >
+      {shareable && adding ? (
+        <AgentPickerPanel
+          agents={agents ?? []}
+          isAdded={(agent) => (addedAgentIds ?? []).includes(agent.id)}
+          onToggle={(agent) => onToggleAdd?.(agent)}
+        />
+      ) : (
+        <View style={{ gap: 16 }}>
+          <View style={{ gap: 4 }}>
+            <Text style={s.label}>{t("agentSpace.skillPurpose")}</Text>
+            <Text style={s.text}>{skill.purpose}</Text>
+          </View>
+          <View style={{ gap: 4 }}>
+            <Text style={s.label}>{t("agentSpace.skillInstructions")}</Text>
+            <Markdown markdownit={assistantMarkdown} style={instructionsMarkdownStyle}>
+              {skill.instructions}
+            </Markdown>
+          </View>
+          <View style={{ gap: 4 }}>
+            <Text style={s.label}>{t("agentSpace.skillOutput")}</Text>
+            <Text style={s.text}>{skill.outputFormat}</Text>
+          </View>
+          <Text style={s.small}>
+            {t("agentSpace.skillVersion", {
+              version: skill.version,
+            })}
+          </Text>
+          {footer}
         </View>
-        <View style={{ gap: 4 }}>
-          <Text style={s.label}>{t("agentSpace.skillInstructions")}</Text>
-          <Text style={s.text}>{skill.instructions}</Text>
-        </View>
-        <View style={{ gap: 4 }}>
-          <Text style={s.label}>{t("agentSpace.skillOutput")}</Text>
-          <Text style={s.text}>{skill.outputFormat}</Text>
-        </View>
-        <Text style={s.small}>
-          {t("agentSpace.skillVersion", {
-            version: skill.version,
-          })}
-        </Text>
-        {footer}
-      </View>
+      )}
     </Sheet>
   );
 }
@@ -854,6 +926,139 @@ function CategoryRail({
   );
 }
 
+/**
+ * 「技能市场 / 我的技能」二级标签页：横向并排，切换内容区。
+ *
+ * 与上方的能力类型索引（插件 / 技能 / 连接器 / 资料）是两层维度：
+ * 上面切能力类型，这里切同一类型下的「目录」与「我创建的」两个视角。
+ */
+function HubTabBar<T extends string>({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: readonly { id: T; label: string }[];
+  active: T;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <View
+      accessibilityRole="tablist"
+      style={{
+        flexDirection: "row",
+        gap: 24,
+        minHeight: 40,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.line,
+      }}
+    >
+      {tabs.map((tab) => {
+        const selected = tab.id === active;
+        return (
+          <Pressable
+            key={tab.id}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected }}
+            onPress={() => onChange(tab.id)}
+            style={{ justifyContent: "center", minHeight: 40 }}
+          >
+            <Text
+              style={{
+                color: selected ? colors.primaryStrong : colors.muted,
+                fontSize: 14,
+                lineHeight: 20,
+                fontWeight: selected ? "600" : "400",
+                fontFamily: fonts.sans,
+              }}
+            >
+              {tab.label}
+            </Text>
+            {selected && (
+              <View
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  bottom: -1,
+                  left: 0,
+                  height: 2,
+                  backgroundColor: colors.primary,
+                }}
+              />
+            )}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * 我的技能列表：所有 Agent 自建技能的汇总，点击查看详情。
+ *
+ * 技能不按 Agent 归类——同一份技能在不同 Agent 下只出现一次，
+ * 因此行内只在右侧给出箭头，不再显示来源 Agent 标签。
+ */
+function MySkillsList({
+  entries,
+  onSelect,
+}: {
+  entries: MySkillEntry[];
+  onSelect: (entry: MySkillEntry) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={{ gap: 8 }}>
+      {entries.map(({ skill, agentId }) => (
+        <Pressable
+          key={`${agentId}:${skill.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`${t("agent.mySkills")} · ${skill.name}`}
+          onPress={() => onSelect({ skill, agentId })}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            paddingVertical: 11,
+            paddingHorizontal: 12,
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
+          })}
+        >
+          <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: colors.text,
+                fontSize: 13,
+                lineHeight: 18,
+                fontWeight: "600",
+                fontFamily: fonts.sans,
+              }}
+            >
+              {skill.name}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: colors.faint,
+                fontSize: 11,
+                lineHeight: 16,
+                fontFamily: fonts.sans,
+              }}
+            >
+              {skill.purpose}
+            </Text>
+          </View>
+          <ChevronRight size={16} strokeWidth={1.6} color={colors.faint} />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 export function CapabilityHubScreen({
   mode = "page",
   onOpenChat,
@@ -865,7 +1070,7 @@ export function CapabilityHubScreen({
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const { navigate, workspace, api, refresh, notify, open, prefillPrompt } = useWorkspace();
-  const { agents: agentList, setSkillInstalled } = useAgentSpace();
+  const { agents: agentList, setSkillInstalled, saveSkill, deleteSkill } = useAgentSpace();
   const [category, setCategory] = useState<CategoryId>("all");
   const [typeFilter, setTypeFilter] = useState<CapabilityType>("plugins");
   const [query, setQuery] = useState("");
@@ -875,6 +1080,10 @@ export function CapabilityHubScreen({
   const [selectedSkillId, setSelectedSkillId] = useState<string>();
   /** 详情弹窗中正在查看的「我的技能」条目。 */
   const [selectedMySkill, setSelectedMySkill] = useState<MySkillEntry>();
+  /** 「我的技能」里正在创建新技能。 */
+  const [creatingSkill, setCreatingSkill] = useState(false);
+  /** 技能 tab 的二级视角：「技能市场」技能目录 / 「我的技能」。 */
+  const [skillTab, setSkillTab] = useState<"all" | "mine">("all");
 
   const desktop = width >= breakpoints.desktop;
   const railWidth = desktop ? 232 : 0;
@@ -926,16 +1135,21 @@ export function CapabilityHubScreen({
     ? skillCatalog.find((skill) => skill.id === selectedSkillId)
     : undefined;
   /**
-   * 我的技能：汇总所有 Agent 下用户自建的技能，卡片标注来源 Agent。
-   * 与市场里的系统技能区分开，仅展示「用户自己创建的技能」。
+   * 我的技能：汇总所有 Agent 下用户自建的技能。
+   *
+   * 技能不以 Agent 为类别——同内容的技能（含复制到多个 Agent 的副本）只保留一条，
+   * 与市场里的系统技能区分开。
    */
-  const mySkills: MySkillEntry[] = agentList.flatMap((agent) =>
-    agent.customSkills.map((skill) => ({
-      skill,
-      agentId: agent.id,
-      agentName: agent.name,
-    })),
-  );
+  const mySkills = collectSharedSkills(agentList);
+  /** 自建技能可添加到的其它 Agent（排除技能来源 Agent）。 */
+  const mySkillTargets = selectedMySkill
+    ? skillTargetAgents(agentList, selectedMySkill.agentId)
+    : [];
+  const mySkillAddedAgentIds = selectedMySkill
+    ? mySkillTargets
+        .filter((agent) => findSkillCopy(agent, selectedMySkill.skill))
+        .map((agent) => agent.id)
+    : [];
 
   async function openGoogleConnector(id: "gmail" | "calendar") {
     if (googleConnectingId) return;
@@ -971,6 +1185,21 @@ export function CapabilityHubScreen({
     prefillPrompt("", undefined, [skill.id]);
     setSelectedSkillId(undefined);
     notify(t("agent.skillAddedToChat", { title }));
+  }
+
+  /**
+   * 自建技能的「添加到智能体」：把技能复制到目标 Agent，已有副本则移除。
+   * 判定与切换逻辑与 Agent 详情页共用 `skill-sharing`。
+   */
+  function toggleMySkillInAgent(agent: AgentDefinition) {
+    if (!selectedMySkill) return;
+    const action = toggleSkillShare({ saveSkill, deleteSkill }, agent, selectedMySkill.skill);
+    notify(
+      t(action === "added" ? "agent.skillInstalledToast" : "agent.skillUninstalledToast", {
+        title: selectedMySkill.skill.name,
+        agent: agent.name,
+      }),
+    );
   }
 
   /** 安装面板按智能体逐一开关，已安装的再次点击即移除。 */
@@ -1240,168 +1469,116 @@ export function CapabilityHubScreen({
       ) : (
         <View>
           <View style={{ gap: 14 }}>
-            {!useCategoryRail && searchField}
-
-            <View style={{ flexDirection: useCategoryRail ? "row" : "column", gap: 20 }}>
-              {useCategoryRail && (
-                <View style={{ width: 200, gap: 10 }}>
-                  {searchField}
-                  <CategoryRail
-                    category={category}
-                    counts={counts}
-                    onChange={setCategory}
-                    options={categoryOptions}
-                  />
+            {/* 技能 tab 的二级标签页：技能市场 / 我的技能，切换时整块内容替换。 */}
+            {typeFilter === "skills" && (
+              <HubTabBar
+                tabs={[
+                  { id: "all", label: t("agent.skillMarketAll") },
+                  { id: "mine", label: t("agent.mySkills") },
+                ]}
+                active={skillTab}
+                onChange={setSkillTab}
+              />
+            )}
+            {typeFilter === "skills" && skillTab === "mine" ? (
+              <View style={{ gap: 12 }}>
+                <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+                  <Button small icon={Plus} onPress={() => setCreatingSkill(true)}>
+                    {t("agentSpace.createSkill")}
+                  </Button>
                 </View>
-              )}
-              {!useCategoryRail && (
-                <CategoryRail
-                  category={category}
-                  counts={counts}
-                  onChange={setCategory}
-                  options={categoryOptions}
-                  horizontal
-                />
-              )}
-
-              <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
-                {/* 我的技能：用户自建的技能汇总板块，仅技能 tab 展示，点击卡片查看详情。 */}
-                {typeFilter === "skills" && mySkills.length > 0 && (
-                  <View style={{ gap: 10 }}>
-                    <SectionHeading title={t("agent.mySkills")} />
-                    <View style={{ gap: 8 }}>
-                      {mySkills.map(({ skill, agentId, agentName }) => (
-                        <Pressable
-                          key={`${agentId}:${skill.id}`}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${t("agent.mySkills")} · ${skill.name}`}
-                          onPress={() => setSelectedMySkill({ skill, agentId, agentName })}
-                          style={({ pressed }) => ({
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 10,
-                            paddingVertical: 11,
-                            paddingHorizontal: 12,
-                            borderRadius: radius.card,
-                            borderWidth: 1,
-                            borderColor: colors.line,
-                            backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
-                          })}
-                        >
-                          <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                            <Text
-                              numberOfLines={1}
-                              style={{
-                                color: colors.text,
-                                fontSize: 13,
-                                lineHeight: 18,
-                                fontWeight: "600",
-                                fontFamily: fonts.sans,
-                              }}
-                            >
-                              {skill.name}
-                            </Text>
-                            <Text
-                              numberOfLines={1}
-                              style={{
-                                color: colors.faint,
-                                fontSize: 11,
-                                lineHeight: 16,
-                                fontFamily: fonts.sans,
-                              }}
-                            >
-                              {skill.purpose}
-                            </Text>
-                          </View>
-                          <View
-                            style={{
-                              maxWidth: 120,
-                              paddingHorizontal: 8,
-                              paddingVertical: 3,
-                              borderRadius: radius.badge,
-                              backgroundColor: colors.surface,
-                            }}
-                          >
-                            <Text
-                              numberOfLines={1}
-                              style={{
-                                color: colors.muted,
-                                fontSize: 11,
-                                lineHeight: 16,
-                                fontFamily: fonts.sans,
-                              }}
-                            >
-                              {agentName}
-                            </Text>
-                          </View>
-                          <ChevronRight size={16} strokeWidth={1.6} color={colors.faint} />
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                <View style={[s.between, { minHeight: 21 }]}>
-                  <Text
-                    style={{
-                      color: colors.text,
-                      fontSize: 14,
-                      lineHeight: 20,
-                      fontWeight: "500",
-                      fontFamily: fonts.sans,
-                    }}
-                  >
-                    {t(activeCategoryLabel)}
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.faint,
-                      fontSize: 11,
-                      lineHeight: 16,
-                      fontFamily: fonts.sans,
-                    }}
-                  >
-                    {t(HUB_COUNT_LABELS[typeFilter], { count: visibleItems.length })}
-                  </Text>
-                </View>
-
-                {visibleRows.length ? (
-                  <View style={{ gap: 12 }}>
-                    {visibleRows.map((row) => (
-                      <View
-                        key={row[0].id}
-                        style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
-                      >
-                        {row.map((item) => (
-                          <CapabilityCard key={item.id} item={item} />
-                        ))}
-                        {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
-                          <View key={key} style={{ flex: 1 }} />
-                        ))}
-                      </View>
-                    ))}
-                  </View>
+                {mySkills.length ? (
+                  <MySkillsList entries={mySkills} onSelect={setSelectedMySkill} />
                 ) : (
-                  <View
-                    style={{
-                      minHeight: 230,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderWidth: 1,
-                      borderColor: colors.line,
-                      borderRadius: radius.card,
-                      backgroundColor: colors.paper,
-                    }}
-                  >
+                  <View style={EMPTY_STATE_BOX}>
                     <Empty
-                      icon={Search}
-                      title={t(HUB_EMPTY_TITLE_LABELS[typeFilter])}
-                      detail={t("agent.hubNoMatchDetail")}
+                      icon={Sparkles}
+                      title={t("agent.mySkills")}
+                      detail={t("agent.mySkillsEmpty")}
                     />
                   </View>
                 )}
               </View>
-            </View>
+            ) : (
+              <>
+                {!useCategoryRail && searchField}
+
+                <View style={{ flexDirection: useCategoryRail ? "row" : "column", gap: 20 }}>
+                  {useCategoryRail && (
+                    <View style={{ width: 200, gap: 10 }}>
+                      {searchField}
+                      <CategoryRail
+                        category={category}
+                        counts={counts}
+                        onChange={setCategory}
+                        options={categoryOptions}
+                      />
+                    </View>
+                  )}
+                  {!useCategoryRail && (
+                    <CategoryRail
+                      category={category}
+                      counts={counts}
+                      onChange={setCategory}
+                      options={categoryOptions}
+                      horizontal
+                    />
+                  )}
+
+                  <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
+                    <View style={[s.between, { minHeight: 21 }]}>
+                      <Text
+                        style={{
+                          color: colors.text,
+                          fontSize: 14,
+                          lineHeight: 20,
+                          fontWeight: "500",
+                          fontFamily: fonts.sans,
+                        }}
+                      >
+                        {t(activeCategoryLabel)}
+                      </Text>
+                      <Text
+                        style={{
+                          color: colors.faint,
+                          fontSize: 11,
+                          lineHeight: 16,
+                          fontFamily: fonts.sans,
+                        }}
+                      >
+                        {t(HUB_COUNT_LABELS[typeFilter], { count: visibleItems.length })}
+                      </Text>
+                    </View>
+
+                    {visibleRows.length ? (
+                      <View style={{ gap: 12 }}>
+                        {visibleRows.map((row) => (
+                          <View
+                            key={row[0].id}
+                            style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
+                          >
+                            {row.map((item) => (
+                              <CapabilityCard key={item.id} item={item} />
+                            ))}
+                            {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
+                              <View key={key} style={{ flex: 1 }} />
+                            ))}
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <View style={EMPTY_STATE_BOX}>
+                        <Empty
+                          icon={Search}
+                          title={t(HUB_EMPTY_TITLE_LABELS[typeFilter])}
+                          detail={t("agent.hubNoMatchDetail")}
+                        />
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         </View>
       )}
@@ -1419,11 +1596,19 @@ export function CapabilityHubScreen({
         </Sheet>
       )}
 
+      {creatingSkill && (
+        <Sheet title={t("agentSpace.createSkill")} onClose={() => setCreatingSkill(false)} narrow>
+          <SkillEditor onClose={() => setCreatingSkill(false)} />
+        </Sheet>
+      )}
+
       {selectedMySkill && (
         <MySkillDetailSheet
           title={selectedMySkill.skill.name}
-          subtitle={t("agent.mySkillSource", { agent: selectedMySkill.agentName })}
           skill={selectedMySkill.skill}
+          agents={mySkillTargets}
+          addedAgentIds={mySkillAddedAgentIds}
+          onToggleAdd={toggleMySkillInAgent}
           onClose={() => setSelectedMySkill(undefined)}
         />
       )}

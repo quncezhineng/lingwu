@@ -503,6 +503,7 @@ const agent = {
   "agent.hubSearchConnectors": "Search connectors",
   "agent.hubAllCategories": "All categories",
   "agent.hubCategoryAll": "All",
+  "agent.skillMarketAll": "Skill market",
   "agent.hubCategoryResearch": "Research",
   "agent.hubCategoryAnalysis": "Analysis",
   "agent.hubCategoryWriting": "Writing",
@@ -555,7 +556,8 @@ const agent = {
     "Package recurring research workflows into repeatable, one-click entry points.",
   "agent.skillsHeading": "Skills",
   "agent.mySkills": "My skills",
-  "agent.mySkillSource": "Created in {agent}",
+  "agent.mySkillsEmpty":
+    "No skills yet. Tap “Create skill” above to write one, or add one from the skill marketplace.",
   "agent.skillsDetail": "Enable reusable specialist actions for research and investment work.",
   "agent.connectorsHeading": "Connectors",
   "agent.connectorsDetail": "Bring models, mail, calendars and browsing into your workspace.",
@@ -603,6 +605,7 @@ const agent = {
     "Agents that already have this skill are marked as installed. Tap an Agent to install or remove it.",
   "agent.skillInstallInstalled": "Installed",
   "agent.skillInstallSummary": "{count} Agents installed",
+  "agent.skillShareNoTargets": "No other Agents yet. Create one first, then add this skill to it.",
   "agent.skillInstalledToast": "“{title}” installed to {agent}.",
   "agent.skillUninstalledToast": "“{title}” removed from {agent}.",
   "agent.onYourComputer": "On your computer",
@@ -757,7 +760,6 @@ const agent = {
     "No resources yet. Files and analysis produced by this Bot's tasks will appear here.",
   "agentSpace.sharedGoalsMemory":
     "Goals and memories are maintained for your account and shared by your Bots.",
-  "agentSpace.mySkills": "My skills",
   "agentSpace.createSkill": "Create skill",
   "agentSpace.addSkill": "Add skill",
   "agentSpace.skillMenuLabel": "Create or add a skill",
@@ -771,6 +773,10 @@ const agent = {
   "agentSpace.skillName": "Skill name",
   "agentSpace.skillPurpose": "One-line purpose",
   "agentSpace.skillInstructions": "Work instructions",
+  "agentSpace.skillInstructionsPreview": "Preview",
+  "agentSpace.skillInstructionsEdit": "Edit",
+  "agentSpace.skillInstructionsPreviewEmpty":
+    "Nothing to preview yet. Switch back to edit and write some Markdown.",
   "agentSpace.skillOutput": "Output format",
   "agentSpace.skillSampleName": "Cash flow quality check",
   "agentSpace.skillSamplePurpose":

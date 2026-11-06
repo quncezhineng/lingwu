@@ -5,6 +5,138 @@
 
 ## 变更记录
 
+### 2026-11-07 · 「我的技能」不再按智能体分类，并支持直接创建技能
+
+**背景**
+
+「我的技能」列表每行右侧带来源 Agent 标签，同一份技能被复制到多个 Agent 后会出现多行；用户认为不同智能体里创建的技能本质上是同一份，不应该以 Agent 作为分类维度。同时希望在这个页面就能创建技能，不必跳到 Agent 详情。
+
+**处理**
+
+- [skill-sharing.ts](../apps/mobile/src/skill-sharing.ts#L39-L70)：新增 `SharedSkillEntry` 与 `collectSharedSkills`，跨 Agent 汇总自建技能时按内容指纹去重，同内容只保留最近更新的一条（副本 id 不同，不能按 id 判重）。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L992-L1050)：`MySkillsList` 行内删除来源 Agent 标签，只保留技能名 + 用途 + 箭头；`MySkillEntry` 改为复用 `SharedSkillEntry`。
+- 详情弹层的副标题「创建于 {agent}」一并去掉：去重后保留的「来源 Agent」只是最近更新的那份副本，标注出来反而是误导；`agent.mySkillSource` 键随之清理。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L1483-L1501)：「我的技能」标签页顶部新增右对齐的「创建技能」按钮，点击在 Sheet 里打开技能表单；列表为空时按钮同样可用，空状态文案同步更新。
+- 新增 [skill-editor.tsx](../apps/mobile/src/skill-editor.tsx)：把原来只存在于 Agent 技能页的创建 / 编辑表单（含「工作提示词」Markdown 预览）抽成共享组件，Agent 技能页与「我的技能」共用同一份表单；技能写入当前选中的 Agent。
+- [i18n] `agent.mySkillsEmpty` 文案更新为「点右上角『创建技能』写一个」，zh-Hans 与 en 同步。
+- [skill-sharing.test.ts](../apps/mobile/test/skill-sharing.test.ts)：新增跨 Agent 去重用例（同内容保留最近更新、不同内容各自成行）。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：无新增类型错误（`connectors.tsx` 的既有错误与本次无关）。
+- `pnpm exec biome check`：改动文件通过。
+- `tsx --test skill-sharing.test.ts i18n.test.ts agent-space.test.ts`：38 项全部通过。
+
+### 2026-11-07 · 自建技能详情新增「添加到智能体」
+
+**背景**
+
+用户自己创建的技能此前只能只读查看；想把同一份技能复用到其他智能体时，只能进入那个 Agent 从头再写一遍。要求在自建技能详情页右上角加一个「添加到智能体」，功能与技能市场里同名按钮一致（点开后逐一选择智能体）。
+
+**处理**
+
+- [skill-sharing.ts](../apps/mobile/src/skill-sharing.ts)：新增共享模块。`findSkillCopy` 按「名称 + 用途 + 工作提示词 + 输出格式」的内容指纹判定目标 Agent 是否已持有该技能（复制过去的是新副本、id 不同，不能按 id 判重）；`skillTargetAgents` 排除技能来源 Agent；`toggleSkillShare` 统一「没有副本就复制、已有副本就删除」。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L554-L600)：把原先内联在 `SkillDetailSheet` 里的智能体选择面板抽成 `AgentPickerPanel`，两个弹层共用同一版式（行进式列表、已添加徽标、底部计数）。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L726-L801)：`MySkillDetailSheet` 新增 `agents` / `addedAgentIds` / `onToggleAdd`；传入后在右上角渲染按钮（复用市场详情页同一按钮 `agent.skillInstallAction`），点开切换为智能体选择面板。
+- 两处调用都接上：「应用与能力 → 我的技能」与 Agent 详情 → 技能 → 自建技能详情；切换后弹 Toast（复用 `skillInstalledToast` / `skillUninstalledToast`）。
+- [i18n] 新增 `agent.skillShareNoTargets`（只有一个 Agent、没有可添加目标时的提示），zh-Hans 与 en 同步。
+- [skill-sharing.test.ts](../apps/mobile/test/skill-sharing.test.ts)：新增 4 项单元测试，覆盖内容判重、目标筛选与添加 / 移除。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：无新增类型错误（`connectors.tsx` 的既有错误与本次无关）。
+- `pnpm exec biome check`：改动文件通过。
+- `tsx --test apps/mobile/test/skill-sharing.test.ts apps/mobile/test/i18n.test.ts`：20 项全部通过。
+
+### 2026-11-07 · 「应用与能力 → 技能」二级标签「全部」改为「技能市场」
+
+**背景**
+
+用户选中「应用与能力 → 技能」页面顶部的「全部」标签（蓝色激活态），希望改名为「技能市场」，与「我的技能」形成「市场 / 个人」两个视角的对照。
+
+**处理**
+
+- [i18n] 新增 `agent.skillMarketAll`（zh-Hans：技能市场 / en：Skill market）。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L1400-L1408)：技能 tab 二级标签页的「全部」标签改用 `agent.skillMarketAll`；插件 / 连接器等类型分类筛选里的「全部」（`agent.hubCategoryAll`）保持不变。
+- 同步更新 `HubTabBar` 组件注释（「全部 / 我的技能」→「技能市场 / 我的技能」）。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：无类型错误（`connectors.tsx` 的既有错误与本次改动无关）。
+
+### 2026-11-06 · 「我的技能」详情弹窗工作提示词支持 Markdown 渲染
+
+**背景**
+
+「应用与能力 → 我的技能」卡片详情弹窗中的「工作提示词」以纯文本展示 Markdown 源码（标题、列表、加粗都显示为 `#`、`-`、`**`），可读性差。用户在浏览器中选中这些源码，要求按 Markdown 语法渲染。
+
+**处理**
+
+- [instructions-markdown.ts](../apps/mobile/src/instructions-markdown.ts)：新增共享样式模块，将技能编辑器里已调好的 `instructionsTextStyle` / `instructionsMarkdownStyle`（15 号正文字、按层级缩放的标题、引用/代码/分割线等样式）从 skills.tsx 迁出，供编辑器预览与详情弹窗共用，保证同一份指令各处排版一致。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L719-L724)：`MySkillDetailSheet` 的「工作提示词」板块改用 `<Markdown markdownit={assistantMarkdown} style={instructionsMarkdownStyle}>` 渲染，替代原来的 `<Text>` 纯文本。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L8-L16)：移除本地样式定义与不再使用的 `Platform` / `TextStyle` / `MarkdownStyles` / `fonts` 导入，改为引用共享样式，行为不变。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`instructions-markdown.ts` / `capability-hub.tsx` / `skills.tsx` 无类型错误（`connectors.tsx` 的既有错误与本次改动无关）。
+
+### 2026-11-07 · 「应用与能力 → 技能」恢复「全部 / 我的技能」双标签页
+
+**背景**
+
+上一版把「我的技能」当成独立板块叠在技能目录上方：一屏里两个列表互相挤压，浏览技能目录时视线要跨过整块自建技能。用户要求恢复到之前的双标签页设计——「全部」和「我的技能」两个横排标签页切换内容。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L863-L923)：新增 `HubTabBar`，横排标签页（40 高、1px 下分隔线、选中态主色文字 + 2px 下划线），带 `accessibilityRole="tab"` / `tablist` 与 `selected` 状态。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L925-L1004)：抽出 `MySkillsList`，复用原「我的技能」卡片样式（名称 + 用途 + 来源 Agent 标签 + 箭头），点击仍打开只读详情弹窗。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L1394-L1417)：技能 tab 顶部渲染标签页；切到「我的技能」时整块内容替换为自建技能列表，目录侧栏与搜索框隐藏；没有自建技能时给空状态提示。
+- 目录视图（「全部」标签页）删除原来的「我的技能」板块，侧栏分类 + 技能栅格回到原样。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L113)：抽取 `EMPTY_STATE_BOX` 供目录无匹配与「我的技能」空态共用；不再使用的 `SectionHeading` 从 `./ui` 的 import 中移除。
+- [i18n] 新增 `agent.mySkillsEmpty`（zh-Hans / en）；标签文案复用 `agent.hubCategoryAll`（全部 / All）与 `agent.mySkills`（我的技能 / My skills）。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`capability-hub.tsx` 无类型错误（`connectors.tsx` 的既有错误与本次无关）。
+- `pnpm exec biome check`：改动文件通过。
+- `tsx --test apps/mobile/test/i18n.test.ts`：16 项全部通过。
+
+### 2026-11-06 · 移除技能页「我的技能」标题
+
+**背景**
+
+用户选中技能页顶部的「我的技能」大标题，认为页面内容已自明（上方就是技能卡片列表），标题冗余，要求删除。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L320-L323)：删除标题行 `<Text>{t("agentSpace.mySkills")}</Text>`，顶部「+」入口所在容器由 `s.between` 改为 `alignItems: flex-end`，保持按钮固定在右上角。
+- [i18n] 清理无引用的 `agentSpace.mySkills` 键（zh-Hans 与 en 同步删除）。「应用与能力」页「我的技能」板块使用的 `agent.mySkills` 不受影响、继续保留。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`skills.tsx` 无类型错误。
+
+### 2026-11-07 · Agent 详情「工作提示词」支持 Markdown 预览
+
+**背景**
+
+技能编辑表单里的「工作提示词」是纯文本输入框：用户用 Markdown 写的标题、列表、加粗只能看到源码，无法确认渲染后的排版，写坏了也没法自查。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L66-L135)：新增 `InstructionsField`，字段标签右侧提供「预览 / 编辑」切换；预览态用 `react-native-markdown-renderer` 配共享 `assistantMarkdown` 实例渲染，容器复用 `s.input` 的描边与内边距，与输入框同高（120）不跳版，内容为空时给占位提示。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L26-L64)：`instructionsMarkdownStyle` 对齐输入框的 15 号字，标题逐级缩小，行内代码 / 引用 / 表格沿用正文配色。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L159)：工作提示词改用 `InstructionsField`，其余字段仍走 `Field`。
+- [ui.tsx](../apps/mobile/src/ui.tsx#L80)：抽出 `s.fieldLabel`（12/18 w500），供 `Field` 与自定义字段共用，`Field` 的视觉输出不变。
+- [i18n] 新增 `agentSpace.skillInstructionsPreview`（预览 / Preview）、`agentSpace.skillInstructionsEdit`（编辑 / Edit）、`agentSpace.skillInstructionsPreviewEmpty`，zh-Hans 与 en 同步。
+- 切换只影响渲染分支，`instructions` 草稿状态始终保留，预览不会丢内容。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`skills.tsx` / `ui.tsx` 无类型错误（`connectors.tsx` 的既有错误与本次改动无关）。
+- `pnpm exec biome check`：4 个改动文件通过。
+- `tsx --test apps/mobile/test/i18n.test.ts`：16 项全部通过。
+
 ### 2026-11-06 · 移除技能详情弹窗中的使用提示文案
 
 **背景**
