@@ -98,6 +98,8 @@ const screens = {
   "screens.libraryNotes": "我的笔记",
   "screens.libraryInsightsEmptyTitle": "还没有沉淀下来的领悟卡",
   "screens.libraryInsightsEmptyDetail": "完成的研报、对比与市场简报会自动归档到这里。",
+  "screens.libraryInsightsHint": "从已完成的研究中沉淀的结论，点开可追溯依据与来源。",
+  "screens.libraryItemCount": "{count} 条",
   "screens.filesImportShort": "上传",
   "screens.filesSourceUpload": "我的上传",
   "screens.filesSourceAnalysis": "分析生成",

@@ -142,21 +142,21 @@ export const space = {
 } as const;
 
 /**
- * 圆角八档 + 胶囊。
+ * 圆角六档 + 胶囊。
  *
- * 取值与用途来自 Demo CSS 实测（Delta §4.2），对应 lingwu 现状归并：
- * 3/2 → badge，6 → micro，8 → control，12 → field 或 panel，18 → composer，
- * 22 → sheet，其余 19/20/21/30 见各页面收敛记录。
+ * 收敛为「小控件 / 中容器 / 大浮层」三级：8 用于按钮与输入框，12 用于卡片与面板，
+ * 16 用于输入区与弹层。层级越少，界面越安静；同一层级内的元素必须取同一个值。
+ * `micro` / `field` / `panel` 保留为语义别名，避免既有引用散落裸值。
  */
 export const radius = {
-  badge: 4,
-  micro: 5,
-  control: 7,
-  field: 9,
-  card: 10,
-  panel: 11,
-  composer: 14,
-  sheet: 17,
+  badge: 6,
+  micro: 6,
+  control: 8,
+  field: 8,
+  card: 12,
+  panel: 12,
+  composer: 16,
+  sheet: 16,
   full: 999,
 } as const;
 
@@ -172,7 +172,7 @@ export const typography = {
     fontSize: 10,
     lineHeight: 14,
     fontWeight: "600",
-    letterSpacing: 1.4,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
     fontFamily: fonts.sans,
   },
@@ -216,12 +216,12 @@ export const typography = {
     letterSpacing: 0,
     fontFamily: fonts.sans,
   },
-  /** 26/37：页面 H1，统一字体 / w500 / ls 0.5。 */
+  /** 22/32：页面 H1 与浮层标题，统一字体 / w500 / ls 0.3。 */
   h1: {
-    fontSize: 26,
-    lineHeight: 37,
+    fontSize: 22,
+    lineHeight: 32,
     fontWeight: "500",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
     fontFamily: fonts.sans,
   },
   /** 20/26：度量数字。 */
@@ -240,20 +240,20 @@ export const typography = {
     letterSpacing: 0,
     fontFamily: fonts.number,
   },
-  /** 31/48：工作台问候（serif，移动 25/40 见 displayCompact）。 */
+  /** 28/40：工作台问候（serif，移动 22/34 见 displayCompact）。 */
   display: {
-    fontSize: 31,
-    lineHeight: 48,
-    fontWeight: "500",
-    letterSpacing: 0.5,
-    fontFamily: fonts.serif,
-  },
-  /** 25/40：移动端问候。 */
-  displayCompact: {
-    fontSize: 25,
+    fontSize: 28,
     lineHeight: 40,
     fontWeight: "500",
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+    fontFamily: fonts.serif,
+  },
+  /** 22/34：移动端问候。 */
+  displayCompact: {
+    fontSize: 22,
+    lineHeight: 34,
+    fontWeight: "500",
+    letterSpacing: 0.4,
     fontFamily: fonts.serif,
   },
   /** 17/29：洞察卡标题（serif 特例，Delta §5.1：17/1.7）。 */
@@ -272,41 +272,42 @@ export const type = typography;
 /**
  * 阴影三档。
  *
- * Demo 的卡面阴影透明度只有 0.016–0.05；lingwu 卡面统一「1px 描边、不加阴影」，
- * 仅 composer 与模态保留阴影。
+ * 层级仍由 1px 描边承担，阴影只表示「浮在画布之上」这一件事：
+ * 卡面几乎不投影，输入区与浮层用一层极淡的晕，模态用一层扩散阴影。
+ * 同一元素只允许叠加一档阴影，避免多层阴影糊成灰边。
  */
 export const shadow = {
   /** 卡面（默认不用；需要浮起时用这一档）。 */
   card: {
     shadowColor: "#5A5A5A",
-    shadowOpacity: 0.04,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   /** 输入 composer / 浮层面板。 */
   composer: {
     shadowColor: "#404040",
-    shadowOpacity: 0.05,
-    shadowRadius: 25,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   /** 侧向抽屉（对话会话栏）。 */
   drawer: {
     shadowColor: "#404040",
     shadowOpacity: 0.05,
-    shadowRadius: 14,
+    shadowRadius: 12,
     shadowOffset: { width: -4, height: 0 },
     elevation: 8,
   },
   /** 模态面板。 */
   sheet: {
     shadowColor: "#2D2D2D",
-    shadowOpacity: 0.14,
-    shadowRadius: 38,
-    shadowOffset: { width: 0, height: 18 },
-    elevation: 24,
+    shadowOpacity: 0.1,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 20,
   },
 } as const satisfies Record<string, ViewStyle>;
 

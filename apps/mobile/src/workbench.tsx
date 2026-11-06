@@ -325,11 +325,11 @@ function TaskRow({ task }: { task: AgentTask }) {
       accessibilityLabel={t("workbench.openTask", { title: task.title })}
       onPress={() => open({ type: "task", taskId: task.id })}
       style={({ pressed }) => ({
-        minHeight: 72,
+        minHeight: 64,
         flexDirection: "row",
         alignItems: "center",
-        gap: 12,
-        paddingVertical: 12,
+        gap: 10,
+        paddingVertical: 10,
         borderTopWidth: 1,
         borderTopColor: colors.line,
         backgroundColor: pressed ? colors.overlay1 : "transparent",
@@ -337,9 +337,9 @@ function TaskRow({ task }: { task: AgentTask }) {
     >
       <View
         style={{
-          width: 36,
-          height: 39,
-          borderRadius: radius.field,
+          width: 34,
+          height: 34,
+          borderRadius: radius.control,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: colors.surface,
@@ -522,23 +522,24 @@ export function WorkbenchScreen() {
                 accessibilityLabel={t("workbench.briefing")}
                 onPress={() => setBriefingOpen(true)}
                 style={({ pressed }) => ({
-                  width: narrow ? "100%" : 180,
-                  minHeight: 62,
+                  width: narrow ? "100%" : 176,
+                  minHeight: 56,
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 11,
-                  paddingHorizontal: 13,
+                  gap: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
                   borderWidth: 1,
                   borderColor: colors.line,
-                  borderRadius: radius.field,
+                  borderRadius: radius.card,
                   backgroundColor: pressed ? colors.surface : colors.paper,
                 })}
               >
                 <View
                   style={{
-                    width: 31,
-                    height: 31,
-                    borderRadius: radius.full,
+                    width: 28,
+                    height: 28,
+                    borderRadius: radius.control,
                     alignItems: "center",
                     justifyContent: "center",
                     backgroundColor: colors.sky,

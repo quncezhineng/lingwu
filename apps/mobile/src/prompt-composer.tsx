@@ -91,22 +91,22 @@ export function PromptComposer({
       style={({ pressed }) => ({
         position: "absolute",
         // Keep the shortcut fully above the composer instead of covering its input area.
-        top: -48,
+        top: -44,
         right: 13,
         zIndex: 20,
-        width: 38,
-        height: 38,
-        borderRadius: radius.full,
+        width: 34,
+        height: 34,
+        borderRadius: radius.control,
         alignItems: "center",
         justifyContent: "center",
         borderWidth: 1,
-        borderColor: pressed ? colors.primary : colors.line,
+        borderColor: pressed ? colors.primary : colors.lineSoft,
         backgroundColor: pressed ? colors.sky : colors.paper,
         transform: [{ scale: pressed ? 0.96 : 1 }],
         ...shadow.card,
       })}
     >
-      <cornerAction.icon size={18} strokeWidth={1.8} color={colors.primaryStrong} />
+      <cornerAction.icon size={17} strokeWidth={1.8} color={colors.primaryStrong} />
     </Pressable>
   ) : null;
 
@@ -175,8 +175,8 @@ export function PromptComposer({
       hitSlop={4}
       onPress={action}
       style={({ pressed }) => ({
-        width: dense ? 36 : 38,
-        height: dense ? 36 : 38,
+        width: dense ? 34 : 36,
+        height: dense ? 34 : 36,
         borderRadius: radius.full,
         alignItems: "center",
         justifyContent: "center",
@@ -205,11 +205,11 @@ export function PromptComposer({
           {
             position: "relative",
             backgroundColor: colors.paper,
-            borderRadius: 29,
+            borderRadius: radius.composer,
             borderWidth: 1,
-            borderColor: focused ? colors.primary : colors.lineSoft,
-            padding: 8,
-            minHeight: 58,
+            borderColor: focused ? colors.primary : colors.line,
+            padding: 6,
+            minHeight: 54,
             ...shadow.composer,
           },
           style,
@@ -217,7 +217,7 @@ export function PromptComposer({
       >
         {cornerButton}
         {attachments}
-        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
           <View style={{ position: "relative", zIndex: 10 }}>
             <Pressable
               accessibilityRole="button"
@@ -225,15 +225,15 @@ export function PromptComposer({
               accessibilityState={{ expanded: toolsOpen }}
               onPress={() => setToolsOpen(!toolsOpen)}
               style={({ pressed }) => ({
-                width: 38,
-                height: 38,
-                borderRadius: radius.full,
+                width: 36,
+                height: 36,
+                borderRadius: radius.control,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: toolsOpen || pressed ? colors.sky : colors.surface,
+                backgroundColor: toolsOpen || pressed ? colors.overlay2 : "transparent",
               })}
             >
-              <Plus size={20} color={colors.muted} />
+              <Plus size={19} color={colors.muted} />
             </Pressable>
             {toolsOpen && (
               <View
@@ -242,11 +242,11 @@ export function PromptComposer({
                   bottom: "100%",
                   left: 0,
                   minWidth: 200,
-                  marginBottom: 12,
-                  padding: 6,
+                  marginBottom: 10,
+                  padding: 4,
                   borderWidth: 1,
                   borderColor: colors.line,
-                  borderRadius: 16,
+                  borderRadius: radius.card,
                   backgroundColor: colors.paper,
                   ...shadow.card,
                 }}
@@ -262,14 +262,15 @@ export function PromptComposer({
                     style={({ pressed }) => ({
                       flexDirection: "row",
                       alignItems: "center",
-                      gap: 10,
-                      minHeight: 42,
-                      padding: 10,
-                      borderRadius: 10,
-                      backgroundColor: pressed ? colors.surface : "transparent",
+                      gap: 8,
+                      minHeight: 36,
+                      paddingHorizontal: 8,
+                      paddingVertical: 6,
+                      borderRadius: radius.badge,
+                      backgroundColor: pressed ? colors.overlay1 : "transparent",
                     })}
                   >
-                    <Icon size={17} color={colors.muted} />
+                    <Icon size={16} color={colors.muted} />
                     <Text style={{ fontSize: 12, color: colors.text }}>{label}</Text>
                   </Pressable>
                 ))}
@@ -288,10 +289,10 @@ export function PromptComposer({
         {
           position: "relative",
           backgroundColor: colors.paper,
-          borderRadius: dense ? radius.panel : radius.composer,
+          borderRadius: radius.composer,
           borderWidth: 1,
-          borderColor: focused ? colors.primary : colors.lineStrong,
-          padding: dense ? 8 : 10,
+          borderColor: focused ? colors.primary : colors.line,
+          padding: dense ? 6 : 8,
           ...shadow.composer,
         },
         style,
@@ -302,14 +303,14 @@ export function PromptComposer({
       {input}
       <View
         style={{
-          minHeight: 36,
-          marginTop: 8,
+          minHeight: 32,
+          marginTop: 6,
           flexDirection: "row",
           alignItems: "center",
-          gap: 6,
+          gap: 4,
         }}
       >
-        <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 4 }}>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 2 }}>
           {tools.map(({ key, icon: Icon, label, onPress, active }) => (
             <Pressable
               key={key}
@@ -319,12 +320,12 @@ export function PromptComposer({
               hitSlop={6}
               onPress={onPress}
               style={({ pressed }) => ({
-                width: 34,
-                height: 34,
+                width: 32,
+                height: 32,
                 borderRadius: radius.control,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: active || pressed ? colors.overlay1 : colors.paper,
+                backgroundColor: active || pressed ? colors.overlay1 : "transparent",
               })}
             >
               <Icon

@@ -71,8 +71,8 @@ export interface WorkspaceContextValue {
   clearReminderIntent: () => void;
   notify: (message: string, action?: { label: string; onPress: () => void }) => void;
   ask: (prompt: string, attachmentIds?: readonly string[]) => void;
-  /** 只把内容填进输入框、不自动发送，由用户确认后再发送。 */
-  prefillPrompt: (text: string) => void;
+  /** 只把内容（与附件）填进输入框、不自动发送，由用户确认后再发送。 */
+  prefillPrompt: (text: string, attachmentIds?: readonly string[]) => void;
 }
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 export function useWorkspace() {

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -36,6 +37,8 @@ import { Details, SettingsScreen } from "./details";
 import { useTranslation } from "./i18n";
 import { LOCALE_LABELS } from "./i18n/types";
 import {
+  ArrowDown,
+  ArrowUp,
   Bell,
   Check,
   ChevronLeft,
@@ -44,10 +47,12 @@ import {
   Languages,
   Lightbulb,
   LogOut,
+  MoreHorizontal,
   PanelRight,
   Plus,
   Search,
   Settings2,
+  Trash2,
   X,
 } from "./icons";
 import { ModalOverlay } from "./modal-overlay";
@@ -74,48 +79,233 @@ import { useDesktopColumns } from "./use-desktop-columns";
 import { WatchlistHubScreen } from "./watchlist-hub";
 import { type ComposerPrompt, type Detail, useWorkspace } from "./workspace";
 
+/** 行尾「更多」按钮的锚点：用窗口坐标把菜单贴在按钮下方，滚出边界也能正常展示。 */
+type AgentMenuAnchor = {
+  agent: AgentDefinition;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** 菜单行：置顶 / 取消置顶、进入设置、删除。 */
+function AgentMenuRow({
+  icon: Icon,
+  label,
+  onPress,
+  danger = false,
+}: {
+  icon: typeof Settings2;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <HoverPressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed, hovered }) => ({
+        minHeight: 34,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingHorizontal: 9,
+        paddingVertical: 6,
+        borderRadius: radius.badge,
+        backgroundColor: pressed
+          ? danger
+            ? colors.errorSoft
+            : colors.overlay2
+          : hovered
+            ? danger
+              ? colors.errorSoft
+              : colors.overlay1
+            : "transparent",
+      })}
+    >
+      <Icon size={14} strokeWidth={1.7} color={danger ? colors.danger : colors.muted} />
+      <Text
+        numberOfLines={1}
+        style={{
+          flex: 1,
+          fontSize: 12,
+          fontWeight: "500",
+          color: danger ? colors.danger : colors.text,
+        }}
+      >
+        {label}
+      </Text>
+    </HoverPressable>
+  );
+}
+
+/**
+ * Agent 行的操作菜单。
+ *
+ * 用透明 Modal 承载：左侧栏是可滚动的，行内绝对定位的浮层会被裁掉；
+ * 也没有整屏遮罩，点空白处即关闭，接近桌面端的下拉菜单手感。
+ */
+function AgentMenu({
+  anchor,
+  onClose,
+  onSettings,
+  onTogglePin,
+  onDelete,
+}: {
+  anchor: AgentMenuAnchor;
+  onClose: () => void;
+  onSettings: () => void;
+  onTogglePin: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  const { width, height } = useWindowDimensions();
+  const menuWidth = Math.min(180, width - 24);
+  const rows = anchor.agent.system ? 1 : 3;
+  const menuHeight = 10 + rows * 34 + (anchor.agent.system ? 0 : 7);
+  // 默认贴按钮右下方展开；底部空间不够就翻到上方。
+  const left = Math.max(12, Math.min(anchor.x + anchor.width - menuWidth, width - menuWidth - 12));
+  const below = anchor.y + anchor.height + 6;
+  const top = below + menuHeight > height - 12 ? Math.max(12, anchor.y - menuHeight - 6) : below;
+  return (
+    <Modal transparent visible animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("ui.closeDetails")}
+          onPress={onClose}
+          style={{ flex: 1 }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            top,
+            left,
+            width: menuWidth,
+            padding: 4,
+            gap: 1,
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: radius.card,
+            backgroundColor: colors.paper,
+            ...shadow.sheet,
+          }}
+        >
+          {!anchor.agent.system && (
+            <AgentMenuRow
+              icon={anchor.agent.pinned ? ArrowDown : ArrowUp}
+              label={anchor.agent.pinned ? t("agentSpace.unpinAgent") : t("agentSpace.pinAgent")}
+              onPress={onTogglePin}
+            />
+          )}
+          <AgentMenuRow icon={Settings2} label={t("details.settingsTitle")} onPress={onSettings} />
+          {!anchor.agent.system && (
+            <>
+              <View style={{ height: 1, marginVertical: 3, backgroundColor: colors.line }} />
+              <AgentMenuRow
+                danger
+                icon={Trash2}
+                label={t("agentSpace.deleteAgent")}
+                onPress={onDelete}
+              />
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function AgentListItem({
   agent,
   active,
   onPress,
+  onOpenMenu,
 }: {
   agent: AgentDefinition;
   active: boolean;
   onPress: () => void;
+  onOpenMenu: (anchor: AgentMenuAnchor) => void;
 }) {
+  const { t } = useTranslation();
+  const [hovered, setHovered] = useState(false);
+  const moreRef = useRef<View>(null);
+  const openMenu = () => {
+    moreRef.current?.measureInWindow((x, y, width, height) => {
+      onOpenMenu({ agent, x, y, width, height });
+    });
+  };
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: 52,
-        paddingHorizontal: 11,
-        paddingVertical: 6,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: active ? colors.accentLine : "transparent",
-        backgroundColor: active ? colors.sky : pressed ? colors.overlay1 : "transparent",
+    <View
+      // 整行悬停底色：让「切换对话」与右侧「更多」读起来是同一行。
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      style={{
         flexDirection: "row",
         alignItems: "center",
-        gap: 11,
-      })}
+        borderRadius: radius.control,
+        backgroundColor: active ? colors.sky : hovered ? colors.overlay1 : "transparent",
+      }}
     >
-      <AgentOrb avatar={agent.avatar} size={30} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          numberOfLines={1}
-          style={{
-            fontSize: 13,
-            lineHeight: 17,
-            fontWeight: active ? "600" : "500",
-            color: active ? colors.primaryStrong : colors.text,
-          }}
-        >
-          {agent.name}
-        </Text>
-      </View>
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={agent.name}
+        accessibilityState={{ selected: active }}
+        onPress={onPress}
+        style={({ pressed }) => ({
+          flex: 1,
+          minWidth: 0,
+          minHeight: 44,
+          paddingLeft: 9,
+          paddingRight: 4,
+          paddingVertical: 5,
+          borderRadius: radius.control,
+          backgroundColor: pressed ? colors.overlay1 : "transparent",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+        })}
+      >
+        <AgentOrb avatar={agent.avatar} size={30} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 13,
+              lineHeight: 17,
+              fontWeight: active ? "600" : "500",
+              color: active ? colors.primaryStrong : colors.text,
+            }}
+          >
+            {agent.name}
+          </Text>
+        </View>
+      </Pressable>
+      <Pressable
+        ref={moreRef}
+        accessibilityRole="button"
+        accessibilityLabel={t("ui.moreActions")}
+        accessibilityHint={agent.name}
+        hitSlop={4}
+        onPress={openMenu}
+        style={({ pressed }) => ({
+          width: 26,
+          height: 26,
+          marginRight: 4,
+          borderRadius: radius.badge,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: pressed ? colors.overlay2 : "transparent",
+        })}
+      >
+        <MoreHorizontal
+          size={16}
+          strokeWidth={1.8}
+          color={active || hovered ? colors.muted : colors.faint}
+        />
+      </Pressable>
+    </View>
   );
 }
 
@@ -136,13 +326,13 @@ function AccountMenuRow({
       accessibilityLabel={title}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 44,
-        paddingHorizontal: 9,
-        paddingVertical: 8,
-        borderRadius: 10,
+        minHeight: 40,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: radius.control,
         flexDirection: "row",
         alignItems: "center",
-        gap: 11,
+        gap: 10,
         backgroundColor: pressed ? colors.overlay1 : "transparent",
       })}
     >
@@ -188,13 +378,13 @@ function LanguageMenuRow({ compact }: { compact: boolean }) {
         accessibilityState={{ expanded: open }}
         onPress={() => setOpen((value) => !value)}
         style={({ pressed }) => ({
-          minHeight: 44,
-          paddingHorizontal: 9,
-          paddingVertical: 8,
-          borderRadius: 10,
+          minHeight: 40,
+          paddingHorizontal: 8,
+          paddingVertical: 6,
+          borderRadius: radius.control,
           flexDirection: "row",
           alignItems: "center",
-          gap: 11,
+          gap: 10,
           backgroundColor: pressed ? colors.overlay1 : "transparent",
         })}
       >
@@ -228,14 +418,14 @@ function LanguageMenuRow({ compact }: { compact: boolean }) {
             // 抽屉里空间不足，改为覆盖在下方选项上。
             ...(compact ? { top: 44, left: 6 } : { top: 0, left: "100%" as const }),
             width: 176,
-            padding: 6,
-            gap: 2,
+            padding: 4,
+            gap: 1,
             zIndex: 30,
             borderWidth: 1,
             borderColor: colors.line,
-            borderRadius: 14,
+            borderRadius: radius.card,
             backgroundColor: colors.paper,
-            ...shadow.card,
+            ...shadow.sheet,
           }}
         >
           {locales.map((item) => {
@@ -252,13 +442,13 @@ function LanguageMenuRow({ compact }: { compact: boolean }) {
                   setOpen(false);
                 }}
                 style={({ pressed, hovered }) => ({
-                  minHeight: 34,
+                  minHeight: 32,
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 8,
-                  paddingHorizontal: 10,
-                  paddingVertical: 7,
-                  borderRadius: 9,
+                  paddingHorizontal: 9,
+                  paddingVertical: 6,
+                  borderRadius: radius.badge,
                   backgroundColor: selected
                     ? colors.sky
                     : pressed
@@ -332,12 +522,12 @@ function AccountMenu({
             left: compact ? 16 : 18,
             bottom: 82,
             width: menuWidth,
-            padding: 8,
+            padding: 6,
             borderWidth: 1,
             borderColor: colors.line,
-            borderRadius: 17,
+            borderRadius: radius.card,
             backgroundColor: colors.paper,
-            ...shadow.card,
+            ...shadow.sheet,
           }}
         >
           <View
@@ -381,12 +571,12 @@ function AccountMenu({
             accessibilityLabel={t("app.signOutLabel")}
             onPress={onSignOut}
             style={({ pressed }) => ({
-              minHeight: 42,
-              paddingHorizontal: 10,
-              borderRadius: 10,
+              minHeight: 40,
+              paddingHorizontal: 8,
+              borderRadius: radius.control,
               flexDirection: "row",
               alignItems: "center",
-              gap: 11,
+              gap: 10,
               backgroundColor: pressed ? colors.errorSoft : "transparent",
             })}
           >
@@ -416,7 +606,21 @@ function AgentRail({
 }) {
   const { t } = useTranslation();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const { agents, current, selectAgent } = useAgentSpace();
+  /** 待删除的 Agent：菜单里点删除后弹出确认弹窗，确认才真正移除。 */
+  const [pendingDelete, setPendingDelete] = useState<AgentDefinition>();
+  const [menuAnchor, setMenuAnchor] = useState<AgentMenuAnchor>();
+  const { agents, current, selectAgent, deleteAgent, setAgentPinned } = useAgentSpace();
+  // 排序规则：系统内置默认 Agent 永远置顶 → 用户置顶的 → 其余（同组内保持创建顺序）。
+  const orderedAgents = useMemo(
+    () =>
+      [...agents].sort((a, b) => {
+        if (a.system !== b.system) return a.system ? -1 : 1;
+        const pinnedDiff = Number(!!b.pinned) - Number(!!a.pinned);
+        if (pinnedDiff !== 0) return pinnedDiff;
+        return 0;
+      }),
+    [agents],
+  );
   const { navigate, open, workspace } = useWorkspace();
   const { data: agentData } = useAgentWorkspace();
   const unreadNotifications = (agentData?.notifications ?? []).filter((item) => !item.read).length;
@@ -426,15 +630,21 @@ function AgentRail({
     navigate("chat");
     onClose?.();
   };
+  /** 进入某个 Agent 的设置页：先切换 current，设置页才读得到它。 */
+  const openAgentSettings = (agent: AgentDefinition) => {
+    selectAgent(agent.id);
+    navigate("agent");
+    onClose?.();
+  };
   return (
     <View
       style={{
         width: "100%",
         height: "100%",
-        paddingHorizontal: compact ? 22 : 18,
-        paddingTop: compact ? 44 : 20,
-        paddingBottom: 18,
-        borderRightWidth: 0,
+        paddingHorizontal: compact ? 20 : 14,
+        paddingTop: compact ? 44 : 18,
+        paddingBottom: 14,
+        borderRightWidth: compact ? 0 : 1,
         borderRightColor: colors.line,
         backgroundColor: colors.surfaceRaised,
       }}
@@ -453,16 +663,16 @@ function AgentRail({
             source={require("../assets/logo.png")}
             resizeMode="contain"
             accessible={false}
-            style={{ width: 34, height: 34, flexShrink: 0 }}
+            style={{ width: 28, height: 28, flexShrink: 0 }}
           />
           <View style={{ flex: 1 }}>
             <Text
               style={{
                 color: colors.text,
-                fontSize: 21,
-                lineHeight: 38,
+                fontSize: 17,
+                lineHeight: 26,
                 fontWeight: "600",
-                letterSpacing: 2,
+                letterSpacing: 1.6,
                 fontFamily: fonts.serif,
               }}
             >
@@ -491,34 +701,35 @@ function AgentRail({
       </View>
 
       <ScrollView
-        style={{ flex: 1, marginTop: 24 }}
-        contentContainerStyle={{ gap: 8, paddingBottom: 24 }}
+        style={{ flex: 1, marginTop: 18 }}
+        contentContainerStyle={{ gap: 4, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        {agents.map((agent) => (
+        {orderedAgents.map((agent) => (
           <AgentListItem
             key={agent.id}
             agent={agent}
             active={agent.id === current.id}
             onPress={() => choose(agent)}
+            onOpenMenu={setMenuAnchor}
           />
         ))}
         <Pressable
           accessibilityRole="button"
           onPress={() => onOpen("create")}
           style={({ pressed }) => ({
-            minHeight: 46,
-            paddingHorizontal: 12,
-            borderRadius: 13,
+            minHeight: 40,
+            paddingHorizontal: 9,
+            borderRadius: radius.control,
             backgroundColor: pressed ? colors.overlay1 : "transparent",
             flexDirection: "row",
             alignItems: "center",
-            gap: 9,
-            marginTop: 3,
+            gap: 8,
+            marginTop: 2,
           })}
         >
-          <Plus size={17} color={colors.primaryStrong} />
-          <Text style={{ fontSize: 12, color: colors.primaryStrong, fontWeight: "600" }}>
+          <Plus size={16} color={colors.primaryStrong} />
+          <Text style={{ fontSize: 12, color: colors.primaryStrong, fontWeight: "500" }}>
             {t("agentSpace.createAgent")}
           </Text>
         </Pressable>
@@ -539,21 +750,21 @@ function AgentRail({
           style={({ pressed, hovered }) => ({
             flex: 1,
             minWidth: 0,
-            paddingVertical: 13,
-            paddingLeft: 10,
+            paddingVertical: 8,
+            paddingLeft: 6,
             paddingRight: 4,
-            borderRadius: 13,
+            borderRadius: radius.control,
             backgroundColor: pressed ? colors.overlay3 : hovered ? colors.overlay2 : "transparent",
             flexDirection: "row",
             alignItems: "center",
-            gap: 10,
+            gap: 9,
           })}
         >
           <AccountAvatar
             avatarUrl={workspace.profile.avatarUrl}
             name={accountNickname}
-            size={31}
-            borderRadius={10}
+            size={30}
+            borderRadius={8}
           />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>{accountNickname}</Text>
@@ -638,6 +849,58 @@ function AgentRail({
           }}
         />
       )}
+      {menuAnchor && (
+        <AgentMenu
+          anchor={menuAnchor}
+          onClose={() => setMenuAnchor(undefined)}
+          onSettings={() => {
+            const target = menuAnchor.agent;
+            setMenuAnchor(undefined);
+            openAgentSettings(target);
+          }}
+          onTogglePin={() => {
+            setAgentPinned(menuAnchor.agent.id, !menuAnchor.agent.pinned);
+            setMenuAnchor(undefined);
+          }}
+          onDelete={() => {
+            setPendingDelete(menuAnchor.agent);
+            setMenuAnchor(undefined);
+          }}
+        />
+      )}
+      {/* 删除 Agent 确认弹窗：不可恢复，需用户显式确认。 */}
+      {pendingDelete && (
+        <ModalOverlay visible onRequestClose={() => setPendingDelete(undefined)}>
+          <Pressable onPress={() => setPendingDelete(undefined)} style={s.modalShade}>
+            <Pressable
+              accessibilityViewIsModal
+              onPress={(event) => event.stopPropagation()}
+              style={[s.card, { maxWidth: 360, width: "100%", padding: 22, gap: 10 }]}
+            >
+              <Text style={s.heading}>{t("agentSpace.deleteConfirmTitle")}</Text>
+              <Text style={s.muted}>{t("agentSpace.deleteAgentNote")}</Text>
+              <View style={[s.row, { gap: 10, marginTop: 8 }]}>
+                <Button
+                  style={{ flex: 1, minHeight: 44 }}
+                  onPress={() => setPendingDelete(undefined)}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  danger
+                  style={{ flex: 1, minHeight: 44 }}
+                  onPress={() => {
+                    deleteAgent(pendingDelete.id);
+                    setPendingDelete(undefined);
+                  }}
+                >
+                  {t("agentSpace.deleteConfirmAction")}
+                </Button>
+              </View>
+            </Pressable>
+          </Pressable>
+        </ModalOverlay>
+      )}
     </View>
   );
 }
@@ -659,7 +922,7 @@ function RailToggleButton({
       style={({ pressed, hovered }) => ({
         width: 30,
         height: 30,
-        borderRadius: 9,
+        borderRadius: radius.control,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: pressed ? colors.overlay2 : hovered ? colors.overlay1 : "transparent",
@@ -686,7 +949,15 @@ function CapabilityRail({
   const { top: safeTop } = useSafeAreaInsets();
   const drawerTop = Math.max(safeTop, 12);
   return (
-    <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.surfaceRaised }}>
+    <View
+      style={{
+        flex: 1,
+        minHeight: 0,
+        backgroundColor: colors.surfaceRaised,
+        borderLeftWidth: compact ? 0 : 1,
+        borderLeftColor: colors.line,
+      }}
+    >
       {compact && (
         <View
           style={{
@@ -718,7 +989,7 @@ function CapabilityRail({
             top: 10,
             right: 10,
             zIndex: 2,
-            borderRadius: 9,
+            borderRadius: radius.control,
             backgroundColor: colors.surfaceRaised,
           }}
         >
@@ -729,15 +1000,16 @@ function CapabilityRail({
         style={{ flex: 1, minHeight: 0 }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingHorizontal: 18,
-          paddingTop: 20,
+          paddingHorizontal: 14,
+          paddingTop: 18,
           paddingBottom: 24,
         }}
       >
         <Text
           style={{
-            marginBottom: 18,
-            fontSize: 17,
+            marginBottom: 14,
+            paddingHorizontal: 6,
+            fontSize: 15,
             fontFamily: fonts.serif,
             fontWeight: "600",
             color: colors.text,
@@ -772,6 +1044,9 @@ function AgentHeader({
   const { t } = useTranslation();
   const { current } = useAgentSpace();
   const { section, navigate } = useWorkspace();
+  const { width } = useWindowDimensions();
+  // 与页面正文同一条判定：< mobile 用窄边距，其余用桌面边距。
+  const stacked = width < breakpoints.mobile;
   if (section === "chat")
     return (
       <AgentFloatingHeader
@@ -817,39 +1092,39 @@ function AgentHeader({
   return (
     <View
       style={{
-        height: agentLayout.headerHeight,
+        height: stacked ? agentLayout.headerHeight : 64,
         width: "100%",
-        maxWidth: agentLayout.columnMaxWidth,
+        // 与二级页正文共用同一列宽与内距：主列变宽/变窄时两者同步，
+        // 返回按钮始终贴住正文左边缘，标题也始终居中在正文列上。
+        maxWidth: agentLayout.pageMaxWidth,
         alignSelf: "center",
-        paddingHorizontal: 17,
+        paddingHorizontal: stacked ? space.pageMobile : space.page,
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: colors.canvas,
       }}
     >
-      <View style={{ width: 48 }}>
+      <View style={{ width: 40 }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t("agentSpace.backToChat")}
           onPress={() => navigate("chat")}
           style={({ pressed }) => ({
-            width: 43,
-            height: 43,
-            borderRadius: radius.full,
+            width: 36,
+            height: 36,
+            borderRadius: radius.control,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: pressed ? colors.overlay1 : colors.paper,
-            borderWidth: 1,
-            borderColor: colors.lineSoft,
+            backgroundColor: pressed ? colors.overlay1 : "transparent",
           })}
         >
-          <ChevronLeft size={20} color={colors.text} />
+          <ChevronLeft size={18} color={colors.muted} />
         </Pressable>
       </View>
       <View style={{ flex: 1, alignItems: "center" }}>
-        <Text style={[typography.heading, { fontSize: 16 }]}>{sectionTitle}</Text>
+        <Text style={[typography.heading, { fontSize: 15 }]}>{sectionTitle}</Text>
       </View>
-      <View style={{ width: 48 }} />
+      <View style={{ width: 40 }} />
     </View>
   );
 }
@@ -863,6 +1138,8 @@ function SecondarySection({
 }) {
   const { section } = useWorkspace();
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
+  const stacked = width < breakpoints.mobile;
   const content = (() => {
     switch (section) {
       case "account":
@@ -908,11 +1185,13 @@ function SecondarySection({
     <ScrollView
       contentContainerStyle={{
         width: "100%",
-        maxWidth: "100%",
+        // 与 AgentHeader 共用 agentLayout.pageMaxWidth 与同一套横向内距，
+        // 顶栏的返回按钮才会与正文左边缘对齐。
+        maxWidth: agentLayout.pageMaxWidth,
         alignSelf: "center",
-        paddingHorizontal: space.pageMobile,
-        paddingTop: 22,
-        paddingBottom: 46,
+        paddingHorizontal: stacked ? space.pageMobile : space.page,
+        paddingTop: 20,
+        paddingBottom: 48,
       }}
     >
       {content}
@@ -943,19 +1222,16 @@ function IdeasOverlay({ onClose }: { onClose: () => void }) {
             maxWidth: "100%",
             maxHeight: "100%",
             overflow: "hidden",
-            borderRadius: desktop ? 24 : 20,
+            borderRadius: radius.sheet,
             borderWidth: 1,
-            borderColor: colors.lineStrong,
+            borderColor: colors.line,
             backgroundColor: colors.canvas,
-            shadowColor: "#0b1b33",
-            shadowOpacity: 0.2,
-            shadowRadius: 36,
-            shadowOffset: { width: 0, height: 16 },
+            ...shadow.sheet,
           }}
         >
           <View
             style={{
-              height: 58,
+              height: 54,
               flexShrink: 0,
               paddingHorizontal: 18,
               flexDirection: "row",
@@ -1069,6 +1345,16 @@ export function AgentProductShell({
     setPanelStack([]);
     setDrawer(null);
   }, [reminderIntent]);
+
+  // 预填意图代表「回到对话框」：先收起 Agent 弹层、抽屉和浮层，
+  // 否则资料/自选等面板会继续盖在对话页上，看起来像没有跳转。
+  useEffect(() => {
+    if (!prompt?.draft) return;
+    setPanelStack([]);
+    setDrawer(null);
+    setSearchOpen(false);
+    setIdeasOpen(false);
+  }, [prompt]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;

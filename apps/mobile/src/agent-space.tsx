@@ -52,6 +52,8 @@ type AgentSpaceContextValue = {
   createAgent: (input: CreateAgentInput) => AgentDefinition;
   updateAgent: (id: string, patch: Partial<AgentDefinition>) => void;
   deleteAgent: (id: string) => void;
+  /** 置顶 / 取消置顶：只影响列表展示顺序，不改动 agents 的存储顺序。 */
+  setAgentPinned: (id: string, pinned: boolean) => void;
   markThreadUsed: (id: string) => void;
   setPreferences: (patch: Partial<AgentUserPreferences>) => void;
   resetPreferences: () => void;
@@ -208,6 +210,25 @@ export function AgentSpaceProvider({
     });
   }, []);
 
+  const setAgentPinned = useCallback((id: string, pinned: boolean) => {
+    setState((value) => {
+      const target = value.agents.find((agent) => agent.id === id);
+      if (!target || target.system === true) return value;
+      if (!!target.pinned === pinned) return value;
+      return {
+        ...value,
+        agents: value.agents.map((agent) => {
+          if (agent.id !== id) return agent;
+          // 取消置顶时删掉字段，与归一化后的持久化形态保持一致。
+          const next = { ...agent };
+          if (pinned) next.pinned = true;
+          else delete next.pinned;
+          return next;
+        }),
+      };
+    });
+  }, []);
+
   const markThreadUsed = useCallback((id: string) => {
     setState((value) => ({
       ...value,
@@ -318,6 +339,7 @@ export function AgentSpaceProvider({
       createAgent,
       updateAgent,
       deleteAgent,
+      setAgentPinned,
       markThreadUsed,
       setPreferences,
       resetPreferences,
@@ -337,6 +359,7 @@ export function AgentSpaceProvider({
       createAgent,
       updateAgent,
       deleteAgent,
+      setAgentPinned,
       markThreadUsed,
       setPreferences,
       resetPreferences,

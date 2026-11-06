@@ -44,13 +44,13 @@ export function PageHeader({
           flexDirection: "row",
           alignItems: "flex-start",
           justifyContent: "space-between",
-          gap: space.lg,
-          marginBottom: compact ? 23 : 28,
+          gap: space.md,
+          marginBottom: compact ? 20 : 24,
         },
         style,
       ]}
     >
-      <View style={{ flex: 1, minWidth: 0, gap: space.xs }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         {!!eyebrow && <Text style={[typography.eyebrow, { color: colors.faint }]}>{eyebrow}</Text>}
         <Text
           accessibilityRole="header"
@@ -66,8 +66,8 @@ export function PageHeader({
           <Text
             numberOfLines={compact ? 2 : 1}
             style={[
-              typography.caption,
-              { lineHeight: 20, color: colors.faint, maxWidth: 720, marginTop: 2 },
+              typography.meta,
+              { lineHeight: 19, color: colors.faint, maxWidth: 720, marginTop: 1 },
             ]}
           >
             {description}
@@ -75,7 +75,7 @@ export function PageHeader({
         )}
       </View>
       {!!actions && (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>{actions}</View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>{actions}</View>
       )}
     </View>
   );

@@ -40,6 +40,8 @@ const agentSchema = z
       .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/)
       .optional(),
     system: z.boolean(),
+    // 列表置顶标记；旧客户端不带该字段，保持可选以兼容。
+    pinned: z.boolean().optional(),
     threadExists: z.boolean(),
     createdAt: timestamp,
     skills: z.array(identifier).max(30),

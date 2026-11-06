@@ -21,16 +21,7 @@ import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
 import { ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
 import { ModalOverlay } from "./modal-overlay";
-import {
-  breakpoints,
-  colors,
-  fonts,
-  radius,
-  shadow,
-  space,
-  statusColors,
-  typography,
-} from "./theme";
+import { breakpoints, colors, fonts, radius, shadow, space, typography } from "./theme";
 
 /**
  * 设计令牌统一由 `theme.ts` 提供，这里 re-export 以兼容既有 `from "./ui"` 引用。
@@ -59,10 +50,10 @@ export const s = StyleSheet.create({
   muted: { color: colors.muted, ...typography.prose },
   small: { color: colors.muted, ...typography.caption },
   label: { color: colors.muted, ...typography.eyebrow },
-  /** 浮层标题：26/37 页面 H1 规格，与页面头保持同一层级。 */
+  /** 浮层标题：与页面 H1 同一档字阶（22/32）。 */
   title: { color: colors.heading, ...typography.h1 },
   heading: { color: colors.heading, ...typography.heading },
-  /** 白纸卡片：轻描边、10px 圆角，靠描边而非阴影表达层级。 */
+  /** 白纸卡片：轻描边、12px 圆角，靠描边而非阴影表达层级。 */
   card: {
     backgroundColor: colors.paper,
     borderRadius: radius.card,
@@ -70,78 +61,76 @@ export const s = StyleSheet.create({
     borderColor: colors.line,
     padding: space.md,
   },
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: space.md },
+  divider: { height: 1, backgroundColor: colors.line, marginVertical: space.sm },
   input: {
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: radius.field,
     paddingHorizontal: space.sm,
-    paddingVertical: 10,
+    paddingVertical: 9,
     color: colors.text,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 22,
     backgroundColor: colors.paper,
-    minHeight: 44,
+    minHeight: 40,
     fontFamily: fonts.sans,
   },
-  field: { gap: space.xs, marginBottom: space.md },
-  /** 按钮：control 圆角 + 1px 描边，默认高度 40（small 32），触控可达 44。 */
+  field: { gap: 6, marginBottom: space.sm },
+  /** 按钮：control 圆角 + 1px 描边，默认高度 36（small 30），触控可达 44。 */
   button: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: space.xs,
-    paddingHorizontal: space.md,
-    minHeight: 40,
-    paddingVertical: space.xs,
+    gap: 6,
+    paddingHorizontal: 14,
+    minHeight: 36,
+    paddingVertical: 7,
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: "transparent",
   },
   primary: { backgroundColor: colors.primaryAction, borderColor: colors.primaryAction },
-  secondary: { backgroundColor: colors.paper, borderColor: colors.lineStrong },
+  secondary: { backgroundColor: colors.paper, borderColor: colors.line },
   dangerSurface: { backgroundColor: colors.errorSoft, borderColor: colors.errorSoft },
-  buttonText: { fontSize: 14, fontWeight: "600", fontFamily: fonts.sans },
+  buttonText: { fontSize: 13, fontWeight: "500", fontFamily: fonts.sans },
   chip: {
-    paddingHorizontal: 10,
-    paddingVertical: space.xxs,
-    borderRadius: radius.control,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.badge,
     alignSelf: "flex-start",
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
   },
   chipText: {
-    fontSize: typography.eyebrow.fontSize,
-    lineHeight: typography.eyebrow.lineHeight,
-    fontWeight: "600",
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+    fontWeight: "500",
     color: colors.muted,
     fontFamily: fonts.sans,
   },
-  /** 触控目标底座：44×44（不小于 touch 下限）。 */
+  /** 触控目标底座：40×40（不小于视觉下限，可配合 hitSlop 达到 44）。 */
   iconBox: {
-    width: space.touch,
-    height: space.touch,
+    width: 40,
+    height: 40,
     borderRadius: radius.control,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.surface,
   },
-  /** 任务行 / 列表图标底座：36×39 / r9（Delta C5）。 */
+  /** 任务行 / 列表图标底座：36×36 / r8。 */
   glyph: {
     width: 36,
-    height: 39,
+    height: 36,
     borderRadius: radius.field,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.surface,
   },
   error: {
-    padding: space.md,
+    padding: space.sm,
     borderRadius: radius.card,
     backgroundColor: colors.errorSoft,
-    marginVertical: 10,
-    gap: space.xxs,
+    marginVertical: space.xs,
+    gap: 2,
   },
   modalShade: {
     flex: 1,
@@ -149,7 +138,7 @@ export const s = StyleSheet.create({
     alignItems: "center",
     padding: space.lg,
   },
-  /** 弹窗面板：白底 + 1px 描边 + 17px 圆角（Demo .modal），最大宽度对齐设计库 .panel 的 760。 */
+  /** 弹窗面板：白底 + 1px 描边 + 16px 圆角，最大宽度对齐设计库 .panel 的 760。 */
   sheet: {
     backgroundColor: colors.paper,
     borderRadius: radius.sheet,
@@ -225,17 +214,25 @@ export function Button({
   const color = danger ? colors.danger : primary ? colors.onPrimary : colors.text;
 
   return (
-    <Pressable
+    <HoverPressable
       accessibilityRole="button"
       disabled={disabled || busy}
       accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
       hitSlop={hitSlop}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         s.button,
         primary ? s.primary : danger ? s.dangerSurface : s.secondary,
-        primary && pressed && { backgroundColor: colors.primaryStrong },
-        small && { minHeight: 32, paddingVertical: 6, paddingHorizontal: 13 },
+        // 悬停只做一档极淡的底色变化，按下再加深；主按钮悬停走深色变体。
+        !disabled &&
+          !busy &&
+          (primary
+            ? hovered && {
+                backgroundColor: colors.primaryStrong,
+                borderColor: colors.primaryStrong,
+              }
+            : hovered && { backgroundColor: colors.surface }),
+        small && { minHeight: 30, paddingVertical: 5, paddingHorizontal: 11 },
         style,
         {
           opacity: disabled ? 0.4 : busy && !quietBusy ? 0.75 : pressed ? 0.9 : 1,
@@ -248,7 +245,7 @@ export function Button({
         <Icon size={15} color={color} />
       ) : null}
       <Text style={[s.buttonText, small && { fontSize: 12 }, { color }]}>{children}</Text>
-    </Pressable>
+    </HoverPressable>
   );
 }
 export function IconButton({
@@ -266,27 +263,27 @@ export function IconButton({
   disabled?: boolean;
 }) {
   return (
-    <Pressable
+    <HoverPressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
       disabled={disabled}
       hitSlop={disabled ? undefined : 4}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         {
           width: size,
           height: size,
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: radius.card,
-          backgroundColor: pressed ? colors.overlay1 : "transparent",
+          borderRadius: radius.control,
+          backgroundColor: pressed ? colors.overlay2 : hovered ? colors.overlay1 : "transparent",
           opacity: disabled ? 0.28 : 1,
         },
       ]}
     >
       <Icon size={size >= 44 ? 20 : 18} color={colors.muted} />
-    </Pressable>
+    </HoverPressable>
   );
 }
 export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
@@ -303,16 +300,7 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={s.field}>
-      <Text
-        style={[
-          s.small,
-          {
-            fontWeight: "600",
-            color: focused ? colors.primaryStrong : colors.text,
-            letterSpacing: 0.2,
-          },
-        ]}
-      >
+      <Text style={{ fontSize: 12, lineHeight: 18, fontWeight: "500", color: colors.text }}>
         {label}
       </Text>
       <TextInput
@@ -329,10 +317,8 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
         }}
         style={[
           s.input,
-          focused && {
-            borderColor: colors.primary,
-            backgroundColor: colors.sky,
-          },
+          // 聚焦只换描边色，保留输入框本身的纸面感。
+          focused && { borderColor: colors.primary },
           props.multiline && { minHeight: 120, textAlignVertical: "top" },
           props.style,
         ]}
@@ -352,12 +338,12 @@ export function Empty({
   children?: ReactNode;
 }) {
   return (
-    <View style={{ alignItems: "center", padding: 40, gap: space.sm }}>
-      <View style={[s.iconBox, { width: 48, height: 48, borderRadius: radius.composer }]}>
-        <Icon size={24} color={colors.primary} />
+    <View style={{ alignItems: "center", paddingVertical: 36, paddingHorizontal: 24, gap: 6 }}>
+      <View style={[s.iconBox, { width: 44, height: 44, marginBottom: 4 }]}>
+        <Icon size={20} color={colors.muted} />
       </View>
-      <Text style={s.heading}>{title}</Text>
-      <Text style={[s.muted, { textAlign: "center", maxWidth: 360 }]}>{detail}</Text>
+      <Text style={[s.heading, { fontSize: 14 }]}>{title}</Text>
+      <Text style={[s.small, { textAlign: "center", maxWidth: 340 }]}>{detail}</Text>
       {children}
     </View>
   );
@@ -434,7 +420,7 @@ export function Sheet({
             s.sheet,
             !compact && {
               maxHeight: Math.max(0, height - space.xl * 2),
-              borderRadius: 20,
+              borderRadius: radius.sheet,
               ...shadow.sheet,
             },
             wide && { maxWidth: 1050 },
@@ -518,15 +504,15 @@ export function Sheet({
                   numberOfLines={2}
                   style={[
                     s.title,
-                    compact && { fontSize: 22, lineHeight: 32 },
+                    compact && { fontSize: 19, lineHeight: 27 },
                     // 标题带品牌 Logo 时收紧字号，与左侧图形保持和谐。
-                    titleIcon ? { fontSize: 18, lineHeight: 26 } : undefined,
-                    titleIcon && compact ? { fontSize: 17, lineHeight: 24 } : undefined,
+                    titleIcon ? { fontSize: 17, lineHeight: 24 } : undefined,
+                    titleIcon && compact ? { fontSize: 16, lineHeight: 22 } : undefined,
                     botLayout && {
-                      fontSize: compact ? 17 : 22,
-                      lineHeight: compact ? 26 : 32,
+                      fontSize: compact ? 16 : 19,
+                      lineHeight: compact ? 22 : 27,
                       fontFamily: fonts.sans,
-                      fontWeight: compact ? "500" : "600",
+                      fontWeight: "600",
                     },
                   ]}
                 >
@@ -614,26 +600,23 @@ export function SectionHeading({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <View style={[s.between, { marginBottom: space.lg }, style]}>
-      <View style={[s.row, { gap: space.xs }]}>
-        <Text style={[s.heading, { fontSize: 15 }]}>{title}</Text>
+    <View style={[s.between, { marginBottom: space.md, gap: space.xs }, style]}>
+      <View style={[s.row, { gap: 6, flexShrink: 1, minWidth: 0 }]}>
+        <Text style={{ fontSize: 14, lineHeight: 22, fontWeight: "600", color: colors.text }}>
+          {title}
+        </Text>
         {count !== undefined && (
           <View
             style={{
               minWidth: 18,
               paddingHorizontal: 5,
-              paddingVertical: 2,
+              paddingVertical: 1,
               borderRadius: radius.badge,
-              backgroundColor: statusColors.surface,
+              backgroundColor: colors.surface,
               alignItems: "center",
             }}
           >
-            <Text
-              style={[
-                s.metric,
-                { fontSize: typography.eyebrow.fontSize, lineHeight: 14, color: colors.link },
-              ]}
-            >
+            <Text style={[s.metric, { fontSize: 10, lineHeight: 16, color: colors.muted }]}>
               {count}
             </Text>
           </View>
@@ -642,9 +625,9 @@ export function SectionHeading({
       {actions ? (
         actions
       ) : action && onPress ? (
-        <Pressable accessibilityRole="button" onPress={onPress} style={[s.row, { gap: 4 }]}>
+        <Pressable accessibilityRole="button" onPress={onPress} style={[s.row, { gap: 3 }]}>
           <Text style={[s.small, { color: colors.link }]}>{action}</Text>
-          <ArrowUpRight size={13} color={colors.link} />
+          <ArrowUpRight size={12} color={colors.link} />
         </Pressable>
       ) : null}
     </View>
@@ -669,18 +652,24 @@ export function LinkRow({
       onPress={onPress}
       style={({ pressed }) => [
         s.row,
-        { paddingVertical: 13, gap: 14, borderRadius: radius.card },
+        {
+          paddingVertical: 8,
+          paddingHorizontal: 6,
+          marginHorizontal: -6,
+          gap: 12,
+          borderRadius: radius.card,
+        },
         pressed && { backgroundColor: colors.overlay1 },
       ]}
     >
       <View style={[s.iconBox, { backgroundColor: tint || colors.surface }]}>
-        <Icon size={19} color={colors.text} />
+        <Icon size={18} color={colors.text} />
       </View>
-      <View style={{ flex: 1, gap: 3 }}>
+      <View style={{ flex: 1, gap: 2 }}>
         <Text style={[s.text, { fontWeight: "500" }]}>{title}</Text>
         {!!detail && <Text style={s.small}>{detail}</Text>}
       </View>
-      <ChevronRight size={15} color={colors.muted} />
+      <ChevronRight size={15} color={colors.faint} />
     </Pressable>
   );
 }

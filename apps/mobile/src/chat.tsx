@@ -926,6 +926,11 @@ export function ChatScreen({
     if (prompt.draft) {
       if (!claimPrompt(prompt.id)) return;
       setDraft(prompt.text);
+      // 附件同样只预选，用户可以在发送前移除。
+      const ids = (prompt.attachmentIds ?? []).filter((id) =>
+        w.files.some((file) => file.id === id),
+      );
+      if (ids.length) setAttachments(ids);
       composerInput.current?.focus();
       return;
     }
@@ -1289,11 +1294,11 @@ export function ChatScreen({
                   gap: wideEmpty ? 54 : 26,
                 }}
               >
-                <View style={{ flex: 1, minWidth: 0, justifyContent: "center", gap: 16 }}>
+                <View style={{ flex: 1, minWidth: 0, justifyContent: "center", gap: 14 }}>
                   {hideHeader ? (
                     <AgentOrb
                       avatar={agentContext?.avatar ?? "orb"}
-                      size={firstRunWelcome ? 48 : 73}
+                      size={firstRunWelcome ? 40 : 56}
                     />
                   ) : (
                     <View style={[s.row, { gap: 8 }]}>
@@ -1314,8 +1319,8 @@ export function ChatScreen({
                     style={{
                       maxWidth: 560,
                       color: colors.heading,
-                      fontSize: hideHeader ? 25 : wideEmpty ? 40 : 31,
-                      lineHeight: hideHeader ? 40 : wideEmpty ? 54 : 43,
+                      fontSize: hideHeader ? 22 : wideEmpty ? 34 : 28,
+                      lineHeight: hideHeader ? 32 : wideEmpty ? 46 : 38,
                       fontWeight: "500",
                       letterSpacing: 0.2,
                       fontFamily: hideHeader ? fonts.sans : fonts.serif,
@@ -1366,14 +1371,13 @@ export function ChatScreen({
                   {firstRunWelcome && (
                     <View
                       style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 15,
-                        borderRadius: 18,
-                        borderTopLeftRadius: 5,
+                        paddingHorizontal: 14,
+                        paddingVertical: 12,
+                        borderRadius: radius.card,
                         borderWidth: 1,
-                        borderColor: colors.lineSoft,
+                        borderColor: colors.line,
                         backgroundColor: colors.paper,
-                        gap: 8,
+                        gap: 6,
                       }}
                     >
                       <View style={[s.row, { gap: 8 }]}>
@@ -1401,15 +1405,15 @@ export function ChatScreen({
                             accessibilityRole="button"
                             onPress={() => enqueue(action.prompt)}
                             style={({ pressed }) => ({
-                              minHeight: 38,
-                              borderRadius: radius.full,
+                              minHeight: 32,
+                              borderRadius: radius.control,
                               borderWidth: 1,
                               borderColor: colors.accentLine,
                               backgroundColor: pressed ? colors.skyStrong : colors.sky,
-                              paddingHorizontal: 12,
+                              paddingHorizontal: 10,
                               flexDirection: "row",
                               alignItems: "center",
-                              gap: 5,
+                              gap: 4,
                             })}
                           >
                             <Text
@@ -1482,9 +1486,9 @@ export function ChatScreen({
                               alignItems: "center",
                               gap: 7,
                               maxWidth: 260,
-                              paddingHorizontal: 10,
-                              paddingVertical: 7,
-                              borderRadius: 10,
+                              paddingHorizontal: 9,
+                              paddingVertical: 6,
+                              borderRadius: radius.field,
                               borderWidth: 1,
                               borderColor: colors.line,
                               backgroundColor: pressed ? colors.overlay1 : colors.paper,
@@ -1505,11 +1509,9 @@ export function ChatScreen({
                   {!!text && (
                     <View
                       style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 13,
-                        borderRadius: 14,
-                        borderBottomRightRadius: user ? 4 : 14,
-                        borderBottomLeftRadius: user ? 14 : 4,
+                        paddingHorizontal: 14,
+                        paddingVertical: 11,
+                        borderRadius: radius.card,
                         borderWidth: user ? 0 : 1,
                         borderColor: colors.line,
                         backgroundColor: user ? colors.primary : colors.paper,
@@ -1732,14 +1734,13 @@ export function ChatScreen({
                 s.row,
                 {
                   alignSelf: "flex-start",
-                  gap: 7,
-                  paddingHorizontal: 18,
-                  paddingVertical: 16,
+                  gap: 6,
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
                   backgroundColor: colors.paper,
                   borderWidth: 1,
                   borderColor: colors.line,
-                  borderRadius: 14,
-                  borderBottomLeftRadius: 4,
+                  borderRadius: radius.card,
                 },
               ]}
             >
@@ -1747,9 +1748,9 @@ export function ChatScreen({
                 <View
                   key={opacity}
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
                     backgroundColor: colors.muted,
                     opacity,
                   }}

@@ -5,6 +5,38 @@
 
 ## 变更记录
 
+### 2026-11-06 · 左侧栏系统内置默认 Agent 永远置顶
+
+**背景**
+
+用户反馈左侧栏的系统内置默认 Agent（如「小悟」）会被用户置顶的 Agent 挤到下方，需要始终固定在列表最上方。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx#L613-L623)：`orderedAgents` 排序规则由「仅按置顶」改为三级排序——系统内置（`agent.system`）永远置顶 → 用户置顶 → 其余（同组内保持创建顺序）。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`agent-product.tsx` 无类型错误。
+
+### 2026-11-06 · 界面精简：删除免责声明、移除「研究模板」标题、删除 Agent 改为弹窗确认
+
+**背景**
+
+用户通过元素选择器反馈三处 UI 调整：删除笔记列表底部的两段免责声明文字与「研究模板」标题行；两个「删除 Agent」按钮（左侧栏菜单项与编辑页底部按钮）点击后需先弹窗确认，避免误删（删除不可恢复，必须带红色确认警示态）。
+
+**处理**
+
+- [notes-screen.tsx](../apps/mobile/src/notes-screen.tsx)：删除笔记列表末尾的「AI 生成，仅供参考，不构成投资建议」与「以上内容为信息整理，不构成投资建议。」两行免责声明。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx#L1233-L1238)：研究模板区块移除 `SectionHeading` 标题行，仅保留说明文字与模板卡片。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：删除行内二次确认组件 `AgentDeleteConfirm`，`pendingDelete` 由存 id 改为存 `AgentDefinition`；菜单点击「删除 Agent」后不再行内展开确认块，改为 `ModalOverlay` 居中弹窗（标题 + 不可恢复说明 + 取消/确认删除），确认按钮为 danger 红色。
+- [bot-pages/edit.tsx](../apps/mobile/src/bot-pages/edit.tsx)：删除行内确认块，删除按钮常驻，点击后弹出 `ModalOverlay` 确认弹窗。
+- i18n 新增文案键：`agentSpace.deleteConfirmTitle`（确定删除这个 Agent？/ Delete this Agent?）、`agentSpace.deleteConfirmAction`（确认删除 / Delete），zh-Hans 与 en 同步。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：本次改动文件无类型错误。
+
 ### 2026-11-06 · 任务弹窗改为全局视图（汇总所有 Agent 的任务）
 
 **背景**

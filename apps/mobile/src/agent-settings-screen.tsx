@@ -1,5 +1,6 @@
 import { type ComponentType, useState } from "react";
 import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import { Text } from "./app-text";
@@ -55,6 +56,8 @@ export function AgentSettingsScreen() {
   const [width, setWidth] = useState(windowWidth);
   // 单列宽度下左栏收成横向分区条，避免挤压右侧内容。
   const stacked = width < breakpoints.mobile;
+  // 横向内距只跟窗口走（与顶部返回栏同一判定），分栏方向才跟实际列宽走。
+  const narrowViewport = windowWidth < breakpoints.mobile;
   const active = TABS.find((item) => item.id === tab) ?? TABS[0];
 
   const notifySaved = () => notify(t("agentSpace.changesSaved"));
@@ -105,9 +108,10 @@ export function AgentSettingsScreen() {
           flex: 1,
           minHeight: 0,
           width: "100%",
-          maxWidth: 1180,
+          // 与顶栏共用同一列宽与横向内距，返回按钮才与左栏卡片对齐。
+          maxWidth: agentLayout.pageMaxWidth,
           alignSelf: "center",
-          paddingHorizontal: stacked ? space.pageMobile : space.page,
+          paddingHorizontal: narrowViewport ? space.pageMobile : space.page,
           paddingTop: stacked ? space.sm : space.md,
           paddingBottom: space.sm,
           flexDirection: stacked ? "column" : "row",

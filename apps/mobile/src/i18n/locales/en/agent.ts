@@ -629,6 +629,10 @@ const agent = {
   "agentSpace.deleteAgent": "Delete Agent",
   "agentSpace.deleteAgentNote":
     "Removes this Agent entry and local skills. The system default Agent cannot be deleted.",
+  "agentSpace.deleteConfirmTitle": "Delete this Agent?",
+  "agentSpace.deleteConfirmAction": "Delete",
+  "agentSpace.pinAgent": "Pin Agent",
+  "agentSpace.unpinAgent": "Unpin Agent",
   "agentSpace.manageAgent": "Manage",
   "agentSpace.agentDetails": "Agent details",
   "agentSpace.changesSaved": "Saved.",
@@ -769,7 +773,7 @@ const agent = {
   "agentSpace.welcomeTitle": "Give research to the right Agent,",
   "agentSpace.welcomeTail": "Start with today's most important question.",
   "agentSpace.composer": "Message {name}…",
-  "agentSpace.openIdeasPage": "Ideas page",
+  "agentSpace.openIdeasPage": "Ideas",
   "agentSpace.ready": "Ready when you are",
   "agentSpace.noTasks": "No tasks yet. Return to chat and let an Agent start a piece of work.",
   "agentSpace.noInsights":

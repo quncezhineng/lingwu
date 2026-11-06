@@ -424,7 +424,7 @@ function CapabilityCard({
       style={{
         flex: 1,
         minWidth: 0,
-        minHeight: 176,
+        minHeight: 160,
         borderRadius: radius.card,
         borderWidth: 1,
         borderColor: colors.line,
@@ -438,17 +438,17 @@ function CapabilityCard({
         onPress={item.onPress}
         style={({ pressed }) => ({
           flex: 1,
-          paddingTop: 16,
-          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingHorizontal: 14,
           backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
         })}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
           <View
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: radius.field,
+              width: 32,
+              height: 32,
+              borderRadius: radius.control,
               alignItems: "center",
               justifyContent: "center",
               backgroundColor: item.iconSurface,
@@ -475,23 +475,23 @@ function CapabilityCard({
           numberOfLines={3}
           style={{
             flex: 1,
-            marginTop: 14,
+            marginTop: 10,
             color: colors.muted,
             fontSize: 13,
-            lineHeight: 17,
+            lineHeight: 18,
             fontFamily: fonts.sans,
           }}
         >
           {item.detail}
         </Text>
       </Pressable>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+      <View style={{ paddingHorizontal: 14, paddingBottom: 10 }}>
         <View
           style={[
             s.between,
             {
               gap: 8,
-              paddingTop: 10,
+              paddingTop: 8,
               borderTopWidth: 1,
               borderTopColor: colors.line,
             },
@@ -727,7 +727,14 @@ function CategoryRail({
   );
 }
 
-export function CapabilityHubScreen({ mode = "page" }: { mode?: "page" | "embedded" } = {}) {
+export function CapabilityHubScreen({
+  mode = "page",
+  onOpenChat,
+}: {
+  mode?: "page" | "embedded";
+  /** 预填提示词后跳转对话：弹层内使用时由调用方关闭弹层。 */
+  onOpenChat?: () => void;
+} = {}) {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const { navigate, ask, workspace, api, refresh, notify, open } = useWorkspace();
@@ -1116,7 +1123,7 @@ export function CapabilityHubScreen({ mode = "page" }: { mode?: "page" | "embedd
       )}
 
       {mode === "embedded" && typeFilter === "workspace" ? (
-        <FilesScreen />
+        <FilesScreen onOpenChat={onOpenChat} />
       ) : (
         <View>
           <View

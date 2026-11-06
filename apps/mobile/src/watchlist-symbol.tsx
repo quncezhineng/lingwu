@@ -77,7 +77,7 @@ export function WatchlistSymbolSheet({
   quote?: Quote;
   watchlist: { id: string; name: string };
 }) {
-  const { api, ask, close, notify, open, requestPriceReminder } = useWorkspace();
+  const { api, prefillPrompt, close, notify, open, requestPriceReminder } = useWorkspace();
   const { data: agent } = useAgentWorkspace();
   const notesState = useNotesState();
   const { t } = useTranslation();
@@ -406,7 +406,7 @@ export function WatchlistSymbolSheet({
               style={{ minHeight: 42 }}
               onPress={() => {
                 close();
-                ask(
+                prefillPrompt(
                   t("markets.watchlistAnalyzePrompt", {
                     name: displayName,
                     code: symbol.code,

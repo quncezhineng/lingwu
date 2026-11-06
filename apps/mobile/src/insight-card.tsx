@@ -74,16 +74,16 @@ export function InsightCard({
   const compact = width < breakpoints.mobile;
 
   const cardStyle: ViewStyle = {
-    minHeight: collapsed ? undefined : compact ? 106 : undefined,
-    paddingTop: 17,
-    paddingHorizontal: 20,
-    paddingBottom: 14,
+    minHeight: collapsed ? undefined : compact ? 100 : undefined,
+    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: radius.field,
+    borderRadius: radius.card,
     backgroundColor: colors.paper,
     justifyContent: "space-between",
-    gap: space.sm,
+    gap: 10,
   };
 
   const sections = [

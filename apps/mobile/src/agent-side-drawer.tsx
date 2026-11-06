@@ -56,6 +56,10 @@ export function AgentSideDrawer({
             width: drawerWidth,
             height: "100%",
             backgroundColor: colors.surfaceRaised,
+            // 抽屉与画布底色只差一档，用内侧 1px 描边把边界交代清楚。
+            borderLeftWidth: side === "right" ? 1 : 0,
+            borderRightWidth: side === "left" ? 1 : 0,
+            borderColor: colors.line,
             transform: [
               {
                 translateX: progress.interpolate({

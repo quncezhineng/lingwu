@@ -11,6 +11,7 @@ import {
 } from "../agent-space-model";
 import { Text } from "../app-text";
 import { statusLabel, useTranslation } from "../i18n";
+import { ModalOverlay } from "../modal-overlay";
 import { Button, colors, Field, radius, s } from "../ui";
 import { BotPage, type BotPageProps } from "./shared";
 
@@ -156,49 +157,44 @@ export function BotEditPage({
       <PersonaEditor onSaved={onClose} />
       <View style={{ marginTop: 12 }}>
         {!current.system && (
-          <>
-            {confirmDelete && (
-              <View
-                style={{
-                  marginTop: 8,
-                  padding: 14,
-                  borderRadius: 13,
-                  backgroundColor: colors.errorSoft,
-                  gap: 10,
-                }}
-              >
-                <Text style={[s.text, { fontWeight: "600", color: colors.danger }]}>
-                  {t("agentSpace.deleteAgent")}
-                </Text>
-                <Text style={s.small}>{t("agentSpace.deleteAgentNote")}</Text>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  <Button
-                    small
-                    danger
-                    onPress={() => {
-                      deleteAgent(current.id);
-                      onDeleted();
-                    }}
-                  >
-                    {t("agentSpace.deleteAgent")}
-                  </Button>
-                  <Button small onPress={() => setConfirmDelete(false)}>
-                    {t("common.cancel")}
-                  </Button>
-                </View>
-              </View>
-            )}
-            {!confirmDelete && (
-              <Button danger onPress={() => setConfirmDelete(true)}>
-                {t("agentSpace.deleteAgent")}
-              </Button>
-            )}
-          </>
+          <Button danger onPress={() => setConfirmDelete(true)}>
+            {t("agentSpace.deleteAgent")}
+          </Button>
         )}
         {current.system && (
           <Text style={[s.small, { color: colors.faint, marginTop: 10 }]}>
             {t("agentSpace.systemCannotDelete")}
           </Text>
+        )}
+        {/* 删除 Agent 确认弹窗：不可恢复，需用户显式确认。 */}
+        {confirmDelete && (
+          <ModalOverlay visible onRequestClose={() => setConfirmDelete(false)}>
+            <Pressable onPress={() => setConfirmDelete(false)} style={s.modalShade}>
+              <Pressable
+                accessibilityViewIsModal
+                onPress={(event) => event.stopPropagation()}
+                style={[s.card, { maxWidth: 360, width: "100%", padding: 22, gap: 10 }]}
+              >
+                <Text style={s.heading}>{t("agentSpace.deleteConfirmTitle")}</Text>
+                <Text style={s.muted}>{t("agentSpace.deleteAgentNote")}</Text>
+                <View style={[s.row, { gap: 10, marginTop: 8 }]}>
+                  <Button style={{ flex: 1, minHeight: 44 }} onPress={() => setConfirmDelete(false)}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    danger
+                    style={{ flex: 1, minHeight: 44 }}
+                    onPress={() => {
+                      deleteAgent(current.id);
+                      onDeleted();
+                    }}
+                  >
+                    {t("agentSpace.deleteConfirmAction")}
+                  </Button>
+                </View>
+              </Pressable>
+            </Pressable>
+          </ModalOverlay>
         )}
       </View>
     </BotPage>

@@ -100,6 +100,9 @@ const screens = {
   "screens.libraryInsightsEmptyTitle": "No saved insights yet",
   "screens.libraryInsightsEmptyDetail":
     "Finished reports, comparisons and briefings are filed here automatically.",
+  "screens.libraryInsightsHint":
+    "Conclusions kept from finished research. Open one to trace its evidence and sources.",
+  "screens.libraryItemCount": "{count} items",
   "screens.filesImportShort": "Upload",
   "screens.filesSourceUpload": "My uploads",
   "screens.filesSourceAnalysis": "From analysis",

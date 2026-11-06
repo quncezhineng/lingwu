@@ -36,8 +36,10 @@ import {
   CalendarDays,
   Check,
   CheckCheck,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock3,
   Cpu,
   FileText,
@@ -89,7 +91,7 @@ function eventDate(event: CalendarEvent) {
   return event.allDay ? event.start : localDateTime(event.start, event.timeZone).date;
 }
 export function TodayScreen() {
-  const { workspace: w, navigate, open, ask } = useWorkspace();
+  const { workspace: w, navigate, open, prefillPrompt } = useWorkspace();
   const { t } = useTranslation();
   const wide = useWindowDimensions().width > 1180;
   const pending = w.actions.filter((a) => a.status === "awaiting_review");
@@ -144,7 +146,7 @@ export function TodayScreen() {
             {t("screens.todayLetMakeSpace")}
           </Text>
           <Button
-            onPress={() => ask(t("screens.todayPlanDayPrompt"))}
+            onPress={() => prefillPrompt(t("screens.todayPlanDayPrompt"))}
             icon={Sparkles}
             primary
             style={{ alignSelf: "flex-start", marginTop: 5 }}
@@ -381,7 +383,7 @@ export function TodayScreen() {
           ].map((prompt) => (
             <Pressable
               key={prompt}
-              onPress={() => ask(prompt)}
+              onPress={() => prefillPrompt(prompt)}
               style={({ pressed }) => [
                 s.between,
                 {
@@ -1051,11 +1053,14 @@ type LibrarySection = "files" | "insights" | "notes";
 export function FilesScreen({
   initialSection = "files",
   embedded = false,
+  onOpenChat,
 }: {
   initialSection?: LibrarySection;
   embedded?: boolean;
+  /** 预填提示词后回到对话：资料库若挂在弹层里，由调用方负责关闭弹层。 */
+  onOpenChat?: () => void;
 }) {
-  const { workspace: w, api, refresh, open, ask, notify } = useWorkspace();
+  const { workspace: w, api, refresh, open, prefillPrompt, notify } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
@@ -1065,6 +1070,8 @@ export function FilesScreen({
   const [formatFilter, setFormatFilter] = useState<FileFormatFilter>("all");
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  // 格式筛选默认收起：首屏只留「所有格式」按钮，避免十几个胶囊把工具栏撑满。
+  const [formatsOpen, setFormatsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const savedInsightIds = useSavedInsightIds();
@@ -1143,13 +1150,15 @@ export function FilesScreen({
     });
   }
 
+  /** 投入分析只把文件与提示词预填进对话框，是否开始由用户确认。 */
   function analyzeFiles(files: readonly Artifact[]) {
     if (!files.length) return;
-    ask(
+    prefillPrompt(
       t("screens.filesAnalyzePrompt"),
       files.map((file) => file.id),
     );
     setSelectedIds(new Set());
+    onOpenChat?.();
   }
 
   function download(file: Artifact) {
@@ -1253,18 +1262,35 @@ export function FilesScreen({
       <ErrorNotice error={error || agentError} />
 
       {section === "files" && (
-        <View style={{ gap: 16 }}>
-          <View style={{ gap: 14 }}>
+        <View style={{ gap: space.md }}>
+          {/* 筛选收进一张工具卡：来源切换 + 搜索 + 格式下拉，首屏只占两行 */}
+          <View
+            style={{
+              gap: space.sm,
+              padding: space.sm,
+              borderRadius: radius.card,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: colors.paper,
+            }}
+          >
             <View
               style={{
                 flexDirection: "row",
-                flexWrap: "wrap",
                 alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
+                flexWrap: "wrap",
+                gap: space.xs,
               }}
             >
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: compact ? 16 : 24 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 2,
+                  padding: 3,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.surface,
+                }}
+              >
                 {sourceFilters.map((item) => {
                   const active = item.id === sourceFilter;
                   return (
@@ -1274,19 +1300,22 @@ export function FilesScreen({
                       accessibilityState={{ selected: active }}
                       onPress={() => setSourceFilter(item.id)}
                       style={{
-                        minHeight: 38,
+                        minHeight: compact ? 36 : 32,
                         flexDirection: "row",
                         alignItems: "center",
                         gap: 6,
-                        borderBottomWidth: 2,
-                        borderBottomColor: active ? colors.primary : "transparent",
+                        paddingHorizontal: 12,
+                        borderRadius: radius.full,
+                        backgroundColor: active ? colors.paper : "transparent",
+                        borderWidth: 1,
+                        borderColor: active ? colors.line : "transparent",
                       }}
                     >
                       <Text
                         style={{
                           fontSize: 12,
                           fontWeight: active ? "600" : "500",
-                          color: active ? colors.primaryStrong : colors.muted,
+                          color: active ? colors.text : colors.muted,
                         }}
                       >
                         {item.label}
@@ -1296,7 +1325,7 @@ export function FilesScreen({
                   );
                 })}
               </View>
-              <Text style={s.small}>
+              <Text style={[s.small, { marginLeft: "auto", color: colors.faint }]}>
                 {t("screens.filesVisibleCount", { count: visibleFiles.length })}
               </Text>
             </View>
@@ -1305,7 +1334,7 @@ export function FilesScreen({
               style={{
                 flexDirection: compact ? "column" : "row",
                 alignItems: compact ? "stretch" : "center",
-                gap: 10,
+                gap: space.xs,
               }}
             >
               <View
@@ -1313,14 +1342,13 @@ export function FilesScreen({
                   s.row,
                   {
                     flex: 1,
-                    minWidth: compact ? undefined : 260,
-                    minHeight: 44,
+                    minHeight: 40,
                     gap: 9,
                     paddingHorizontal: 12,
                     borderWidth: 1,
                     borderColor: colors.line,
                     borderRadius: radius.field,
-                    backgroundColor: colors.paper,
+                    backgroundColor: colors.surfaceSoft,
                   },
                 ]}
               >
@@ -1334,7 +1362,7 @@ export function FilesScreen({
                   style={{
                     flex: 1,
                     minWidth: 0,
-                    minHeight: 42,
+                    minHeight: 38,
                     paddingVertical: 0,
                     borderWidth: 0,
                     color: colors.text,
@@ -1343,10 +1371,43 @@ export function FilesScreen({
                   }}
                 />
               </View>
-              <View
+              <Pressable
+                accessibilityRole="button"
                 accessibilityLabel={t("screens.filesFormatFilter")}
-                style={{ flexDirection: "row", flexWrap: "wrap", gap: 7 }}
+                accessibilityState={{ expanded: formatsOpen }}
+                onPress={() => setFormatsOpen((open) => !open)}
+                style={{
+                  minHeight: 40,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: radius.field,
+                  borderWidth: 1,
+                  borderColor: formatFilter === "all" ? colors.lineStrong : colors.accentLine,
+                  backgroundColor: formatFilter === "all" ? colors.paper : colors.sky,
+                }}
               >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "500",
+                    color: formatFilter === "all" ? colors.muted : colors.primaryStrong,
+                  }}
+                >
+                  {formatFilters.find((item) => item.id === formatFilter)?.label}
+                </Text>
+                {formatsOpen ? (
+                  <ChevronUp size={13} color={colors.faint} />
+                ) : (
+                  <ChevronDown size={13} color={colors.faint} />
+                )}
+              </Pressable>
+            </View>
+
+            {formatsOpen && (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, paddingTop: 2 }}>
                 {formatFilters.map((item) => {
                   const active = item.id === formatFilter;
                   return (
@@ -1356,9 +1417,9 @@ export function FilesScreen({
                       accessibilityState={{ selected: active }}
                       onPress={() => setFormatFilter(item.id)}
                       style={{
-                        minHeight: 38,
+                        minHeight: 32,
                         justifyContent: "center",
-                        paddingHorizontal: 12,
+                        paddingHorizontal: 11,
                         borderRadius: radius.full,
                         borderWidth: 1,
                         borderColor: active ? colors.accentLine : colors.line,
@@ -1378,7 +1439,7 @@ export function FilesScreen({
                   );
                 })}
               </View>
-            </View>
+            )}
           </View>
 
           {!!selectedFiles.length && (
@@ -1387,21 +1448,22 @@ export function FilesScreen({
                 s.row,
                 {
                   flexWrap: "wrap",
-                  gap: 12,
-                  padding: 12,
+                  gap: space.xs,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
                   borderRadius: radius.card,
-                  backgroundColor: colors.surface,
+                  backgroundColor: colors.sky,
                   borderWidth: 1,
-                  borderColor: colors.line,
+                  borderColor: colors.accentLine,
                 },
               ]}
             >
-              <Text style={s.text}>
+              <Text style={[s.text, { fontSize: 13, fontWeight: "500", flex: 1, minWidth: 140 }]}>
                 {t("screens.filesSelectedCount", { count: selectedFiles.length })}
               </Text>
               <Button
                 small
-                style={{ marginLeft: "auto", minHeight: compact ? 44 : 34 }}
+                style={{ minHeight: compact ? 44 : 34 }}
                 onPress={() => setSelectedIds(new Set())}
               >
                 {t("screens.filesClearSelection")}
@@ -1418,32 +1480,10 @@ export function FilesScreen({
             </View>
           )}
 
-          {!!visibleFiles.length && !compact && (
-            <View
-              style={[
-                s.row,
-                {
-                  gap: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.line,
-                },
-              ]}
-            >
-              <View style={{ width: 40 }} />
-              <Text style={[s.small, { flex: 1 }]}>{t("screens.filesColumnName")}</Text>
-              <Text style={[s.small, { width: 96 }]}>{t("screens.filesColumnSource")}</Text>
-              <Text style={[s.small, { width: 72 }]}>{t("screens.filesColumnDate")}</Text>
-              <Text style={[s.small, { width: 154, textAlign: "right" }]}>
-                {t("screens.filesColumnActions")}
-              </Text>
-            </View>
-          )}
-
           {visibleFiles.length ? (
-            <View style={{ gap: 8 }}>
-              {visibleFiles.map((file) => {
+            // 文件改为一张卡内的分行列表：共用描边、行间 1px 分隔，去掉表头与逐行卡片
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              {visibleFiles.map((file, index) => {
                 const kind = fileKind(file);
                 const extension = fileExtension(file);
                 const selected = selectedIds.has(file.id);
@@ -1465,142 +1505,116 @@ export function FilesScreen({
                   }[kind];
                 })();
                 return (
-                  <Card
+                  <View
                     key={file.id}
                     style={{
-                      padding: 0,
-                      overflow: "hidden",
-                      backgroundColor: selected ? colors.sky : colors.paper,
+                      flexDirection: compact ? "column" : "row",
+                      alignItems: compact ? "stretch" : "center",
+                      gap: compact ? space.xs : space.sm,
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                      borderTopWidth: index ? 1 : 0,
+                      borderTopColor: colors.line,
+                      backgroundColor: selected ? colors.sky : "transparent",
                     }}
                   >
-                    <View
-                      style={{
-                        flexDirection: compact ? "column" : "row",
-                        alignItems: compact ? "stretch" : "center",
-                        gap: compact ? 10 : 12,
-                        padding: compact ? 12 : 14,
-                      }}
-                    >
-                      <View style={[s.row, { flex: 1, minWidth: 0, gap: 12 }]}>
-                        <Pressable
-                          accessibilityRole="checkbox"
-                          accessibilityLabel={t("screens.filesSelectLabel", { name: file.name })}
-                          accessibilityState={{ checked: selected }}
-                          onPress={() => toggleSelection(file.id)}
-                          style={{
-                            width: 40,
-                            height: 40,
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: 18,
-                              height: 18,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              borderRadius: radius.badge,
-                              borderWidth: 1,
-                              borderColor: selected ? colors.primary : colors.lineStrong,
-                              backgroundColor: selected ? colors.primary : colors.paper,
-                            }}
-                          >
-                            {selected && <Check size={12} color={colors.onPrimary} />}
-                          </View>
-                        </Pressable>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={t("screens.filesOpenLabel", { name: file.name })}
-                          onPress={() => open({ type: "file", file })}
-                          style={({ pressed }) => [
-                            s.row,
-                            { flex: 1, minWidth: 0, gap: 12 },
-                            pressed && { opacity: 0.78 },
-                          ]}
-                        >
-                          <View
-                            style={{
-                              width: 38,
-                              height: 43,
-                              flexShrink: 0,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              borderRadius: radius.control,
-                              borderWidth: 1,
-                              borderColor: colors.line,
-                              backgroundColor: colors.surface,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 9,
-                                fontWeight: "600",
-                                color: colors.muted,
-                              }}
-                            >
-                              {fileBadge(file)}
-                            </Text>
-                          </View>
-                          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                            <Text numberOfLines={1} style={[s.text, { fontWeight: "500" }]}>
-                              {file.name}
-                            </Text>
-                            <Text numberOfLines={1} style={s.small}>
-                              {Math.max(1, Math.round(file.size / 1024))} KB · {fileMeta}
-                              {compact
-                                ? ` · ${fileSourceLabel(file.source, t)} · ${dateLabel(file.createdAt)}`
-                                : ""}
-                            </Text>
-                          </View>
-                        </Pressable>
-                      </View>
-
-                      {!compact && (
-                        <Text
-                          numberOfLines={1}
-                          style={[s.small, { width: 96, color: colors.faint }]}
-                        >
-                          {fileSourceLabel(file.source, t)}
-                        </Text>
-                      )}
-                      {!compact && (
-                        <Text
-                          numberOfLines={1}
-                          style={[s.small, { width: 72, color: colors.faint }]}
-                        >
-                          {dateLabel(file.createdAt)}
-                        </Text>
-                      )}
-                      <View
+                    <View style={[s.row, { flex: 1, minWidth: 0, gap: 10 }]}>
+                      <Pressable
+                        accessibilityRole="checkbox"
+                        accessibilityLabel={t("screens.filesSelectLabel", { name: file.name })}
+                        accessibilityState={{ checked: selected }}
+                        onPress={() => toggleSelection(file.id)}
                         style={{
-                          flexDirection: "row",
+                          width: 32,
+                          height: 40,
                           alignItems: "center",
-                          justifyContent: "flex-end",
-                          gap: 7,
-                          marginLeft: compact ? 40 : 0,
+                          justifyContent: "center",
                         }}
                       >
-                        <IconButton
-                          icon={ArrowDownToLine}
-                          label={t("screens.filesDownload", { name: file.name })}
-                          size={compact ? 44 : 36}
-                          onPress={() => download(file)}
-                        />
-                        <Button
-                          small
-                          icon={Sparkles}
-                          style={{ minHeight: compact ? 44 : 34 }}
-                          onPress={() => analyzeFiles([file])}
+                        <View
+                          style={{
+                            width: 18,
+                            height: 18,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: radius.badge,
+                            borderWidth: 1,
+                            borderColor: selected ? colors.primary : colors.lineStrong,
+                            backgroundColor: selected ? colors.primary : colors.paper,
+                          }}
                         >
-                          {t("screens.filesAnalyze")}
-                        </Button>
-                      </View>
+                          {selected && <Check size={12} color={colors.onPrimary} />}
+                        </View>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("screens.filesOpenLabel", { name: file.name })}
+                        onPress={() => open({ type: "file", file })}
+                        style={({ pressed }) => [
+                          s.row,
+                          { flex: 1, minWidth: 0, gap: 10 },
+                          pressed && { opacity: 0.72 },
+                        ]}
+                      >
+                        <View
+                          style={{
+                            width: 36,
+                            height: 40,
+                            flexShrink: 0,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: radius.control,
+                            borderWidth: 1,
+                            borderColor: colors.line,
+                            backgroundColor: colors.surface,
+                          }}
+                        >
+                          <Text style={{ fontSize: 9, fontWeight: "600", color: colors.muted }}>
+                            {fileBadge(file)}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                          <Text
+                            numberOfLines={1}
+                            style={[s.text, { fontSize: 14, lineHeight: 21, fontWeight: "500" }]}
+                          >
+                            {file.name}
+                          </Text>
+                          <Text numberOfLines={1} style={[s.small, { color: colors.faint }]}>
+                            {Math.max(1, Math.round(file.size / 1024))} KB · {fileMeta} ·{" "}
+                            {fileSourceLabel(file.source, t)} · {dateLabel(file.createdAt)}
+                          </Text>
+                        </View>
+                      </Pressable>
                     </View>
-                  </Card>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "flex-end",
+                        gap: 6,
+                        marginLeft: compact ? 32 : 0,
+                      }}
+                    >
+                      <IconButton
+                        icon={ArrowDownToLine}
+                        label={t("screens.filesDownload", { name: file.name })}
+                        size={compact ? 40 : 34}
+                        onPress={() => download(file)}
+                      />
+                      <Button
+                        small
+                        icon={Sparkles}
+                        style={{ minHeight: compact ? 40 : 32 }}
+                        onPress={() => analyzeFiles([file])}
+                      >
+                        {t("screens.filesAnalyze")}
+                      </Button>
+                    </View>
+                  </View>
                 );
               })}
-            </View>
+            </Card>
           ) : (
             <Card>
               <Empty
@@ -1633,13 +1647,14 @@ export function FilesScreen({
             style={({ pressed }) => [
               s.row,
               {
-                gap: 14,
-                padding: compact ? 14 : 18,
+                gap: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
                 borderWidth: 1,
                 borderStyle: "dashed",
                 borderColor: colors.lineStrong,
                 borderRadius: radius.field,
-                backgroundColor: pressed ? colors.surface : colors.surfaceSoft,
+                backgroundColor: pressed ? colors.surface : "transparent",
                 opacity: busy ? 0.7 : 1,
               },
             ]}
@@ -1647,18 +1662,20 @@ export function FilesScreen({
             {busy ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
-              <Upload size={21} color={colors.muted} />
+              <Upload size={18} color={colors.muted} />
             )}
-            <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-              <Text style={[s.text, { fontSize: 13, fontWeight: "500" }]}>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>
                 {t("screens.filesUploadAreaTitle")}
               </Text>
-              <Text style={s.small}>{t("screens.filesUploadAreaDetail")}</Text>
+              <Text numberOfLines={compact ? 2 : 1} style={[s.small, { color: colors.faint }]}>
+                {t("screens.filesUploadAreaDetail")}
+              </Text>
             </View>
-            {!compact && <Plus size={16} color={colors.muted} />}
+            {!compact && <Plus size={15} color={colors.faint} />}
           </Pressable>
 
-          <View style={[s.row, { gap: 7, alignItems: "flex-start" }]}>
+          <View style={[s.row, { gap: 6, alignItems: "flex-start", paddingHorizontal: 2 }]}>
             <View style={{ marginTop: 3 }}>
               <ShieldCheck size={12} color={colors.faint} />
             </View>
@@ -1671,40 +1688,54 @@ export function FilesScreen({
 
       {section === "insights" &&
         (savedArtifacts.length ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, alignItems: "stretch" }}>
-            {savedArtifacts.map((artifact) => {
-              const view = workbenchInsightView(artifact);
-              const symbol = [view.symbolName, view.code].filter(Boolean).join(" · ");
-              return (
-                <View
-                  key={artifact.id}
-                  style={{
-                    width: savedArtifacts.length === 1 ? Math.min(contentWidth, 760) : cardWidth,
-                  }}
-                >
-                  <InsightCard
-                    eyebrow={`${t("screens.libraryInsights")} · ${
-                      view.category || statusLabel(artifact.kind)
-                    }`}
-                    title={view.title}
-                    basis={view.basis}
-                    limits={view.limits}
-                    revisit={view.revisit}
-                    showSections={false}
-                    meta={symbol || t("workbench.insightRelatedAnalysis")}
-                    saved={true}
-                    savePlacement="header"
-                    onToggleSave={() => {
-                      toggleSavedInsight(artifact.id);
-                      notify(t("workbench.insightUnsavedNotice"));
-                    }}
-                    actionLabel={t("workbench.expand")}
-                    accessibilityLabel={`${t("workbench.expand")}：${view.title}`}
-                    onPress={() => open({ type: "insight", artifact })}
-                  />
-                </View>
-              );
-            })}
+          <View style={{ gap: space.md }}>
+            <View style={[s.between, { gap: space.xs, flexWrap: "wrap" }]}>
+              <Text style={[s.small, { flex: 1, minWidth: 200 }]}>
+                {t("screens.libraryInsightsHint")}
+              </Text>
+              <Text style={[s.small, s.metric, { color: colors.faint }]}>
+                {t("screens.libraryItemCount", { count: savedArtifacts.length })}
+              </Text>
+            </View>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: space.md,
+                alignItems: "stretch",
+              }}
+            >
+              {savedArtifacts.map((artifact) => {
+                const view = workbenchInsightView(artifact);
+                const symbol = [view.symbolName, view.code].filter(Boolean).join(" · ");
+                const date = dateLabel(artifact.createdAt);
+                return (
+                  <View
+                    key={artifact.id}
+                    style={{ width: savedArtifacts.length === 1 ? "100%" : cardWidth }}
+                  >
+                    <InsightCard
+                      // 分类做眉标、标题保留两行，再用一句结论/依据补齐卡片信息量
+                      eyebrow={view.category || statusLabel(artifact.kind)}
+                      title={view.title}
+                      detail={view.takeaway || view.basis}
+                      showSections={false}
+                      meta={symbol ? `${symbol} · ${date}` : date}
+                      saved={true}
+                      savePlacement="header"
+                      onToggleSave={() => {
+                        toggleSavedInsight(artifact.id);
+                        notify(t("workbench.insightUnsavedNotice"));
+                      }}
+                      actionLabel={t("workbench.expand")}
+                      accessibilityLabel={`${t("workbench.expand")}：${view.title}`}
+                      onPress={() => open({ type: "insight", artifact })}
+                      style={{ height: "100%", minHeight: 168 }}
+                    />
+                  </View>
+                );
+              })}
+            </View>
           </View>
         ) : (
           <Card>

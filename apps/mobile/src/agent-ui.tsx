@@ -1232,7 +1232,6 @@ export function IdeasScreen({ onUsePrompt }: { onUsePrompt?: () => void } = {}) 
       <AgentStatus />
       <View style={{ gap: 14 }}>
         <View style={{ gap: 4 }}>
-          <SectionHeading title={t("agent.researchTemplates")} />
           <Text style={s.muted}>{t("agent.researchTemplatesDetail")}</Text>
         </View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
@@ -1251,10 +1250,10 @@ export function IdeasScreen({ onUsePrompt }: { onUsePrompt?: () => void } = {}) 
                 style={({ pressed }) => ({
                   flexBasis: threeColumns ? "31.5%" : "47%",
                   flexGrow: threeColumns ? 1 : 0,
-                  minHeight: threeColumns ? 164 : 208,
+                  minHeight: threeColumns ? 152 : 196,
                   gap: threeColumns ? 10 : 12,
                   padding: threeColumns ? 14 : 12,
-                  borderRadius: 17,
+                  borderRadius: radius.card,
                   borderWidth: 1,
                   borderColor: colors.line,
                   backgroundColor: pressed ? colors.surfaceRaised : colors.paper,
@@ -1393,28 +1392,28 @@ function IdeaCard({ idea, onUsePrompt }: { idea: Idea; onUsePrompt?: () => void 
           : Lightbulb;
   return (
     // 灵感列表行：紧凑内边距 + 底部描边分隔，整行可点击展开。
-    <View style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line }}>
+    <View style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("agent.viewIdeaLabel", { title: idea.title })}
         accessibilityState={{ expanded }}
         onPress={() => setExpanded(!expanded)}
-        // 可点击行按压态用 overlay1，圆角 10 与控件体系一致。
+        // 可点击行按压态用 overlay1，圆角与控件体系一致。
         style={({ pressed }) => [
-          { flexDirection: "row", gap: 12, borderRadius: 10 },
+          { flexDirection: "row", gap: 10, borderRadius: radius.control },
           pressed && { backgroundColor: colors.overlay1 },
         ]}
       >
-        <View style={{ width: 34, alignItems: "center", justifyContent: "center" }}>
-          <IdeaIcon size={22} color={colors.primary} />
+        <View style={{ width: 30, alignItems: "center", justifyContent: "center" }}>
+          <IdeaIcon size={20} color={colors.primary} />
         </View>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={[s.heading, { fontSize: 15, lineHeight: 21 }]}>{idea.title}</Text>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={[s.heading, { fontSize: 14, lineHeight: 21 }]}>{idea.title}</Text>
           <Text style={s.muted}>{idea.reason}</Text>
         </View>
       </Pressable>
       {expanded && (
-        <View style={{ gap: 12, marginTop: 12, paddingLeft: 46 }}>
+        <View style={{ gap: 12, marginTop: 10, paddingLeft: 40 }}>
           <EvidenceList items={idea.evidence} />
           {editing && (
             <Field

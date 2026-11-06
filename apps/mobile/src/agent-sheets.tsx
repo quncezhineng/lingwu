@@ -73,12 +73,10 @@ export function PanelButton({
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed, hovered }) => ({
-        minHeight: 52,
-        paddingHorizontal: 7,
-        paddingVertical: 8,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: active ? colors.accentLine : "transparent",
+        minHeight: 46,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: radius.card,
         backgroundColor: active
           ? colors.sky
           : pressed
@@ -88,22 +86,22 @@ export function PanelButton({
               : "transparent",
         flexDirection: "row",
         alignItems: "center",
-        gap: 12,
+        gap: 10,
       })}
     >
       <View
         style={{
-          width: compact ? 32 : 38,
-          height: compact ? 32 : 38,
-          borderRadius: 12,
+          width: compact ? 30 : 34,
+          height: compact ? 30 : 34,
+          borderRadius: radius.control,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: active ? colors.paper : colors.surface,
         }}
       >
-        <Icon size={18} color={active ? colors.primary : colors.muted} />
+        <Icon size={17} color={active ? colors.primary : colors.muted} />
       </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text style={[s.text, { fontSize: 13, fontWeight: "500" }]}>{title}</Text>
         {!!detail && !compact && (
           <Text numberOfLines={2} style={[s.small, { color: colors.faint }]}>
@@ -213,9 +211,10 @@ export function AgentMoreContent({
       {!!capabilities.length && (
         <Text
           style={{
-            marginTop: 18,
-            marginBottom: 10,
-            fontSize: 13,
+            marginTop: 16,
+            marginBottom: 8,
+            paddingHorizontal: 8,
+            fontSize: 12,
             fontWeight: "600",
             color: colors.muted,
           }}
@@ -223,7 +222,7 @@ export function AgentMoreContent({
           {t("agentSpace.agentCapabilities", { name: current.name })}
         </Text>
       )}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 9 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {capabilities.map((capability) => {
           const label = AGENT_CAPABILITY_LABELS[capability];
           return (
@@ -233,13 +232,13 @@ export function AgentMoreContent({
               onPress={() => onPanel("capabilities")}
               style={({ pressed }) => ({
                 width: "47%",
-                minHeight: 64,
-                padding: 11,
-                borderRadius: 15,
+                minHeight: 60,
+                padding: 10,
+                borderRadius: radius.card,
                 borderWidth: 1,
                 borderColor: colors.line,
                 backgroundColor: pressed ? colors.surface : colors.paper,
-                gap: 9,
+                gap: 8,
               })}
             >
               <Sparkles size={15} color={colors.primary} />
@@ -440,9 +439,9 @@ function PreferencesSheet({ onClose }: { onClose: () => void }) {
             key={value}
             onPress={() => setRisk(value)}
             style={{
-              paddingHorizontal: 12,
-              paddingVertical: 7,
-              borderRadius: radius.full,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: radius.control,
               borderWidth: 1,
               borderColor: risk === value ? colors.primary : colors.line,
               backgroundColor: risk === value ? colors.sky : colors.paper,
@@ -450,7 +449,7 @@ function PreferencesSheet({ onClose }: { onClose: () => void }) {
           >
             <Text
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 color: risk === value ? colors.primaryStrong : colors.muted,
               }}
             >
@@ -472,9 +471,9 @@ function PreferencesSheet({ onClose }: { onClose: () => void }) {
               accessibilityState={{ selected }}
               onPress={() => setHorizon(selected ? "" : value)}
               style={{
-                paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: radius.full,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: radius.control,
                 borderWidth: 1,
                 borderColor: selected ? colors.primary : colors.line,
                 backgroundColor: selected ? colors.sky : colors.paper,
@@ -482,7 +481,7 @@ function PreferencesSheet({ onClose }: { onClose: () => void }) {
             >
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   color: selected ? colors.primaryStrong : colors.muted,
                 }}
               >
@@ -612,7 +611,7 @@ export function AgentSheets({
   if (panel === "watchlist")
     return (
       <Sheet botLayout title={t("agentSpace.watchlistAndPortfolio")} onClose={onClose} wide>
-        <WatchlistHubScreen mode="embedded" />
+        <WatchlistHubScreen mode="embedded" onOpenChat={onClose} />
       </Sheet>
     );
   if (panel === "tasks")
@@ -625,7 +624,8 @@ export function AgentSheets({
   if (panel === "files")
     return (
       <Sheet botLayout title={t("agentSpace.library")} onClose={onClose} wide>
-        <FilesScreen embedded />
+        {/* 投入分析会把提示词预填进对话，这里先关掉弹层让用户看到输入框。 */}
+        <FilesScreen embedded onOpenChat={onClose} />
       </Sheet>
     );
   if (panel === "insights") return <InsightsSheet onClose={onClose} />;
@@ -643,7 +643,7 @@ export function AgentSheets({
         onClose={onClose}
         wide
       >
-        <CapabilityHubScreen mode="embedded" />
+        <CapabilityHubScreen mode="embedded" onOpenChat={onClose} />
       </Sheet>
     );
   if (panel === "account")

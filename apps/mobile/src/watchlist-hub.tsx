@@ -11,7 +11,14 @@ import { useWorkspace } from "./workspace";
  * 自选与投资组合共用「我的自选」导航入口，在页面内通过页签切换。
  * 页面模式联动 watchlist / portfolio 路由；内嵌模式只切换弹窗内的内容。
  */
-export function WatchlistHubScreen({ mode = "page" }: { mode?: "page" | "embedded" } = {}) {
+export function WatchlistHubScreen({
+  mode = "page",
+  onOpenChat,
+}: {
+  mode?: "page" | "embedded";
+  /** 预填提示词后跳转对话：弹层内使用时由调用方关闭弹层。 */
+  onOpenChat?: () => void;
+} = {}) {
   const { section, navigate } = useWorkspace();
   const { t } = useTranslation();
   const [embeddedTab, setEmbeddedTab] = useState<"watchlist" | "portfolio">("watchlist");
@@ -77,7 +84,7 @@ export function WatchlistHubScreen({ mode = "page" }: { mode?: "page" | "embedde
       {activeTab === "portfolio" ? (
         <PortfolioScreen embedded={mode === "embedded"} />
       ) : (
-        <WatchlistScreen embedded={mode === "embedded"} />
+        <WatchlistScreen embedded={mode === "embedded"} onOpenChat={onOpenChat} />
       )}
     </View>
   );

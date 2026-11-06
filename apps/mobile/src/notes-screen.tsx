@@ -35,7 +35,7 @@ import {
   type ThesisStatus,
   useNotesState,
 } from "./notes";
-import { breakpoints } from "./theme";
+import { breakpoints, radius, space } from "./theme";
 import { Button, Card, Chip, colors, DisclaimerNote, Empty, ErrorNotice, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -71,17 +71,18 @@ function ChipButton({
       accessibilityRole="tab"
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
+      hitSlop={disabled ? undefined : 4}
       onPress={onPress}
       style={{
-        minHeight: 44,
+        minHeight: 36,
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        paddingHorizontal: 12,
-        borderRadius: 999,
+        paddingHorizontal: 10,
+        borderRadius: radius.full,
         borderWidth: 1,
-        borderColor: selected ? colors.primary : colors.line,
-        backgroundColor: selected ? colors.sky : colors.paper,
+        borderColor: selected ? colors.accentLine : "transparent",
+        backgroundColor: selected ? colors.sky : colors.surfaceSoft,
         opacity: disabled ? 0.4 : 1,
       }}
     >
@@ -362,47 +363,102 @@ export function NotesScreen() {
   ];
 
   return (
-    <View style={{ gap: 14 }}>
-      <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-        <View style={{ flex: 1, minWidth: 220 }}>
-          <View
-            style={[
-              s.row,
-              {
-                gap: 8,
-                minHeight: 44,
-                paddingHorizontal: 12,
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: colors.line,
-              },
-            ]}
-          >
-            <Search size={17} color={colors.faint} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t("notes.searchPlaceholder")}
-              placeholderTextColor={colors.faint}
-              accessibilityLabel={t("notes.searchPlaceholder")}
-              style={{ flex: 1, fontSize: 15, color: colors.text, paddingVertical: 8 }}
-            />
-            {!!query && (
+    <View style={{ gap: space.md }}>
+      {/* 控制栏：视图切换 + 搜索 + 写笔记并排一行，避免三层筛选把首屏占满 */}
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: space.xs,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 2,
+            padding: 3,
+            borderRadius: radius.full,
+            backgroundColor: colors.surface,
+          }}
+        >
+          {(
+            [
+              { id: "notes", label: t("notes.tabNotes") },
+              { id: "theses", label: t("notes.tabTheses") },
+            ] as Array<{ id: "notes" | "theses"; label: string }>
+          ).map((item) => {
+            const active = tab === item.id;
+            return (
               <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("notes.clearFilters")}
-                onPress={() => setQuery("")}
-                style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
+                key={item.id}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                onPress={() => setTab(item.id)}
+                style={{
+                  minHeight: width < 600 ? 36 : 32,
+                  paddingHorizontal: 14,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: radius.full,
+                  backgroundColor: active ? colors.paper : "transparent",
+                  borderWidth: 1,
+                  borderColor: active ? colors.line : "transparent",
+                }}
               >
-                <Text style={{ color: colors.faint, fontSize: 16 }}>×</Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: active ? "600" : "500",
+                    color: active ? colors.text : colors.muted,
+                  }}
+                >
+                  {item.label}
+                </Text>
               </Pressable>
-            )}
-          </View>
+            );
+          })}
+        </View>
+        <View
+          style={[
+            s.row,
+            {
+              flexGrow: 1,
+              flexBasis: width < 600 ? "100%" : 220,
+              minHeight: 40,
+              gap: 8,
+              paddingHorizontal: 10,
+              borderRadius: radius.field,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: colors.paper,
+            },
+          ]}
+        >
+          <Search size={15} color={colors.faint} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t("notes.searchPlaceholder")}
+            placeholderTextColor={colors.faint}
+            accessibilityLabel={t("notes.searchPlaceholder")}
+            style={{ flex: 1, fontSize: 13, color: colors.text, paddingVertical: 8 }}
+          />
+          {!!query && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("notes.clearFilters")}
+              onPress={() => setQuery("")}
+              style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}
+            >
+              <Text style={{ color: colors.faint, fontSize: 16 }}>×</Text>
+            </Pressable>
+          )}
         </View>
         <Button
           primary={state.notes.length > 0}
           icon={Plus}
-          style={{ minHeight: 44 }}
+          style={{ minHeight: width < 600 ? 44 : 38 }}
           onPress={() =>
             setEditor({
               type: tab === "theses" ? "THESIS" : "RESEARCH",
@@ -411,55 +467,6 @@ export function NotesScreen() {
         >
           {t("notes.writeNote")}
         </Button>
-      </View>
-
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 3,
-          padding: 3,
-          borderRadius: 999,
-          backgroundColor: colors.surface,
-          alignSelf: width < 600 ? "stretch" : "flex-start",
-        }}
-      >
-        {(
-          [
-            { id: "notes", label: t("notes.tabNotes") },
-            { id: "theses", label: t("notes.tabTheses") },
-          ] as Array<{ id: "notes" | "theses"; label: string }>
-        ).map((item) => {
-          const active = tab === item.id;
-          return (
-            <Pressable
-              key={item.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              onPress={() => setTab(item.id)}
-              style={{
-                flex: width < 600 ? 1 : undefined,
-                minHeight: 44,
-                paddingHorizontal: 18,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 999,
-                backgroundColor: active ? colors.paper : "transparent",
-                borderWidth: active ? 1 : 0,
-                borderColor: colors.line,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: active ? "600" : "500",
-                  color: active ? colors.text : colors.muted,
-                }}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
       </View>
 
       {state.status === "loading" && state.notes.length === 0 ? (
@@ -699,8 +706,6 @@ export function NotesScreen() {
               ))}
             </View>
           )}
-          <Text style={[s.small, { color: colors.faint }]}>{t("notes.aiNotice")}</Text>
-          <DisclaimerNote />
         </>
       )}
 

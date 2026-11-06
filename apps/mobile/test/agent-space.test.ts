@@ -148,6 +148,29 @@ test("each Agent keeps its own model and drops unusable values", () => {
   assert.equal(broken && "model" in broken, false);
 });
 
+test("pinning survives persistence and stays off the wire when unset", () => {
+  const state = normalizeAgentSpace(
+    {
+      currentAgentId: "pinned-agent",
+      agents: [
+        {
+          ...createAgentFromTemplate("market", { id: "pinned-agent", threadId: "pinned-thread" }),
+          pinned: true,
+        },
+        createAgentFromTemplate("custom", { id: "plain-agent", threadId: "plain-thread" }),
+      ],
+      onboardingDone: true,
+    },
+    MAIN_THREAD,
+  );
+  const pinned = state.agents.find((agent) => agent.id === "pinned-agent");
+  const plain = state.agents.find((agent) => agent.id === "plain-agent");
+  assert.equal(pinned?.pinned, true);
+  // 未置顶不写字段：归一化前后一致，也不会给服务端多送一个键。
+  assert.equal(plain && "pinned" in plain, false);
+  assert.deepEqual(normalizeAgentSpace(JSON.parse(JSON.stringify(state)), MAIN_THREAD), state);
+});
+
 test("normalization is idempotent across repeated persisted loads", () => {
   const first = normalizeAgentSpace(
     {

@@ -202,13 +202,34 @@ export function NoteCard({
         pressed && { backgroundColor: colors.overlay1 },
       ]}
     >
-      <View style={[s.between, { gap: 8 }]}>
-        <View style={[s.row, { gap: 6, flexWrap: "wrap", flex: 1 }]}>
-          <NoteTypeChip type={note.type} />
-          <Chip>{note.symbolCode}</Chip>
-          {note.type === "THESIS" && <ThesisStatusChip status={note.status} />}
-          {note.type === "THESIS" && <ThesisCheckChip note={note} />}
-        </View>
+      {/* 层级：类型/标的 → 标题 → 正文 → 元信息（标的名称 + 时间），不再让日期抢在首行 */}
+      <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>
+        <NoteTypeChip type={note.type} />
+        <Chip>{note.symbolCode}</Chip>
+        {note.type === "THESIS" && <ThesisStatusChip status={note.status} />}
+        {note.type === "THESIS" && <ThesisCheckChip note={note} />}
+      </View>
+      {!!note.title && (
+        <Text
+          style={[s.text, { fontSize: 15, lineHeight: 23, fontWeight: "600" }]}
+          numberOfLines={2}
+        >
+          {note.title}
+        </Text>
+      )}
+      <Text
+        style={[
+          s.text,
+          { fontSize: 14, lineHeight: 22, color: note.title ? colors.muted : colors.text },
+        ]}
+        numberOfLines={compact ? 1 : 2}
+      >
+        {note.content}
+      </Text>
+      <View style={[s.between, { gap: 8, marginTop: 2 }]}>
+        <Text style={[s.small, { flex: 1, minWidth: 0, color: colors.faint }]} numberOfLines={1}>
+          {symbolName}
+        </Text>
         <Text style={[s.small, s.metric, { color: colors.faint }]}>
           {new Date(note.createdAt).toLocaleDateString()}{" "}
           {new Date(note.createdAt).toLocaleTimeString(undefined, {
@@ -217,20 +238,6 @@ export function NoteCard({
           })}
         </Text>
       </View>
-      <Text style={[s.muted, { fontSize: 12 }]} numberOfLines={1}>
-        {symbolName}
-      </Text>
-      {!!note.title && (
-        <Text style={[s.text, { fontSize: 14, fontWeight: "600" }]} numberOfLines={1}>
-          {note.title}
-        </Text>
-      )}
-      <Text
-        style={[s.text, { fontSize: 14, lineHeight: 21 }]}
-        numberOfLines={note.title ? 1 : compact ? 1 : 2}
-      >
-        {note.content}
-      </Text>
       {note.type === "THESIS" && (
         <Text
           style={[
@@ -814,7 +821,7 @@ export function NoteDetailSheet({
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
-  const { ask, close } = useWorkspace();
+  const { prefillPrompt } = useWorkspace();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmStatus, setConfirmStatus] = useState(false);
@@ -886,8 +893,9 @@ export function NoteDetailSheet({
           icon={MessageCircle}
           style={{ minHeight: 44 }}
           onPress={() => {
-            close();
-            ask(
+            onClose();
+            // 追问只预填到对话框，由用户决定是否发送。
+            prefillPrompt(
               t("notes.followUpPrompt", {
                 symbol: note.symbolCode,
                 excerpt: note.content.slice(0, 60),

@@ -277,10 +277,9 @@ export function AgentOnboarding() {
               style={{
                 alignSelf: "flex-end",
                 maxWidth: "86%",
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderRadius: 16,
-                borderBottomRightRadius: 5,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: radius.card,
                 backgroundColor: colors.surface,
                 marginBottom: compact ? 25 : 32,
               }}
@@ -329,11 +328,10 @@ export function AgentOnboarding() {
               backgroundColor: colors.paper,
               borderWidth: 1,
               borderColor: colors.line,
-              borderRadius: compact ? 23 : 26,
-              paddingHorizontal: compact ? 18 : 34,
-              paddingVertical: compact ? 20 : 32,
-              gap: compact ? 12 : 20,
-              minHeight: compact ? undefined : 430,
+              borderRadius: radius.card,
+              paddingHorizontal: compact ? 18 : 28,
+              paddingVertical: compact ? 20 : 28,
+              gap: compact ? 12 : 18,
             }}
           >
             {step === 0 && (
@@ -354,8 +352,8 @@ export function AgentOnboarding() {
                   style={[
                     s.input,
                     {
-                      minHeight: compact ? 48 : 56,
-                      borderRadius: compact ? 13 : 15,
+                      minHeight: compact ? 48 : 54,
+                      borderRadius: radius.field,
                       textAlign: "center",
                       fontSize: compact ? 16 : 18,
                       fontWeight: "600",

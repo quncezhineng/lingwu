@@ -34,6 +34,7 @@ import {
   Empty,
   IconButton,
   LinkRow,
+  radius,
   SectionHeading,
   Sheet,
   s,
@@ -247,12 +248,12 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
           style={[
             s.row,
             {
-              gap: 10,
-              minHeight: 48,
-              paddingHorizontal: 14,
+              gap: 8,
+              minHeight: 44,
+              paddingHorizontal: 12,
               borderWidth: 1,
-              borderColor: colors.lineStrong,
-              borderRadius: 9,
+              borderColor: colors.line,
+              borderRadius: radius.field,
               backgroundColor: colors.paper,
             },
           ]}
@@ -268,7 +269,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
             placeholder={t("search.placeholder")}
             placeholderTextColor={colors.faint}
             style={[
-              { flex: 1, minHeight: 46, color: colors.text, fontSize: 14 },
+              { flex: 1, minHeight: 42, color: colors.text, fontSize: 14 },
               Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null,
             ]}
           />

@@ -357,7 +357,7 @@ export function MarketBriefingCard({
   plain?: boolean;
   onRequestClose?: () => void;
 } = {}) {
-  const { api, ask, navigate, notify, open } = useWorkspace();
+  const { api, prefillPrompt, navigate, notify, open } = useWorkspace();
   const { data } = useAgentWorkspace();
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
@@ -409,7 +409,8 @@ export function MarketBriefingCard({
           }`,
       )
       .join(" · ");
-    ask(
+    // 只把提示词预填进输入框，是否发送交给用户确认。
+    prefillPrompt(
       t("markets.briefingFollowUpPrompt", {
         date: dateLabel(briefing.date, { month: "long", day: "numeric" }),
         source:

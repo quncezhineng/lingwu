@@ -1231,7 +1231,7 @@ function FileDetail({ file: f }: { file: Artifact }) {
  * 完整 HTML 报告仍从对话、资料库或搜索结果进入 `ArtifactDetail`。
  */
 function InsightDetail({ artifact }: { artifact: AgentArtifact }) {
-  const { api, ask, close, navigate, notify, open } = useWorkspace();
+  const { api, prefillPrompt, close, navigate, notify, open } = useWorkspace();
   const { t } = useTranslation();
   useWatchlistState();
   const savedInsightIds = useSavedInsightIds();
@@ -1268,7 +1268,7 @@ function InsightDetail({ artifact }: { artifact: AgentArtifact }) {
       setPlainOpen((current) => !current);
       return;
     }
-    ask(t("workbench.insightSimplifyPrompt", { title: view.title }));
+    prefillPrompt(t("workbench.insightSimplifyPrompt", { title: view.title }));
     close();
   };
 
@@ -1457,7 +1457,7 @@ function InsightDetail({ artifact }: { artifact: AgentArtifact }) {
                   small
                   disabled={!disagreement.trim()}
                   onPress={() => {
-                    ask(
+                    prefillPrompt(
                       `${t("workbench.insightDisagreePrompt", {
                         title: view.title,
                       })}\n\n${disagreement.trim()}`,
@@ -1558,7 +1558,7 @@ function InsightDetail({ artifact }: { artifact: AgentArtifact }) {
  * 与「对话里只显示标题提示、点击弹出网页详情」的交互保持一致。
  */
 function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
-  const { ask, close, notify } = useWorkspace();
+  const { prefillPrompt, close, notify } = useWorkspace();
   const { t } = useTranslation();
   const savedInsightIds = useSavedInsightIds();
   const [plainOpen, setPlainOpen] = useState(false);
@@ -1578,12 +1578,12 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
       setPlainOpen((current) => !current);
       return;
     }
-    ask(t("workbench.insightSimplifyPrompt", { title: view.title }));
+    prefillPrompt(t("workbench.insightSimplifyPrompt", { title: view.title }));
     close();
   };
 
   const disagree = () => {
-    ask(t("workbench.insightDisagreePrompt", { title: view.title }));
+    prefillPrompt(t("workbench.insightDisagreePrompt", { title: view.title }));
     close();
   };
 

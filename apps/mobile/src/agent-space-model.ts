@@ -50,6 +50,8 @@ export interface AgentDefinition {
   model?: string;
   /** The system-created default Agent cannot be deleted. */
   system: boolean;
+  /** 置顶：在左侧 Agent 列表中排在未置顶的 Agent 之前（不改动 agents 的实际存储顺序）。 */
+  pinned?: boolean;
   /** True once the server has created or already knows this thread. */
   threadExists: boolean;
   createdAt: string;
@@ -315,6 +317,8 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
   // 没有专属模型时不写字段：键不存在才等于「跟随默认模型」，也让持久化前后保持一致。
   const model = normalizeAgentModel(value.model);
   if (model) agent.model = model;
+  // 置顶同理：只在置顶时写入标记，未置顶的 Agent 不产出多余字段（幂等归一化不会多出 key）。
+  if (value.pinned === true) agent.pinned = true;
   return agent;
 }
 

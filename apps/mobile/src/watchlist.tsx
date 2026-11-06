@@ -1286,8 +1286,15 @@ export function WatchlistAddSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function WatchlistScreen({ embedded = false }: { embedded?: boolean } = {}) {
-  const { api, notify, open, ask } = useWorkspace();
+export function WatchlistScreen({
+  embedded = false,
+  onOpenChat,
+}: {
+  embedded?: boolean;
+  /** 预填提示词后跳转对话：页面若挂在弹层里，由调用方关闭弹层。 */
+  onOpenChat?: () => void;
+} = {}) {
+  const { api, notify, open, prefillPrompt } = useWorkspace();
   const { t, locale } = useTranslation();
   const { width, height } = useWindowDimensions();
   const sidebarWidth = useSidebarCollapsed() ? layout.sidebarCollapsed : layout.sidebar;
@@ -1349,14 +1356,16 @@ export function WatchlistScreen({ embedded = false }: { embedded?: boolean } = {
       watchlist: { id: list?.id ?? "", name: list?.name ?? "" },
     });
 
+  // 投入分析只预填提示词，是否开始由用户在对话框里确认。
   const analyzeSymbol = (item: WatchlistSymbol) => {
-    ask(
+    prefillPrompt(
       t("markets.watchlistAnalyzePrompt", {
         name: localizedSymbolName(item.symbol),
         code: item.symbol.code,
       }),
     );
     setMenuFor(null);
+    onOpenChat?.();
   };
 
   // 移除后通过统一 Toast 提供撤销（3.2s，动作即把标的重新加回列表）。

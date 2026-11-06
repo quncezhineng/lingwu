@@ -556,9 +556,11 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
     setPrompt({ id: Date.now(), text, attachmentIds });
     setSection("chat");
   }, []);
-  /** 语义与 ask 相反：只预填输入框，是否发送交由用户决定。 */
-  const prefillPrompt = useCallback((text: string) => {
-    setPrompt({ id: Date.now(), text, draft: true });
+  /** 语义与 ask 相反：只预填输入框（含附件），是否发送交由用户决定。 */
+  const prefillPrompt = useCallback((text: string, attachmentIds?: readonly string[]) => {
+    setPrompt({ id: Date.now(), text, attachmentIds, draft: true });
+    // 预填后立刻切到对话：先关掉可能盖在上面的详情浮层，避免用户看不到输入框。
+    setDetail(undefined);
     setSection("chat");
   }, []);
   if (!workspace)

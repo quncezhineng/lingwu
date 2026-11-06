@@ -628,7 +628,8 @@ export function SymbolDetailSheet({
   quote?: Quote;
   watchlist?: { id: string; name: string };
 }) {
-  const { api, close, ask, navigate, notify, open, refresh, requestPriceReminder } = useWorkspace();
+  const { api, close, prefillPrompt, navigate, notify, open, refresh, requestPriceReminder } =
+    useWorkspace();
   const { t } = useTranslation();
   const { data: agentData } = useAgentWorkspace();
   const [alerts, setAlerts] = useState<PriceAlertRecord[]>();
@@ -919,7 +920,8 @@ export function SymbolDetailSheet({
             icon={MessageCircle}
             onPress={() => {
               close();
-              ask(t("research.askPrompt", { code: symbol.code }));
+              // 只预填提问，用户确认后再发送。
+              prefillPrompt(t("research.askPrompt", { code: symbol.code }));
             }}
           >
             {t("research.askAgent")}
@@ -1187,7 +1189,7 @@ export function SymbolDetailSheet({
               onExport={() => void exportReport()}
               onFollowUp={() => {
                 close();
-                ask(t("research.followUpPrompt", { code: symbol.code }));
+                prefillPrompt(t("research.followUpPrompt", { code: symbol.code }));
               }}
               onRerun={() => void runResearch()}
               rerunBusy={starting}
