@@ -28,7 +28,7 @@ export function ModelSelector({
   /** 受控模式下「跟随默认模型」这一项的文案。 */
   inheritLabel?: string;
 }) {
-  const { workspace, api, refresh, notify, navigate, open } = useWorkspace();
+  const { workspace, api, refresh, notify, open } = useWorkspace();
   const { t } = useTranslation();
   const controlled = Boolean(onSelect);
   const [userModel, setUserModel] = useState(workspace.runtime.model);
@@ -53,10 +53,13 @@ export function ModelSelector({
     if (disabled) setExpanded(false);
   }, [disabled]);
 
+  /**
+   * 只叠一层「模型管理」浮层，不切换底层页面：
+   * 从 Agent 详情等任意位置进来，关掉浮层都应回到原页面，而不是被带到账号页。
+   */
   function manage() {
     setExpanded(false);
     onManage?.();
-    navigate("account");
     open({ type: "model-settings" });
   }
 

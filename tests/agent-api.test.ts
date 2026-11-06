@@ -32,6 +32,12 @@ async function read<T>(path: string, body?: unknown, status = 200): Promise<T> {
   assert.equal(response.status, status, await response.clone().text());
   return response.json();
 }
+function milestoneState(milestones: Goal["milestones"] = []) {
+  return milestones.map(({ completedAt, ...milestone }) => ({
+    ...milestone,
+    hasCompletedAt: Boolean(completedAt),
+  }));
+}
 
 before(async () => {
   directory = await mkdtemp(join(tmpdir(), "lingwu-agent-api-"));
@@ -194,6 +200,97 @@ test("goal updates validate milestones and pausing a goal pauses its task", asyn
     (await request("/tasks", { prompt: "Link private goal", goalId: hidden.id })).status,
     404,
   );
+});
+
+test("a reminder can carry goal context into its durable task", async () => {
+  const goal = await read<Goal>(
+    "/goals",
+    { title: "Monitor semiconductors", milestones: ["Review filings"] },
+    201,
+  );
+  const secondGoal = await read<Goal>(
+    "/goals",
+    { title: "Monitor software", milestones: ["Review pricing"] },
+    201,
+  );
+  const privateGoal = await server.agent.createGoal("other-user", {
+    title: "Private goal",
+    milestones: ["Private milestone"],
+  });
+  const input = {
+    title: "Semiconductor filing watch",
+    url: "sample://availability",
+    condition: "change",
+    intervalMinutes: 15,
+    goalId: goal.id,
+    milestoneId: goal.milestones[0].id,
+  };
+  for (const [bad, status] of [
+    [{ ...input, goalId: undefined }, 422],
+    [{ ...input, goalId: privateGoal.id, milestoneId: privateGoal.milestones[0].id }, 404],
+    [{ ...input, milestoneId: "missing" }, 404],
+  ] as const)
+    assert.equal((await request("/monitors", bad)).status, status);
+
+  const monitor = await read<Monitor>("/monitors", input, 201);
+  assert.equal(monitor.goalId, goal.id);
+  assert.equal(monitor.milestoneId, goal.milestones[0].id);
+  const task = await server.agent.getTask("local-user", monitor.taskId);
+  assert.equal(task.goalId, goal.id);
+  assert.equal(task.milestoneId, goal.milestones[0].id);
+
+  assert.equal(
+    (
+      await request(`/monitors/${monitor.id}`, {
+        ...input,
+        goalId: privateGoal.id,
+        milestoneId: privateGoal.milestones[0].id,
+      })
+    ).status,
+    404,
+  );
+  const edited = await read<Monitor>(`/monitors/${monitor.id}`, {
+    ...input,
+    title: "Updated semiconductor filing watch",
+  });
+  assert.equal(edited.goalId, goal.id);
+  assert.equal(edited.milestoneId, goal.milestones[0].id);
+
+  const rebound = await read<Monitor>(`/monitors/${monitor.id}`, {
+    ...input,
+    title: "Software pricing watch",
+    goalId: secondGoal.id,
+    milestoneId: secondGoal.milestones[0].id,
+  });
+  assert.equal(rebound.goalId, secondGoal.id);
+  assert.equal(rebound.milestoneId, secondGoal.milestones[0].id);
+  const reboundTask = await server.agent.getTask("local-user", monitor.taskId);
+  assert.equal(reboundTask.goalId, secondGoal.id);
+  assert.equal(reboundTask.milestoneId, secondGoal.milestones[0].id);
+
+  const wholeGoal = await read<Monitor>(`/monitors/${monitor.id}`, {
+    ...input,
+    title: "Software goal watch",
+    goalId: secondGoal.id,
+    milestoneId: null,
+  });
+  assert.equal(wholeGoal.goalId, secondGoal.id);
+  assert.equal(wholeGoal.milestoneId, undefined);
+  assert.equal((await server.agent.getTask("local-user", monitor.taskId)).milestoneId, null);
+
+  const standalone = await read<Monitor>(`/monitors/${monitor.id}`, {
+    ...input,
+    title: "Independent watch",
+    goalId: null,
+    milestoneId: null,
+  });
+  assert.equal(standalone.goalId, undefined);
+  assert.equal(standalone.milestoneId, undefined);
+  const standaloneTask = await server.agent.getTask("local-user", monitor.taskId);
+  assert.equal(standaloneTask.goalId, null);
+  assert.equal(standaloneTask.milestoneId, null);
+
+  await read(`/monitors/${monitor.id}/control`, { action: "stop" });
 });
 
 test("memories can be edited and forgotten while identity changes persist", async () => {
@@ -605,10 +702,10 @@ test("manual milestone completion preserves current titles, ordering and concurr
     read(`/goals/${goal.id}`, { status: "paused" }),
   ]);
   const saved = (await read<AgentWorkspace>("")).goals.find((item) => item.id === goal.id);
-  assert.deepEqual(saved?.milestones, [
-    { ...tickets, done: true },
-    { ...renamed, done: true },
-    { id: "new", title: "Pack", done: true },
+  assert.deepEqual(milestoneState(saved?.milestones), [
+    { ...tickets, done: true, hasCompletedAt: true },
+    { ...renamed, done: true, hasCompletedAt: true },
+    { id: "new", title: "Pack", done: true, hasCompletedAt: true },
   ]);
   assert.equal(saved?.status, "paused");
   await read(`/goals/${goal.id}/milestones/${dates.id}`, { done: false });

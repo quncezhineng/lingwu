@@ -199,7 +199,7 @@ const app = {
   "app.subtitleAccount": "Review your profile, sign-in status and workspace details.",
   "app.taskHubEyebrow": "Ongoing work",
   "app.taskHubTasks": "Tasks",
-  "app.taskHubReminders": "Scheduled",
+  "app.taskHubReminders": "Tracking",
   "app.personalContextHeading": "Personal context",
   "app.memoryShortcutDetail": "{count} memories · goals, risks and focus areas",
   "app.titleConnections": "Apps & capabilities",

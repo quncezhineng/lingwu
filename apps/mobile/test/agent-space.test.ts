@@ -264,6 +264,32 @@ test("custom skills version forward while preserving identity and enabled state"
   assert.equal(second.enabled, false);
 });
 
+test("installed catalog skills are per Agent, deduped and idempotent on reload", () => {
+  const marketAgent = {
+    ...createAgentFromTemplate("market", { id: "market-agent", threadId: "market-thread" }),
+    installedSkills: ["china-dcf", "china-dcf", "3-statement-model"],
+  };
+  const assetAgent = createAgentFromTemplate("asset", {
+    id: "asset-agent",
+    threadId: "asset-thread",
+  });
+  const state = normalizeAgentSpace(
+    {
+      currentAgentId: marketAgent.id,
+      agents: [marketAgent, assetAgent],
+      onboardingDone: true,
+    },
+    MAIN_THREAD,
+  );
+  assert.deepEqual(state.agents.find((agent) => agent.id === "market-agent")?.installedSkills, [
+    "china-dcf",
+    "3-statement-model",
+  ]);
+  assert.deepEqual(state.agents.find((agent) => agent.id === "asset-agent")?.installedSkills, []);
+  // 安装关系随 Agent 空间一起持久化，重复读取后保持完全一致。
+  assert.deepEqual(normalizeAgentSpace(JSON.parse(JSON.stringify(state)), MAIN_THREAD), state);
+});
+
 test("onboarding summary keeps global preferences readable in either locale", () => {
   assert.deepEqual(
     onboardingSummary({

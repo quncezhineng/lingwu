@@ -18,6 +18,12 @@ import { createSamplePdf } from "../packages/integrations/src/pdf.ts";
 let db: Store, server: Awaited<ReturnType<typeof createApp>>, directory: string;
 const owner = "workflow-user";
 const reconcile = () => (server.agent as unknown as { maintain(): Promise<void> }).maintain();
+function milestoneState(milestones: Goal["milestones"] = []) {
+  return milestones.map(({ completedAt, ...milestone }) => ({
+    ...milestone,
+    hasCompletedAt: Boolean(completedAt),
+  }));
+}
 before(async () => {
   directory = await mkdtemp(join(tmpdir(), "lingwu-workflows-"));
   db = await createStore({ dataDir: join(directory, "db") });
@@ -397,15 +403,23 @@ test("milestone-linked outcomes preserve manual progress and legacy goal tasks s
   assert.equal(detail.task.status, "succeeded");
   assert.equal(detail.task.milestoneId, goal.milestones[0].id);
   assert.ok(detail.artifacts.length);
-  assert.deepEqual((await db.get<Goal>(owner, "goals", goal.id))?.milestones, reordered);
+  assert.deepEqual(milestoneState((await db.get<Goal>(owner, "goals", goal.id))?.milestones), [
+    { ...reordered[0], hasCompletedAt: true },
+    { ...reordered[1], hasCompletedAt: false },
+  ]);
   await server.agent.setMilestoneDone(owner, goal.id, goal.milestones[0].id, true);
   // Startup maintenance replays durable outcomes after process interruptions.
   await reconcile();
   const completed = reordered.map((m) => ({ ...m, done: true }));
-  assert.deepEqual((await db.get<Goal>(owner, "goals", goal.id))?.milestones, completed);
+  assert.deepEqual(milestoneState((await db.get<Goal>(owner, "goals", goal.id))?.milestones), [
+    { ...completed[0], hasCompletedAt: true },
+    { ...completed[1], hasCompletedAt: true },
+  ]);
   await server.agent.updateGoal(owner, goal.id, { milestones: [completed[0]] });
   await reconcile();
-  assert.deepEqual((await db.get<Goal>(owner, "goals", goal.id))?.milestones, [completed[0]]);
+  assert.deepEqual(milestoneState((await db.get<Goal>(owner, "goals", goal.id))?.milestones), [
+    { ...completed[0], hasCompletedAt: true },
+  ]);
   assert.ok((await server.agent.detail(owner, task.id)).artifacts.length);
   const legacy = await server.agent.createTask(
     owner,
@@ -505,8 +519,8 @@ test("linked task results and manual completion survive a database restart", asy
     await app.agent.setMilestoneDone(owner, goal.id, goal.milestones[0].id, true);
     app.agent.start();
     await app.agent.stop();
-    assert.deepEqual((await store.get<Goal>(owner, "goals", goal.id))?.milestones, [
-      { ...goal.milestones[0], done: true },
+    assert.deepEqual(milestoneState((await store.get<Goal>(owner, "goals", goal.id))?.milestones), [
+      { ...goal.milestones[0], done: true, hasCompletedAt: true },
     ]);
   } finally {
     await app.agent.stop();

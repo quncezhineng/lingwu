@@ -24,7 +24,6 @@ import {
 } from "./note-ui";
 import {
   consumeNotesIntent,
-  groupNotesByDate,
   type InvestmentNote,
   loadNotes,
   NOTE_TYPES,
@@ -271,6 +270,10 @@ export function NotesScreen() {
   const [statusTarget, setStatusTarget] = useState<InvestmentNote>();
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState("");
+  // 笔记列表真实可用宽度（挂在资料页内或全屏浮层里宽度不同），据此决定栅格列数。
+  const [listWidth, setListWidth] = useState(0);
+  const noteColumns = listWidth >= 840 ? 3 : listWidth >= 560 ? 2 : 1;
+  const noteCardWidth = noteColumns === 3 ? "31.8%" : noteColumns === 2 ? "48.5%" : "100%";
 
   useEffect(() => {
     const intent = consumeNotesIntent();
@@ -293,14 +296,17 @@ export function NotesScreen() {
 
   const filteredNotes = useMemo(
     () =>
-      state.notes.filter((note) => {
-        if (typeFilter !== "all" && note.type !== typeFilter) return false;
-        if (symbolFilter && note.symbolCode !== symbolFilter) return false;
-        if (!debounced) return true;
-        return `${note.title ?? ""} ${note.content} ${note.symbolCode}`
-          .toLowerCase()
-          .includes(debounced);
-      }),
+      state.notes
+        .filter((note) => {
+          if (typeFilter !== "all" && note.type !== typeFilter) return false;
+          if (symbolFilter && note.symbolCode !== symbolFilter) return false;
+          if (!debounced) return true;
+          return `${note.title ?? ""} ${note.content} ${note.symbolCode}`
+            .toLowerCase()
+            .includes(debounced);
+        })
+        // 新笔记在前；不再按今天/更早切段，卡片直接进栅格。
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [state.notes, typeFilter, symbolFilter, debounced],
   );
 
@@ -354,16 +360,11 @@ export function NotesScreen() {
     }
   }
 
-  const groups = groupNotesByDate(filteredNotes);
-  const groupOrder: Array<{ key: keyof typeof groups; label: TranslationKey }> = [
-    { key: "today", label: "notes.groupToday" },
-    { key: "yesterday", label: "notes.groupYesterday" },
-    { key: "week", label: "notes.groupThisWeek" },
-    { key: "earlier", label: "notes.groupEarlier" },
-  ];
-
   return (
-    <View style={{ gap: space.md }}>
+    <View
+      style={{ gap: space.md }}
+      onLayout={(event) => setListWidth(Math.round(event.nativeEvent.layout.width))}
+    >
       {/* 控制栏：视图切换 + 搜索 + 写笔记并排一行，避免三层筛选把首屏占满 */}
       <View
         style={{
@@ -470,11 +471,18 @@ export function NotesScreen() {
       </View>
 
       {state.status === "loading" && state.notes.length === 0 ? (
-        <View style={{ gap: 8 }}>
-          {[0, 1, 2, 3].map((index) => (
+        <View
+          style={{
+            flexDirection: noteColumns > 1 ? "row" : "column",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          {[0, 1, 2, 3, 4, 5].slice(0, noteColumns * 2).map((index) => (
             <View
               key={index}
               style={{
+                width: noteCardWidth,
                 height: 92,
                 borderRadius: 14,
                 borderWidth: 1,
@@ -565,18 +573,21 @@ export function NotesScreen() {
               </Empty>
             )
           ) : (
-            groupOrder.map((group) =>
-              groups[group.key].length ? (
-                <View key={group.key} style={{ gap: 8 }}>
-                  <Text style={[s.label, { color: colors.faint, marginTop: 8 }]}>
-                    {t(group.label)}
-                  </Text>
-                  {groups[group.key].map((note) => (
-                    <NoteCard key={note.id} note={note} onPress={() => setDetail(note)} />
-                  ))}
+            /* 宽屏走多列栅格：笔记卡内容短，单列会把右侧留成大片空白 */
+            <View
+              style={{
+                flexDirection: noteColumns > 1 ? "row" : "column",
+                flexWrap: "wrap",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              {filteredNotes.map((note) => (
+                <View key={note.id} style={{ width: noteCardWidth }}>
+                  <NoteCard note={note} onPress={() => setDetail(note)} />
                 </View>
-              ) : null,
-            )
+              ))}
+            </View>
           )}
           <DisclaimerNote />
         </>

@@ -59,9 +59,8 @@ import { workbenchInsightView } from "./insight-view";
 import { NotesScreen } from "./notes-screen";
 import { PageHeader } from "./page-header";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
-import { useSidebarCollapsed } from "./sidebar-state";
 import { StatusBadge, type StatusTone } from "./status-badge";
-import { breakpoints, fonts, layout, radius, space } from "./theme";
+import { breakpoints, fonts, radius, space } from "./theme";
 import {
   Button,
   Card,
@@ -1064,7 +1063,6 @@ export function FilesScreen({
   const { data: agent, error: agentError } = useAgentWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
-  const sidebarWidth = useSidebarCollapsed() ? layout.sidebarCollapsed : layout.sidebar;
   const [section, setSection] = useState<LibrarySection>(initialSection);
   const [sourceFilter, setSourceFilter] = useState<FileSourceFilter>("all");
   const [formatFilter, setFormatFilter] = useState<FileFormatFilter>("all");
@@ -1095,13 +1093,10 @@ export function FilesScreen({
   const selectedFiles = library.files.filter((file) => selectedIds.has(file.id));
   const filtersActive = sourceFilter !== "all" || formatFilter !== "all" || query.trim().length > 0;
   const compact = width < breakpoints.mobile;
-  // 内容区宽度：桌面扣侧栏与页面 padding，决定资料卡栅格列数（避免单卡右侧大片留白）。
-  const contentWidth =
-    width >= breakpoints.desktop
-      ? width - sidebarWidth - space.page * 2
-      : width - space.pageMobile * 2;
-  const columns = contentWidth >= 1080 ? 3 : contentWidth >= 700 ? 2 : 1;
-  const cardWidth = columns === 1 ? "100%" : columns === 2 ? "48.5%" : "31.8%";
+  // 资料库可能是整页、也可能挂在全屏浮层里，两种容器宽度不同：用实测宽度决定栅格列数。
+  const [contentWidth, setContentWidth] = useState(0);
+  const insightColumns = contentWidth >= 840 ? 3 : contentWidth >= 560 ? 2 : 1;
+  const insightCardWidth = insightColumns === 3 ? "31.8%" : insightColumns === 2 ? "48.5%" : "100%";
 
   useEffect(() => {
     setSection(initialSection);
@@ -1184,7 +1179,10 @@ export function FilesScreen({
     }
   }
   return (
-    <View style={{ gap: 20 }}>
+    <View
+      style={{ gap: 20 }}
+      onLayout={(event) => setContentWidth(Math.round(event.nativeEvent.layout.width))}
+    >
       {embedded ? (
         <View
           style={{
@@ -1710,10 +1708,7 @@ export function FilesScreen({
                 const symbol = [view.symbolName, view.code].filter(Boolean).join(" · ");
                 const date = dateLabel(artifact.createdAt);
                 return (
-                  <View
-                    key={artifact.id}
-                    style={{ width: savedArtifacts.length === 1 ? "100%" : cardWidth }}
-                  >
+                  <View key={artifact.id} style={{ width: insightCardWidth }}>
                     <InsightCard
                       // 分类做眉标、标题保留两行，再用一句结论/依据补齐卡片信息量
                       eyebrow={view.category || statusLabel(artifact.kind)}

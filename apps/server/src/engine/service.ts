@@ -526,7 +526,27 @@ export class AgentService {
     id: string,
     patch: { status?: Goal["status"]; milestones?: Goal["milestones"] },
   ) {
-    const saved = await this.db.compareAndSwap<Goal>(owner, "goals", id, {}, patch);
+    const current = await this.db.get<Goal>(owner, "goals", id);
+    if (!current) throw new AppError("Goal not found", 404);
+    const milestones = patch.milestones?.map((milestone) => {
+      const previous = current.milestones.find((item) => item.id === milestone.id);
+      if (!milestone.done) return { id: milestone.id, title: milestone.title, done: false };
+      if (milestone.completedAt) return milestone;
+      return {
+        ...milestone,
+        completedAt: previous?.done && previous.completedAt ? previous.completedAt : date(),
+      };
+    });
+    const saved = await this.db.compareAndSwap<Goal>(
+      owner,
+      "goals",
+      id,
+      {},
+      {
+        ...patch,
+        ...(milestones ? { milestones } : {}),
+      },
+    );
     if (!saved) throw new AppError("Goal not found", 404);
     if (patch.status === "paused")
       for (const task of await this.db.listByGoalId<AgentTask>(owner, "tasks", id))
@@ -535,12 +555,27 @@ export class AgentService {
     return saved;
   }
   async setMilestoneDone(owner: string, goalId: string, milestoneId: string, done: boolean) {
-    const saved = await this.db.setMilestoneDone<Goal>(owner, goalId, milestoneId, done);
+    const saved = await this.db.setMilestoneDone<Goal>(owner, goalId, milestoneId, done, date());
     if (!saved) throw new AppError("Goal or milestone not found", 404);
     return saved;
   }
+  private async validateMonitorGoal(
+    owner: string,
+    goalId?: string,
+    milestoneId?: string,
+  ): Promise<Goal | null> {
+    if (!goalId) return null;
+    const goal = await this.db.get<Goal>(owner, "goals", goalId);
+    if (!goal) throw new AppError("Goal not found", 404);
+    if (milestoneId && !goal.milestones.some((milestone) => milestone.id === milestoneId))
+      throw new AppError("Milestone not found in this goal", 404);
+    return goal;
+  }
   async createMonitor(owner: string, raw: unknown, idempotencyKey?: string) {
     const input = monitorInputSchema.parse(raw);
+    const goalId = input.goalId ?? undefined;
+    const milestoneId = input.milestoneId ?? undefined;
+    await this.validateMonitorGoal(owner, goalId, milestoneId);
     if (input.condition === "price_below") {
       input.currency = resolveMonitorCurrency(input);
       if (!input.currency) throw new AppError("Choose CNY, HKD or USD for this price watch", 422);
@@ -565,14 +600,19 @@ export class AgentService {
         title: input.title,
         prompt: `Watch ${input.url} for ${input.condition}${input.value ? `: ${input.value}` : ""}${input.description ? `. Context: ${input.description}` : ""}`,
         input: { monitorId: id },
+        ...(goalId ? { goalId } : {}),
+        ...(milestoneId ? { milestoneId } : {}),
       },
       `monitor:${id}`,
       true,
     );
+    const { goalId: _goalId, milestoneId: _milestoneId, ...monitorInput } = input;
     const monitor: Monitor = {
       id,
       taskId: task.id,
-      ...input,
+      ...monitorInput,
+      ...(goalId ? { goalId } : {}),
+      ...(milestoneId ? { milestoneId } : {}),
       status: "active",
       nextCheckAt: date(),
       checks: 0,
@@ -588,6 +628,17 @@ export class AgentService {
     if (monitor.status === "stopped")
       throw new AppError("Create a new watch to restart this stopped monitor", 409);
     const input = monitorInputSchema.parse(raw);
+    const goalId = input.goalId === undefined ? monitor.goalId : (input.goalId ?? undefined);
+    const milestoneId =
+      input.goalId === undefined
+        ? input.milestoneId === undefined
+          ? monitor.milestoneId
+          : (input.milestoneId ?? undefined)
+        : goalId
+          ? (input.milestoneId ?? undefined)
+          : undefined;
+    if (milestoneId && !goalId) throw new AppError("A milestone requires a goal", 422);
+    await this.validateMonitorGoal(owner, goalId, milestoneId);
     if (input.condition === "price_below") {
       input.currency = resolveMonitorCurrency({
         ...input,
@@ -605,9 +656,13 @@ export class AgentService {
 
     // A changed target or condition invalidates the old baseline. Reset it before the
     // worker can compare the next response, otherwise the first check could be skipped.
+    const { goalId: _previousGoalId, milestoneId: _previousMilestoneId, ...previous } = monitor;
+    const { goalId: _inputGoalId, milestoneId: _inputMilestoneId, ...monitorInput } = input;
     const saved = await this.db.put<Monitor>(owner, "monitors", {
-      ...monitor,
-      ...input,
+      ...previous,
+      ...monitorInput,
+      ...(goalId ? { goalId } : {}),
+      ...(milestoneId ? { milestoneId } : {}),
       lastValue: "",
       lastHash: "",
       error: undefined,
@@ -624,6 +679,8 @@ export class AgentService {
         {
           title: input.title,
           prompt: `Watch ${input.url} for ${input.condition}${input.value ? `: ${input.value}` : ""}${input.description ? `. Context: ${input.description}` : ""}`,
+          goalId: goalId ?? null,
+          milestoneId: milestoneId ?? null,
           state: { ...task.state, lastHash: null, matched: false, failures: 0, notice: null },
         },
       );
@@ -1178,7 +1235,10 @@ export class AgentService {
               goal.id,
               { milestones: goal.milestones },
               {
-                milestones: [...goal.milestones, { id: task.id, title: task.title, done: true }],
+                milestones: [
+                  ...goal.milestones,
+                  { id: task.id, title: task.title, done: true, completedAt: date() },
+                ],
               },
             )
           )

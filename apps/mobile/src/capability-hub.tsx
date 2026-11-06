@@ -1,46 +1,58 @@
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  ScrollView,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { type ReactNode, useState } from "react";
+import { Linking, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { AgentOrb } from "./agent-orb";
+import { useAgentSpace } from "./agent-space";
+import type { AgentDefinition, AgentSkill } from "./agent-space-model";
 import { Text, TextInput } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
   Activity,
+  ArrowLeft,
   ArrowUpRight,
   Brain,
   CalendarDays,
-  Check,
   ChevronRight,
   CircleDollarSign,
+  Download,
   FolderOpen,
   Globe2,
   Hand,
   type IconComponent,
   Link2,
   Mail,
-  Plus,
   Search,
   ShieldCheck,
   Sparkles,
   Target,
-  Trash2,
   X,
 } from "./icons";
 import { FilesScreen } from "./screens";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
+import { StatusBadge, type StatusTone } from "./status-badge";
 import { breakpoints, radius } from "./theme";
-import { appBrands, Button, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
+import {
+  appBrands,
+  Button,
+  Chip,
+  colors,
+  Empty,
+  fonts,
+  SectionHeading,
+  Sheet,
+  s,
+  serviceBrands,
+} from "./ui";
 import { useWorkspace } from "./workspace";
 
-type HubTab = "marketplace" | "mine";
 type CapabilityType = "plugins" | "skills" | "connectors" | "workspace";
 type ConfigSheet = "openbot";
+/** 「我的技能」条目：用户在某 Agent 下自建的技能，带来源 Agent 标注。 */
+type MySkillEntry = {
+  skill: AgentSkill;
+  agentId: string;
+  agentName: string;
+};
 type CapabilityCategoryId =
   | "research"
   | "analysis"
@@ -64,11 +76,10 @@ type CatalogItem = {
   iconSurface: string;
   source: string;
   state: CapabilityState;
-  installed: boolean;
-  /** 系统预装能力不提供卸载入口。 */
-  system?: boolean;
   searchText?: string;
   onPress: () => void;
+  /** 技能卡片右下角的快捷动作：把技能带入对话输入区，不经过详情弹层。 */
+  onUse?: () => void;
 };
 
 type Shortcut = {
@@ -116,25 +127,6 @@ const TYPE_LABELS: Record<CapabilityType, TranslationKey> = {
   workspace: "agent.hubCategoryWorkspace",
 };
 
-const HUB_TAB_LABELS: Record<CapabilityType, Record<HubTab, TranslationKey>> = {
-  plugins: {
-    marketplace: "agent.hubPluginMarketplace",
-    mine: "agent.hubMyPlugins",
-  },
-  skills: {
-    marketplace: "agent.hubSkillMarketplace",
-    mine: "agent.hubMySkills",
-  },
-  connectors: {
-    marketplace: "agent.hubConnectorMarketplace",
-    mine: "agent.hubMyConnectors",
-  },
-  workspace: {
-    marketplace: "agent.hubMarketplace",
-    mine: "agent.hubMine",
-  },
-};
-
 const HUB_SEARCH_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubSearchPlugins",
   skills: "agent.hubSearchSkills",
@@ -153,13 +145,6 @@ const HUB_EMPTY_TITLE_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubPluginNoMatchTitle",
   skills: "agent.hubSkillNoMatchTitle",
   connectors: "agent.hubConnectorNoMatchTitle",
-  workspace: "agent.hubNoMatchTitle",
-};
-
-const HUB_MY_EMPTY_TITLE_LABELS: Record<CapabilityType, TranslationKey> = {
-  plugins: "agent.hubMyPluginsEmptyTitle",
-  skills: "agent.hubMySkillsEmptyTitle",
-  connectors: "agent.hubMyConnectorsEmptyTitle",
   workspace: "agent.hubNoMatchTitle",
 };
 
@@ -318,107 +303,16 @@ function ShortcutCard({
   );
 }
 
-function ConnectedCapabilityBadge({ label }: { label: string }) {
-  return (
-    <View
-      accessibilityLiveRegion="polite"
-      style={{
-        minHeight: 30,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        paddingHorizontal: 9,
-        borderRadius: radius.control,
-        backgroundColor: colors.sky,
-      }}
-    >
-      <Check size={13} color={colors.primary} />
-      <Text
-        style={{
-          color: colors.primaryStrong,
-          fontSize: 11,
-          lineHeight: 16,
-          fontWeight: "500",
-          fontFamily: fonts.sans,
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function CapabilityAction({
-  item,
-  tab,
-  installBusy,
-  onSetInstalled,
-}: {
-  item: CatalogItem;
-  tab: HubTab;
-  installBusy: boolean;
-  onSetInstalled: (installed: boolean) => void;
-}) {
+function CapabilityCard({ item }: { item: CatalogItem }) {
   const { t } = useTranslation();
+  /** 连接器卡片右下角展示真实连接状态，未接通时不暗示「可用」。 */
+  const connectorStatus =
+    item.type === "connectors"
+      ? item.state === "connected"
+        ? { tone: "done" as StatusTone, label: t("agent.hubConnectorStateConnected") }
+        : { tone: "paused" as StatusTone, label: t("agent.hubConnectorStateDisconnected") }
+      : undefined;
 
-  if (item.installed) {
-    return (
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-        <ConnectedCapabilityBadge label={t("agent.hubStateInstalled")} />
-        {tab === "mine" && !item.system && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("agent.hubRemove")}
-            accessibilityState={{ disabled: installBusy }}
-            disabled={installBusy}
-            hitSlop={8}
-            onPress={() => onSetInstalled(false)}
-            style={({ pressed }) => ({
-              width: 28,
-              height: 28,
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: radius.field,
-              backgroundColor: pressed ? colors.surfaceSoft : "transparent",
-              opacity: installBusy ? 0.4 : 1,
-            })}
-          >
-            {installBusy ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Trash2 size={14} color={colors.muted} />
-            )}
-          </Pressable>
-        )}
-      </View>
-    );
-  }
-
-  return (
-    <Button
-      small
-      primary
-      icon={Plus}
-      busy={installBusy}
-      onPress={() => onSetInstalled(true)}
-      style={{ minHeight: 30, paddingVertical: 4, paddingHorizontal: 10 }}
-    >
-      {installBusy ? t("agent.hubInstalling") : t("agent.hubInstall")}
-    </Button>
-  );
-}
-
-function CapabilityCard({
-  item,
-  tab,
-  installBusy,
-  onSetInstalled,
-}: {
-  item: CatalogItem;
-  tab: HubTab;
-  installBusy: boolean;
-  onSetInstalled: (installed: boolean) => void;
-}) {
   return (
     <View
       style={{
@@ -510,96 +404,329 @@ function CapabilityCard({
           >
             {item.source}
           </Text>
-          <CapabilityAction
-            item={item}
-            tab={tab}
-            installBusy={installBusy}
-            onSetInstalled={onSetInstalled}
-          />
+          {connectorStatus && (
+            <StatusBadge
+              tone={connectorStatus.tone}
+              label={connectorStatus.label}
+              style={{
+                alignSelf: "center",
+                borderRadius: 6,
+                paddingHorizontal: 7,
+                paddingVertical: 3,
+              }}
+            />
+          )}
+          {item.onUse && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t("agent.skillDetailUse")} · ${item.title}`}
+              hitSlop={6}
+              onPress={item.onUse}
+              style={({ pressed }) => ({
+                height: 24,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                paddingHorizontal: 9,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: colors.accentLine,
+                backgroundColor: pressed ? colors.skyStrong : colors.sky,
+              })}
+            >
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: colors.primaryStrong,
+                  fontSize: 11,
+                  lineHeight: 16,
+                  fontWeight: "500",
+                  fontFamily: fonts.sans,
+                }}
+              >
+                {t("agent.skillDetailUse")}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </View>
   );
 }
 
-function SkillDetailSheet({
+/** 安装面板里的一行智能体：已安装的用底色 + 徽标区分，未安装保留空选中圈。 */
+function AgentInstallRow({
+  agent,
+  installed,
+  first,
+  onPress,
+}: {
+  agent: AgentDefinition;
+  installed: boolean;
+  first: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityLabel={`${agent.name} · ${
+        installed ? t("agent.skillInstallInstalled") : t("agent.skillInstallAction")
+      }`}
+      accessibilityState={{ checked: installed }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        s.row,
+        {
+          gap: 11,
+          minHeight: 58,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderTopWidth: first ? 0 : 1,
+          borderTopColor: colors.line,
+          backgroundColor: installed ? colors.sky : pressed ? colors.surfaceSoft : colors.paper,
+        },
+      ]}
+    >
+      <AgentOrb avatar={agent.avatar} size={30} />
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: colors.text,
+            fontSize: 13,
+            lineHeight: 18,
+            fontWeight: "600",
+            fontFamily: fonts.sans,
+          }}
+        >
+          {agent.name}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: colors.faint,
+            fontSize: 11,
+            lineHeight: 16,
+            fontFamily: fonts.sans,
+          }}
+        >
+          {agent.role}
+        </Text>
+      </View>
+      {installed ? (
+        <StatusBadge
+          tone="done"
+          label={t("agent.skillInstallInstalled")}
+          style={{
+            alignSelf: "center",
+            borderRadius: 6,
+            paddingHorizontal: 7,
+            paddingVertical: 3,
+          }}
+        />
+      ) : (
+        <View
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: colors.lineStrong,
+            backgroundColor: colors.paper,
+          }}
+        />
+      )}
+    </Pressable>
+  );
+}
+
+/**
+ * 技能目录条目的详情弹层。
+ *
+ * 传入 `agents` 与 `onToggleInstall` 时才提供「安装到智能体」入口；
+ * 只传 `skill` 即退化为只读详情（供 Agent 详情页等场景复用）。
+ */
+export function SkillDetailSheet({
   skill,
+  agents,
   onClose,
   onUse,
+  onToggleInstall,
 }: {
   skill: SkillCatalogEntry;
+  /** 传入即展示「安装到智能体」面板；不传则为只读详情。 */
+  agents?: AgentDefinition[];
   onClose: () => void;
-  onUse: () => void;
+  /** 传入即展示「使用此技能」操作；不传则隐藏该区域。 */
+  onUse?: () => void;
+  /** 切换某个智能体的安装状态（已安装则移除）。 */
+  onToggleInstall?: (agent: AgentDefinition) => void;
 }) {
   const { t, locale } = useTranslation();
+  const [installing, setInstalling] = useState(false);
   const appearance = SKILL_CATEGORY_APPEARANCE[skillCategory(skill)];
   const primaryTitle = locale === "zh-Hans" ? skill.titleZh : skill.titleEn;
   const secondaryTitle = locale === "zh-Hans" ? skill.titleEn : skill.titleZh;
+  const installable = Boolean(agents && onToggleInstall);
+  const installedCount = (agents ?? []).filter((agent) =>
+    agent.installedSkills.includes(skill.id),
+  ).length;
 
   return (
-    <Sheet title={primaryTitle} subtitle={secondaryTitle} onClose={onClose} narrow>
-      <View style={{ gap: 18 }}>
-        <View style={[s.row, { gap: 11 }]}>
+    <Sheet
+      title={installable && installing ? t("agent.skillInstallTitle") : primaryTitle}
+      subtitle={installable && installing ? primaryTitle : secondaryTitle}
+      onClose={onClose}
+      narrow
+      headerAction={
+        installable ? (
+          <Button
+            small
+            icon={installing ? ArrowLeft : Download}
+            onPress={() => setInstalling((value) => !value)}
+          >
+            {installing ? t("common.back") : t("agent.skillInstallAction")}
+          </Button>
+        ) : undefined
+      }
+    >
+      {installable && installing ? (
+        <View style={{ gap: 12 }}>
+          <Text style={s.small}>{t("agent.skillInstallHint")}</Text>
           <View
             style={{
-              width: 40,
-              height: 40,
+              borderWidth: 1,
+              borderColor: colors.line,
               borderRadius: radius.field,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: appearance.surface,
+              overflow: "hidden",
             }}
           >
-            <appearance.icon size={21} color={appearance.color} />
+            {(agents ?? []).map((agent, index) => (
+              <AgentInstallRow
+                key={agent.id}
+                agent={agent}
+                installed={agent.installedSkills.includes(skill.id)}
+                first={index === 0}
+                onPress={() => onToggleInstall?.(agent)}
+              />
+            ))}
           </View>
-          <View style={{ flex: 1, gap: 7 }}>
-            <Text style={s.label}>{t("agent.skillDetailCategory")}</Text>
-            <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>
-              {skill.categories.map((category) => (
-                <Chip key={category} tint={colors.sky}>
-                  {t(SKILL_CATEGORY_LABELS[category])}
-                </Chip>
-              ))}
+          <Text style={[s.small, { color: colors.faint }]}>
+            {t("agent.skillInstallSummary", { count: installedCount })}
+          </Text>
+        </View>
+      ) : (
+        <View style={{ gap: 18 }}>
+          <View style={[s.row, { gap: 11 }]}>
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: radius.field,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: appearance.surface,
+              }}
+            >
+              <appearance.icon size={21} color={appearance.color} />
+            </View>
+            <View style={{ flex: 1, gap: 7 }}>
+              <Text style={s.label}>{t("agent.skillDetailCategory")}</Text>
+              <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>
+                {skill.categories.map((category) => (
+                  <Chip key={category} tint={colors.sky}>
+                    {t(SKILL_CATEGORY_LABELS[category])}
+                  </Chip>
+                ))}
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={{ gap: 7 }}>
-          <Text style={s.label}>{t("agent.skillDetailChinese")}</Text>
-          <Text selectable style={s.text}>
-            {skill.descriptionZh}
-          </Text>
-        </View>
+          <View style={{ gap: 7 }}>
+            <Text style={s.label}>{t("agent.skillDetailChinese")}</Text>
+            <Text selectable style={s.text}>
+              {skill.descriptionZh}
+            </Text>
+          </View>
 
-        <View style={{ height: 1, backgroundColor: colors.line }} />
+          <View style={{ height: 1, backgroundColor: colors.line }} />
 
-        <View style={{ gap: 7 }}>
-          <Text style={s.label}>{t("agent.skillDetailEnglish")}</Text>
-          <Text selectable style={s.text}>
-            {skill.descriptionEn}
-          </Text>
-        </View>
+          <View style={{ gap: 7 }}>
+            <Text style={s.label}>{t("agent.skillDetailEnglish")}</Text>
+            <Text selectable style={s.text}>
+              {skill.descriptionEn}
+            </Text>
+          </View>
 
-        <View
-          style={{
-            gap: 5,
-            padding: 12,
-            borderRadius: radius.field,
-            backgroundColor: colors.surfaceSoft,
-          }}
-        >
-          <Text style={s.label}>{t("agent.skillDetailSource")}</Text>
-          <Text selectable style={s.small}>
-            {skill.sourceFolder}
-          </Text>
-        </View>
+          <View
+            style={{
+              gap: 5,
+              padding: 12,
+              borderRadius: radius.field,
+              backgroundColor: colors.surfaceSoft,
+            }}
+          >
+            <Text style={s.label}>{t("agent.skillDetailSource")}</Text>
+            <Text selectable style={s.small}>
+              {skill.sourceFolder}
+            </Text>
+          </View>
 
-        <View style={{ gap: 10 }}>
-          <Text style={s.small}>{t("agent.skillDetailUseHint")}</Text>
-          <Button primary icon={Sparkles} onPress={onUse}>
-            {t("agent.skillDetailUse")}
-          </Button>
+          {onUse && (
+            <View style={{ gap: 10 }}>
+              <Button primary icon={Sparkles} onPress={onUse}>
+                {t("agent.skillDetailUse")}
+              </Button>
+            </View>
+          )}
         </View>
+      )}
+    </Sheet>
+  );
+}
+
+/**
+ * 用户自建技能的只读详情。
+ *
+ * 「应用与能力 → 我的技能」与 Agent 详情的技能页共用这一版式，
+ * 传入 `footer` 可追加场景专属操作（如编辑）。
+ */
+export function MySkillDetailSheet({
+  title,
+  subtitle,
+  skill,
+  footer,
+  onClose,
+}: {
+  title: string;
+  subtitle?: string;
+  skill: Pick<AgentSkill, "purpose" | "instructions" | "outputFormat" | "version">;
+  footer?: ReactNode;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Sheet title={title} subtitle={subtitle} onClose={onClose} narrow>
+      <View style={{ gap: 16 }}>
+        <View style={{ gap: 4 }}>
+          <Text style={s.label}>{t("agentSpace.skillPurpose")}</Text>
+          <Text style={s.text}>{skill.purpose}</Text>
+        </View>
+        <View style={{ gap: 4 }}>
+          <Text style={s.label}>{t("agentSpace.skillInstructions")}</Text>
+          <Text style={s.text}>{skill.instructions}</Text>
+        </View>
+        <View style={{ gap: 4 }}>
+          <Text style={s.label}>{t("agentSpace.skillOutput")}</Text>
+          <Text style={s.text}>{skill.outputFormat}</Text>
+        </View>
+        <Text style={s.small}>
+          {t("agentSpace.skillVersion", {
+            version: skill.version,
+          })}
+        </Text>
+        {footer}
       </View>
     </Sheet>
   );
@@ -737,8 +864,8 @@ export function CapabilityHubScreen({
 } = {}) {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
-  const { navigate, ask, workspace, api, refresh, notify, open } = useWorkspace();
-  const [tab, setTab] = useState<HubTab>("marketplace");
+  const { navigate, workspace, api, refresh, notify, open, prefillPrompt } = useWorkspace();
+  const { agents: agentList, setSkillInstalled } = useAgentSpace();
   const [category, setCategory] = useState<CategoryId>("all");
   const [typeFilter, setTypeFilter] = useState<CapabilityType>("plugins");
   const [query, setQuery] = useState("");
@@ -746,7 +873,8 @@ export function CapabilityHubScreen({
   const [configSheet, setConfigSheet] = useState<ConfigSheet>();
   const [googleConnectingId, setGoogleConnectingId] = useState<"gmail" | "calendar">();
   const [selectedSkillId, setSelectedSkillId] = useState<string>();
-  const [installBusyId, setInstallBusyId] = useState<string>();
+  /** 详情弹窗中正在查看的「我的技能」条目。 */
+  const [selectedMySkill, setSelectedMySkill] = useState<MySkillEntry>();
 
   const desktop = width >= breakpoints.desktop;
   const railWidth = desktop ? 232 : 0;
@@ -766,9 +894,6 @@ export function CapabilityHubScreen({
   const browserConnected = workspace.connections.some(
     (connection) => connection.id === "browser" && connection.status === "connected",
   );
-  const installedCapabilityIds = new Set(
-    (workspace.installedCapabilities ?? []).map((capability) => capability.id),
-  );
   const builtInSource = t("agent.hubSourceLingwu");
   const workspaceSource = t("agent.hubSourceWorkspace");
   const skillSource = t("agent.hubSourceLingwu");
@@ -786,7 +911,6 @@ export function CapabilityHubScreen({
       iconSurface: appearance.surface,
       source: skillSource,
       state: "ready",
-      installed: installedCapabilityIds.has(id),
       searchText: [
         skill.id,
         skill.titleZh,
@@ -795,11 +919,23 @@ export function CapabilityHubScreen({
         skill.descriptionEn,
       ].join(" "),
       onPress: () => setSelectedSkillId(skill.id),
+      onUse: () => startSelectedSkill(skill),
     };
   });
   const selectedSkill = selectedSkillId
     ? skillCatalog.find((skill) => skill.id === selectedSkillId)
     : undefined;
+  /**
+   * 我的技能：汇总所有 Agent 下用户自建的技能，卡片标注来源 Agent。
+   * 与市场里的系统技能区分开，仅展示「用户自己创建的技能」。
+   */
+  const mySkills: MySkillEntry[] = agentList.flatMap((agent) =>
+    agent.customSkills.map((skill) => ({
+      skill,
+      agentId: agent.id,
+      agentName: agent.name,
+    })),
+  );
 
   async function openGoogleConnector(id: "gmail" | "calendar") {
     if (googleConnectingId) return;
@@ -826,39 +962,28 @@ export function CapabilityHubScreen({
     }
   }
 
-  async function setCapabilityInstalled(item: CatalogItem, installed: boolean) {
-    if (installBusyId) return;
-    setInstallBusyId(item.id);
-    try {
-      await api.request(
-        `/api/capabilities/${encodeURIComponent(item.id)}`,
-        {
-          type: item.type,
-          installed,
-        },
-        "PUT",
-      );
-      await refresh();
-      if (!installed) setCategory("all");
-      notify(
-        t(installed ? "agent.hubInstalledNotice" : "agent.hubRemovedNotice", {
-          title: item.title,
-        }),
-      );
-    } catch (error) {
-      notify(error instanceof Error ? error.message : String(error));
-    } finally {
-      setInstallBusyId(undefined);
-    }
+  /**
+   * 只把技能预选进对话输入区（chip 形式），不发起任何分析：
+   * 用户看过说明、自己描述问题后再决定是否发送。
+   */
+  function startSelectedSkill(skill: SkillCatalogEntry) {
+    const title = locale === "zh-Hans" ? skill.titleZh : skill.titleEn;
+    prefillPrompt("", undefined, [skill.id]);
+    setSelectedSkillId(undefined);
+    notify(t("agent.skillAddedToChat", { title }));
   }
 
-  function startSelectedSkill(skill: SkillCatalogEntry) {
-    ask(
-      locale === "zh-Hans"
-        ? `请使用「${skill.titleZh}」技能处理当前任务。\n\n技能说明：${skill.descriptionZh}\n\n开始前请先询问我缺少的必要信息。`
-        : `Use the "${skill.titleEn}" skill for this task.\n\nSkill description: ${skill.descriptionEn}\n\nAsk for any missing inputs before starting.`,
+  /** 安装面板按智能体逐一开关，已安装的再次点击即移除。 */
+  function toggleSkillInstall(agent: AgentDefinition) {
+    if (!selectedSkill) return;
+    const installed = agent.installedSkills.includes(selectedSkill.id);
+    setSkillInstalled(agent.id, selectedSkill.id, !installed);
+    notify(
+      t(installed ? "agent.skillUninstalledToast" : "agent.skillInstalledToast", {
+        title: locale === "zh-Hans" ? selectedSkill.titleZh : selectedSkill.titleEn,
+        agent: agent.name,
+      }),
     );
-    setSelectedSkillId(undefined);
   }
 
   const items: CatalogItem[] = [
@@ -874,8 +999,6 @@ export function CapabilityHubScreen({
       iconSurface: serviceBrands.gmail.surface,
       source: workspaceSource,
       state: "open",
-      installed: true,
-      system: true,
       onPress: () => navigate("mail"),
     },
     {
@@ -889,8 +1012,6 @@ export function CapabilityHubScreen({
       iconSurface: serviceBrands.googleCalendar.surface,
       source: workspaceSource,
       state: "open",
-      installed: true,
-      system: true,
       onPress: () => navigate("calendar"),
     },
     {
@@ -904,8 +1025,6 @@ export function CapabilityHubScreen({
       iconSurface: serviceBrands.browser.surface,
       source: builtInSource,
       state: browserConnected ? "connected" : "available",
-      installed: true,
-      system: true,
       onPress: () => open({ type: "computer" }),
     },
     {
@@ -919,7 +1038,6 @@ export function CapabilityHubScreen({
       iconSurface: serviceBrands.gmail.surface,
       source: "@Google",
       state: googleConnected ? "connected" : "available",
-      installed: installedCapabilityIds.has("gmail"),
       onPress: () => void openGoogleConnector("gmail"),
     },
     {
@@ -933,7 +1051,6 @@ export function CapabilityHubScreen({
       iconSurface: serviceBrands.googleCalendar.surface,
       source: "@Google",
       state: googleConnected ? "connected" : "available",
-      installed: installedCapabilityIds.has("calendar"),
       onPress: () => void openGoogleConnector("calendar"),
     },
     {
@@ -947,13 +1064,11 @@ export function CapabilityHubScreen({
       iconSurface: serviceBrands.openbot.surface,
       source: "@OpenBot",
       state: workspace.runtime.openbotConfigured ? "connected" : "available",
-      installed: installedCapabilityIds.has("openbot"),
       onPress: () => setConfigSheet("openbot"),
     },
   ];
 
   const selectType = (next: CapabilityType) => {
-    setTab("marketplace");
     setCategory("all");
     setQuery("");
     setTypeFilter(next);
@@ -993,8 +1108,7 @@ export function CapabilityHubScreen({
     },
   ];
 
-  const tabItems = items.filter((item) => tab === "marketplace" || item.installed);
-  const scopedItems = tabItems.filter((item) => item.type === typeFilter);
+  const scopedItems = items.filter((item) => item.type === typeFilter);
   const cardsForCategory = (item: CatalogItem, nextCategory: CategoryId) =>
     nextCategory === "all" || item.tags.includes(nextCategory as CatalogTag);
   const baseCategoryOptions = CATEGORY_OPTIONS_BY_TYPE[typeFilter];
@@ -1032,7 +1146,6 @@ export function CapabilityHubScreen({
   const visibleRows = chunk(visibleItems, gridColumns);
   const activeCategoryLabel =
     categoryOptions.find((option) => option.id === category)?.labelKey ?? "agent.hubAllCategories";
-  const showMineEmptyState = tab === "mine" && category === "all" && !normalizedQuery;
 
   const searchField = (
     <View
@@ -1126,62 +1239,7 @@ export function CapabilityHubScreen({
         <FilesScreen onOpenChat={onOpenChat} />
       ) : (
         <View>
-          <View
-            style={{
-              minHeight: 40,
-              flexDirection: "row",
-              gap: 24,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.line,
-            }}
-          >
-            {(
-              [
-                ["marketplace", HUB_TAB_LABELS[typeFilter].marketplace],
-                ["mine", HUB_TAB_LABELS[typeFilter].mine],
-              ] as const
-            ).map(([id, labelKey]) => {
-              const active = tab === id;
-              return (
-                <Pressable
-                  key={id}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                  onPress={() => {
-                    setTab(id);
-                    setCategory("all");
-                  }}
-                  style={{ justifyContent: "center", minHeight: 40 }}
-                >
-                  <Text
-                    style={{
-                      color: active ? colors.primaryStrong : colors.muted,
-                      fontSize: 14,
-                      lineHeight: 20,
-                      fontWeight: active ? "600" : "400",
-                      fontFamily: fonts.sans,
-                    }}
-                  >
-                    {t(labelKey)}
-                  </Text>
-                  {active && (
-                    <View
-                      style={{
-                        position: "absolute",
-                        right: 0,
-                        bottom: -1,
-                        left: 0,
-                        height: 2,
-                        backgroundColor: colors.primary,
-                      }}
-                    />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={{ paddingTop: 16, gap: 14 }}>
+          <View style={{ gap: 14 }}>
             {!useCategoryRail && searchField}
 
             <View style={{ flexDirection: useCategoryRail ? "row" : "column", gap: 20 }}>
@@ -1207,6 +1265,82 @@ export function CapabilityHubScreen({
               )}
 
               <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
+                {/* 我的技能：用户自建的技能汇总板块，仅技能 tab 展示，点击卡片查看详情。 */}
+                {typeFilter === "skills" && mySkills.length > 0 && (
+                  <View style={{ gap: 10 }}>
+                    <SectionHeading title={t("agent.mySkills")} />
+                    <View style={{ gap: 8 }}>
+                      {mySkills.map(({ skill, agentId, agentName }) => (
+                        <Pressable
+                          key={`${agentId}:${skill.id}`}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${t("agent.mySkills")} · ${skill.name}`}
+                          onPress={() => setSelectedMySkill({ skill, agentId, agentName })}
+                          style={({ pressed }) => ({
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 10,
+                            paddingVertical: 11,
+                            paddingHorizontal: 12,
+                            borderRadius: radius.card,
+                            borderWidth: 1,
+                            borderColor: colors.line,
+                            backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
+                          })}
+                        >
+                          <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                color: colors.text,
+                                fontSize: 13,
+                                lineHeight: 18,
+                                fontWeight: "600",
+                                fontFamily: fonts.sans,
+                              }}
+                            >
+                              {skill.name}
+                            </Text>
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                color: colors.faint,
+                                fontSize: 11,
+                                lineHeight: 16,
+                                fontFamily: fonts.sans,
+                              }}
+                            >
+                              {skill.purpose}
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              maxWidth: 120,
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: radius.badge,
+                              backgroundColor: colors.surface,
+                            }}
+                          >
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                color: colors.muted,
+                                fontSize: 11,
+                                lineHeight: 16,
+                                fontFamily: fonts.sans,
+                              }}
+                            >
+                              {agentName}
+                            </Text>
+                          </View>
+                          <ChevronRight size={16} strokeWidth={1.6} color={colors.faint} />
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
                 <View style={[s.between, { minHeight: 21 }]}>
                   <Text
                     style={{
@@ -1239,15 +1373,7 @@ export function CapabilityHubScreen({
                         style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
                       >
                         {row.map((item) => (
-                          <CapabilityCard
-                            key={item.id}
-                            item={item}
-                            tab={tab}
-                            installBusy={installBusyId === item.id}
-                            onSetInstalled={(installed) =>
-                              void setCapabilityInstalled(item, installed)
-                            }
-                          />
+                          <CapabilityCard key={item.id} item={item} />
                         ))}
                         {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
                           <View key={key} style={{ flex: 1 }} />
@@ -1269,21 +1395,9 @@ export function CapabilityHubScreen({
                   >
                     <Empty
                       icon={Search}
-                      title={t(
-                        showMineEmptyState
-                          ? HUB_MY_EMPTY_TITLE_LABELS[typeFilter]
-                          : HUB_EMPTY_TITLE_LABELS[typeFilter],
-                      )}
-                      detail={t(
-                        showMineEmptyState ? "agent.hubMyEmptyDetail" : "agent.hubNoMatchDetail",
-                      )}
-                    >
-                      {showMineEmptyState && (
-                        <Button small primary onPress={() => setTab("marketplace")}>
-                          {t("agent.hubBrowseMarketplace")}
-                        </Button>
-                      )}
-                    </Empty>
+                      title={t(HUB_EMPTY_TITLE_LABELS[typeFilter])}
+                      detail={t("agent.hubNoMatchDetail")}
+                    />
                   </View>
                 )}
               </View>
@@ -1305,11 +1419,22 @@ export function CapabilityHubScreen({
         </Sheet>
       )}
 
+      {selectedMySkill && (
+        <MySkillDetailSheet
+          title={selectedMySkill.skill.name}
+          subtitle={t("agent.mySkillSource", { agent: selectedMySkill.agentName })}
+          skill={selectedMySkill.skill}
+          onClose={() => setSelectedMySkill(undefined)}
+        />
+      )}
+
       {selectedSkill && (
         <SkillDetailSheet
           skill={selectedSkill}
+          agents={agentList}
           onClose={() => setSelectedSkillId(undefined)}
           onUse={() => startSelectedSkill(selectedSkill)}
+          onToggleInstall={toggleSkillInstall}
         />
       )}
     </View>

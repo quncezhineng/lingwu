@@ -26,6 +26,7 @@ import type { ActionProposal, Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
+import { useAgentSpace } from "./agent-space";
 import type { AgentAvatarId, AgentCommunication, AgentTone } from "./agent-space-model";
 import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
@@ -35,6 +36,14 @@ import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { BackgroundUpdates } from "./background-updates";
 import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
+import {
+  type ComposerSelection,
+  ComposerSelectionChips,
+  ConnectorPickerSheet,
+  connectorOptions,
+  SkillPickerSheet,
+  skillDisplayName,
+} from "./capability-picker";
 import { displayUserMessage, promptWithAttachments } from "./chat-content";
 import { ComposerDock, ComposerMatte } from "./composer-dock";
 import { BrowserThreadCard } from "./computer";
@@ -66,9 +75,11 @@ import { statusLabel } from "./i18n/translate";
 import {
   ArrowDown,
   ArrowUpRight,
+  Brain,
   FileText,
   FolderOpen,
   Lightbulb,
+  Link2,
   RotateCcw,
   Sparkles,
   Upload,
@@ -575,6 +586,38 @@ export function ChatScreen({
   const [pickerSelection, setPickerSelection] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
+  // 对话级能力选择：技能与连接器勾选后进入上下文，选中期间对本对话持续生效。
+  const [skillPickerOpen, setSkillPickerOpen] = useState(false);
+  const [connectorPickerOpen, setConnectorPickerOpen] = useState(false);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [selectedConnectorIds, setSelectedConnectorIds] = useState<string[]>([]);
+  const { current: currentAgent } = useAgentSpace();
+  const connectorChoices = connectorOptions(w);
+  const selectedSkills: ComposerSelection[] = selectedSkillIds.map((id) => ({
+    id,
+    name: skillDisplayName(id, currentAgent.customSkills),
+  }));
+  const selectedConnectors = connectorChoices.filter((option) =>
+    selectedConnectorIds.includes(option.id),
+  );
+  // 切换对话时清空能力选择，避免把上一个对话的技能/连接器带到新对话。
+  useEffect(() => {
+    setSelectedSkillIds([]);
+    setSelectedConnectorIds([]);
+    setSkillPickerOpen(false);
+    setConnectorPickerOpen(false);
+  }, [threadId]);
+  useAgentContext({
+    description:
+      "Skills and connectors the user attached to this conversation from the composer. Use the skills when the request matches them; a connector marked connected can be used directly. This context does not grant access to any resource the user has not connected.",
+    value: {
+      skills: selectedSkills.map((skill) => skill.name),
+      connectors: selectedConnectors.map((option) => ({
+        name: option.name,
+        status: option.connected ? "connected" : "not connected",
+      })),
+    },
+  });
   // 对话页顶部「文件产物」按钮控制的右边栏是否展开。
   const [filesOpen, setFilesOpen] = useState(false);
   const list = useRef<ScrollView>(null);
@@ -921,16 +964,21 @@ export function ChatScreen({
   }, [busy, agent.isRunning, outbox.pending.length, flush]);
   useEffect(() => {
     if (!active || !prompt) return;
-    if (!prompt.text.trim()) return;
+    // 技能预选可以不带文字：只把技能放进输入区，问题交给用户自己写。
+    if (!prompt.text.trim() && !prompt.skillIds?.length) return;
     // draft 意图只预填输入框，等用户确认后再走 send，避免模板一点就开跑。
     if (prompt.draft) {
       if (!claimPrompt(prompt.id)) return;
-      setDraft(prompt.text);
+      if (prompt.text.trim()) setDraft(prompt.text);
       // 附件同样只预选，用户可以在发送前移除。
       const ids = (prompt.attachmentIds ?? []).filter((id) =>
         w.files.some((file) => file.id === id),
       );
       if (ids.length) setAttachments(ids);
+      // 技能以 chip 形式带入输入区，与「技能选择」里的选中项合并。
+      const skillIds = (prompt.skillIds ?? []).filter((id) => id.trim());
+      if (skillIds.length)
+        setSelectedSkillIds((current) => [...new Set([...current, ...skillIds])]);
       composerInput.current?.focus();
       return;
     }
@@ -1976,6 +2024,20 @@ export function ChatScreen({
                   active: picking,
                   onPress: openFilePicker,
                 },
+                {
+                  key: "skills",
+                  icon: Brain,
+                  label: t("chat.skillPickerTool"),
+                  active: selectedSkillIds.length > 0,
+                  onPress: () => setSkillPickerOpen(true),
+                },
+                {
+                  key: "connectors",
+                  icon: Link2,
+                  label: t("chat.connectorPickerTool"),
+                  active: selectedConnectorIds.length > 0,
+                  onPress: () => setConnectorPickerOpen(true),
+                },
               ]}
               cornerAction={
                 showIdeasShortcut
@@ -1987,13 +2049,31 @@ export function ChatScreen({
                   : undefined
               }
               attachments={
-                <ComposerAttachments
-                  files={w.files}
-                  selectedIds={attachments}
-                  onRemove={(id) =>
-                    setAttachments((ids) => ids.filter((candidate) => candidate !== id))
-                  }
-                />
+                <>
+                  <ComposerSelectionChips
+                    items={selectedSkills}
+                    icon={Brain}
+                    removeLabel={(name) => t("chat.removeSkill", { name })}
+                    onRemove={(id) =>
+                      setSelectedSkillIds((ids) => ids.filter((candidate) => candidate !== id))
+                    }
+                  />
+                  <ComposerSelectionChips
+                    items={selectedConnectors}
+                    icon={Link2}
+                    removeLabel={(name) => t("chat.removeConnector", { name })}
+                    onRemove={(id) =>
+                      setSelectedConnectorIds((ids) => ids.filter((candidate) => candidate !== id))
+                    }
+                  />
+                  <ComposerAttachments
+                    files={w.files}
+                    selectedIds={attachments}
+                    onRemove={(id) =>
+                      setAttachments((ids) => ids.filter((candidate) => candidate !== id))
+                    }
+                  />
+                </>
               }
               sendLabel={t("chat.sendMessage")}
               stopLabel={t("chat.stopReply")}
@@ -2023,6 +2103,36 @@ export function ChatScreen({
           onBrowse={() => {
             setPicking(false);
             navigate("files");
+          }}
+        />
+      )}
+      {skillPickerOpen && (
+        <SkillPickerSheet
+          customSkills={currentAgent.customSkills}
+          selectedIds={selectedSkillIds}
+          onToggle={(id) =>
+            setSelectedSkillIds((ids) =>
+              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+            )
+          }
+          onConfirm={() => setSkillPickerOpen(false)}
+          onClose={() => setSkillPickerOpen(false)}
+        />
+      )}
+      {connectorPickerOpen && (
+        <ConnectorPickerSheet
+          options={connectorChoices}
+          selectedIds={selectedConnectorIds}
+          onToggle={(id) =>
+            setSelectedConnectorIds((ids) =>
+              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+            )
+          }
+          onConfirm={() => setConnectorPickerOpen(false)}
+          onClose={() => setConnectorPickerOpen(false)}
+          onManage={() => {
+            setConnectorPickerOpen(false);
+            navigate("connections");
           }}
         />
       )}

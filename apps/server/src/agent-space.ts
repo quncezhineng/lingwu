@@ -45,6 +45,8 @@ const agentSchema = z
     threadExists: z.boolean(),
     createdAt: timestamp,
     skills: z.array(identifier).max(30),
+    // 从技能目录安装到该 Agent 的技能 id；旧客户端不带该字段，保持可选以兼容。
+    installedSkills: z.array(identifier).max(60).optional(),
     customSkills: z.array(skillSchema).max(30),
   })
   .strict();

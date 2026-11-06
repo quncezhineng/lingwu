@@ -5,6 +5,119 @@
 
 ## 变更记录
 
+### 2026-11-06 · 移除技能详情弹窗中的使用提示文案
+
+**背景**
+
+用户选中技能详情弹窗中「只 会把技能带入对话输入区，你描述问题后再决定是否发送。」的提示文本，认为「使用」按钮已能表达意图，提示冗余，要求删除。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L676-L682)：删除 `onUse` 区块中 `<Text>{t("agent.skillDetailUseHint")}</Text>` 提示文本，仅保留「使用此技能」按钮。
+- [i18n] 清理无引用的 `agent.skillDetailUseHint` 键（zh-Hans 与 en 同步删除）。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`capability-hub.tsx` 无类型错误。
+
+### 2026-11-06 · 移除安装技能卡片的勾选图标
+
+**背景**
+
+用户选中「从技能库安装的技能」卡片右上角的绿色勾选图标，要求一并移除。自建技能与安装技能两张卡片随后续精简，逐步统一为纯信息卡片。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L400-L407)：删除安装技能卡片内 `<Check size={16} color={colors.success} />` 勾选图标，并从 `../icons` 的 import 中移除未再使用的 `Check`。卡片结构简化为：技能标题 → 描述。
+- 至此技能页「从技能库安装的技能」卡片与自建技能卡片均为纯信息展示（标题 + 描述），不再冗余状态元素。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`skills.tsx` 无类型错误。
+
+### 2026-11-06 · 移除自建技能卡片的版本号展示
+
+**背景**
+
+用户选中自建技能卡片底部的「版本 10」小字，认为版本号对用户无参考价值，要求移除。此前该卡片已同步移除启停开关（自建技能不再提供开关），卡片信息进一步精简。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L384-L385)：删除自建技能卡片内 `customSkills.map` 末尾的 `<Text>{t("agentSpace.skillVersion", ...)}</Text>` 版本号行。卡片结构简化为：技能名 + 删除按钮 → 用途描述。
+- i18n 键 `agentSpace.skillVersion` 保留：「应用与能力」页「我的技能」只读详情弹窗中仍展示版本。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`skills.tsx` 无类型错误。
+
+### 2026-11-06 · 移除技能卡片中的「已添加」状态文本
+
+**背景**
+
+用户在技能页选中「已添加」的灰色小字，认为该状态信息冗余：卡片右上角已有绿色勾选图标表示已安装状态，无需再单独用文字提示。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L393-L418)：删除「从技能库安装的技能」卡片内 `installedEntries.map` 末尾的状态文本行 `<Text>{t("agent.skillInstallInstalled")}</Text>`。卡片结构简化为：技能名 + 勾选图标 → 描述。
+- i18n 键 `agent.skillInstallInstalled` 保留：技能库行内徽标（StatusBadge）与「应用与能力」页 AgentInstallRow 仍在使用。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`skills.tsx` 无类型错误。
+
+### 2026-11-06 · 「应用与能力」技能 tab 新增「我的技能」板块
+
+**背景**
+
+用户希望「应用与能力」页面的「技能」中能直接看到自己创建的自建技能，而不必逐个进入 Agent 的人设页。已与用户确认：展示范围为**全部 Agent 的自建技能汇总**，点击技能卡片打开**只读详情弹窗**。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L857-L867)：新增 `MySkillEntry` 类型与 `mySkills` 数据——`agentList.flatMap` 汇总所有 Agent 下的 `customSkills`，每条带来源 Agent 名。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L1196-L1271)：技能 tab 内容列顶部新增「我的技能」板块（仅 `typeFilter === "skills"` 且有数据时显示），卡片展示技能名、一句话用途、来源 Agent 标签，点击打开详情。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L1351-L1378)：新增只读详情 Sheet，展示用途 / 工作提示词 / 输出格式 / 版本，副标题标注「创建于 {agent}」。
+- [i18n] `agent.mySkills`（我的技能 / My skills）、`agent.mySkillSource`（创建于 {agent} / Created in {agent}），zh-Hans 与 en 同步。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`capability-hub.tsx` 无类型错误。
+
+### 2026-11-06 · 任务目标提醒 P1：关联管理、通知分组与近 7 天活动
+
+**背景**
+
+完成 [PRD：任务目标提醒](./PRD-任务目标提醒.md) 的 P1 范围，在 P0「接下来 + 目标轨道」之上补齐收件箱与关联管理。
+
+**处理**
+
+- [service.ts](../apps/server/src/engine/service.ts)：已有提醒支持关联、改绑、解除目标；`null` 表示显式解除；监控任务同步更新 `goalId` / `milestoneId`，避免展示与执行上下文不一致。
+- [agent.ts](../packages/domain/src/agent.ts) / [db.ts](../apps/server/src/db.ts)：里程碑新增可选 `completedAt`，勾选、整表更新和任务自动完成三条路径都会记录完成时间，取消勾选时清除。
+- [tracking-view.ts](../apps/mobile/src/tracking-view.ts)：目标轨道增加近 7 天任务回执、提醒告警与里程碑完成记录，并按 `Asia/Shanghai` 生成当日摘要。
+- [notification-view.ts](../apps/mobile/src/notification-view.ts) / [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：通知抽屉按 `notification.taskId -> task.goalId -> goal` 分组；缺失任务、已删目标和无任务通知回退到「独立通知」。
+- [tracking-screen.tsx](../apps/mobile/src/tracking-screen.tsx)：完成目标的关联提醒进入独立折叠区，保留逐条暂停/恢复、查看与改绑入口；每日摘要放在目标卡片内，不新增逐条推送。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：提醒编辑表单支持独立提醒、关联目标、切换里程碑和解除关联。
+
+**验证**
+
+- `pnpm typecheck`
+- `pnpm build:web`
+- `node --import tsx --import ./tests/setup.ts --test --test-reporter=dot tests/*.test.ts apps/mobile/test/*.test.ts`：983 个测试通过。
+
+### 2026-11-06 · 左侧栏置顶 Agent 区块底色区分
+
+**背景**
+
+用户反馈左侧栏 Agent 列表中，置顶 Agent 区域与下方的非置顶区块视觉上没有区分，需要为置顶区域添加背景色。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx#L624-L632)：新增 `pinnedAgents`（系统默认 + 用户置顶）与 `restAgents` 分组计算。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx#L717-L745)：列表渲染改为两块——置顶区块包裹在带 `colors.overlay1` 淡灰底色、圆角、4px 内边距的容器中；非置顶区块正常平铺。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：`agent-product.tsx` 无类型错误。
+
 ### 2026-11-06 · 左侧栏系统内置默认 Agent 永远置顶
 
 **背景**

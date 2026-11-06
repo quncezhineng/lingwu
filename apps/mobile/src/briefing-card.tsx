@@ -364,6 +364,10 @@ export function MarketBriefingCard({
   const state = useBriefingState();
   const [expanded, setExpanded] = useState(false);
   const compact = width < 600;
+  // 今日领悟是短标题小卡：按实测宽度并排 3 / 2 / 1 列，避免逐条堆成一长列。
+  const [insightRowWidth, setInsightRowWidth] = useState(0);
+  const insightColumns = insightRowWidth >= 660 ? 3 : insightRowWidth >= 420 ? 2 : 1;
+  const insightCardWidth = insightColumns === 3 ? "32%" : insightColumns === 2 ? "48.5%" : "100%";
 
   useEffect(() => {
     void loadBriefing(api, locale);
@@ -628,9 +632,19 @@ export function MarketBriefingCard({
         </View>
 
         {insights.length ? (
-          <View style={{ gap: 11 }}>
+          <View
+            style={{
+              flexDirection: insightColumns > 1 ? "row" : "column",
+              flexWrap: "wrap",
+              alignItems: "stretch",
+              gap: 11,
+            }}
+            onLayout={(event) => setInsightRowWidth(Math.round(event.nativeEvent.layout.width))}
+          >
             {insights.map((artifact) => (
-              <BriefingInsightCard key={artifact.id} artifact={artifact} onOpen={openInsight} />
+              <View key={artifact.id} style={{ width: insightCardWidth }}>
+                <BriefingInsightCard artifact={artifact} onOpen={openInsight} />
+              </View>
             ))}
           </View>
         ) : (

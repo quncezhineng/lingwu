@@ -621,6 +621,15 @@ function AgentRail({
       }),
     [agents],
   );
+  // 列表分块：置顶区（系统默认 + 用户置顶）用底色区分于普通区。
+  const { pinnedAgents, restAgents } = useMemo(() => {
+    const pinned: AgentDefinition[] = [];
+    const rest: AgentDefinition[] = [];
+    for (const agent of orderedAgents) {
+      (agent.system || agent.pinned ? pinned : rest).push(agent);
+    }
+    return { pinnedAgents: pinned, restAgents: rest };
+  }, [orderedAgents]);
   const { navigate, open, workspace } = useWorkspace();
   const { data: agentData } = useAgentWorkspace();
   const unreadNotifications = (agentData?.notifications ?? []).filter((item) => !item.read).length;
@@ -705,7 +714,27 @@ function AgentRail({
         contentContainerStyle={{ gap: 4, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        {orderedAgents.map((agent) => (
+        {pinnedAgents.length > 0 && (
+          <View
+            style={{
+              gap: 2,
+              padding: 4,
+              borderRadius: radius.control,
+              backgroundColor: colors.overlay1,
+            }}
+          >
+            {pinnedAgents.map((agent) => (
+              <AgentListItem
+                key={agent.id}
+                agent={agent}
+                active={agent.id === current.id}
+                onPress={() => choose(agent)}
+                onOpenMenu={setMenuAnchor}
+              />
+            ))}
+          </View>
+        )}
+        {restAgents.map((agent) => (
           <AgentListItem
             key={agent.id}
             agent={agent}
@@ -1043,7 +1072,7 @@ function AgentHeader({
 }) {
   const { t } = useTranslation();
   const { current } = useAgentSpace();
-  const { section, navigate } = useWorkspace();
+  const { section, back } = useWorkspace();
   const { width } = useWindowDimensions();
   // 与页面正文同一条判定：< mobile 用窄边距，其余用桌面边距。
   const stacked = width < breakpoints.mobile;
@@ -1107,8 +1136,8 @@ function AgentHeader({
       <View style={{ width: 40 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t("agentSpace.backToChat")}
-          onPress={() => navigate("chat")}
+          accessibilityLabel={t("common.back")}
+          onPress={back}
           style={({ pressed }) => ({
             width: 36,
             height: 36,

@@ -56,6 +56,8 @@ export interface AgentDefinition {
   threadExists: boolean;
   createdAt: string;
   skills: string[];
+  /** 从技能目录安装到该 Agent 的技能 id；详情页据此区分「已安装」。 */
+  installedSkills: string[];
   customSkills: AgentSkill[];
 }
 
@@ -217,6 +219,7 @@ export function createSystemAgent(
     threadExists: true,
     createdAt: now,
     skills: [...SYSTEM_AGENT_CAPABILITIES],
+    installedSkills: [],
     customSkills: [],
   };
 }
@@ -308,6 +311,7 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
     threadExists: system || value.threadExists === true,
     createdAt: stringValue(value.createdAt, defaults.createdAt),
     skills: skills.length ? skills : defaults.skills,
+    installedSkills: [...new Set(stringArray(value.installedSkills))].slice(0, 60),
     customSkills: Array.isArray(value.customSkills)
       ? value.customSkills
           .map(normalizeSkill)
@@ -437,6 +441,7 @@ export function createAgentFromTemplate(
     threadExists: false,
     createdAt: now,
     skills: [...preset.skills],
+    installedSkills: [],
     customSkills: [],
   };
 }

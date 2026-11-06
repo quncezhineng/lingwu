@@ -66,12 +66,15 @@ export interface Goal {
   description: string;
   category: string;
   status: "active" | "paused" | "completed";
-  milestones: { id: string; title: string; done: boolean }[];
+  milestones: { id: string; title: string; done: boolean; completedAt?: string }[];
   createdAt: string;
 }
 export interface Monitor {
   id: string;
   taskId: string;
+  /** Optional goal context. A reminder remains a Monitor; this only groups it in the UI. */
+  goalId?: string;
+  milestoneId?: string;
   title: string;
   /** 用户希望关注的内容；为空时回退到触发条件文案。 */
   description?: string;
@@ -189,8 +192,14 @@ export const monitorInputSchema = z
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
       .optional(),
     weekday: z.number().int().min(1).max(7).optional(),
+    goalId: z.string().min(1).max(200).nullable().optional(),
+    milestoneId: z.string().min(1).max(200).nullable().optional(),
   })
   .superRefine((v, c) => {
+    if (v.goalId === null && v.milestoneId)
+      c.addIssue({ code: "custom", message: "A milestone requires a goal", path: ["milestoneId"] });
+    if (v.milestoneId && !v.goalId)
+      c.addIssue({ code: "custom", message: "A milestone requires a goal", path: ["milestoneId"] });
     if (v.condition !== "change" && !v.value.trim())
       c.addIssue({ code: "custom", message: "Enter a condition value" });
     if (

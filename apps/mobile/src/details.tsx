@@ -16,7 +16,8 @@ import {
 } from "../../../packages/domain/src";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { ArchivedThreadsScreen } from "./account";
-import { DelegateSheet, NotificationsSheet, TaskDetail } from "./agent-ui";
+import { DelegateSheet, GoalCard, NotificationsSheet, TaskDetail } from "./agent-ui";
+import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
 import { artifactHasHtmlPreview, renderArtifactHtml } from "./artifact-html";
 import BrowserConsole from "./BrowserConsole";
@@ -56,6 +57,7 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Target,
   Trash2,
   X,
 } from "./icons";
@@ -99,12 +101,14 @@ export function Details({ detail }: { detail: Detail }) {
   const { close, navigate } = useWorkspace();
   if (detail.type === "computer") return <ComputerSheet />;
   if (detail.type === "task") return <TaskDetail taskId={detail.taskId} />;
+  if (detail.type === "goal") return <GoalDetailSheet goalId={detail.goalId} />;
   if (detail.type === "delegate")
     return (
       <DelegateSheet
-        key={`${detail.goalId}:${detail.milestoneId}`}
+        key={`${detail.goalId}:${detail.milestoneId}:${detail.kind}`}
         goalId={detail.goalId}
         milestoneId={detail.milestoneId}
+        initialKind={detail.kind}
       />
     );
   if (detail.type === "notifications") return <NotificationsSheet />;
@@ -155,6 +159,22 @@ export function Details({ detail }: { detail: Detail }) {
           }}
         />
       ))}
+    </Sheet>
+  );
+}
+
+function GoalDetailSheet({ goalId }: { goalId: string }) {
+  const { t } = useTranslation();
+  const { data } = useAgentWorkspace();
+  const { close } = useWorkspace();
+  const goal = data?.goals.find((item) => item.id === goalId);
+  return (
+    <Sheet title={goal?.title ?? t("agent.goalsTab")} onClose={close}>
+      {goal ? (
+        <GoalCard goal={goal} />
+      ) : (
+        <Empty icon={Target} title={t("agent.goalsEmptyTitle")} detail={t("agent.goalsEmpty")} />
+      )}
     </Sheet>
   );
 }

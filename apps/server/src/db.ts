@@ -94,17 +94,27 @@ export class Store {
   }
   // Update only the selected checkbox against the current row, preserving concurrent
   // additions, renames, reordering and other milestones' completion state.
-  async setMilestoneDone<T>(owner: string, goalId: string, milestoneId: string, done: boolean) {
+  async setMilestoneDone<T>(
+    owner: string,
+    goalId: string,
+    milestoneId: string,
+    done: boolean,
+    completedAt = new Date().toISOString(),
+  ) {
     const result = await this.db.query(
       `UPDATE records SET data=jsonb_set(data, '{milestones}', (
-        SELECT jsonb_agg(CASE WHEN item->>'id'=$3
-          THEN item || jsonb_build_object('done', $4::boolean) ELSE item END ORDER BY ordinal)
+        SELECT jsonb_agg(CASE WHEN item->>'id'=$3 THEN
+          CASE WHEN $4::boolean
+            THEN (item - 'completedAt') || jsonb_build_object('done', true, 'completedAt', $5::text)
+            ELSE (item - 'completedAt') || jsonb_build_object('done', false)
+          END
+          ELSE item END ORDER BY ordinal)
         FROM jsonb_array_elements(data->'milestones') WITH ORDINALITY AS milestones(item, ordinal)
       )), updated_at=now()
       WHERE owner=$1 AND kind='goals' AND id=$2
         AND EXISTS (SELECT 1 FROM jsonb_array_elements(data->'milestones') item WHERE item->>'id'=$3)
       RETURNING data`,
-      [owner, goalId, milestoneId, done],
+      [owner, goalId, milestoneId, done, completedAt],
     );
     return (result.rows[0]?.data as T | undefined) ?? null;
   }

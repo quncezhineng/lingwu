@@ -36,6 +36,7 @@ import { I18nProvider, useTranslation } from "./src/i18n";
 import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
 import { Bell, Menu, Search, Settings2 } from "./src/icons";
+import { goBack, navigateTo, ROOT_NAVIGATION, type SectionNavigation } from "./src/navigation";
 import { PageHeader } from "./src/page-header";
 import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
@@ -482,7 +483,9 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
   const { t } = useTranslation();
   const api = useMemo(() => new LingWuApi(token), [token]);
   const [workspace, setWorkspace] = useState<Workspace>();
-  const [section, setSection] = useState<Section>("chat");
+  // 页面层级：section 为当前页，stack 记录进入当前页之前依次经过的页面，
+  // 顶部「返回」据此回到上一级页面；对话页是根页面，栈空。
+  const [{ section }, setNavigation] = useState<SectionNavigation>(ROOT_NAVIGATION);
   const [detail, setDetail] = useState<Detail>();
   const [reminderIntent, setReminderIntent] = useState<PriceReminderIntent>();
   const [toast, setToast] = useState<ToastState>();
@@ -532,10 +535,15 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
       setToast({ text: message, action }),
     [],
   );
+  /** 进入下一级页面：把当前页压栈，作为「返回」的目标。 */
   const navigate = useCallback(
-    (next: Section) => setSection(next === "connections" ? "apps" : next),
+    (next: Section) => setNavigation((state) => navigateTo(state, next)),
     [],
   );
+  /** 返回上一级页面：回栈顶；没有上级时回到对话页（根页面）。 */
+  const back = useCallback(() => setNavigation(goBack), []);
+  /** 回到对话页并清空层级：用于「在对话里继续」这类明确的回家动作。 */
+  const goHome = useCallback(() => setNavigation(ROOT_NAVIGATION), []);
   const open = useCallback((next: Detail) => setDetail(next), []);
   const close = useCallback(() => setDetail(undefined), []);
   const clearReminderIntent = useCallback(() => setReminderIntent(undefined), []);
@@ -543,26 +551,32 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
     (symbol: PriceReminderIntent["symbol"], quote?: PriceReminderIntent["quote"]) => {
       setDetail(undefined);
       setReminderIntent({ id: Date.now(), kind: "price", symbol, quote });
-      setSection("goals");
+      navigate("goals");
     },
-    [],
+    [navigate],
   );
   /** 退出登录：先让服务端作废令牌，再清空本地会话回到登录页。 */
   const signOut = useCallback(() => {
     void api.request("/api/auth/signout", {}).catch(() => undefined);
     onSignOut();
   }, [api, onSignOut]);
-  const ask = useCallback((text: string, attachmentIds?: readonly string[]) => {
-    setPrompt({ id: Date.now(), text, attachmentIds });
-    setSection("chat");
-  }, []);
-  /** 语义与 ask 相反：只预填输入框（含附件），是否发送交由用户决定。 */
-  const prefillPrompt = useCallback((text: string, attachmentIds?: readonly string[]) => {
-    setPrompt({ id: Date.now(), text, attachmentIds, draft: true });
-    // 预填后立刻切到对话：先关掉可能盖在上面的详情浮层，避免用户看不到输入框。
-    setDetail(undefined);
-    setSection("chat");
-  }, []);
+  const ask = useCallback(
+    (text: string, attachmentIds?: readonly string[]) => {
+      setPrompt({ id: Date.now(), text, attachmentIds });
+      goHome();
+    },
+    [goHome],
+  );
+  /** 语义与 ask 相反：只预填输入框（含附件与技能预选），是否发送交由用户决定。 */
+  const prefillPrompt = useCallback(
+    (text: string, attachmentIds?: readonly string[], skillIds?: readonly string[]) => {
+      setPrompt({ id: Date.now(), text, attachmentIds, skillIds, draft: true });
+      // 预填后立刻切到对话：先关掉可能盖在上面的详情浮层，避免用户看不到输入框。
+      setDetail(undefined);
+      goHome();
+    },
+    [goHome],
+  );
   if (!workspace)
     return (
       <SafeAreaView
@@ -597,6 +611,7 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
         section,
         reminderIntent,
         navigate,
+        back,
         refresh,
         open,
         close,
@@ -1055,21 +1070,23 @@ function WorkspaceShell({
             key={
               detail.type === "task"
                 ? detail.taskId
-                : detail.type === "file"
-                  ? detail.file.id
-                  : detail.type === "browser"
-                    ? detail.browser.id
-                    : detail.type === "mail"
-                      ? detail.mail.id
-                      : detail.type === "review"
-                        ? detail.action.id
-                        : detail.type === "email"
-                          ? JSON.stringify(detail.draft)
-                          : detail.type === "event"
-                            ? detail.event?.id || "event-new"
-                            : detail.type === "artifact"
-                              ? detail.artifact.id
-                              : detail.type
+                : detail.type === "goal"
+                  ? detail.goalId
+                  : detail.type === "file"
+                    ? detail.file.id
+                    : detail.type === "browser"
+                      ? detail.browser.id
+                      : detail.type === "mail"
+                        ? detail.mail.id
+                        : detail.type === "review"
+                          ? detail.action.id
+                          : detail.type === "email"
+                            ? JSON.stringify(detail.draft)
+                            : detail.type === "event"
+                              ? detail.event?.id || "event-new"
+                              : detail.type === "artifact"
+                                ? detail.artifact.id
+                                : detail.type
             }
             detail={detail}
           />

@@ -67,6 +67,10 @@ type AgentSpaceContextValue = {
     skillId?: string,
   ) => void;
   toggleSkill: (agentId: string, skillId: string) => void;
+  /** 删除用户自建的技能：所有读取 customSkills 的界面（Agent 详情、应用与能力、对话选择）同步移除。 */
+  deleteSkill: (agentId: string, skillId: string) => void;
+  /** 从技能目录安装 / 卸载某个技能到指定 Agent；已安装时不重复写入。 */
+  setSkillInstalled: (agentId: string, skillId: string, installed: boolean) => void;
 };
 
 const AgentSpaceContext = createContext<AgentSpaceContextValue | null>(null);
@@ -318,6 +322,46 @@ export function AgentSpaceProvider({
     }));
   }, []);
 
+  const deleteSkill = useCallback<AgentSpaceContextValue["deleteSkill"]>((agentId, skillId) => {
+    setState((value) => {
+      const target = value.agents.find((agent) => agent.id === agentId);
+      if (!target?.customSkills.some((skill) => skill.id === skillId)) return value;
+      return {
+        ...value,
+        agents: value.agents.map((agent) =>
+          agent.id === agentId
+            ? {
+                ...agent,
+                customSkills: agent.customSkills.filter((skill) => skill.id !== skillId),
+              }
+            : agent,
+        ),
+      };
+    });
+  }, []);
+
+  const setSkillInstalled = useCallback<AgentSpaceContextValue["setSkillInstalled"]>(
+    (agentId, skillId, installed) => {
+      const id = skillId.trim();
+      if (!id) return;
+      setState((value) => {
+        const target = value.agents.find((agent) => agent.id === agentId);
+        if (!target || target.installedSkills.includes(id) === installed) return value;
+        return {
+          ...value,
+          agents: value.agents.map((agent) => {
+            if (agent.id !== agentId) return agent;
+            const next = installed
+              ? [...agent.installedSkills, id]
+              : agent.installedSkills.filter((candidate) => candidate !== id);
+            return { ...agent, installedSkills: next };
+          }),
+        };
+      });
+    },
+    [],
+  );
+
   const selection = useMemo<SelectionLike>(
     () => ({
       id: current.threadId || mainId,
@@ -349,6 +393,8 @@ export function AgentSpaceProvider({
       replayOnboarding,
       saveSkill,
       toggleSkill,
+      deleteSkill,
+      setSkillInstalled,
     }),
     [
       state,
@@ -369,6 +415,8 @@ export function AgentSpaceProvider({
       replayOnboarding,
       saveSkill,
       toggleSkill,
+      deleteSkill,
+      setSkillInstalled,
     ],
   );
 
