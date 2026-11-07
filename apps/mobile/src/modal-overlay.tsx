@@ -10,12 +10,13 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { colors } from "./theme";
+import { colors, motion } from "./theme";
 import { useReducedMotion } from "./use-reduced-motion";
 
+/** 背板只做一层轻微虚化，层级由面板的 1px 描边承担（shadcn Dialog 的做法）。 */
 const webBackdrop = {
-  backdropFilter: "blur(8px)",
-  WebkitBackdropFilter: "blur(8px)",
+  backdropFilter: "blur(4px)",
+  WebkitBackdropFilter: "blur(4px)",
   backgroundColor: colors.modalShade,
 } as ViewStyle;
 
@@ -34,7 +35,7 @@ export function ModalBackdrop({ subtle = false }: { subtle?: boolean }) {
     <BlurView
       testID="modal-backdrop"
       pointerEvents="none"
-      intensity={subtle ? 8 : 24}
+      intensity={subtle ? 6 : 16}
       tint="default"
       experimentalBlurMethod="dimezisBlurView"
       style={StyleSheet.absoluteFill}
@@ -72,7 +73,7 @@ export function ModalOverlay({
     animation.current = Animated.timing(progress, {
       toValue: 1,
       delay: 60,
-      duration: transition === "bottom" ? 280 : 160,
+      duration: transition === "bottom" ? motion.base : motion.fast,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: Platform.OS !== "web",
     });

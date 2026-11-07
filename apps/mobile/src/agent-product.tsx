@@ -167,7 +167,7 @@ function AgentMenu({
 }) {
   const { t } = useTranslation();
   const { width, height } = useWindowDimensions();
-  const menuWidth = Math.min(180, width - 24);
+  const menuWidth = Math.min(160, width - 24);
   const rows = anchor.agent.system ? 1 : 3;
   const menuHeight = 10 + rows * 34 + (anchor.agent.system ? 0 : 7);
   // 默认贴按钮右下方展开；底部空间不够就翻到上方。
@@ -423,7 +423,7 @@ function LanguageMenuRow({ compact }: { compact: boolean }) {
             // 桌面窄栏时菜单左侧还有横向空间，小窗贴在行右侧浮出，避免遮住下面的设置项；
             // 抽屉里空间不足，改为覆盖在下方选项上。
             ...(compact ? { top: 44, left: 6 } : { top: 0, left: "100%" as const }),
-            width: 176,
+            width: 160,
             padding: 4,
             gap: 1,
             zIndex: 30,

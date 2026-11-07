@@ -8,7 +8,6 @@ import {
   AGENT_CAPABILITY_LABELS,
   AGENT_TEMPLATES,
   type AgentAvatarId,
-  type AgentSkill,
   type AgentTemplateId,
   parsePreferenceFocus,
 } from "./agent-space-model";
@@ -19,11 +18,13 @@ import { CapabilityHubScreen, MySkillDetailSheet, SkillDetailSheet } from "./cap
 import { skillDisplayName } from "./capability-picker";
 import { useTranslation } from "./i18n";
 import {
+  Brain,
   ChevronRight,
   Clock3,
   FolderOpen,
   Heart,
   type MessageCircle,
+  Newspaper,
   Plus,
   Shapes,
   Sparkles,
@@ -178,7 +179,7 @@ export function AgentMoreContent({
       <SheetSection>
         <PanelButton
           compact={compact}
-          icon={Star}
+          icon={Newspaper}
           title={t("agentSpace.marketBrief")}
           detail={t("agentSpace.marketBriefDetail")}
           onPress={() => onPanel("brief")}
@@ -262,7 +263,7 @@ export function AgentMoreContent({
                 gap: 8,
               })}
             >
-              <Sparkles size={15} color={colors.primary} />
+              <Brain size={15} color={colors.primary} />
               <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]} numberOfLines={2}>
                 {displayName}
               </Text>

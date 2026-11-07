@@ -24,6 +24,7 @@ import {
   Link2,
   Mail,
   Plus,
+  Puzzle,
   Search,
   ShieldCheck,
   Sparkles,
@@ -1410,7 +1411,7 @@ export function CapabilityHubScreen({
       id: "plugins",
       title: t("agent.pluginsHeading"),
       detail: t("agent.hubPluginsDetail"),
-      icon: Sparkles,
+      icon: Puzzle,
       onPress: () => selectType("plugins"),
     },
     {

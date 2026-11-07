@@ -13,6 +13,9 @@ import { colors, space, typography } from "./theme";
  *
  * 决策 D5（页面 H1 是否保留衬线）尚未批复；当前按 Demo 实测用 sans，
  * 若产品选择品牌延续，只需把 `serif` 打开。
+ *
+ * 视觉按 shadcn 的 Typography 层级收紧：H1 20/28 w600、说明单行弱化、
+ * 区块下留白统一到 16 / 20；配色与字体保持项目原有主题不变。
  */
 export function PageHeader({
   eyebrow,
@@ -44,18 +47,21 @@ export function PageHeader({
           flexDirection: "row",
           alignItems: "flex-start",
           justifyContent: "space-between",
-          gap: space.md,
-          marginBottom: compact ? 20 : 24,
+          gap: space.sm,
+          marginBottom: compact ? 16 : 20,
         },
         style,
       ]}
     >
-      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         {!!eyebrow && <Text style={[typography.eyebrow, { color: colors.faint }]}>{eyebrow}</Text>}
         <Text
           accessibilityRole="header"
           style={{
             ...typography.h1,
+            fontSize: 20,
+            lineHeight: 28,
+            fontWeight: "600",
             color: colors.pageTitle,
             ...(serif ? { fontFamily: typography.insightTitle.fontFamily } : null),
           }}
@@ -65,17 +71,14 @@ export function PageHeader({
         {!!description && (
           <Text
             numberOfLines={compact ? 2 : 1}
-            style={[
-              typography.meta,
-              { lineHeight: 19, color: colors.faint, maxWidth: 720, marginTop: 1 },
-            ]}
+            style={[typography.meta, { lineHeight: 19, color: colors.faint, maxWidth: 640 }]}
           >
             {description}
           </Text>
         )}
       </View>
       {!!actions && (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>{actions}</View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>{actions}</View>
       )}
     </View>
   );

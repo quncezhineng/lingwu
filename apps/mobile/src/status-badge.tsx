@@ -62,7 +62,7 @@ export function StatusBadge({
         {
           alignSelf: "flex-start",
           paddingHorizontal: 6,
-          paddingVertical: 3,
+          paddingVertical: 2,
           borderRadius: radius.badge,
           backgroundColor: palette.background,
         },
@@ -74,7 +74,7 @@ export function StatusBadge({
         style={{
           fontSize: typography.eyebrow.fontSize,
           lineHeight: 14,
-          fontWeight: "500",
+          fontWeight: "600",
           color: palette.foreground,
         }}
       >

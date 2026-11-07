@@ -25,6 +25,7 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
+import { CardGrid } from "./card-grid";
 import { fileTypeName } from "./file-kind";
 import { activeLocaleTag, type TranslationFn, type TranslationKey, useTranslation } from "./i18n";
 import { statusLabel, tr } from "./i18n/translate";
@@ -70,7 +71,6 @@ import { Toggle } from "./toggle";
 import {
   Button,
   Card,
-  CardGrid,
   CheckRow,
   Chip,
   colors,
@@ -248,14 +248,11 @@ function TaskProgress({ view }: { view: ReturnType<typeof presentTask> }) {
 export function TaskCard({
   task,
   compact = false,
-  fill = false,
   onOpen,
   showGoal = true,
 }: {
   task: AgentTask;
   compact?: boolean;
-  /** 网格布局里撑满单元高度，保证同一行的卡片等高。 */
-  fill?: boolean;
   onOpen?: () => void;
   showGoal?: boolean;
 }) {
@@ -281,7 +278,7 @@ export function TaskCard({
         open({ type: "task", taskId: task.id });
       }}
       style={({ pressed }) => ({
-        flex: fill ? 1 : undefined,
+        flex: 1,
         padding: compact ? 12 : 14,
         gap: 10,
         borderWidth: 1,
@@ -461,14 +458,12 @@ export function AgentActivityScreen() {
           </Pressable>
         ))}
       </View>
-      {tasks.length > 0 && (
-        <CardGrid
-          items={tasks}
-          minColumnWidth={340}
-          getKey={(task) => task.id}
-          render={(task) => <TaskCard task={task} fill />}
-        />
-      )}
+      <CardGrid
+        items={tasks}
+        minColumnWidth={340}
+        getKey={(task) => task.id}
+        render={(task) => <TaskCard task={task} />}
+      />
       {!tasks.length && (
         <Empty
           icon={ListChecks}

@@ -6,6 +6,10 @@
  *
  * 设计库能直接命中的走 `library`，只有设计库缺失的语义才走 `project`；
  * 同一语义有多个库内近似图标时，取与原用途最接近的一个。
+ *
+ * 键名与几何统一向 shadcn 默认的 Lucide 语义靠拢：导航与高频操作优先使用
+ * 笔画更少、无外圈、无装饰点的版本，让图标与「冷静的投研工作台」一致。
+ * 导出名保持不变，60+ 个调用点无需改动。
  */
 export const ICON_KEYS = {
   Activity: "activity",
@@ -36,7 +40,7 @@ export const ICON_KEYS = {
   CircleDollarSign: "circle-dollar-sign",
   CircleMinus: "circle-minus",
   CirclePlus: "circle-plus",
-  CircleUserRound: "user",
+  CircleUserRound: "circle-user-round",
   CircleX: "circle-x",
   Clock3: "clock",
   Cpu: "cpu",
@@ -44,11 +48,11 @@ export const ICON_KEYS = {
   Edit3: "pen-line",
   ExternalLink: "external-link",
   FilePlus2: "file-plus",
-  FileText: "file",
+  FileText: "file-text",
   Folder: "folder",
   FolderOpen: "folder-open",
   FolderPlus: "folder-plus",
-  Funnel: "funnel",
+  Funnel: "list-filter",
   Globe2: "globe",
   Grip: "grip",
   Hand: "hand",
@@ -64,21 +68,23 @@ export const ICON_KEYS = {
   Mail: "mail",
   MapPin: "map-pin",
   Menu: "menu",
-  MessageCircle: "message-circle-more",
+  MessageCircle: "message-circle",
   MessageCircleQuestion: "circle-question-mark",
   Minus: "minus",
   Monitor: "monitor",
   MoreHorizontal: "more-horizontal",
   MousePointerClick: "mouse-pointer-click",
+  Newspaper: "newspaper",
   PanelLeftClose: "panel-left-close",
   PanelLeftOpen: "panel-left-open",
   PanelRight: "panel-right",
-  PanelsTopLeft: "panels-top-left",
-  Pause: "circle-pause",
+  PanelsTopLeft: "layout-dashboard",
+  Pause: "pause",
   Pencil: "pen-line",
-  Play: "circle-play",
+  Play: "play",
   Plus: "plus",
   Power: "power",
+  Puzzle: "puzzle",
   RefreshCw: "rotate-cw",
   Reply: "reply",
   RotateCcw: "rotate-ccw",
@@ -86,7 +92,7 @@ export const ICON_KEYS = {
   Save: "save",
   Search: "search",
   Send: "send-horizontal",
-  Settings2: "settings",
+  Settings2: "sliders-horizontal",
   Shapes: "shapes",
   ShieldAlert: "shield-alert",
   ShieldCheck: "shield-check",

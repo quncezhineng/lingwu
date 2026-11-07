@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import { useAgentSpace } from "../agent-space";
 import type { AgentDefinition, AgentSkill } from "../agent-space-model";
 import { Text, TextInput } from "../app-text";
 import { MySkillDetailSheet, SkillDeleteConfirm, SkillDetailSheet } from "../capability-hub";
+import { CardGrid } from "../card-grid";
 import { useTranslation } from "../i18n";
 import { FileText, Plus, Search } from "../icons";
 import { type SkillCatalogEntry, skillCatalog } from "../skill-catalog";
@@ -17,7 +18,7 @@ import {
 import { StatusBadge } from "../status-badge";
 import { Button, colors, radius, s } from "../ui";
 import { useWorkspace } from "../workspace";
-import { BotInlineBack, BotPage, type BotPageProps, TwoColumnGrid } from "./shared";
+import { BotInlineBack, BotPage, type BotPageProps } from "./shared";
 
 /** 两列网格 / 单列列表各自一次渲染的条数，避免把 180+ 条目录一次铺进页面。 */
 const GRID_PAGE_SIZE = 120;
@@ -380,6 +381,88 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
         )}
       </BotPage>
     );
+  // 自建技能与从技能库安装的技能同列展示，合并成一个列表交给两列网格。
+  const skillCards: { key: string; node: ReactNode }[] = [
+    ...current.customSkills.map((skill) => ({
+      key: `custom:${skill.id}`,
+      node: (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={skill.name}
+          onPress={() => setViewingCustom(skill)}
+          style={({ pressed }) => ({
+            flex: 1,
+            padding: 14,
+            borderRadius: 15,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: pressed ? colors.surface : colors.paper,
+            gap: 7,
+          })}
+        >
+          <View style={s.between}>
+            <Text style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>{skill.name}</Text>
+            {/* 用户自建的技能不再提供启停开关，右侧直接给出移除入口。 */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t("agentSpace.removeSkill")} ${skill.name}`}
+              hitSlop={6}
+              onPress={(event) => {
+                event.stopPropagation();
+                setViewingCustom(undefined);
+                setDeletingSkill(skill);
+              }}
+              style={({ pressed }) => ({
+                height: 24,
+                justifyContent: "center",
+                paddingHorizontal: 9,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: colors.errorSoft,
+                backgroundColor: pressed ? colors.errorSoft : colors.paper,
+              })}
+            >
+              <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
+                {t("agentSpace.removeSkill")}
+              </Text>
+            </Pressable>
+          </View>
+          <Text style={s.small}>{skill.purpose || t("agentSpace.skillInstructions")}</Text>
+        </Pressable>
+      ),
+    })),
+    ...installedEntries.map((skill) => {
+      const title = zh ? skill.titleZh : skill.titleEn;
+      return {
+        key: `catalog:${skill.id}`,
+        node: (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            onPress={() => setViewingCatalog(skill)}
+            style={({ pressed }) => ({
+              flex: 1,
+              padding: 14,
+              borderRadius: 15,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: pressed ? colors.surface : colors.paper,
+              gap: 7,
+            })}
+          >
+            <View style={s.between}>
+              <Text numberOfLines={1} style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>
+                {title}
+              </Text>
+            </View>
+            <Text numberOfLines={2} style={s.small}>
+              {zh ? skill.descriptionZh : skill.descriptionEn}
+            </Text>
+          </Pressable>
+        ),
+      };
+    }),
+  ];
   return (
     <BotPage title={t("agentSpace.skills")} onClose={onClose} embedded={embedded}>
       <View style={{ gap: 8 }}>
@@ -390,95 +473,12 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
           </Button>
         </View>
         {current.customSkills.length || installedEntries.length ? (
-          <TwoColumnGrid>
-            {(columns, itemWidth) => (
-              <>
-                {current.customSkills.map((skill) => (
-                  <View key={skill.id} style={columns === 2 ? { width: itemWidth } : undefined}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={skill.name}
-                      onPress={() => setViewingCustom(skill)}
-                      style={({ pressed }) => ({
-                        padding: 14,
-                        borderRadius: 15,
-                        borderWidth: 1,
-                        borderColor: colors.line,
-                        backgroundColor: pressed ? colors.surface : colors.paper,
-                        gap: 7,
-                      })}
-                    >
-                      <View style={s.between}>
-                        <Text style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>
-                          {skill.name}
-                        </Text>
-                        {/* 用户自建的技能不再提供启停开关，右侧直接给出移除入口。 */}
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`${t("agentSpace.removeSkill")} ${skill.name}`}
-                          hitSlop={6}
-                          onPress={(event) => {
-                            event.stopPropagation();
-                            setViewingCustom(undefined);
-                            setDeletingSkill(skill);
-                          }}
-                          style={({ pressed }) => ({
-                            height: 24,
-                            justifyContent: "center",
-                            paddingHorizontal: 9,
-                            borderRadius: 6,
-                            borderWidth: 1,
-                            borderColor: colors.errorSoft,
-                            backgroundColor: pressed ? colors.errorSoft : colors.paper,
-                          })}
-                        >
-                          <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
-                            {t("agentSpace.removeSkill")}
-                          </Text>
-                        </Pressable>
-                      </View>
-                      <Text style={s.small}>
-                        {skill.purpose || t("agentSpace.skillInstructions")}
-                      </Text>
-                    </Pressable>
-                  </View>
-                ))}
-                {/* 从技能库安装的技能与自建技能同列展示，点击同样打开详情。 */}
-                {installedEntries.map((skill) => {
-                  const title = zh ? skill.titleZh : skill.titleEn;
-                  return (
-                    <View key={skill.id} style={columns === 2 ? { width: itemWidth } : undefined}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={title}
-                        onPress={() => setViewingCatalog(skill)}
-                        style={({ pressed }) => ({
-                          padding: 14,
-                          borderRadius: 15,
-                          borderWidth: 1,
-                          borderColor: colors.line,
-                          backgroundColor: pressed ? colors.surface : colors.paper,
-                          gap: 7,
-                        })}
-                      >
-                        <View style={s.between}>
-                          <Text
-                            numberOfLines={1}
-                            style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}
-                          >
-                            {title}
-                          </Text>
-                        </View>
-                        <Text numberOfLines={2} style={s.small}>
-                          {zh ? skill.descriptionZh : skill.descriptionEn}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  );
-                })}
-              </>
-            )}
-          </TwoColumnGrid>
+          <CardGrid
+            items={skillCards}
+            minColumnWidth={300}
+            getKey={(card) => card.key}
+            render={(card) => card.node}
+          />
         ) : (
           <Text style={[s.muted, { paddingVertical: 18 }]}>{t("agentSpace.skillEmpty")}</Text>
         )}

@@ -64,8 +64,9 @@ export function Toast({
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: space.md,
-          padding: 14,
+          gap: space.sm,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
           backgroundColor: colors.toast,
           borderRadius: radius.field,
           maxWidth: 560,
@@ -73,7 +74,13 @@ export function Toast({
       >
         <Text
           numberOfLines={2}
-          style={{ ...typography.body, color: colors.onToast, flexShrink: 1 }}
+          style={{
+            ...typography.meta,
+            fontSize: 13,
+            lineHeight: 20,
+            color: colors.onToast,
+            flexShrink: 1,
+          }}
         >
           {toast.text}
         </Text>

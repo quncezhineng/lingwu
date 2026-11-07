@@ -2,11 +2,11 @@
  * 统一图标模块。
  *
  * 图标几何来自 Doubao 设计库（`library.ts`，40 枚资产逐字转写）与项目补齐
- * 图标（`project.ts`），渲染统一交给 react-native-svg，从而在 iOS / Android / Web
- * 三端得到一致的线宽与端点表现。
+ * 图标（`project.ts`，含一批按 shadcn/Lucide 语义重绘的轻量版本），渲染统一交给
+ * react-native-svg，从而在 iOS / Android / Web 三端得到一致的线宽与端点表现。
  *
- * 使用约定（与 Demo 图标规范一致）：
- * - `strokeWidth`：常规 1.65、底栏 1.7、导航 1.9；不传则取常规值。
+ * 使用约定（shadcn / Lucide 风格）：
+ * - `strokeWidth`：常规与底栏统一 1.75，仅导航激活态用 2；不传则取常规值。
  * - `color`：描边色；`fill` 缺省为 `none`（纯描边），传入时为填充态。
  * - `size`：默认 24，实际按调用点传入。
  */
@@ -24,7 +24,7 @@ export type IconProps = {
   size?: number;
   /** 描边色，默认正文色。 */
   color?: string;
-  /** 描边宽度，默认 1.65（常规）。 */
+  /** 描边宽度，默认 1.75（常规）。 */
   strokeWidth?: number;
   /** 填充色，缺省 `none`（纯描边）。 */
   fill?: string;
@@ -39,7 +39,7 @@ export type IconProps = {
 /** 项目自有图标组件类型，替代第三方图标库的组件类型。 */
 export type IconComponent = FC<IconProps>;
 
-/** 常规描边宽度基准（导航 1.9 / 底栏 1.7 见 `iconStroke`）。 */
+/** 常规描边宽度基准（导航激活 2 见 `iconStroke`，底栏与常规同值）。 */
 export const DEFAULT_STROKE_WIDTH = iconStroke.regular;
 
 /** 未显式指定颜色时的兜底前景色，与正文色保持一致。 */
@@ -122,6 +122,8 @@ function createIcon(name: string, key: string): IconComponent {
         strokeWidth={resolvedStrokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
+        // 装饰性图标对读屏隐藏；只有显式提供 label 的图标才参与无障碍树。
+        accessible={!!accessibilityLabel}
         accessibilityLabel={accessibilityLabel}
         testID={testID}
       >
@@ -213,6 +215,7 @@ export const Minus = createIcon("Minus", ICON_KEYS.Minus);
 export const Monitor = createIcon("Monitor", ICON_KEYS.Monitor);
 export const MoreHorizontal = createIcon("MoreHorizontal", ICON_KEYS.MoreHorizontal);
 export const MousePointerClick = createIcon("MousePointerClick", ICON_KEYS.MousePointerClick);
+export const Newspaper = createIcon("Newspaper", ICON_KEYS.Newspaper);
 export const PanelLeftClose = createIcon("PanelLeftClose", ICON_KEYS.PanelLeftClose);
 export const PanelLeftOpen = createIcon("PanelLeftOpen", ICON_KEYS.PanelLeftOpen);
 export const PanelRight = createIcon("PanelRight", ICON_KEYS.PanelRight);
@@ -222,6 +225,7 @@ export const Pencil = createIcon("Pencil", ICON_KEYS.Pencil);
 export const Play = createIcon("Play", ICON_KEYS.Play);
 export const Plus = createIcon("Plus", ICON_KEYS.Plus);
 export const Power = createIcon("Power", ICON_KEYS.Power);
+export const Puzzle = createIcon("Puzzle", ICON_KEYS.Puzzle);
 export const RefreshCw = createIcon("RefreshCw", ICON_KEYS.RefreshCw);
 export const Reply = createIcon("Reply", ICON_KEYS.Reply);
 export const RotateCcw = createIcon("RotateCcw", ICON_KEYS.RotateCcw);

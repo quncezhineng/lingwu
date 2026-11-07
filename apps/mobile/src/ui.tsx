@@ -19,9 +19,9 @@ import { agentLayout } from "./agent-layout";
 import { Text, TextInput } from "./app-text";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
-import { ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
+import { AlertTriangle, ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
 import { ModalOverlay } from "./modal-overlay";
-import { breakpoints, colors, fonts, radius, shadow, space, typography } from "./theme";
+import { breakpoints, colors, fonts, radius, semantic, shadow, space, typography } from "./theme";
 
 /**
  * 设计令牌统一由 `theme.ts` 提供，这里 re-export 以兼容既有 `from "./ui"` 引用。
@@ -35,6 +35,7 @@ export {
   fonts,
   iconStroke,
   radius,
+  semantic,
   serviceBrands,
   shadow,
   space,
@@ -53,86 +54,131 @@ export const s = StyleSheet.create({
   /** 浮层标题：与页面 H1 同一档字阶（22/32）。 */
   title: { color: colors.heading, ...typography.h1 },
   heading: { color: colors.heading, ...typography.heading },
-  /** 白纸卡片：轻描边、12px 圆角，靠描边而非阴影表达层级。 */
+  /** 白纸卡片：1px 描边 + 8px 圆角，靠描边与留白建立层级（无阴影）。 */
   card: {
-    backgroundColor: colors.paper,
+    backgroundColor: semantic.card,
     borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: semantic.border,
     padding: space.md,
   },
-  divider: { height: 1, backgroundColor: colors.line, marginVertical: space.sm },
+  divider: { height: 1, backgroundColor: semantic.border, marginVertical: space.sm },
   input: {
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: semantic.input,
     borderRadius: radius.field,
     paddingHorizontal: space.sm,
-    paddingVertical: 9,
-    color: colors.text,
-    fontSize: 15,
-    lineHeight: 22,
-    backgroundColor: colors.paper,
-    minHeight: 40,
+    paddingVertical: 8,
+    color: semantic.foreground,
+    fontSize: 14,
+    lineHeight: 20,
+    backgroundColor: semantic.card,
+    minHeight: 36,
     fontFamily: fonts.sans,
   },
   field: { gap: 6, marginBottom: space.sm },
   /** 表单字段标签：12/18 w500，供 Field 与自定义字段（如带预览的输入区）共用。 */
-  fieldLabel: { fontSize: 12, lineHeight: 18, fontWeight: "500", color: colors.text },
-  /** 按钮：control 圆角 + 1px 描边，默认高度 36（small 30），触控可达 44。 */
+  fieldLabel: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
+    color: semantic.foreground,
+  },
+  /** 按钮：6px 圆角、无冗余描边，高度 34（sm 28 / lg 40），触控可达 44。 */
   button: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    paddingHorizontal: 14,
-    minHeight: 36,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    minHeight: 34,
+    paddingVertical: 6,
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: "transparent",
   },
+  buttonSm: { minHeight: 28, paddingVertical: 4, paddingHorizontal: 10 },
+  buttonLg: { minHeight: 40, paddingVertical: 9, paddingHorizontal: 16 },
+  buttonIcon: { width: 34, height: 34, minHeight: 34, paddingHorizontal: 0, paddingVertical: 0 },
+  /** shadcn variant → 表面色，全部复用既有主题色。 */
+  buttonDefault: { backgroundColor: semantic.action, borderColor: semantic.action },
+  buttonSecondary: { backgroundColor: semantic.secondary, borderColor: semantic.secondary },
+  buttonOutline: { backgroundColor: semantic.card, borderColor: semantic.border },
+  buttonGhost: { backgroundColor: "transparent", borderColor: "transparent" },
+  buttonDestructive: { backgroundColor: colors.errorSoft, borderColor: colors.errorSoft },
+  buttonLink: { backgroundColor: "transparent", borderColor: "transparent", paddingHorizontal: 4 },
+  buttonHoverDefault: { backgroundColor: colors.primaryStrong, borderColor: colors.primaryStrong },
+  buttonHoverMuted: { backgroundColor: semantic.accent },
+  /** 兼容既有引用的旧样式名。 */
   primary: { backgroundColor: colors.primaryAction, borderColor: colors.primaryAction },
   secondary: { backgroundColor: colors.paper, borderColor: colors.line },
   dangerSurface: { backgroundColor: colors.errorSoft, borderColor: colors.errorSoft },
   buttonText: { fontSize: 13, fontWeight: "500", fontFamily: fonts.sans },
+  buttonTextSm: { fontSize: 12 },
+  buttonTextLg: { fontSize: 14 },
+  /** RN 没有 outline，用 1px ring 色描边表达 focus / focus-visible。 */
+  focusRing: { borderColor: semantic.ring },
+  /** 徽标：4px 圆角 + 紧凑内距，对应 shadcn Badge 的 secondary 形态。 */
   chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: radius.badge,
+    borderWidth: 1,
+    borderColor: "transparent",
     alignSelf: "flex-start",
-    backgroundColor: colors.surface,
+    backgroundColor: semantic.secondary,
   },
+  chipOutline: { backgroundColor: "transparent", borderColor: semantic.border },
   chipText: {
     fontSize: typography.caption.fontSize,
     lineHeight: typography.caption.lineHeight,
     fontWeight: "500",
-    color: colors.muted,
+    color: semantic.mutedForeground,
     fontFamily: fonts.sans,
   },
-  /** 触控目标底座：40×40（不小于视觉下限，可配合 hitSlop 达到 44）。 */
+  /** 图标按钮：默认 ghost，仅在 hover / pressed 时出现一层极浅的底。 */
+  iconButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: "transparent",
+    backgroundColor: "transparent",
+  },
+  iconButtonHover: { backgroundColor: colors.overlay1 },
+  iconButtonPressed: { backgroundColor: colors.overlay2 },
+  iconButtonOutline: { backgroundColor: semantic.card, borderColor: semantic.border },
+  iconButtonSecondary: { backgroundColor: semantic.secondary },
+  /** 触控目标底座：36×36（可配合 hitSlop 达到 44）。 */
   iconBox: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: radius.control,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: semantic.secondary,
   },
-  /** 任务行 / 列表图标底座：36×36 / r8。 */
+  /** 任务行 / 列表图标底座：36×36 / r6。 */
   glyph: {
     width: 36,
     height: 36,
     borderRadius: radius.field,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: semantic.secondary,
   },
+  /** 错误提示：shadcn Alert 的紧凑形态，图标 + 文本 + 左侧语义条。 */
   error: {
-    padding: space.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: space.sm,
+    paddingVertical: 10,
     borderRadius: radius.card,
+    borderLeftWidth: 2,
+    borderLeftColor: semantic.destructive,
     backgroundColor: colors.errorSoft,
     marginVertical: space.xs,
-    gap: 2,
   },
   modalShade: {
     flex: 1,
@@ -140,9 +186,9 @@ export const s = StyleSheet.create({
     alignItems: "center",
     padding: space.lg,
   },
-  /** 弹窗面板：白底 + 1px 描边 + 16px 圆角，最大宽度对齐设计库 .panel 的 760。 */
+  /** 弹窗面板：白底 + 1px 描边 + 12px 圆角，最大宽度对齐设计库 .panel 的 760。 */
   sheet: {
-    backgroundColor: colors.paper,
+    backgroundColor: semantic.popover,
     borderRadius: radius.sheet,
     width: "100%",
     maxWidth: 760,
@@ -150,13 +196,13 @@ export const s = StyleSheet.create({
     flexShrink: 1,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: semantic.border,
   },
   /** 数据/度量数字：等宽字体 + tabular 数字，对齐 TraeWork 数值展示规范。 */
   metric: { fontVariant: ["tabular-nums"] as const, fontFamily: fonts.number },
 });
-/** 悬停/按下状态：RN 的类型只声明了 pressed，这里显式补上 hovered。 */
-export type HoverPressableState = { pressed: boolean; hovered: boolean };
+/** 悬停/按下/焦点状态：RN 的类型只声明了 pressed，这里显式补上 hovered 与 focused。 */
+export type HoverPressableState = { pressed: boolean; hovered: boolean; focused?: boolean };
 
 type HoverPressableProps = Omit<PressableProps, "style"> & {
   style?: StyleProp<ViewStyle> | ((state: HoverPressableState) => StyleProp<ViewStyle>);
@@ -168,12 +214,22 @@ type HoverPressableProps = Omit<PressableProps, "style"> & {
  * react-native-web 的 Pressable 内部会算 hovered，但 RN 的类型没有暴露；
  * 这里自行记录悬停状态再交给样式函数，原生触摸端 hovered 恒为 false。
  */
-export function HoverPressable({ style, onHoverIn, onHoverOut, ...props }: HoverPressableProps) {
+export function HoverPressable({
+  style,
+  onHoverIn,
+  onHoverOut,
+  onFocus,
+  onBlur,
+  ...props
+}: HoverPressableProps) {
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       {...props}
-      style={typeof style === "function" ? ({ pressed }) => style({ pressed, hovered }) : style}
+      style={
+        typeof style === "function" ? ({ pressed }) => style({ pressed, hovered, focused }) : style
+      }
       onHoverIn={(event) => {
         setHovered(true);
         onHoverIn?.(event);
@@ -182,9 +238,32 @@ export function HoverPressable({ style, onHoverIn, onHoverOut, ...props }: Hover
         setHovered(false);
         onHoverOut?.(event);
       }}
+      onFocus={(event) => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setFocused(false);
+        onBlur?.(event);
+      }}
     />
   );
 }
+
+/** shadcn 风格按钮变体；旧 API（primary / danger）会自动映射到对应变体。 */
+export type ButtonVariant = "default" | "secondary" | "outline" | "ghost" | "destructive" | "link";
+
+/** shadcn 风格按钮尺寸；旧 API（small）映射到 sm。 */
+export type ButtonSize = "default" | "sm" | "lg" | "icon";
+
+const buttonSurface: Record<ButtonVariant, ViewStyle> = {
+  default: s.buttonDefault,
+  secondary: s.buttonSecondary,
+  outline: s.buttonOutline,
+  ghost: s.buttonGhost,
+  destructive: s.buttonDestructive,
+  link: s.buttonLink,
+};
 
 export function Button({
   children,
@@ -196,24 +275,41 @@ export function Button({
   quietBusy,
   small,
   danger,
+  variant,
+  size,
   style,
   hitSlop,
 }: {
   children: ReactNode;
   onPress: () => void;
   icon?: IconComponent;
+  /** 兼容旧调用：等价于 variant="default"。 */
   primary?: boolean;
   disabled?: boolean;
   busy?: boolean;
   /** busy 时不显示加载动画、不降低透明度，仅保留防重复点击，避免文字产生动态效果。 */
   quietBusy?: boolean;
+  /** 兼容旧调用：等价于 size="sm"。 */
   small?: boolean;
+  /** 兼容旧调用：等价于 variant="destructive"。 */
   danger?: boolean;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   style?: ViewStyle;
   /** 扩大触控热区（视觉尺寸不变）；小尺寸按钮用于达到 44px 触控目标。 */
   hitSlop?: number;
 }) {
-  const color = danger ? colors.danger : primary ? colors.onPrimary : colors.text;
+  const resolvedVariant: ButtonVariant =
+    variant ?? (primary ? "default" : danger ? "destructive" : "outline");
+  const resolvedSize: ButtonSize = size ?? (small ? "sm" : "default");
+  const color =
+    resolvedVariant === "destructive"
+      ? semantic.destructive
+      : resolvedVariant === "default"
+        ? semantic.primaryForeground
+        : resolvedVariant === "link"
+          ? colors.link
+          : semantic.foreground;
 
   return (
     <HoverPressable
@@ -222,19 +318,19 @@ export function Button({
       accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
       hitSlop={hitSlop}
       onPress={onPress}
-      style={({ pressed, hovered }) => [
+      style={({ pressed, hovered, focused }) => [
         s.button,
-        primary ? s.primary : danger ? s.dangerSurface : s.secondary,
-        // 悬停只做一档极淡的底色变化，按下再加深；主按钮悬停走深色变体。
+        buttonSurface[resolvedVariant],
+        resolvedSize === "sm" && s.buttonSm,
+        resolvedSize === "lg" && s.buttonLg,
+        resolvedSize === "icon" && s.buttonIcon,
+        // 悬停只做一档底色变化；主按钮走深色变体，其余走 accent。
         !disabled &&
           !busy &&
-          (primary
-            ? hovered && {
-                backgroundColor: colors.primaryStrong,
-                borderColor: colors.primaryStrong,
-              }
-            : hovered && { backgroundColor: colors.surface }),
-        small && { minHeight: 30, paddingVertical: 5, paddingHorizontal: 11 },
+          hovered &&
+          (resolvedVariant === "default" ? s.buttonHoverDefault : s.buttonHoverMuted),
+        // 键盘导航时的 focus-visible 等价物：只换 1px ring 描边。
+        focused && s.focusRing,
         style,
         {
           opacity: disabled ? 0.4 : busy && !quietBusy ? 0.75 : pressed ? 0.9 : 1,
@@ -244,9 +340,18 @@ export function Button({
       {busy && !quietBusy ? (
         <ActivityIndicator color={color} size="small" />
       ) : Icon ? (
-        <Icon size={15} color={color} />
+        <Icon size={resolvedSize === "lg" ? 16 : 14} color={color} />
       ) : null}
-      <Text style={[s.buttonText, small && { fontSize: 12 }, { color }]}>{children}</Text>
+      <Text
+        style={[
+          s.buttonText,
+          resolvedSize === "sm" && s.buttonTextSm,
+          resolvedSize === "lg" && s.buttonTextLg,
+          { color },
+        ]}
+      >
+        {children}
+      </Text>
     </HoverPressable>
   );
 }
@@ -254,7 +359,8 @@ export function IconButton({
   icon: Icon,
   label,
   onPress,
-  size = 38,
+  size = 34,
+  variant = "ghost",
   disabled = false,
 }: {
   icon: IconComponent;
@@ -262,6 +368,7 @@ export function IconButton({
   onPress: () => void;
   /** Touch target; pass 44 for dense table rows that need a larger hit area. */
   size?: number;
+  variant?: "ghost" | "outline" | "secondary";
   disabled?: boolean;
 }) {
   return (
@@ -270,75 +377,65 @@ export function IconButton({
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
       disabled={disabled}
-      hitSlop={disabled ? undefined : 4}
+      hitSlop={disabled ? undefined : 6}
       onPress={onPress}
-      style={({ pressed, hovered }) => [
-        {
-          width: size,
-          height: size,
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: radius.control,
-          backgroundColor: pressed ? colors.overlay2 : hovered ? colors.overlay1 : "transparent",
-          opacity: disabled ? 0.28 : 1,
-        },
+      style={({ pressed, hovered, focused }) => [
+        s.iconButton,
+        { width: size, height: size },
+        variant === "outline" && s.iconButtonOutline,
+        variant === "secondary" && s.iconButtonSecondary,
+        !disabled && pressed && s.iconButtonPressed,
+        !disabled && variant === "ghost" && hovered && !pressed && s.iconButtonHover,
+        focused && s.focusRing,
+        { opacity: disabled ? 0.35 : 1 },
       ]}
     >
-      <Icon size={size >= 44 ? 20 : 18} color={colors.muted} />
+      <Icon size={size >= 40 ? 18 : 16} color={semantic.mutedForeground} />
     </HoverPressable>
   );
 }
-export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
-  return <View style={[s.card, style]}>{children}</View>;
-}
-
-/**
- * 卡片网格：按容器实测宽度自动分栏，保证每栏不小于 `minColumnWidth`。
- *
- * 页面内容宽度（扣掉侧栏）与弹层宽度都和窗口宽度差很多，按窗口宽度估算会把
- * 卡片挤成窄条；这里统一用 onLayout 的实测结果换算列宽。窄屏自动退回单列。
- */
-export function CardGrid<T>({
-  items,
-  minColumnWidth,
-  maxColumns = 2,
-  gap = 10,
-  getKey,
-  render,
+export function Card({
+  children,
+  variant = "default",
+  style,
 }: {
-  items: readonly T[];
-  /** 单栏最小宽度：不足则减少列数。目标卡约 340，紧凑卡片约 200。 */
-  minColumnWidth: number;
-  maxColumns?: 1 | 2 | 3;
-  /** 卡片间距，默认 10。 */
-  gap?: number;
-  getKey: (item: T) => string;
-  render: (item: T) => ReactNode;
+  children: ReactNode;
+  /** shadcn 卡片形态：默认白纸描边，muted 浅底，ghost 仅保留留白。 */
+  variant?: "default" | "muted" | "ghost";
+  style?: ViewStyle;
 }) {
-  const [width, setWidth] = useState(0);
-  const columns =
-    width > 0
-      ? Math.max(1, Math.min(maxColumns, Math.floor((width + gap) / (minColumnWidth + gap))))
-      : 1;
-  const cellWidth = width > 0 ? (width - gap * (columns - 1)) / columns : 0;
-  // 实测到之前按目标栏数给百分比兜底，避免首帧挤成单列再跳变。
-  const fallback = maxColumns >= 3 ? "31%" : maxColumns === 2 ? "48%" : "100%";
   return (
     <View
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-      style={{ flexDirection: "row", flexWrap: "wrap", gap }}
+      style={[
+        s.card,
+        variant === "muted" && { backgroundColor: semantic.muted, borderColor: "transparent" },
+        variant === "ghost" && { backgroundColor: "transparent", borderColor: "transparent" },
+        style,
+      ]}
     >
-      {items.map((item) => (
-        <View key={getKey(item)} style={cellWidth ? { width: cellWidth } : { width: fallback }}>
-          {render(item)}
-        </View>
-      ))}
+      {children}
     </View>
   );
 }
-export function Chip({ children, tint }: { children: ReactNode; tint?: string }) {
+export function Chip({
+  children,
+  tint,
+  variant = "default",
+}: {
+  children: ReactNode;
+  /** 兼容旧调用：自定义底色。 */
+  tint?: string;
+  variant?: "default" | "secondary" | "outline";
+}) {
   return (
-    <View style={[s.chip, tint ? { backgroundColor: tint } : null]}>
+    <View
+      style={[
+        s.chip,
+        variant === "secondary" && { backgroundColor: semantic.muted },
+        variant === "outline" && s.chipOutline,
+        tint ? { backgroundColor: tint } : null,
+      ]}
+    >
       <Text style={s.chipText}>{children}</Text>
     </View>
   );
@@ -349,7 +446,7 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
     <View style={s.field}>
       <Text style={s.fieldLabel}>{label}</Text>
       <TextInput
-        placeholderTextColor={colors.faint}
+        placeholderTextColor={semantic.placeholder}
         accessibilityLabel={label}
         {...props}
         onFocus={(event) => {
@@ -362,8 +459,8 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
         }}
         style={[
           s.input,
-          // 聚焦只换描边色，保留输入框本身的纸面感。
-          focused && { borderColor: colors.primary },
+          // RN 没有 outline，聚焦只换 1px ring 描边，保留输入框的纸面感。
+          focused && s.focusRing,
           props.multiline && { minHeight: 120, textAlignVertical: "top" },
           props.style,
         ]}
@@ -383,12 +480,14 @@ export function Empty({
   children?: ReactNode;
 }) {
   return (
-    <View style={{ alignItems: "center", paddingVertical: 36, paddingHorizontal: 24, gap: 6 }}>
-      <View style={[s.iconBox, { width: 44, height: 44, marginBottom: 4 }]}>
-        <Icon size={20} color={colors.muted} />
-      </View>
-      <Text style={[s.heading, { fontSize: 14 }]}>{title}</Text>
-      <Text style={[s.small, { textAlign: "center", maxWidth: 340 }]}>{detail}</Text>
+    <View style={{ alignItems: "center", paddingVertical: 32, paddingHorizontal: 24, gap: 6 }}>
+      <Icon size={22} color={semantic.mutedForeground} />
+      <Text style={[s.heading, { fontSize: 14, marginTop: 6 }]}>{title}</Text>
+      <Text
+        style={[s.small, { textAlign: "center", maxWidth: 340, color: semantic.mutedForeground }]}
+      >
+        {detail}
+      </Text>
       {children}
     </View>
   );
@@ -396,7 +495,12 @@ export function Empty({
 export function ErrorNotice({ error }: { error?: string }) {
   return error ? (
     <View accessibilityRole="alert" style={s.error}>
-      <Text style={[s.text, { color: colors.danger }]}>{error}</Text>
+      <AlertTriangle size={15} color={semantic.destructive} />
+      <Text
+        style={[s.text, { flex: 1, color: semantic.destructive, fontSize: 13, lineHeight: 20 }]}
+      >
+        {error}
+      </Text>
     </View>
   ) : null;
 }
@@ -451,7 +555,7 @@ export function Sheet({
         onPress={dismissOnBackdrop ? onClose : undefined}
         style={[
           s.modalShade,
-          !compact && { padding: space.xl },
+          !compact && { padding: space.lg },
           bottomSheet && { padding: 0, justifyContent: "flex-end" },
           edgeToEdge && { padding: 0 },
         ]}
@@ -490,7 +594,7 @@ export function Sheet({
             mobileBotLayout && {
               maxWidth: agentLayout.sheetMaxWidth,
               maxHeight: "91%",
-              borderRadius: 28,
+              borderRadius: radius.sheet * 2,
               borderBottomLeftRadius: 0,
               borderBottomRightRadius: 0,
               borderBottomWidth: 0,
@@ -516,11 +620,11 @@ export function Sheet({
               testID="sheet-drag-handle"
               style={{
                 alignSelf: "center",
-                width: 34,
-                height: 4,
+                width: 28,
+                height: 3,
                 borderRadius: radius.full,
                 backgroundColor: colors.lineStrong,
-                marginTop: 10,
+                marginTop: 8,
               }}
             />
           )}
@@ -528,9 +632,9 @@ export function Sheet({
             style={[
               s.between,
               {
-                padding: compact ? space.md : space.lg,
+                padding: space.md,
                 borderBottomWidth: 1,
-                borderBottomColor: colors.line,
+                borderBottomColor: semantic.border,
                 flexShrink: 0,
               },
               mobileBotLayout && {
@@ -549,13 +653,14 @@ export function Sheet({
                   numberOfLines={2}
                   style={[
                     s.title,
-                    compact && { fontSize: 19, lineHeight: 27 },
-                    // 标题带品牌 Logo 时收紧字号，与左侧图形保持和谐。
-                    titleIcon ? { fontSize: 17, lineHeight: 24 } : undefined,
-                    titleIcon && compact ? { fontSize: 16, lineHeight: 22 } : undefined,
+                    // shadcn DialogTitle：18/26 w600，比页面 H1 收敛一档。
+                    { fontSize: 18, lineHeight: 26, fontWeight: "600" },
+                    compact && { fontSize: 17, lineHeight: 24 },
+                    // 标题带品牌 Logo 时再收紧一档，与左侧图形保持和谐。
+                    titleIcon ? { fontSize: 16, lineHeight: 22 } : undefined,
                     botLayout && {
-                      fontSize: compact ? 16 : 19,
-                      lineHeight: compact ? 22 : 27,
+                      fontSize: compact ? 16 : 18,
+                      lineHeight: compact ? 22 : 26,
                       fontFamily: fonts.sans,
                       fontWeight: "600",
                     },
@@ -564,10 +669,12 @@ export function Sheet({
                   {title}
                 </Text>
               </View>
-              {!!subtitle && <Text style={s.muted}>{subtitle}</Text>}
+              {!!subtitle && (
+                <Text style={[s.muted, { fontSize: 12, lineHeight: 18 }]}>{subtitle}</Text>
+              )}
             </View>
             {!!headerAction && <View style={{ marginRight: 8 }}>{headerAction}</View>}
-            <IconButton icon={X} label={t("ui.closeDetails")} onPress={onClose} />
+            <IconButton icon={X} label={t("ui.closeDetails")} onPress={onClose} size={32} />
           </View>
           <ScrollView
             testID="sheet-scroll-content"
@@ -575,10 +682,10 @@ export function Sheet({
             style={[{ flexShrink: 1, minHeight: 0 }, fullscreen && { flex: 1 }]}
             contentContainerStyle={
               fullscreen
-                ? { flexGrow: 1, padding: compact ? space.md : space.lg }
+                ? { flexGrow: 1, padding: space.md }
                 : mobileBotLayout
-                  ? { paddingHorizontal: 22, paddingBottom: 30 }
-                  : { padding: compact ? space.md : space.lg }
+                  ? { paddingHorizontal: space.lg, paddingBottom: 30 }
+                  : { padding: space.md }
             }
           >
             {children}
@@ -606,17 +713,17 @@ export function CheckRow({
     >
       <View
         style={{
-          width: 19,
-          height: 19,
+          width: 16,
+          height: 16,
           borderRadius: radius.micro,
           borderWidth: 1,
-          borderColor: checked ? colors.primary : colors.lineStrong,
-          backgroundColor: checked ? colors.primary : colors.paper,
+          borderColor: checked ? semantic.primary : colors.lineStrong,
+          backgroundColor: checked ? semantic.primary : semantic.card,
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        {checked && <Check size={13} color={colors.onPrimary} />}
+        {checked && <Check size={12} color={semantic.primaryForeground} strokeWidth={2} />}
       </View>
       <Text style={[s.text, { flex: 1 }]}>{label}</Text>
     </Pressable>
@@ -645,19 +752,21 @@ export function SectionHeading({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <View style={[s.between, { marginBottom: space.md, gap: space.xs }, style]}>
+    <View style={[s.between, { marginBottom: space.sm, gap: space.xs }, style]}>
       <View style={[s.row, { gap: 6, flexShrink: 1, minWidth: 0 }]}>
-        <Text style={{ fontSize: 14, lineHeight: 22, fontWeight: "600", color: colors.text }}>
+        <Text
+          style={{ fontSize: 13, lineHeight: 20, fontWeight: "600", color: semantic.foreground }}
+        >
           {title}
         </Text>
         {count !== undefined && (
           <View
             style={{
-              minWidth: 18,
-              paddingHorizontal: 5,
+              minWidth: 16,
+              paddingHorizontal: 4,
               paddingVertical: 1,
               borderRadius: radius.badge,
-              backgroundColor: colors.surface,
+              backgroundColor: semantic.secondary,
               alignItems: "center",
             }}
           >
@@ -701,20 +810,27 @@ export function LinkRow({
           paddingVertical: 8,
           paddingHorizontal: 6,
           marginHorizontal: -6,
-          gap: 12,
-          borderRadius: radius.card,
+          gap: 10,
+          borderRadius: radius.control,
         },
         pressed && { backgroundColor: colors.overlay1 },
       ]}
     >
-      <View style={[s.iconBox, { backgroundColor: tint || colors.surface }]}>
-        <Icon size={18} color={colors.text} />
+      <View
+        style={[
+          s.iconButton,
+          s.iconButtonOutline,
+          { width: 28, height: 28 },
+          tint ? { backgroundColor: tint } : null,
+        ]}
+      >
+        <Icon size={15} color={semantic.foreground} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[s.text, { fontWeight: "500" }]}>{title}</Text>
         {!!detail && <Text style={s.small}>{detail}</Text>}
       </View>
-      <ChevronRight size={15} color={colors.faint} />
+      <ChevronRight size={14} color={semantic.subtleForeground} />
     </Pressable>
   );
 }

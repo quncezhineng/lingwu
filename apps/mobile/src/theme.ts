@@ -13,6 +13,11 @@
  * - `colors.primary` 只用于图标描边、选中/聚焦描边、圆点、进度条与浅底，
  *   蓝色文字一律用 `primaryStrong` 或 `primaryAction`；
  * - 卡片靠描边和留白建立层级，阴影只给输入框、弹层和浮导航。
+ *
+ * 组件语义按 shadcn/ui 的 token convention 组织（见 `semantic`）：
+ * background/foreground、card、popover、primary、secondary、muted、accent、
+ * destructive、border、input、ring 成对出现，组件只消费语义令牌，不直接写色名。
+ * 这一层完全是别名，所有色值仍来自上方 `colors`，主题颜色不发生变化。
  */
 import type { TextStyle, ViewStyle } from "react-native";
 import { Platform } from "react-native";
@@ -86,6 +91,48 @@ export const colors = {
 } as const;
 
 /**
+ * shadcn 语义令牌（唯一来源仍是上面的 `colors`）。
+ *
+ * 组件按「表面 + 前景」成对取色：`card` 配 `cardForeground`，
+ * `primary` 配 `primaryForeground`，与 shadcn 的 token convention 一致。
+ * 这里只做别名映射，没有引入任何新色值，也不会改变现有主题配色；
+ * 需要换肤时只需改这一层，组件样式无需改动。
+ */
+export const semantic = {
+  background: colors.canvas,
+  foreground: colors.text,
+  card: colors.paper,
+  cardForeground: colors.text,
+  popover: colors.paper,
+  popoverForeground: colors.text,
+  /** 选中 / 聚焦语义，沿用项目里「primary 只做描边与圆点」的约束。 */
+  primary: colors.primary,
+  primaryForeground: colors.onPrimary,
+  /** 实心操作按钮沿用项目既有的 primaryAction，避免改变按钮配色。 */
+  action: colors.primaryAction,
+  secondary: colors.surface,
+  secondaryForeground: colors.text,
+  muted: colors.surfaceSoft,
+  mutedForeground: colors.muted,
+  /** 更次要的文本（原本用 colors.faint 的地方）。 */
+  subtleForeground: colors.faint,
+  placeholder: colors.faint,
+  accent: colors.surface,
+  accentForeground: colors.text,
+  destructive: colors.danger,
+  destructiveForeground: colors.onPrimary,
+  border: colors.line,
+  input: colors.line,
+  ring: colors.primary,
+  sidebar: colors.sidebar,
+  sidebarForeground: colors.muted,
+  sidebarAccent: colors.surfaceSoft,
+  sidebarBorder: colors.line,
+  subtleBorder: colors.lineSoft,
+  overlay: colors.modalShade,
+} as const;
+
+/**
  * 状态语义（StatusBadge）。
  *
  * 四态统一中性底 `#EFEFEF`：只有 running 用蓝、waiting 用行动色（唯一需要用户动手的状态），
@@ -142,21 +189,21 @@ export const space = {
 } as const;
 
 /**
- * 圆角六档 + 胶囊。
+ * 圆角：单一基准派生出的三档 + 胶囊（对齐 shadcn 的 `--radius` 派生思路）。
  *
- * 收敛为「小控件 / 中容器 / 大浮层」三级：8 用于按钮与输入框，12 用于卡片与面板，
- * 16 用于输入区与弹层。层级越少，界面越安静；同一层级内的元素必须取同一个值。
+ * 从原来的 6/8/12/16 四档收敛为「徽标 4 / 控件 6 / 容器 8 / 浮层 12」：
+ * 半径越小、层级越少，界面越安静，也更接近 shadcn 的克制感。
  * `micro` / `field` / `panel` 保留为语义别名，避免既有引用散落裸值。
  */
 export const radius = {
-  badge: 6,
-  micro: 6,
-  control: 8,
-  field: 8,
-  card: 12,
-  panel: 12,
-  composer: 16,
-  sheet: 16,
+  badge: 4,
+  micro: 4,
+  control: 6,
+  field: 6,
+  card: 8,
+  panel: 8,
+  composer: 12,
+  sheet: 12,
   full: 999,
 } as const;
 
@@ -270,44 +317,43 @@ export const typography = {
 export const type = typography;
 
 /**
- * 阴影三档。
+ * 阴影：只保留「浮在画布之上」这一层极淡的晕（shadcn 以 1px 描边为主）。
  *
- * 层级仍由 1px 描边承担，阴影只表示「浮在画布之上」这一件事：
- * 卡面几乎不投影，输入区与浮层用一层极淡的晕，模态用一层扩散阴影。
+ * 色值保持原样，只收紧扩散半径、位移与不透明度，让卡片与浮层更平整；
  * 同一元素只允许叠加一档阴影，避免多层阴影糊成灰边。
  */
 export const shadow = {
   /** 卡面（默认不用；需要浮起时用这一档）。 */
   card: {
     shadowColor: "#5A5A5A",
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
   /** 输入 composer / 浮层面板。 */
   composer: {
     shadowColor: "#404040",
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   /** 侧向抽屉（对话会话栏）。 */
   drawer: {
     shadowColor: "#404040",
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: -4, height: 0 },
-    elevation: 8,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    shadowOffset: { width: -2, height: 0 },
+    elevation: 4,
   },
   /** 模态面板。 */
   sheet: {
     shadowColor: "#2D2D2D",
-    shadowOpacity: 0.1,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 20,
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
   },
 } as const satisfies Record<string, ViewStyle>;
 
@@ -347,14 +393,15 @@ export const motion = {
 } as const;
 
 /**
- * 图标线宽：常规 1.65 / 底栏 1.7 / 导航激活 1.9。
+ * 图标线宽：常规与底栏统一 1.75，仅导航激活态用 2（Lucide 默认线宽）。
  *
- * 除这三档与填充态 0 之外不允许其它线宽。
+ * 全站只保留这两档，图标重量不再随位置漂移；除两档与填充态 0 之外
+ * 不允许其它线宽。
  */
 export const iconStroke = {
-  regular: 1.65,
-  tab: 1.7,
-  nav: 1.9,
+  regular: 1.75,
+  tab: 1.75,
+  nav: 2,
 } as const;
 
 /**

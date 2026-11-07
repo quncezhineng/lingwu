@@ -4,13 +4,13 @@ import { colors, radius } from "./theme";
 import { useReducedMotion } from "./use-reduced-motion";
 
 const TRACK_WIDTH = 32;
-const TRACK_HEIGHT = 19;
-const THUMB = 15;
+const TRACK_HEIGHT = 18;
+const THUMB = 14;
 const PAD = 2;
 const TRAVEL = TRACK_WIDTH - THUMB - PAD * 2;
 
 /**
- * 开关：自绘 32×19 轨道 + 15px 白色圆钮。
+ * 开关：自绘 32×18 轨道 + 14px 白色圆钮（对齐 shadcn Switch 的轻量比例）。
  *
  * 不使用 RN core `Switch`：它在 react-native-web 上的实际渲染与 props 不一致
  * （轨道色与钮色错位、钮会溢出轨道）。这里统一视觉，同时保留 44×44 触控热区。

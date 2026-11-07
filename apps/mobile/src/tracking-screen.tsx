@@ -15,6 +15,7 @@ import {
 } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
+import { CardGrid } from "./card-grid";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
 import { Bell, CalendarDays, ChevronRight, type IconComponent, Plus, Target } from "./icons";
@@ -27,7 +28,7 @@ import {
   buildTrackingView,
   type GoalTrack,
 } from "./tracking-view";
-import { Button, Card, CardGrid, Chip, Empty, SectionHeading, Sheet, s } from "./ui";
+import { Button, Card, Chip, Empty, SectionHeading, Sheet, s } from "./ui";
 import { type PriceReminderIntent, useWorkspace } from "./workspace";
 
 type TrackingFilter = "all" | "goal" | "reminder";

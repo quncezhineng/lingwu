@@ -11,7 +11,7 @@ import { BotInstructionsPage } from "./bot-pages/instructions";
 import { BotLibraryPage } from "./bot-pages/library";
 import { BotSkillsPage } from "./bot-pages/skills";
 import { type TranslationKey, useTranslation } from "./i18n";
-import { Clock3, Cpu, FolderOpen, Settings2, Sparkles, Target, Terminal } from "./icons";
+import { Brain, Clock3, Cpu, FolderOpen, Heart, Settings2, Terminal } from "./icons";
 import { ModelSelector } from "./model-selector";
 import { breakpoints, colors, radius, shadow, space, typography } from "./theme";
 import { HoverPressable, s } from "./ui";
@@ -34,10 +34,10 @@ const TABS: ReadonlyArray<{
 }> = [
   { id: "profile", icon: Settings2, labelKey: "agentSpace.persona" },
   { id: "instructions", icon: Terminal, labelKey: "agentSpace.instructions" },
-  { id: "skills", icon: Sparkles, labelKey: "agentSpace.skills" },
+  { id: "skills", icon: Brain, labelKey: "agentSpace.skills" },
   { id: "resources", icon: FolderOpen, labelKey: "agentSpace.library" },
   { id: "history", icon: Clock3, labelKey: "agentSpace.analysisHistory" },
-  { id: "goals", icon: Target, labelKey: "agent.memory" },
+  { id: "goals", icon: Heart, labelKey: "agent.memory" },
   { id: "model", icon: Cpu, labelKey: "modelSettings.model" },
 ];
 

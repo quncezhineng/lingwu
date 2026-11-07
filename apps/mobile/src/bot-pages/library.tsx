@@ -1,10 +1,11 @@
 import { View } from "react-native";
 import { ArtifactCard } from "../agent-ui";
+import { CardGrid } from "../card-grid";
 import { useTranslation } from "../i18n";
 import { FileText } from "../icons";
 import { LinkRow, SectionHeading } from "../ui";
 import { useWorkspace } from "../workspace";
-import { BotEmpty, BotPage, type BotPageProps, TwoColumnGrid, useBotResources } from "./shared";
+import { BotEmpty, BotPage, type BotPageProps, useBotResources } from "./shared";
 
 export function BotLibraryPage({ onClose, embedded }: BotPageProps) {
   const { t } = useTranslation();
@@ -17,33 +18,29 @@ export function BotLibraryPage({ onClose, embedded }: BotPageProps) {
         {!!files.length && (
           <>
             <SectionHeading title={t("screens.libraryFiles")} count={files.length} />
-            <TwoColumnGrid>
-              {(columns, itemWidth) =>
-                files.map((file) => (
-                  <View key={file.id} style={columns === 2 ? { width: itemWidth } : undefined}>
-                    <LinkRow
-                      icon={FileText}
-                      title={file.name}
-                      onPress={() => open({ type: "file", file })}
-                    />
-                  </View>
-                ))
-              }
-            </TwoColumnGrid>
+            <CardGrid
+              items={files}
+              minColumnWidth={300}
+              getKey={(file) => file.id}
+              render={(file) => (
+                <LinkRow
+                  icon={FileText}
+                  title={file.name}
+                  onPress={() => open({ type: "file", file })}
+                />
+              )}
+            />
           </>
         )}
         {!!artifacts.length && (
           <>
             <SectionHeading title={t("agentSpace.artifacts")} count={artifacts.length} />
-            <TwoColumnGrid>
-              {(columns, itemWidth) =>
-                artifacts.map((artifact) => (
-                  <View key={artifact.id} style={columns === 2 ? { width: itemWidth } : undefined}>
-                    <ArtifactCard artifact={artifact} />
-                  </View>
-                ))
-              }
-            </TwoColumnGrid>
+            <CardGrid
+              items={artifacts}
+              minColumnWidth={300}
+              getKey={(artifact) => artifact.id}
+              render={(artifact) => <ArtifactCard artifact={artifact} />}
+            />
           </>
         )}
       </View>

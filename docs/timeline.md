@@ -5,53 +5,139 @@
 
 ## 变更记录
 
-### 2026-11-08 · 配置：.env 与 render.yaml 对齐 .env.example（Hindsight 变量补全）
+### 2026-11-08 · 图标：Agent 详情页左侧栏「记忆」同心圆图标换为心形
 
 **背景**
 
-以 `.env.example` 为基准校对本地 `.env`，最近一次提交（e654ff0）为 example 新增了 Hindsight 自托管 LLM 配置块并激活了每日简报调度，但 `.env` 未同步跟上；`render.yaml` 也缺少对应的 Hindsight LLM 变量。
+Agent 详情页左侧栏「记忆」分区标签沿用同心圆（Target）图标，与全局页面右侧栏「记忆」入口（Heart 心形图标、34×34 圆角底 + 17px 描边）不一致，同一功能的图标在不同入口缺乏统一辨识。
 
 **处理**
 
-- [.env](../.env)（gitignore 保护，不入库）：
-  - 激活 `BRIEFING_SCHEDULE_ENABLED=true`（原为注释，开启每日简报调度）。
-  - 末尾新增 Hindsight 自托管 LLM 配置块：`HINDSIGHT_LLM_PROVIDER=deepseek`、`HINDSIGHT_LLM_API_KEY=`（留空，云端模式 LingWu API 不读取，仅自托管容器 infra/hindsight.yaml 需要）、`HINDSIGHT_LLM_MODEL=deepseek-flash`、`HINDSIGHT_LLM_BASE_URL=https://api.deepseek.com`、`HF_ENDPOINT=https://hf-mirror.com`。
-  - 经确认保留 `RATE_LIMIT_MAX_REQUESTS=1200`（本地多屏轮询共享 127.0.0.1 限流桶，避免自伤 429）与 `COPILOTKIT_TELEMETRY_DISABLED=true`（关闭 SDK 遥测），未删除。
-- [render.yaml](../render.yaml)：`lingwu-api` 服务 Hindsight 区块新增 `HINDSIGHT_LLM_PROVIDER`（value: deepseek）、`HINDSIGHT_LLM_API_KEY`（sync: false，需控制台手动填入）、`HINDSIGHT_LLM_MODEL`（value: deepseek-flash）、`HINDSIGHT_LLM_BASE_URL`（value: https://api.deepseek.com）、`HF_ENDPOINT`（value: https://hf-mirror.com）。
+- [agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx) 左侧栏「记忆」标签 `icon` 由 `Target` 改为 `Heart`（导入同步替换；图标在两个渲染分支（16px/15px）同时生效，尺寸与颜色逻辑保持不变）。
 
 **验证**
 
-- `git diff` 核对：render.yaml 新增 12 行；`.env` 变更经 Read 确认（gitignore 保护不显示于 diff）。
+- `npx biome check apps/mobile/src/agent-settings-screen.tsx`：无警告。
+- `npx tsc --noEmit`：改动文件无类型错误（`bot-pages/connectors.tsx` 报错为 HEAD 既有问题，与本次无关）。
 
-### 2026-11-08 · 交互：我的技能列表改自适应分栏网格，删除入口移入详情弹层
+### 2026-11-08 · 图标：Agent 详情页两处星芒图标统一换为头脑图标
 
 **背景**
 
-「应用与能力 → 技能 → 我的技能」列表是单列长条卡片（名称 + 用途 + 行内删除按钮），一屏只能看到寥寥数张；同页技能市场已是网格版式，两者不一致。
+Agent 详情页中「技能」入口两处仍沿用星芒（Sparkles）图标：左侧栏「技能」分区标签（选中态 16px `primaryStrong`）与「更多」面板的能力卡片（15px `primary`）。星芒语义偏"灵感/魔法"，与「应用与能力」页技能快捷入口（Brain 头脑图标、30×30 圆角底 + 17px 描边）不一致，技能相关入口缺乏统一辨识。
 
 **处理**
 
-- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx) `MySkillsList` 改为自适应分栏网格：`onLayout` 实测容器宽度，宽屏 3 列、中屏 2 列、窄屏单列兜底（`Math.floor` 换算卡片宽度避免换行溢出）。卡片内只保留名称（1 行）与用途（2 行），点击打开详情。
-- 原卡片行内「删除」按钮与详情箭头已移除，删除入口移入 `MySkillDetailSheet` 底部的红色「删除技能」按钮（沿用既有 `footer` 插槽），确认弹窗逻辑不变。
-- 新增 i18n 键 `agent.mySkillDeleteAction`（zh-Hans：删除技能 / en：Delete skill）。
+- [agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx) 左侧栏「技能」标签 `icon` 由 `Sparkles` 改为 `Brain`（导入同步替换，标签在两个渲染分支（16px/15px）同时生效）。
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx) Agent「更多」面板能力卡片图标由 `<Sparkles size={15} color={colors.primary} />` 改为 `<Brain size={15} color={colors.primary} />`，导入追加 `Brain`；「创建 Agent」对话框模板卡的 Sparkles 保持不变。
 
 **验证**
 
-- `npx biome check`（3 个改动文件）：通过。
-- i18n 键位测试（`apps/mobile/test/i18n.test.ts`）：16 个用例全部通过，中英文键位对齐。
-- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关，已通过 git stash 对比确认）。
+- `npx biome check apps/mobile/src/agent-settings-screen.tsx apps/mobile/src/agent-sheets.tsx`：无警告。
+- `npx tsc --noEmit`：改动文件无类型错误（`bot-pages/connectors.tsx` 报错为 HEAD 既有问题，与本次无关）。
 
-### 2026-11-08 · 交互：任务中心任务列表改两列，网格组件提到 ui 层
+### 2026-11-08 · UI：Agent 详情页语言选择弹窗宽度收紧至 160px
 
 **背景**
 
-任务中心「任务」标签下的列表（全部 / 进行中 / 待确认 / 已结束 / 已暂停五个筛选共用同一份渲染）是单列通栏，一屏只能看到 6 张任务卡；而同页的「追踪」标签、Agent 详情「任务」页都已是双列，同一产品里版式不一致。
+Agent 详情页侧栏「语言」行的弹出菜单宽度 176px，超出项目下拉菜单 144px - 160px 的紧凑宽度约定。
 
 **处理**
 
-- [ui.tsx](../apps/mobile/src/ui.tsx) 新增导出 `CardGrid`：`onLayout` 实测容器宽度、按 `minColumnWidth` 自动分栏（实测前按目标栏数给百分比兜底），窄屏自动退回单列。此前它是 [tracking-screen.tsx](../apps/mobile/src/tracking-screen.tsx) 里的局部组件，但 `agent-ui.tsx` 也要用，而 `tracking-screen` 依赖 `agent-ui`，直接互相引用会成环，因此上提到 `ui` 层；`tracking-screen` 改为从 `./ui` 引入并删掉本地实现（`GRID_GAP` 一并移除，改为 `gap` 参数默认 10）。
-- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx) `AgentActivityScreen` 的任务列表改为 `CardGrid`（`minColumnWidth={340}`，最多 2 列），五个筛选分支共用，切换筛选时列数不变。
-- `TaskCard` 新增可选 `fill`（`flex: 1`），仅在网格里传入，保证同一行卡片等高；其它调用点（会话内联、Agent 详情、任务详情）不传，行为不变。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx) 语言选择弹窗 `width` 由 `176` 调整为 `160`，与「更多」菜单（160px）保持一致；衬垫 `compact` 模式下的横向定位不受影响。
+
+**验证**
+
+- `npx biome check apps/mobile/src/agent-product.tsx`：无警告。
+
+### 2026-11-08 · UI：Agent 详情页「更多」菜单宽度收紧至 160px
+
+**背景**
+
+Agent 详情页右上角「更多」菜单弹窗宽度 180px，超出项目下拉菜单 144px - 160px 的紧凑宽度约定，信息密度偏低。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx) 菜单弹窗 `menuWidth` 由 `Math.min(180, …)` 调整为 `Math.min(160, …)`，贴合紧凑布局规范；窄屏兜底 `width - 24` 不受影响。
+
+**验证**
+
+- `npx biome check apps/mobile/src/agent-product.tsx`：无警告。
+
+### 2026-11-08 · 图标：「应用与能力」页「插件」入口星芒图标换为拼图块
+
+**背景**
+
+「应用与能力」页四个快捷入口中，「插件」入口沿用星芒（Sparkles）图标，星芒语义偏"灵感/魔法"，与插件"把常用研究流程打包成一键入口"的含义不符；且与「技能市场」等处的星芒图标重复，辨识度低。
+
+**处理**
+
+- [icons/keys.ts](../apps/mobile/src/icons/keys.ts) 新增 `Puzzle: "puzzle"` 导出名映射（插在 Power 与 RefreshCw 之间保持字母序）。
+- [icons/project.ts](../apps/mobile/src/icons/project.ts) 补齐 `puzzle` 几何（Lucide 拼图块语义：单条描边路径勾勒互锁凸起轮廓，风格与全站 1.75 线宽一致、无装饰点）。
+- [icons/index.tsx](../apps/mobile/src/icons/index.tsx) 新增 `Puzzle` 组件导出（`createIcon`），icons 注册表三处联动齐备。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx) 快捷入口「插件」`ShortcutCard` 图标由 `Sparkles` 改为 `Puzzle`；其余入口（技能/连接器/知识库）与「研究工具」分类的 Sparkles 均不受影响。
+
+**验证**
+
+- `npx tsx --test apps/mobile/test/icons.test.ts`：6 项全部通过（新增导出名能解析到几何、来源标记与所在注册表一致、无重名、路径数据完整）。
+- `npx biome check`（icons 3 文件 + capability-hub.tsx）：无警告。
+- `npx tsc --noEmit`：改动文件无类型错误（`bot-pages/connectors.tsx` 报错为 HEAD 既有问题，与本次无关）。
+
+### 2026-11-08 · 图标：代理面板「每日市场简报」星形图标换为报纸图标
+
+**背景**
+
+代理「更多」面板中「每日市场简报」按钮沿用星形（Star）图标，与「自选与持仓」按钮的图标重复，且星形语义更贴近收藏而非晨报生成，辨识度低。
+
+**处理**
+
+- [icons/keys.ts](../apps/mobile/src/icons/keys.ts) 新增 `Newspaper: "newspaper"` 导出名映射。
+- [icons/project.ts](../apps/mobile/src/icons/project.ts) 补齐 `newspaper` 几何（Lucide 语义：纸页外框 + 两行标题 + 线性文字行，风格与全站 1.75 线宽一致、无装饰点）。
+- [icons/index.tsx](../apps/mobile/src/icons/index.tsx) 新增 `Newspaper` 组件导出（`createIcon`），icons 注册表三处联动齐备。
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx) 「每日市场简报」`PanelButton` 图标由 `Star` 改为 `Newspaper`；「自选与持仓」仍保留 Star。顺带清理近期的未使用 `type AgentSkill` 导入。
+
+**验证**
+
+- `npx tsx --test apps/mobile/test/icons.test.ts`：6 项全部通过（新增导出名能解析到几何、来源标记与所在注册表一致）。
+- `npx biome check`（4 个改动文件）：无警告。
+- `npx tsc --noEmit`：改动文件无类型错误（`bot-pages/connectors.tsx` 报错为 HEAD 既有问题，与本次无关）。
+
+### 2026-11-08 · 重构：`TwoColumnGrid` 统一迁移到 `CardGrid`
+
+**背景**
+
+`bot-pages/shared.tsx` 的 `TwoColumnGrid`（按 400px 固定阈值判定是否两列）与上一轮抽出的 [card-grid.tsx](../apps/mobile/src/card-grid.tsx) 的 `CardGrid`（`onLayout` 实测容器宽度 + `minColumnWidth` 自动分栏）概念重叠，同一个产品里并存两套分栏规则：同样的容器宽度，在 Agent 详情页可能是两列、在任务页可能是单列，视觉上不一致，后续调列宽还得改两处。
+
+**处理**
+
+- 删除 `TwoColumnGrid`、`TWO_COLUMN_MIN_WIDTH`、`TWO_COLUMN_GAP`；`shared.tsx` 的 import 收敛为 `ReactNode` / `Pressable` / `View`（`ReactNode` 仍被 `BotPage`、`BotEmpty` 使用，保留）。
+- [history.tsx](../apps/mobile/src/bot-pages/history.tsx)：任务卡 `minColumnWidth={340}`，顺带删掉不再需要的 `View` 导入。
+- [library.tsx](../apps/mobile/src/bot-pages/library.tsx)：文件列表与成果列表均 `minColumnWidth={300}`（外层容器仍用 `View`，保留导入）。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：自建技能与从技能库安装的技能原先分两段渲染，改为合并成 `skillCards: { key: string; node: ReactNode }[]` 一个数组（key 前缀 `custom:` / `catalog:` 区分来源）再交给 `CardGrid`（`minColumnWidth={300}`），两处卡片 `Pressable` 补 `flex: 1` 保证同行等高。
+- 现在全仓 `CardGrid` 共 16 处调用，`grep TwoColumnGrid` 无残留（仅本文件历史条目还提到旧名）。
+
+**影响**
+
+`minColumnWidth` 成为唯一的分栏参数：Agent 详情页的卡片偏矮（300）能排两列，任务卡信息多（340）更早退化为单列，规则统一为一句话「容器宽度够放下 N 个最小宽度就排 N 列，最多 2 列」。
+
+**验证**
+
+- `./node_modules/.bin/biome check apps/mobile/src/bot-pages apps/mobile/src/card-grid.tsx`：9 文件通过（先 `--write` 修了 `useImportType` 与 `organizeImports` 两条）。
+- `./node_modules/.bin/tsc --noEmit`：改动文件无错误（`bot-pages/connectors.tsx` 的 7 个报错为 HEAD 既有问题，与本次无关）。
+- `apps/mobile/test/*.test.ts`：282 个用例全部通过。
+
+### 2026-11-08 · 交互：任务页五个筛选的任务列表改两列
+
+**背景**
+
+任务页（`任务` 标签下的 `AgentActivityScreen`）五个状态筛选（全部 / 进行中 / 待确认 / 已结束 / 已暂停）共用同一份任务列表，一直是单列通栏。25 条任务要滚 25 屏，宽屏下右侧大片留白。
+
+**处理**
+
+- 新增 [card-grid.tsx](../apps/mobile/src/card-grid.tsx)：把原先只存在于 `tracking-screen.tsx` 的 `CardGrid` 抽成共享组件（`onLayout` 实测容器宽度 + `minColumnWidth` 自动分栏，实测前按目标栏数给百分比兜底），供任务页与跟踪页共用。
+- [tracking-screen.tsx](../apps/mobile/src/tracking-screen.tsx) 删除本地实现与 `GRID_GAP`，改为 `import { CardGrid } from "./card-grid"`，`ReactNode` 导入随之清理。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx) `AgentActivityScreen` 的任务列表由 `.map` 平铺改为 `CardGrid`（`minColumnWidth={340}`，最多 2 列），五个筛选共用同一处渲染，因此一次性全部生效；窄屏仍自动退化为单列。
+- `TaskCard` 的 `Pressable` 加 `flex: 1`，两列时同一行卡片等高。
 
 **验证**
 

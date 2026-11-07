@@ -1,7 +1,7 @@
-import { View } from "react-native";
 import { TaskCard } from "../agent-ui";
+import { CardGrid } from "../card-grid";
 import { useTranslation } from "../i18n";
-import { BotEmpty, BotPage, type BotPageProps, TwoColumnGrid, useBotResources } from "./shared";
+import { BotEmpty, BotPage, type BotPageProps, useBotResources } from "./shared";
 
 /**
  * 「任务」页：展示当前 Agent 的近期分析任务。
@@ -16,15 +16,12 @@ export function BotHistoryPage({ onClose, embedded }: BotPageProps) {
   return (
     <BotPage title={t("agentSpace.analysisHistory")} onClose={onClose} embedded={embedded}>
       {tasks.length ? (
-        <TwoColumnGrid>
-          {(columns, itemWidth) =>
-            tasks.map((task) => (
-              <View key={task.id} style={columns === 2 ? { width: itemWidth } : undefined}>
-                <TaskCard task={task} compact />
-              </View>
-            ))
-          }
-        </TwoColumnGrid>
+        <CardGrid
+          items={tasks}
+          minColumnWidth={340}
+          getKey={(task) => task.id}
+          render={(task) => <TaskCard task={task} compact />}
+        />
       ) : (
         <BotEmpty>{t("agentSpace.noTasks")}</BotEmpty>
       )}
