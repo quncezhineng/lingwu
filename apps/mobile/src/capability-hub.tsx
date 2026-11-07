@@ -31,14 +31,16 @@ import {
   X,
 } from "./icons";
 import { instructionsMarkdownStyle } from "./instructions-markdown";
+import { ModalOverlay } from "./modal-overlay";
 import { FilesScreen } from "./screens";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
 import { SkillEditor } from "./skill-editor";
 import {
   collectSharedSkills,
-  findSkillCopy,
+  deleteSkillEverywhere,
   type SharedSkillEntry,
-  skillTargetAgents,
+  skillHolderAgentIds,
+  skillLockedAgentIds,
   toggleSkillShare,
 } from "./skill-sharing";
 import { StatusBadge, type StatusTone } from "./status-badge";
@@ -462,26 +464,31 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
   );
 }
 
-/** 安装面板里的一行智能体：已安装的用底色 + 徽标区分，未安装保留空选中圈。 */
+/** 安装面板里的一行智能体：已安装的用底色 + 徽标区分，未安装保留空选中圈；锁定行只读。 */
 function AgentInstallRow({
   agent,
   installed,
   first,
+  locked,
   onPress,
 }: {
   agent: AgentDefinition;
   installed: boolean;
   first: boolean;
+  /** 只读：这份副本需保留（来源 Agent / 最后一份），不可点击移除。 */
+  locked?: boolean;
   onPress: () => void;
 }) {
   const { t } = useTranslation();
+  const installedLabel = locked ? t("agent.skillShareLocked") : t("agent.skillInstallInstalled");
   return (
     <Pressable
+      disabled={locked}
       accessibilityRole="checkbox"
       accessibilityLabel={`${agent.name} · ${
-        installed ? t("agent.skillInstallInstalled") : t("agent.skillInstallAction")
+        installed ? installedLabel : t("agent.skillInstallAction")
       }`}
-      accessibilityState={{ checked: installed }}
+      accessibilityState={{ checked: installed, disabled: locked }}
       onPress={onPress}
       style={({ pressed }) => [
         s.row,
@@ -490,6 +497,7 @@ function AgentInstallRow({
           minHeight: 58,
           paddingHorizontal: 12,
           paddingVertical: 10,
+          opacity: locked ? 0.72 : 1,
           borderTopWidth: first ? 0 : 1,
           borderTopColor: colors.line,
           backgroundColor: installed ? colors.sky : pressed ? colors.surfaceSoft : colors.paper,
@@ -525,7 +533,7 @@ function AgentInstallRow({
       {installed ? (
         <StatusBadge
           tone="done"
-          label={t("agent.skillInstallInstalled")}
+          label={installedLabel}
           style={{
             alignSelf: "center",
             borderRadius: 6,
@@ -553,21 +561,27 @@ function AgentInstallRow({
  * 智能体选择面板：技能详情弹层的「添加到智能体」视图。
  *
  * 目录技能（安装到智能体）与自建技能（添加到智能体）共用这一版式，
- * 只有「是否已持有」的判定方式不同，由调用方通过 `isAdded` 传入。
+ * 两者都展示全部智能体，只有「是否已持有」的判定方式不同，由调用方通过 `isAdded` 传入。
  */
 function AgentPickerPanel({
   agents,
   isAdded,
+  lockedAgentIds,
   onToggle,
 }: {
   agents: AgentDefinition[];
   isAdded: (agent: AgentDefinition) => boolean;
+  /** 只读的已添加 Agent：来源 Agent 与最后一份副本（仅自建技能传入）。 */
+  lockedAgentIds?: string[];
   onToggle: (agent: AgentDefinition) => void;
 }) {
   const { t } = useTranslation();
+  // 只有真正传入锁定列表的面板才提示「不可移除」，避免无锁定视图出现误导性说明。
   return (
     <View style={{ gap: 12 }}>
-      <Text style={s.small}>{t("agent.skillInstallHint")}</Text>
+      <Text style={s.small}>
+        {t(lockedAgentIds ? "agent.skillInstallHint" : "agent.skillInstallHintNoLock")}
+      </Text>
       {agents.length ? (
         <View
           style={{
@@ -577,15 +591,19 @@ function AgentPickerPanel({
             overflow: "hidden",
           }}
         >
-          {agents.map((agent, index) => (
-            <AgentInstallRow
-              key={agent.id}
-              agent={agent}
-              installed={isAdded(agent)}
-              first={index === 0}
-              onPress={() => onToggle(agent)}
-            />
-          ))}
+          {agents.map((agent, index) => {
+            const installed = isAdded(agent);
+            return (
+              <AgentInstallRow
+                key={agent.id}
+                agent={agent}
+                installed={installed}
+                first={index === 0}
+                locked={installed && (lockedAgentIds ?? []).includes(agent.id)}
+                onPress={() => onToggle(agent)}
+              />
+            );
+          })}
         </View>
       ) : (
         <Text style={s.small}>{t("agent.skillShareNoTargets")}</Text>
@@ -601,7 +619,7 @@ function AgentPickerPanel({
  * 技能目录条目的详情弹层。
  *
  * 传入 `agents` 与 `onToggleInstall` 时才提供「安装到智能体」入口；
- * 只传 `skill` 即退化为只读详情（供 Agent 详情页等场景复用）。
+ * 技能市场与 Agent 详情技能页都传入，只传 `skill` 时退化为只读详情。
  */
 export function SkillDetailSheet({
   skill,
@@ -734,6 +752,7 @@ export function MySkillDetailSheet({
   footer,
   agents,
   addedAgentIds,
+  lockedAgentIds,
   onToggleAdd,
   onClose,
 }: {
@@ -741,10 +760,12 @@ export function MySkillDetailSheet({
   subtitle?: string;
   skill: Pick<AgentSkill, "name" | "purpose" | "instructions" | "outputFormat" | "version">;
   footer?: ReactNode;
-  /** 可添加到的智能体（不含技能来源 Agent）。传入即展示「添加到智能体」入口。 */
+  /** 可选的智能体（全部，含技能来源 Agent）。传入即展示「添加到智能体」入口。 */
   agents?: AgentDefinition[];
   /** 已持有该技能的智能体 id，用于行内「已添加」标记与计数。 */
   addedAgentIds?: string[];
+  /** 需保留的副本所在的智能体 id：行只读，不可点击移除。 */
+  lockedAgentIds?: string[];
   /** 切换某个智能体是否持有该技能。 */
   onToggleAdd?: (agent: AgentDefinition) => void;
   onClose: () => void;
@@ -774,6 +795,7 @@ export function MySkillDetailSheet({
         <AgentPickerPanel
           agents={agents ?? []}
           isAdded={(agent) => (addedAgentIds ?? []).includes(agent.id)}
+          lockedAgentIds={lockedAgentIds}
           onToggle={(agent) => onToggleAdd?.(agent)}
         />
       ) : (
@@ -936,16 +958,22 @@ function HubTabBar<T extends string>({
   tabs,
   active,
   onChange,
+  action,
 }: {
   tabs: readonly { id: T; label: string }[];
   active: T;
   onChange: (id: T) => void;
+  /** 标签行右侧的操作区，例如「创建技能」按钮。 */
+  action?: ReactNode;
 }) {
   return (
     <View
       accessibilityRole="tablist"
       style={{
         flexDirection: "row",
+        alignItems: "center",
+        // 窄屏放不下时，右侧操作按钮换到下一行而不是被挤出屏幕。
+        flexWrap: "wrap",
         gap: 24,
         minHeight: 40,
         borderBottomWidth: 1,
@@ -989,6 +1017,7 @@ function HubTabBar<T extends string>({
           </Pressable>
         );
       })}
+      {action && <View style={{ marginLeft: "auto", flexShrink: 0 }}>{action}</View>}
     </View>
   );
 }
@@ -997,14 +1026,16 @@ function HubTabBar<T extends string>({
  * 我的技能列表：所有 Agent 自建技能的汇总，点击查看详情。
  *
  * 技能不按 Agent 归类——同一份技能在不同 Agent 下只出现一次，
- * 因此行内只在右侧给出箭头，不再显示来源 Agent 标签。
+ * 因此行内不显示来源 Agent，右侧给出删除入口与详情箭头。
  */
 function MySkillsList({
   entries,
   onSelect,
+  onDelete,
 }: {
   entries: MySkillEntry[];
   onSelect: (entry: MySkillEntry) => void;
+  onDelete: (entry: MySkillEntry) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -1052,10 +1083,74 @@ function MySkillsList({
               {skill.purpose}
             </Text>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t("agentSpace.deleteSkill")} ${skill.name}`}
+            hitSlop={6}
+            onPress={(event) => {
+              event.stopPropagation();
+              onDelete({ skill, agentId });
+            }}
+            style={({ pressed }) => ({
+              height: 24,
+              justifyContent: "center",
+              paddingHorizontal: 9,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: colors.errorSoft,
+              backgroundColor: pressed ? colors.errorSoft : colors.paper,
+            })}
+          >
+            <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
+              {t("agentSpace.deleteSkill")}
+            </Text>
+          </Pressable>
           <ChevronRight size={16} strokeWidth={1.6} color={colors.faint} />
         </Pressable>
       ))}
     </View>
+  );
+}
+
+/**
+ * 删除自建技能前的二次确认弹层。
+ *
+ * 「应用与能力 → 我的技能」与 Agent 详情的技能页共用：前者删掉所有 Agent 上的副本，
+ * 后者只删当前 Agent 的那一份，因此说明文案由调用方传入。
+ */
+export function SkillDeleteConfirm({
+  title,
+  detail,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  detail: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ModalOverlay visible onRequestClose={onCancel}>
+      <Pressable onPress={onCancel} style={s.modalShade}>
+        <Pressable
+          accessibilityViewIsModal
+          onPress={(event) => event.stopPropagation()}
+          style={[s.card, { maxWidth: 360, width: "100%", padding: 22, gap: 10 }]}
+        >
+          <Text style={s.heading}>{title}</Text>
+          <Text style={s.muted}>{detail}</Text>
+          <View style={[s.row, { gap: 10, marginTop: 8 }]}>
+            <Button style={{ flex: 1, minHeight: 44 }} onPress={onCancel}>
+              {t("common.cancel")}
+            </Button>
+            <Button danger style={{ flex: 1, minHeight: 44 }} onPress={onConfirm}>
+              {t("agentSpace.deleteConfirmAction")}
+            </Button>
+          </View>
+        </Pressable>
+      </Pressable>
+    </ModalOverlay>
   );
 }
 
@@ -1084,6 +1179,8 @@ export function CapabilityHubScreen({
   const [creatingSkill, setCreatingSkill] = useState(false);
   /** 技能 tab 的二级视角：「技能市场」技能目录 / 「我的技能」。 */
   const [skillTab, setSkillTab] = useState<"all" | "mine">("all");
+  /** 删除前二次确认：待删除的「我的技能」条目。 */
+  const [deletingMySkill, setDeletingMySkill] = useState<MySkillEntry>();
 
   const desktop = width >= breakpoints.desktop;
   const railWidth = desktop ? 232 : 0;
@@ -1141,14 +1238,13 @@ export function CapabilityHubScreen({
    * 与市场里的系统技能区分开。
    */
   const mySkills = collectSharedSkills(agentList);
-  /** 自建技能可添加到的其它 Agent（排除技能来源 Agent）。 */
-  const mySkillTargets = selectedMySkill
-    ? skillTargetAgents(agentList, selectedMySkill.agentId)
-    : [];
+  /** 「添加到智能体」展示全部 Agent，含创建该技能的来源 Agent（它天然已添加）。 */
   const mySkillAddedAgentIds = selectedMySkill
-    ? mySkillTargets
-        .filter((agent) => findSkillCopy(agent, selectedMySkill.skill))
-        .map((agent) => agent.id)
+    ? skillHolderAgentIds(agentList, selectedMySkill.skill)
+    : [];
+  /** 只读副本：来源 Agent 与最后一份，禁止通过「添加到智能体」把技能移除到消失。 */
+  const mySkillLockedAgentIds = selectedMySkill
+    ? skillLockedAgentIds(agentList, selectedMySkill.skill, selectedMySkill.agentId)
     : [];
 
   async function openGoogleConnector(id: "gmail" | "calendar") {
@@ -1189,17 +1285,42 @@ export function CapabilityHubScreen({
 
   /**
    * 自建技能的「添加到智能体」：把技能复制到目标 Agent，已有副本则移除。
-   * 判定与切换逻辑与 Agent 详情页共用 `skill-sharing`。
+   * 判定与切换逻辑与 Agent 详情页共用 `skill-sharing`；传入 guard 后，
+   * 来源 Agent 与最后一份副本只读，删除技能请用列表里的删除入口。
    */
   function toggleMySkillInAgent(agent: AgentDefinition) {
     if (!selectedMySkill) return;
-    const action = toggleSkillShare({ saveSkill, deleteSkill }, agent, selectedMySkill.skill);
+    const action = toggleSkillShare({ saveSkill, deleteSkill }, agent, selectedMySkill.skill, {
+      agents: agentList,
+      sourceAgentId: selectedMySkill.agentId,
+    });
+    if (action === "blocked") {
+      notify(t("agent.skillShareBlockedToast"));
+      return;
+    }
     notify(
       t(action === "added" ? "agent.skillInstalledToast" : "agent.skillUninstalledToast", {
         title: selectedMySkill.skill.name,
         agent: agent.name,
       }),
     );
+  }
+
+  /** 点卡片删除只打开确认层，确认后才真正删除。 */
+  function requestDeleteMySkill(entry: MySkillEntry) {
+    setSelectedMySkill(undefined);
+    setDeletingMySkill(entry);
+  }
+
+  /**
+   * 删除「我的技能」：列表按内容去重，所以按内容指纹清掉所有 Agent 上的副本，
+   * 否则只删一条后其它 Agent 的副本会立刻回到列表里。
+   */
+  function deleteMySkill(entry: MySkillEntry) {
+    deleteSkillEverywhere({ deleteSkill }, agentList, entry.skill);
+    setDeletingMySkill(undefined);
+    setSelectedMySkill(undefined);
+    notify(t("agent.mySkillDeletedToast", { title: entry.skill.name }));
   }
 
   /** 安装面板按智能体逐一开关，已安装的再次点击即移除。 */
@@ -1478,17 +1599,21 @@ export function CapabilityHubScreen({
                 ]}
                 active={skillTab}
                 onChange={setSkillTab}
+                action={
+                  <Button small icon={Plus} onPress={() => setCreatingSkill(true)}>
+                    {t("agentSpace.createSkill")}
+                  </Button>
+                }
               />
             )}
             {typeFilter === "skills" && skillTab === "mine" ? (
               <View style={{ gap: 12 }}>
-                <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-                  <Button small icon={Plus} onPress={() => setCreatingSkill(true)}>
-                    {t("agentSpace.createSkill")}
-                  </Button>
-                </View>
                 {mySkills.length ? (
-                  <MySkillsList entries={mySkills} onSelect={setSelectedMySkill} />
+                  <MySkillsList
+                    entries={mySkills}
+                    onSelect={setSelectedMySkill}
+                    onDelete={requestDeleteMySkill}
+                  />
                 ) : (
                   <View style={EMPTY_STATE_BOX}>
                     <Empty
@@ -1598,7 +1723,10 @@ export function CapabilityHubScreen({
 
       {creatingSkill && (
         <Sheet title={t("agentSpace.createSkill")} onClose={() => setCreatingSkill(false)} narrow>
-          <SkillEditor onClose={() => setCreatingSkill(false)} />
+          <SkillEditor
+            onClose={() => setCreatingSkill(false)}
+            onSaved={() => setSkillTab("mine")}
+          />
         </Sheet>
       )}
 
@@ -1606,8 +1734,9 @@ export function CapabilityHubScreen({
         <MySkillDetailSheet
           title={selectedMySkill.skill.name}
           skill={selectedMySkill.skill}
-          agents={mySkillTargets}
+          agents={agentList}
           addedAgentIds={mySkillAddedAgentIds}
+          lockedAgentIds={mySkillLockedAgentIds}
           onToggleAdd={toggleMySkillInAgent}
           onClose={() => setSelectedMySkill(undefined)}
         />
@@ -1620,6 +1749,15 @@ export function CapabilityHubScreen({
           onClose={() => setSelectedSkillId(undefined)}
           onUse={() => startSelectedSkill(selectedSkill)}
           onToggleInstall={toggleSkillInstall}
+        />
+      )}
+
+      {deletingMySkill && (
+        <SkillDeleteConfirm
+          title={t("agent.mySkillDeleteConfirmTitle", { title: deletingMySkill.skill.name })}
+          detail={t("agent.mySkillDeleteConfirmNoteAll")}
+          onCancel={() => setDeletingMySkill(undefined)}
+          onConfirm={() => deleteMySkill(deletingMySkill)}
         />
       )}
     </View>

@@ -1,0 +1,67 @@
+# Hindsight 记忆引擎自托管配置（多 Agent 记忆系统的语义检索后端）。
+#
+# 用法：
+#   1. 准备 LLM key（本配置默认走 DeepSeek，适合中国网络；也可换 OpenAI/Groq）
+#   2. 在项目根 .env 或环境里设置 HINDSIGHT_LLM_API_KEY
+#   3. 启动：docker compose -f infra/hindsight.yaml up -d
+#   4. 在 LingWu 的 .env 里配置：
+#        HINDSIGHT_BASE_URL=http://localhost:8888
+#        HINDSIGHT_API_KEY=（自托管留空）
+#
+# 端口：
+#   - 8888：Hindsight API（retain / recall / reflect）
+#   - 9999：Control Plane 管理界面（http://localhost:9999）
+#
+# 说明：
+#   - 官方单容器镜像内含嵌入式 PostgreSQL（pg0）+ 本地 embedding / rerank 模型，
+#     只需外接一个 LLM（事实抽取 / 实体链接 / 答案生成）。
+#   - 本配置用 DeepSeek 作为 LLM（无 embedding 端点），embedding 走本地模型，
+#     并通过 HF_ENDPOINT 指向 hf-mirror.com 镜像，规避 Hugging Face 下载被墙的问题。
+#   - 生产建议改为外部 PostgreSQL + pgvector，并把 HINDSIGHT_API_WORKER_ID 固定。
+
+name: lingwu-hindsight
+
+services:
+  hindsight:
+    image: ghcr.io/vectorize-io/hindsight:latest
+    pull_policy: always
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 75s
+    shm_size: 1g
+    ports:
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:9999:9999"
+    environment:
+      # ── LLM（事实抽取 / 实体链接 / 答案生成）──
+      # DeepSeek 适合中国网络；若用 OpenAI 改成 HINDSIGHT_API_LLM_PROVIDER=openai + OPENAI key。
+      HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_LLM_PROVIDER:-deepseek}
+      HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_LLM_API_KEY:?Set HINDSIGHT_LLM_API_KEY to your DeepSeek/OpenAI key}
+      HINDSIGHT_API_LLM_MODEL: ${HINDSIGHT_LLM_MODEL:-deepseek-chat}
+      HINDSIGHT_API_LLM_BASE_URL: ${HINDSIGHT_LLM_BASE_URL:-https://api.deepseek.com}
+      # ── Embedding（本地模型，中国网络友好，无需外接 embedding 服务）──
+      HINDSIGHT_API_EMBEDDINGS_PROVIDER: ${HINDSIGHT_EMBEDDINGS_PROVIDER:-local}
+      HINDSIGHT_API_EMBEDDINGS_LOCAL_MODEL: ${HINDSIGHT_EMBEDDINGS_LOCAL_MODEL:-BAAI/bge-small-zh-v1.5}
+      # ── Reranker（本地交叉编码器，无需外接）──
+      HINDSIGHT_API_RERANKER_PROVIDER: ${HINDSIGHT_RERANKER_PROVIDER:-flashrank}
+      # ── 稳定 worker 身份（重启后仍能认领未完成任务）──
+      HINDSIGHT_API_WORKER_ID: lingwu-hindsight
+      # ── Hugging Face 镜像（中国网络下模型下载走国内镜像）──
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
+    volumes:
+      - hindsight-data:/home/hindsight/.pg0
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:8888/health', timeout=5); sys.exit(0)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  hindsight-data:

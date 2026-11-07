@@ -345,6 +345,8 @@ const app = {
   "preferences.categoryRisk": "Risk preference",
   "preferences.categoryFocus": "Focus area",
   "preferences.categoryHabit": "Research habit",
+  "preferences.categoryWatch": "Watched tickers",
+  "preferences.categoryLesson": "Lessons learned",
   "preferences.whatToRemember": "What should LingWu remember?",
   "preferences.placeholder": "For example: a 3+ year horizon, with a focus on portfolio drawdown.",
   "preferences.characterCount": "{count}/4000",

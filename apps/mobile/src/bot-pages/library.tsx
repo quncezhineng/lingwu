@@ -4,7 +4,7 @@ import { useTranslation } from "../i18n";
 import { FileText } from "../icons";
 import { LinkRow, SectionHeading } from "../ui";
 import { useWorkspace } from "../workspace";
-import { BotEmpty, BotPage, type BotPageProps, useBotResources } from "./shared";
+import { BotEmpty, BotPage, type BotPageProps, TwoColumnGrid, useBotResources } from "./shared";
 
 export function BotLibraryPage({ onClose, embedded }: BotPageProps) {
   const { t } = useTranslation();
@@ -17,22 +17,33 @@ export function BotLibraryPage({ onClose, embedded }: BotPageProps) {
         {!!files.length && (
           <>
             <SectionHeading title={t("screens.libraryFiles")} count={files.length} />
-            {files.map((file) => (
-              <LinkRow
-                key={file.id}
-                icon={FileText}
-                title={file.name}
-                onPress={() => open({ type: "file", file })}
-              />
-            ))}
+            <TwoColumnGrid>
+              {(columns, itemWidth) =>
+                files.map((file) => (
+                  <View key={file.id} style={columns === 2 ? { width: itemWidth } : undefined}>
+                    <LinkRow
+                      icon={FileText}
+                      title={file.name}
+                      onPress={() => open({ type: "file", file })}
+                    />
+                  </View>
+                ))
+              }
+            </TwoColumnGrid>
           </>
         )}
         {!!artifacts.length && (
           <>
             <SectionHeading title={t("agentSpace.artifacts")} count={artifacts.length} />
-            {artifacts.map((artifact) => (
-              <ArtifactCard key={artifact.id} artifact={artifact} />
-            ))}
+            <TwoColumnGrid>
+              {(columns, itemWidth) =>
+                artifacts.map((artifact) => (
+                  <View key={artifact.id} style={columns === 2 ? { width: itemWidth } : undefined}>
+                    <ArtifactCard artifact={artifact} />
+                  </View>
+                ))
+              }
+            </TwoColumnGrid>
           </>
         )}
       </View>

@@ -313,7 +313,7 @@ const agent = {
   "agent.reminderDescription": "What to watch",
   "agent.reminderDescriptionPlaceholder":
     "For example: filings, earnings and material changes across my watchlist.",
-  "agent.taskTemplates": "Task templates",
+  "agent.taskTemplates": "Goal templates",
   "agent.taskTemplatePlanTitle": "Build a plan",
   "agent.taskTemplatePlanDetail":
     "Break a goal into executable steps and let LingWu keep moving it forward.",
@@ -333,9 +333,18 @@ const agent = {
   "agent.reminderTplFilingTitle": "Watchlist filing alert",
   "agent.reminderTplFilingDetail":
     "Follow important filings, earnings and updates for holdings and watched names.",
+  "agent.reminderTplPremarketTitle": "Premarket brief",
+  "agent.reminderTplPremarketDetail":
+    "Sum up overnight markets, major news and today's watch items before the open.",
+  "agent.reminderTplEarningsTitle": "Earnings season watch",
+  "agent.reminderTplEarningsDetail":
+    "Flag upcoming or released earnings for your names and outline the key points.",
   "agent.reminderTplWeeklyTitle": "Weekly watchlist review",
   "agent.reminderTplWeeklyDetail":
     "Collect changes, relevant filings and open questions across the names you follow.",
+  "agent.reminderTplPolicyTitle": "Policy watch",
+  "agent.reminderTplPolicyDetail":
+    "Review policy and industry news for your sectors and flag likely impact.",
   "agent.priceReminderTitle": "{name} price alert",
   "agent.priceReminderDescription":
     "Check the latest public quote for {name} ({code}) and alert me when it falls below the target price.",
@@ -558,6 +567,13 @@ const agent = {
   "agent.mySkills": "My skills",
   "agent.mySkillsEmpty":
     "No skills yet. Tap “Create skill” above to write one, or add one from the skill marketplace.",
+  "agent.mySkillDeletedToast": "Deleted “{title}”.",
+  "agent.mySkillDeleteConfirmTitle": "Permanently delete “{title}”?",
+  "agent.mySkillDeleteConfirmTitleOne": "Delete “{title}”?",
+  "agent.mySkillDeleteConfirmNoteAll":
+    "This permanently deletes the skill and its copies from all agents. This can't be undone.",
+  "agent.mySkillDeleteConfirmNoteOne":
+    "This removes the skill from this agent. Copies in other agents are unaffected.",
   "agent.skillsDetail": "Enable reusable specialist actions for research and investment work.",
   "agent.connectorsHeading": "Connectors",
   "agent.connectorsDetail": "Bring models, mail, calendars and browsing into your workspace.",
@@ -599,14 +615,19 @@ const agent = {
   "agent.skillDetailSource": "Skill source",
   "agent.skillDetailUse": "Use this skill",
   "agent.skillAddedToChat": "“{title}” is ready in the chat composer.",
-  "agent.skillInstallAction": "Install to Agent",
-  "agent.skillInstallTitle": "Install to Agent",
+  "agent.skillInstallAction": "Add to Agent",
+  "agent.skillInstallTitle": "Add to Agent",
   "agent.skillInstallHint":
-    "Agents that already have this skill are marked as installed. Tap an Agent to install or remove it.",
-  "agent.skillInstallInstalled": "Installed",
-  "agent.skillInstallSummary": "{count} Agents installed",
-  "agent.skillShareNoTargets": "No other Agents yet. Create one first, then add this skill to it.",
-  "agent.skillInstalledToast": "“{title}” installed to {agent}.",
+    "Agents that already have this skill are marked as added. Tap an Agent to add or remove it; copies that must be kept are locked.",
+  "agent.skillInstallHintNoLock":
+    "Agents that already have this skill are marked as added. Tap an Agent to add or remove it.",
+  "agent.skillInstallInstalled": "Added",
+  "agent.skillInstallSummary": "{count} Agents added",
+  "agent.skillShareNoTargets": "No Agents yet. Create one first, then add this skill to it.",
+  "agent.skillShareLocked": "Added · locked",
+  "agent.skillShareBlockedToast":
+    "This copy can't be removed — the skill must stay in at least one Agent.",
+  "agent.skillInstalledToast": "“{title}” added to {agent}.",
   "agent.skillUninstalledToast": "“{title}” removed from {agent}.",
   "agent.onYourComputer": "On your computer",
   "agent.shortcutPortfolioDetail": "Holdings, P/L and allocation",
@@ -735,8 +756,7 @@ const agent = {
   "agentSpace.instructionsPreviewEmpty":
     "Enter instructions to preview how the Markdown will render.",
   "agentSpace.saveInstructions": "Save instructions",
-  "agentSpace.analysisHistory": "Analysis history & process",
-  "agentSpace.goalsMemory": "Goals & memory",
+  "agentSpace.analysisHistory": "Tasks",
   "agentSpace.savePersona": "Save persona",
   "agentSpace.agentName": "Agent name",
   "agentSpace.agentRole": "Its responsibility",
@@ -758,13 +778,12 @@ const agent = {
   "agentSpace.skillCenter": "Skills & capabilities",
   "agentSpace.libraryEmpty":
     "No resources yet. Files and analysis produced by this Bot's tasks will appear here.",
-  "agentSpace.sharedGoalsMemory":
-    "Goals and memories are maintained for your account and shared by your Bots.",
   "agentSpace.createSkill": "Create skill",
   "agentSpace.addSkill": "Add skill",
-  "agentSpace.skillMenuLabel": "Create or add a skill",
   "agentSpace.addSkillHint":
-    "Pick skills from the library to install on this Agent. Tap an installed skill again to remove it.",
+    "Tap to add or remove (including your own skills); tap the icon or long-press for details, or search to filter.",
+  "agentSpace.addSkillDetailHint": "View skill details",
+  "agentSpace.addSkillCustomTag": "Custom",
   "agentSpace.addSkillSearch": "Search skills",
   "agentSpace.addSkillEmpty": "No matching skills.",
   "agentSpace.addSkillMore": "{count} more skills. Type a keyword to narrow the list.",
@@ -786,8 +805,7 @@ const agent = {
   "agentSpace.skillSampleOutput":
     "Lead with the conclusion, then list the data, open questions and next verification step.",
   "agentSpace.saveSkill": "Save skill",
-  "agentSpace.skillEmpty":
-    "No skills yet. Create one from your research method, or add skills from the library.",
+  "agentSpace.skillEmpty": "No skills yet. Tap Add skill in the top-right to browse the library.",
   "agentSpace.skillDisabled": "Disabled",
   "agentSpace.skillVersion": "Version {version}",
   "agentSpace.preferences": "Name & investment preferences",

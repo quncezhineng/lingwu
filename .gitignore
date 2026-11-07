@@ -23,4 +23,5 @@ artifacts/
 .qoder
 .qoder-collab-runtime
 .codebuddy
+.workbuddy
 .omx

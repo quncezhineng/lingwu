@@ -5,6 +5,526 @@
 
 ## 变更记录
 
+### 2026-11-07 · 交互：跟踪 / 目标 / 提醒三个列表改两列，目标卡片精简
+
+**背景**
+
+跟踪页（`全部` / `目标` / `提醒` 三个筛选）里所有列表都是单列通栏，一屏只能看到一张目标卡；目标卡本身也偏高（约 440px）：顶部有「下一步」区块内的全宽蓝色主按钮，底部又有一组「查看目标 / 设置提醒」，其中「查看目标」出现两次；「最近 7 天」既有今日计数行、又有最多 3 条活动明细，信息重叠。
+
+**处理**
+
+- [tracking-screen.tsx](../apps/mobile/src/tracking-screen.tsx) 把此前的 `TemplateGrid`（按窗口宽度算列数）改成 `CardGrid`：`onLayout` 实测容器宽度，按 `minColumnWidth` 自动分栏，实测前用百分比兜底。页面内容宽度扣掉侧栏后与窗口宽度差别很大，按窗口估算会把卡片挤在窄栏里。
+- 三处模板网格改用新参数：任务模板 `240`、目标分类 `200`、提醒模板 `200` + `maxColumns={3}`。
+- 三个筛选分支的所有列表统一接入 `CardGrid`（`minColumnWidth={340}`，最多 2 列）：关注中目标、暂停目标、独立提醒、按目标分组的提醒、已完成目标的提醒。`renderGoalTrack` 去掉自带 `key`（由网格包装层提供）。
+- 目标卡 `GoalTrackCard` 精简：①「下一步」区块内的全宽主按钮去掉，整块改为可点（右上角 chevron，`runNext` 不变），消除与底部「查看目标」的重复；②「最近 7 天」删掉最多 3 条活动明细，只留今日计数一行（完整时间线在「查看目标」的详情里）；③卡片 `gap` 15→12、提醒行 38→34、活动行整块移除，卡片高度约 440 → 280；④底部操作行 `marginTop: "auto"`，两列时同一行卡片按钮对齐。
+- `Card` 加 `flex: 1`（目标卡与 [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx) 的 `TrackingRow`），让同一行的卡片等高。
+- 清理随之失效的 `recentActivityText`、`recentActivities` 与 `CircleAlert` / `Clock3` / `ListChecks` / `RecentActivity` 导入。
+
+**验证**
+
+- `npx biome check`（2 个改动文件）：通过。
+- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
+- `apps/mobile/test/tracking-view.test.ts`：7 例通过；`apps/mobile/test/*.test.ts`：282 个用例全部通过。
+
+### 2026-11-07 · 文案：删除自建技能的确认提示补充影响范围说明
+
+**背景**
+
+「智能体设置 → 技能」页删除自建技能时的确认正文（`agent.mySkillDeleteConfirmNoteOne`）原为「将移除这个智能体中的这份技能，删除后无法恢复。」——与上方标题「确定删除技能？」存在「移除/删除」措辞割裂，且未说明该删除只作用于当前智能体，其它智能体中共享的同一技能不受影响。
+
+**处理**
+
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agent.mySkillDeleteConfirmNoteOne` 改为「将移除这个智能体中的这份技能，该技能在其他智能体中不受影响。」
+- [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步改为 "This removes the skill from this agent. Copies in other agents are unaffected."
+
+**验证**
+
+- `apps/mobile/test/i18n.test.ts`：16 例全部通过（中英 key 对齐、占位符一致）。
+- `pnpm test` 全量 1027 例中 1016 通过；11 例失败均集中在服务端监控/任务生命周期（alerts、resume、milestone）测试，与本次文案改动无关，属存量问题。
+
+### 2026-11-07 · 交互：技能选择弹层卡片点击直接打勾，不再弹详情页
+
+**背景**
+
+对话输入区的「选择技能」弹层（`SkillPickerSheet`）此前点击技能卡片会先弹出技能详情页，需在详情页里点「使用此技能」才完成勾选——多一步跳转，且详情页与「应用与能力」里的技能详情完全重复。用户期望点击卡片（含右侧方框型勾选按钮）直接打勾即完成选择。
+
+**处理**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx)：
+  - 自建技能卡片与目录技能卡片的 `onPress` 由 `setMyPreview` / `setCatalogPreview`（弹详情）改为直接 `onToggle(skill.id)`，点击即勾选，勾选状态即时写入对话选择。
+  - 移除 `catalogPreview` / `myPreview` 两个预览 state 及对应的 `SkillDetailSheet` / `MySkillDetailSheet` 详情弹层挂载。
+  - 清理不再使用的 import（`MySkillDetailSheet`、`SkillDetailSheet`、`SkillCatalogEntry`），`Sparkles` / `Button` 等其余引用不受影响。
+
+**验证**
+
+- `pnpm exec biome check --write apps/mobile/src/capability-picker.tsx`：通过（移除冗余 Fragment）。
+- `npx tsc --noEmit`：`capability-picker.tsx` 无类型错误（`bot-pages/connectors.tsx` 报错为存量问题，与本次无关）。
+
+### 2026-11-07 · 交互：「设置提醒」页精简并扩充提醒模板
+
+**背景**
+
+「提醒模板」弹层里叠了三层信息：顶部一张蓝底宣传卡（「让每一次提醒，都带着上下文。」+ 两行长说明）、一个与弹层标题完全重复的「提醒模板」小标题、然后是模板卡片和一张大号「自定义提醒」卡片。真正要点的模板被压在下面，一屏能看到的模板只有 3 个。
+
+**处理**
+
+- [tracking-screen.tsx](../apps/mobile/src/tracking-screen.tsx) 删除顶部蓝底上下文卡（标题栏副标题已说明用法）与重复的「提醒模板」小标题，模板直接顶到内容区第一行。
+- 「自定义提醒」由大号 `OptionCard`（图标 + 标题 + 说明，约 76px）改为底部虚线按钮（`+ 自定义提醒`，43px），与仓库里「解锁更多功能」「添加技能」的次级动作样式一致。
+- `TemplateGrid` 由 `desktop: boolean` 改为 `columns: 1 | 2 | 3`（`100%` / `48%` / `31%`）；提醒模板走 3 列（桌面 6 个模板 2 行），目标页仍是 2 列。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx) `REMINDER_TEMPLATES` 新增 `icon` 字段（图标随数据走，取代渲染处的 `id` 三元判断），模板 3 → 6：每天收盘复盘（每日 15:30 / `CalendarDays`）、自选股票公告提醒（每日 09:00 / `Bell`）、盘前要闻速览（新增，每日 08:30 / `Clock3`）、财报季跟踪（新增，每日 20:00 / `FileText`）、每周自选回顾（每周五 18:00 / `RefreshCw`）、行业政策动态（新增，每周一 09:00 / `Globe2`）。
+- 中英文案新增 `agent.reminderTplPremarket*` / `agent.reminderTplEarnings*` / `agent.reminderTplPolicy*` 共 6 条（[zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)、[en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)）。
+- 顺带把 `agent-ui.tsx` 内已废弃 `GoalsScreen` 里同一处 `id` 三元图标判断改为 `template.icon`，避免新增模板后在旧代码里取错图标。
+
+**验证**
+
+- `npx biome check`（4 个改动文件）：通过。
+- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
+- `apps/mobile/test/i18n.test.ts`：16 例通过（中英 key 对齐、无中文串入英文包、占位符一致）。
+- `apps/mobile/test/*.test.ts`：282 个用例全部通过。
+
+### 2026-11-07 · 交互：能力卡片点击弹出该技能的只读详情
+
+**背景**
+
+「更多」面板（侧边浮层 `AgentMoreSheet` / 桌面常驻 `CapabilityRail`）上方的能力卡片（如「金融合约开发」）原先任何卡片点击都打开「技能中心」面板，无法单独查看某个技能的具体说明。用户期望点击卡片直接弹出该技能的详情页面，样式复用「应用与能力」里的技能详情弹层，但右上角不需要「添加到智能体」按钮（只读形态）。
+
+**处理**
+
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：
+  - `AgentMoreContent` 新增可选属性 `onInspectSkill?: (skillId: string) => void`。能力卡片 `onPress` 现先判断该能力是否有详情页——`current.customSkills`（自建技能）或 `skillCatalog`（目录技能）命中即可查看详情；两者都未命中（系统能力，如 `quote`/`brief` 等，技能目录无对应条目）则维持原行为打开「技能中心」面板。
+  - 新增导出组件 `AgentSkillInspectSheet`：根据 `skillId` 从自建技能查 `MySkillDetailSheet`、从目录查 `SkillDetailSheet`，两者均以只读形态渲染（不传 `agents` / `onToggleInstall` / `onUse`，右上角无「添加到智能体」按钮），查不到返回 `null`。
+  - `AgentMoreSheet` 新增并透传 `onInspectSkill`；`AgentSheets` 在 `panel === "more"` 分支改为 Fragment，把 `AgentSkillInspectSheet` 作为 `AgentMoreSheet` 的兄弟节点挂载（避免嵌套 Modal 层级问题），并用组件内 `useState` 记录待查看的 skillId。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：`CapabilityRail` 同样作为兄弟节点挂载 `AgentSkillInspectSheet`，本地 `useState` 记录 skillId 并透传 `onInspectSkill` 给 `AgentMoreContent`，保证桌面端三栏与移动端抽屉行为一致。
+
+**验证**
+
+- `npx tsc --noEmit`：本次改动文件（`agent-sheets.tsx` / `agent-product.tsx`）无类型错误（`bot-pages/connectors.tsx` 报错为存量问题，与本次无关）。
+- `pnpm exec biome check -w apps/mobile/src/agent-sheets.tsx apps/mobile/src/agent-product.tsx`：格式自动修复后通过。
+
+### 2026-11-07 · 交互：新建目标页「任务模板」与「目标分类」统一为卡片网格
+
+**背景**
+
+「创建一个目标」弹层里两段内容风格割裂：任务模板是 2×2 大卡片（图标 + 标题 + 说明 + 右上角 ↗，`minHeight: 132`），目标分类是普通列表行（图标 + 文字 + chevron，`minHeight: 46`）。同一屏两种版式，分类看起来像「另一套东西」，整体也偏松散。
+
+**处理**
+
+- [tracking-screen.tsx](../apps/mobile/src/tracking-screen.tsx) `TemplateCard` 改成两者共用的唯一卡片：`detail` 变为可选，去掉 `minHeight: 132` / `minWidth: 180`，内边距 16→14、图标盒 34→30（底色改用 `colors.sky`）、标题 15→14、圆角统一 `radius.card`；右上角由 `ArrowUpRight` 改为 `ChevronRight`，两段语义都收敛为「进入下一步」。
+- 新增 `TemplateGrid`（`items` + `getKey` + `render` 的泛型两列网格）：桌面两列（`48%`）、窄屏单列，替换原来手写的 `flexDirection: width < 760 ? "column" : "row"` 容器。
+- 「目标分类」由列表行改为 `TemplateGrid` + `TemplateCard`（不传 `detail`，卡片自然收矮），与任务模板同版式；保留原 `agent.createGoalA11y` 读屏文案（`TemplateCard` 新增可选 `accessibilityLabel`）。
+- 间距收紧：两段之间 18→16，标题与网格之间 12→10。
+- 清理不再使用的 `ArrowUpRight` 导入，补 `ReactNode` / `IconComponent` 类型导入。
+
+**验证**
+
+- `npx biome check apps/mobile/src/tracking-screen.tsx`：通过。
+- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
+- `apps/mobile/test/*.test.ts`：282 个用例全部通过。
+
+### 2026-11-07 · 交互：「解锁更多功能」改为进入 Agent 详情设置的技能页
+
+**背景**
+
+「更多」面板（侧边浮层 / 桌面常驻侧栏）底部「解锁更多功能」虚线按钮原先打开「技能中心」浮层（`CapabilityHubScreen`），而左侧「应用与能力」行已经承担了技能中心入口；用户期望该按钮直接进入当前 Agent 的详情设置页并定位到「技能」分区（`BotSkillsPage`），形成「拆解该 Agent 还能加什么技能」的完整路径。
+
+**处理**
+
+- [agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx) `AgentSettingsScreen` 新增 `tabIntent` / `onTabIntentConsumed` 两个可选属性，并导出 `AgentSettingsTab` 类型；新增 `useEffect` 监听 `tabIntent` —— 由于详情页在桌面端可能已挂载（常驻右栏也能触发跳转），意图必须在挂载后仍能响应，应用成功后回调父级清除，避免下次进入详情页被再次定位。
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx) `AgentMoreContent` 新增必选属性 `onOpenAgentSkills`，「解锁更多功能」按钮 `onPress` 由 `onPanel("capabilities")` 改为 `onOpenAgentSkills`（技能中心仍可由上方能力卡片进入，未改动）；`AgentMoreSheet` / `AgentSheets` 均新增并透传该回调。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx) `AgentProductShell` 持有 `agentTabIntent` 状态并实现 `openAgentSkills`：收起浮层/抽屉 → 设置分区意图 `"skills"` → `navigate("agent")`；`CapabilityRail`（含移动端抽屉形态）与 `AgentSheets` 均接入该回调，`AgentSettingsScreen` 渲染时传入意图与消费回调。`navigate` 对相同 Section 为无操作（见 [navigation.ts](../apps/mobile/src/navigation.ts) `navigateTo`），桌面端已停留在详情页时仅更新分区，不会产生重复历史层级。
+
+**验证**
+
+- `pnpm biome check --write`（三个改动文件）：通过。
+- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
+
+### 2026-11-07 · 交互：技能选择弹层点击卡片打开技能详情页
+
+**背景**
+
+输入区「技能选择」弹层改为两列网格后，点击卡片直接切换勾选状态（`onToggle`），用户希望先看到技能详情再决定是否使用——与「更多能力」面板中卡片点击弹出详情的行为对齐。
+
+**处理**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx) `SkillPickerSheet` 新增两个预览状态：`catalogPreview`（技能目录条目，`SkillCatalogEntry`）与 `myPreview`（Agent 自定义技能，`AgentSkill`）。
+- 两类技能卡片的 `onPress` 由 `onToggle` 改为打开对应详情（目录技能 → `SkillDetailSheet`，自定义技能 → `MySkillDetailSheet`）；勾选动作移到详情页内的「使用此技能」按钮（点击后调用 `onToggle` 并关闭详情）。
+- 详情弹层以 fragment 兄弟节点挂在选择弹层之后（非 JSX 嵌套），规避 RN/RNW 嵌套 Modal 的层级与事件冒泡问题；`SkillDetailSheet` 复用只读 + `onUse` 形态（复用 [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx) 内现有组件，无新增大块代码）。
+- 检查确认 `capability-hub.tsx` 不反向依赖 `capability-picker.tsx`，新增 import 无循环依赖。
+
+**验证**
+
+- `pnpm biome check --write apps/mobile/src/capability-picker.tsx`：通过。
+- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
+
+### 2026-11-07 · 交互：连接器选择弹层未连接行支持「去连接」引导
+
+**背景**
+
+连接器选择弹层中，未连接的连接器整行 `disabled`（半透明 + `pointerEvents: none`），点击没有任何反馈，用户只能依赖左下角「管理连接」按钮进入连接管理，路径不直观。现场反馈「为什么无法选择连接器」——连接器确实全部未连接（live 模式未做 Google OAuth、浏览器 worker 与 OpenBot 未配置），但产品层面应给未连接行一条明确的「去连接」出口。
+
+**处理**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx) `OptionRow` 新增 `onConnect` / `connectLabel`：仅当「未连接 且 提供 onConnect」时保留整行可点击（不再设 `disabled` 屏蔽），点击转交 `onConnect()`；右侧占位由灰色「—」改为主色「去连接」标签（`colors.primary`、加粗 11pt），其余置灰视觉不变。
+- `ConnectorPickerSheet` 新增 `onConnect?: (id: string) => void` 属性，为每个未连接的连接器行透传 `onConnect` 与 `connectLabel`（已连接行保持原有勾选交互）。
+- [chat.tsx](../apps/mobile/src/chat.tsx) 调用处接入 `onConnect`：关闭弹层并跳转连接管理页（与「管理连接」按钮行为一致，`connections` 是 `apps` 的遗留别名）。
+- i18n 新增键 `chat.connectorPickerConnect`：中文「去连接」/ 英文 "Connect"。
+
+**验证**
+
+- `npx biome check apps/mobile/src/capability-picker.tsx apps/mobile/src/chat.tsx apps/mobile/src/i18n/locales/zh-Hans/chat.ts apps/mobile/src/i18n/locales/en/chat.ts`：通过。
+- `npx tsc --noEmit`：全量通过。
+
+### 2026-11-07 · 交互：对话框「技能选择」弹层改为两列网格
+
+**背景**
+
+输入区左侧「+」菜单里的「技能选择」弹层，技能按整行列表排列（每行「图标 + 标题 + 描述 + 勾选框」，行间用分隔线）。技能目录有 180+ 条，单列时一次只能看到 10 条左右，滚动成本很高；右侧栏「更多能力」已是 2×2 卡片网格，两处视觉语言也不统一。
+
+**处理**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx) 新增 `OptionGrid` + `OptionCard`，替换 `SkillPickerSheet` 中「我的技能」「技能目录」两段列表（连接器弹层仍保留原来的 `OptionList` / `OptionRow`）。
+- `OptionGrid` 用 `onLayout` 实测容器宽度换算列宽（弹层桌面端最宽 760、手机接近满宽，用窗口宽度估算会首帧错位）；实测到之前用 `48%` 兜底，保证一开始就是两列。
+- `OptionCard` 把整行压成独立小卡片：勾选态改用底色（`colors.sky`）+ 主色描边表达，不再依赖行间分隔线；图标盒 32→26，标题单行截断。
+- 描述信息按列宽分级：列宽 ≥ `240` 才补一行说明（桌面），窄格子只留标题，避免标题被挤成省略号；`status`（如「已停用」）比描述优先，窄格子也保留。
+- `SKILL_PAGE_SIZE` 60 → 80：两列后单屏可见条数约翻倍，扩大渲染上限减少「还有 N 个技能」的折叠感。
+
+**验证**
+
+- `npx biome check apps/mobile/src/capability-picker.tsx`：通过。
+- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
+- `apps/mobile/test/*.test.ts`：282 个用例全部通过。
+
+### 2026-11-07 · 修复：自动沉淀记忆缺失分类导致页面全部显示「关注领域」
+
+**背景**
+
+记忆页面所有记忆的类别标签均为「关注领域」。排查发现：账户内 14 条记忆中 13 条是 Agent 对话中自动沉淀的 `kind=decision` 记忆（市场简报 / 深度研究 / 计划等），这些记忆在写入时未携带 `category`（[conversation.ts](../apps/server/src/engine/conversation.ts) 的 `write_memory` 工具与 [service.ts](../apps/server/src/engine/service.ts) 的投融资决策兜底均未传），前端对无分类记忆统一兜底为「关注领域」，造成页面分类单一。
+
+**处理**
+
+- [service.ts](../apps/server/src/engine/service.ts) `saveMemory`：新增按 kind 推断默认类别的映射（fact→关注领域、thesis→关注标的、analysis→分析习惯、decision→投资目标），显式传入的 category 优先；一处修改，对 `write_memory` / `remember_fact` / 投融资决策兜底 / 手动添加全部生效。
+- 存量数据修复：对本地库中 13 条缺失 category 的记忆按 kind 补齐（仅补缺失，不覆盖已有值），SQL：
+  `UPDATE records SET data=data || jsonb_build_object('category', CASE data->>'kind' ... ) WHERE kind='memories' AND data->'category' IS NULL`。生产环境（Render/Supabase）可在部署新代码后执行同一条 SQL 对齐存量。
+
+**验证**
+
+- `tests/agent-api.test.ts`：21 个用例全部通过（含 `memories can be edited and forgotten` 的 category 校验）。
+- 复查本地库记忆分类分布：投资目标 13 条、关注领域 1 条，不再单一。
+
+### 2026-11-07 · 功能：记忆类型新增「关注标的」与「复盘教训」
+
+**背景**
+
+「添加记忆」弹窗的记忆类型选择器原固定为 4 类（投资目标 / 风险偏好 / 关注领域 / 分析习惯），用户希望补充更多类别，以覆盖更多的投研记忆场景（自选跟踪、复盘纠错）。
+
+**处理**
+
+- [agent.ts](../packages/domain/src/agent.ts)：`MEMORY_CATEGORIES` 常量追加 `"关注标的"`、`"复盘教训"`，作为唯一数据源；后端 `z.enum(MEMORY_CATEGORIES)`（[conversation.ts](../apps/server/src/engine/conversation.ts) / [routes.ts](../apps/server/src/engine/routes.ts)）引用同一常量，校验自动生效，无需改后端。
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：`CATEGORY_META` 注册两项（「关注标的」→ `Star` 图标、「复盘教训」→ `Brain` 图标），并补充图标导入。
+- 中英文文案：新增 `preferences.categoryWatch` / `preferences.categoryLesson`（[zh-Hans/app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts)、[en/app.ts](../apps/mobile/src/i18n/locales/en/app.ts)）。
+
+**验证**
+
+- `npx tsc --noEmit -p apps/mobile/tsconfig.json`：本次改动文件无类型错误（`connectors.tsx` 报错为先存问题，与本次无关）。
+- `npx biome check`（preferences-screen.tsx / agent.ts）：通过。
+
+### 2026-11-07 · 部署：render.yaml 按新版 .env 同步环境变量
+
+**背景**
+
+本地 `.env` 新增了 Hindsight 记忆引擎相关变量（`HINDSIGHT_BASE_URL` / `HINDSIGHT_API_KEY`）、`COPILOTKIT_TELEMETRY_DISABLED`，并显式设置了 `RATE_LIMIT_MAX_REQUESTS=1200` 与 `DEEPSEEK_BASE_URL`，而 Render 部署配置未同步，可能导致生产环境记忆引擎未启用或速率限制默认偏低。
+
+**处理**
+
+- [render.yaml](../render.yaml) `lingwu-api` 服务：
+  - 新增 `RATE_LIMIT_MAX_REQUESTS: "1200"`（与 `.env` 一致，避免 web 端多屏轮询触发 429）。
+  - 新增 `COPILOTKIT_TELEMETRY_DISABLED: "true"`（关闭 SDK 遥测，与 `.env` 一致）。
+  - 新增 `HINDSIGHT_BASE_URL` / `HINDSIGHT_API_KEY`（均 `sync: false`，密钥需在 Render 控制台手动填入；Base URL 留空则走本地关键词召回降级）。
+  - `DEEPSEEK_BASE_URL` 由 `sync: false` 改为固定值 `https://api.deepseek.com/v1`（公开端点，无需控制台填入）。
+
+**验证**
+
+- `ruby -ryaml` 校验通过：3 个服务、`lingwu-api` 40 个 env 项；新增 5 个变量全部就绪。
+
+### 2026-11-07 · 文档：记忆系统术语体系金融投研化（PRD v1.3 + 架构同步）
+
+**背景**
+
+LingWu 定位为个人投研智能体，记忆系统原术语为泛化分类（投资目标/风险偏好/关注领域/分析习惯），与金融投研场景不契合。用户要求记忆系统关键术语全面向金融投研靠拢。
+
+**处理**
+
+- [PRD-多Agent记忆系统.md](PRD-多Agent记忆系统.md) 升至 v1.3：
+  - 记忆类型扩为 **7 类**，覆盖投研全生命周期：`fact` / `watch`（自选）/ `thesis`（论点）/ `analysis` / `decision` / `trade`（操作成交）/ `mistake`（复盘教训）。
+  - `FinanceTerms` 扩为四组维度（标的/研究/市场资金/风险组合），新增 `name`、`index`、`timeframe`、`rating`、`targetPrice`、`thesisStatus`、`capitalFlow`、`catalysts`、`macroFactors`、`position`、`stopLoss`、`takeProfit`、`riskFactors` 字段；`DealHabits` 新增 `round`、`valuation`、`equity`。
+  - 新增 **§4.4 投研术语表**：16 维度关键词 → 结构化字段映射，作为召回/筛选/自动沉淀的统一术语词典。
+  - FR-2 沉淀扩展为「评级→thesis / 操作→trade / 投融资→decision」三路信号；FR-5 召回增加术语感知过滤；非功能新增「术语归一化」。
+- [记忆系统技术架构.md](记忆系统技术架构.md)：
+  - §4 数据模型与 PRD 同步；迁移映射补充「关注领域→watch」「投资笔记/论点追踪→thesis（保留 thesisStatus）」。
+  - §5.4 由单一投融资决策沉淀扩展为三组信号表（`THESIS_SIGNALS` / `TRADE_SIGNALS` / `DEAL_SIGNALS`）。
+
+**验证**
+
+- 字段口径与主 PRD（个人投研智能体 R6 投资笔记/论点追踪、评级、估值口径）对齐；两份文档 kind 枚举与字段定义一致，无术语冲突。
+
+### 2026-11-07 · Agent 详情「任务 / 资料 / 技能」页改为双列布局
+
+**背景**
+
+Agent 详情的「任务」「资料」「技能」三个页面内容都是单列卡片列表，宽屏下浪费横向空间。用户要求把这三个页面（连同「记忆」）改成双列布局。
+
+**处理**
+
+- [shared.tsx](../apps/mobile/src/bot-pages/shared.tsx)：新增通用 `TwoColumnGrid` 容器——用 `onLayout` 实测内容列宽（三栏布局下列宽远小于窗口，首帧用窗口宽做初值），列宽 ≥ 400 时排两列、否则单列；通过 render-prop 把 `columns` 与 `itemWidth`（两列时的固定列宽，单列为 undefined）交给调用方，子项用 `width` 自行撑满对应列。间距 10px。
+- [history.tsx](../apps/mobile/src/bot-pages/history.tsx)：「任务」页的 `TaskCard` 列表包进 `TwoColumnGrid`。
+- [library.tsx](../apps/mobile/src/bot-pages/library.tsx)：「资料」页的文件（`LinkRow`）与产物（`ArtifactCard`）两段各自包进 `TwoColumnGrid`，`SectionHeading` 仍整行占满。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：「技能」页的自建技能卡与已安装技能卡合并包进 `TwoColumnGrid`，每张卡外层套一层 `View` 控制列宽，卡内「删除」入口等交互不变。
+- 「记忆」页（`PreferencesScreen`）的记忆卡片本身已有响应式多列逻辑（列宽 ≥ 560 即两列），无需改动；其偏好设置表单不适合分列，保持单列。
+- 窄屏（内容列 < 400）时三页均自动退回单列，不影响移动端。
+
+**验证**
+
+- `biome check --write` 通过；i18n / skill-sharing / skill-catalog 共 30 例单测通过。
+- `tsc --noEmit`（apps/mobile）仍只有 `bot-pages/connectors.tsx` 的 7 个既有错误，与本次改动无关。
+
+### 2026-11-07 · Agent 详情「任务」页移除「目标」标签
+
+**背景**
+
+上一条刚把目标内容并进 Agent 详情的「任务」页，形成「任务 / 目标」双标签；用户随后认为这里的目标页多余，要求删掉。目标内容在任务中心的一级「目标」标签里仍有入口，Agent 详情不必重复承载。
+
+**处理**
+
+- [history.tsx](../apps/mobile/src/bot-pages/history.tsx)：`BotHistoryPage` 简化为只渲染任务列表——移除 `HubTabs` 二级标签栏、`tab` / `addingGoal` / `goalId` 状态、目标列表 / 详情 / 新建三个分支，以及 `GoalCard` / `GoalForm` / `HubTabs` / `Pressable` / `Button` / `ChevronRight` / `Plus` / `colors` / `s` / `useState` 等导入；`useBotResources` 只取 `tasks`。只剩一个标签时标签栏本身也一并去掉，页面直接铺任务卡片。
+- [goals-memory.tsx](../apps/mobile/src/bot-pages/goals-memory.tsx)：更新过时的组件注释（原写「目标内容已并入任务页」）。
+- 保留：`HubTabs` 组件（`task-hub.tsx` 仍在使用）、`agent.goalsTab` / `agent.goalsEmpty` / `agent.createGoal` 等文案（任务中心、`details.tsx`、`tracking-screen.tsx` 仍用）、以及全局任务中心的「目标」入口。目标功能并未删除，只是不再出现在 Agent 详情。
+- 页面标题 `agentSpace.analysisHistory`（任务 / Tasks）与空态 `agentSpace.noTasks` 保持不变。
+
+**验证**
+
+- Biome 检查通过；i18n / skill-sharing / skill-catalog 共 30 例单测通过；`tsc --noEmit`（apps/mobile）仍只有 `bot-pages/connectors.tsx` 的 7 个既有错误，与本次改动无关。
+
+### 2026-11-07 · 目标内容并入「任务」页，采用「任务 / 目标」双标签页布局
+
+**背景**
+
+Agent 详情页的「目标与记忆」分区内含「目标 / 记忆」两个标签页，与独立的「任务」分区割裂：目标与任务同属 Agent 的执行待办，却分处两个入口。用户希望把目标内容移到「任务」页，并用两个标签页组织。
+
+**处理**
+
+- [history.tsx](../apps/mobile/src/bot-pages/history.tsx)：重写「任务」页，顶部用 `HubTabs`（「任务」/「目标」）切换；任务标签展示现有 TaskCard 列表，目标标签承接原「目标与记忆」页的目标列表（点击进入 `GoalCard` 详情、`GoalForm` 新建），两处均带数量角标与空态。
+- [goals-memory.tsx](../apps/mobile/src/bot-pages/goals-memory.tsx)：精简为纯「记忆」页，仅渲染 `PreferencesScreen`，标题与副标题改用 `agent.memory` / `agent.memoryDetail`；目标相关分支整体移除。
+- [agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx#L40)：左栏导航项「目标与记忆」更名「记忆」（`agent.memory`）。
+- [i18n] 清理无引用的 `agentSpace.goalsMemory` 与 `agentSpace.sharedGoalsMemory` 键（zh-Hans / en 同步删除）。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：无类型错误（`connectors.tsx` 的既有错误与本次改动无关）。
+- `pnpm exec tsx --test apps/mobile/test/i18n.test.ts`：16 项全部通过。
+
+### 2026-11-07 · 「分析记录与过程」标题改为「任务」
+
+**背景**
+
+用户选中 Agent 设置页左侧「分析记录与过程」导航项（该键同时驱动分析记录页标题），希望改名为「任务」，命名更短更贴合记录列表的内容。
+
+**处理**
+
+- [i18n] `agentSpace.analysisHistory` 值更新：zh-Hans「分析记录与过程」→「任务」，en「Analysis history & process」→「Tasks」。影响 [agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx#L39) 的设置导航项与 [history.tsx](../apps/mobile/src/bot-pages/history.tsx#L11) 的页面标题，两处共用同一键保持命名一致。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`（apps/mobile）：无类型错误（`connectors.tsx` 的既有错误与本次改动无关）。
+- `pnpm exec tsx --test apps/mobile/test/i18n.test.ts`：16 项全部通过。
+
+### 2026-11-07 · 技能库为自建技能加「自建」小标签
+
+**背景**
+
+自建技能与内置技能混排在同一网格里，仅靠「置顶」无法一眼区分来源。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：`SkillLibraryItem` 新增 `custom?: boolean`；标题行改为横向容器，自建技能在标题前插入浅灰描边小徽标（10px 文字、`colors.surfaceSoft` 底 + `colors.lineStrong` 描边，在「已添加」蓝底上也清晰），标题设 `flex: 1` 保证长名称照样单行截断；读屏标签同步带上来源。
+- `SkillLibraryPanel` 映射时传 `custom={Boolean(entry.custom)}`。
+- [i18n] 新增 `agentSpace.addSkillCustomTag`（自建 / Custom），zh-Hans / en 同步。
+
+**验证**
+
+- `pnpm exec biome check --write`（改动文件）通过；i18n / skill-sharing / skill-catalog 共 30 例单测通过。
+- `pnpm --dir apps/mobile typecheck` 仍只有 `bot-pages/connectors.tsx` 的 7 个既有错误，与本次改动无关。
+
+### 2026-11-07 · 「添加技能」列表纳入用户自建技能
+
+**背景**
+
+「添加技能」页此前只渲染 `skillCatalog`（180+ 条内置技能），用户自己创建的技能存在各 Agent 的 `customSkills` 里，完全不出现在列表，也就无法从这里把自建技能复制到其它智能体。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：新增 `LibraryEntry` 统一类型（key / title / description / installed + 可选 `catalog` / `custom`）。`SkillLibraryPanel` 用 `collectSharedSkills(agentList)` 跨 Agent 汇总自建技能、按内容指纹去重，与 `skillCatalog` 合并；自建技能**置顶**，避免被内置目录淹没。
+- 搜索：自建匹配 `name` / `purpose` / `instructions` / `outputFormat`，内置仍匹配中英标题、描述与 id；分页上限作用于合并后的列表。
+- 状态与切换：内置用 `current.installedSkills.includes(id)` + `setSkillInstalled`；自建用 `findSkillCopy(current, skill)` 判定是否已持有，`toggleSkillShare({ saveSkill, deleteSkill }, current, skill)` 复制 / 移除副本并给 Toast。沿用上一轮结论，不传 `guard`，没有「不可移除」保护。
+- 详情：props 拆成 `onViewCatalogDetail` / `onViewCustomDetail`；`adding` 分支同时挂 `SkillDetailSheet`（内置，带「添加到智能体」）与 `MySkillDetailSheet`（自建，只读，不传 `agents` / `onToggleAdd`）；点「返回」时清空两个详情 state。
+- [i18n] `agentSpace.addSkillHint` 补上「含自建技能」说明，zh-Hans / en 同步。
+
+**验证**
+
+- `pnpm exec biome check --write`（改动文件）通过；i18n / skill-sharing / skill-catalog 共 30 例单测通过。
+- `pnpm --dir apps/mobile typecheck` 仍只有 `bot-pages/connectors.tsx` 的 7 个既有错误，与本次改动无关。
+
+### 2026-11-07 · Agent 详情技能页取消自建技能的「不可移除」保护
+
+**背景**
+
+Agent 详情 → 技能 → 自建技能 →「添加到智能体」里，来源 Agent 与最后一份副本被锁定：行变灰只读、徽标显示「已添加 · 不可移除」、顶部提示也写「需保留的副本不可移除」。用户要求在这个板块去掉该保护，所有智能体都能自由安装 / 移除。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：`BotSkillsPage` 删除 `shareLockedIds`（`skillLockedAgentIds`）计算与对应导入；`MySkillDetailSheet` 不再传 `lockedAgentIds`；`toggleSkillInAgent` 不再传 `guard`，去掉 `blocked` 分支与 `agent.skillShareBlockedToast`。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`AgentPickerPanel` 的提示改为按是否传入 `lockedAgentIds` 选文案——有锁定列表用原 `agent.skillInstallHint`，没有则用新增的 `agent.skillInstallHintNoLock`（不含「不可移除」）。顺带修正技能库技能详情原本也显示这条锁定说明的不一致。
+- [i18n] zh-Hans / en 同步新增 `agent.skillInstallHintNoLock`；`agent.skillShareLocked`、`agent.skillShareBlockedToast` 仍被「应用与能力 → 技能 → 我的技能」使用，予以保留。
+- 范围只限 Agent 详情页这一处；「我的技能」页的只读保护、`skillLockedAgentIds` / `guard` 及其单测全部保持不变。
+- 行为变化：现在可以把某自建技能从所有智能体上一一移除，该技能会彻底从列表消失；卡片上的「删除」入口仍保留二次确认。
+
+**验证**
+
+- `pnpm exec biome check --write`（改动文件）通过；i18n / skill-sharing / skill-catalog 共 30 例单测通过。
+- `pnpm --dir apps/mobile typecheck` 仍只有 `bot-pages/connectors.tsx` 的 7 个既有错误，与本次改动无关。
+
+### 2026-11-07 · 「添加技能」技能库改为两列网格
+
+**背景**
+
+上一轮把每行压成紧凑行后，用户仍希望一屏看到更多技能，确认改成两列网格：每格只留标题 + 状态图标，描述改由搜索或详情查看。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：新增 `SkillLibraryItem`。宽屏（`grid`）每格 `minHeight` 38、只显示标题与「已添加」徽标 / `Plus`，容器 `flexDirection: "row"` + `flexWrap` + `gap: 8`，列宽 `(width - 8) / 2`；窄屏退回单列并保留一行说明。
+- 列宽用容器 `onLayout` 实测（三栏布局里内容列远窄于窗口），`useWindowDimensions` 仅作首帧初值；列宽 < 400 时走单列，避免两列把标题挤没。
+- 一次渲染条数拆成 `GRID_PAGE_SIZE = 120` / `LIST_PAGE_SIZE = 80`：两列行高更矮，总滚动长度仍可控。
+- 描述不再占版面，但搜索仍匹配 `descriptionZh` / `descriptionEn` 全文。每格右侧提供一个 `FileText` 详情按钮（`event.stopPropagation()` 避免连带触发安装），触摸端另支持长按整格；两者都打开 `SkillDetailSheet` 查看完整说明，复用 `viewingCatalog` 与 `toggleCatalogSkillInstall`。该弹层原先只在技能主页渲染，`adding` 分支提前 return 时看不到，现已一并放到 `adding` 的 `BotPage` 内。点击格子安装 / 再次点击移除的交互不变。
+- [i18n] 新增 `agentSpace.addSkillDetailHint`（查看技能说明 / View skill details），`agentSpace.addSkillHint` 补上「点图标或长按看说明」提示，zh/en 同步。
+
+**验证**
+
+- `pnpm exec biome check --write`（改动文件）通过；i18n / skill-sharing / skill-catalog 共 30 例单测通过。
+- `pnpm --dir apps/mobile typecheck` 仍只有 `bot-pages/connectors.tsx` 的 7 个既有错误，与本次改动无关。
+
+### 2026-11-07 · 「添加技能」技能库改为紧凑列表，一屏显示更多技能
+
+**背景**
+
+技能库每行是大卡片（15px 标题 + 两行描述 + 20px 内边距），行高约 80px，一屏只看得到 7～8 个技能；且一次只渲染 40 条。用户要求页面更简洁、能看到更多技能。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：`SkillLibraryPanel` 改为紧凑行——标题 13/18 加粗、描述 11/15 且 `numberOfLines={1}`，`minHeight` 56 → 44、`paddingVertical` 10 → 6、`gap` 3 → 1，行高约 46px（原约 81px）；「已添加」徽标内距与 `Plus` 图标同步缩小。
+- 同文件：`LIBRARY_PAGE_SIZE` 40 → 80。行高减半后，一次渲染的滚动长度与原先 40 条大卡片相当，首屏开销没有明显增加；搜索框 `minHeight` 40 → 36、容器 `gap` 10 → 8，顶部说明改用 `s.small`。
+- [i18n] `agentSpace.addSkillHint` zh/en 缩短为一行提示。
+- 描述虽然只显示一行，搜索仍匹配 `descriptionZh` / `descriptionEn` 全文，长描述不影响检索；点击安装 / 再次点击移除、「已添加」徽标、空态与「还有 N 个技能」提示均保持不变。
+
+**验证**
+
+- `pnpm exec biome check --write`（改动文件）通过；i18n / skill-sharing / skill-catalog 共 30 例单测通过。
+- `pnpm --dir apps/mobile typecheck` 仍只有 `bot-pages/connectors.tsx` 的 7 个既有错误，与本次改动无关。
+
+### 2026-11-07 · Agent 详情技能页只保留「添加技能」并改为文字按钮
+
+**背景**
+
+Agent 详情 → 技能 右上角的「+」原本弹出双项菜单（创建技能 / 添加技能）。用户要求去掉「创建技能」，只保留从技能库添加；随后又要求把纯图标「+」改成一眼可读的「+ 添加技能」文字按钮。创建入口统一放在「应用与能力 → 技能 → 我的技能」。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：删除 `SkillMenuAnchor` / `SkillMenuRow` / `SkillActionMenu` 与锚点测量、`menuAnchor` 状态；右上角改用一个 `Button small icon={Plus}`，文案 `agentSpace.addSkill`，点击直接 `setAdding(true)` 打开技能库。复用 ui 里的小号次要按钮，与「应用与能力 → 技能」页的「创建技能」同款样式（描边 + 图标 + 文字）。
+- 同文件：`editingSkill` 状态由 `AgentSkill | "new"` 收窄为 `AgentSkill`，编辑页标题固定为 `agentSpace.editSkill`，`SkillEditor` 只接收已有技能；自建技能的「编辑」「删除」入口保持不变。
+- [i18n] zh-Hans / en 同步移除 `agentSpace.skillMenuLabel`；`agentSpace.skillEmpty` 去掉「写下研究方法创建技能」的引导，改为提示点右上角「添加技能」从技能库挑选。`agentSpace.createSkill` 仍被「我的技能」页使用，予以保留。
+
+**验证**
+
+- `pnpm exec biome check --write`（改动文件）通过；`pnpm exec tsx --test` 的 i18n / skill-sharing / skill-catalog 共 30 例通过，确认中英语言包 key 集合仍一一对应。
+- `pnpm typecheck` 仍被既有问题挡住：`apps/mobile/src/bot-pages/connectors.tsx` 引用了不存在的 `AgentDefinition.installedConnectors` 与 `agentSpace.connectors*` 文案 key（HEAD 中同样缺失），与本次改动无关；`skills.tsx` 无类型报错。
+
+### 2026-11-07 · 自建技能「添加到智能体」来源行只读，禁止移除最后一份
+
+**背景**
+
+把来源 Agent 一并放进列表后，它显示「已添加」却仍可点击切换：误点会移除技能的原始副本；若那是最后一份，技能会从「我的技能」列表彻底消失。用户要求来源行只读，且任何情况下都不允许把技能移除到没有任何副本。删除技能统一走列表里的「删除」入口（`deleteSkillEverywhere`）。
+
+**处理**
+
+- [skill-sharing.ts](../apps/mobile/src/skill-sharing.ts)：新增 `skillLockedAgentIds(agents, skill, sourceAgentId?)`——锁定来源 Agent 的副本；若只剩一个持有者，即使没传来源也锁住那最后一份。
+- [skill-sharing.ts](../apps/mobile/src/skill-sharing.ts)：`toggleSkillShare` 增加可选 `guard: { agents, sourceAgentId }`，移除前查锁定列表，命中返回 `blocked` 且不调用 `deleteSkill`，作为 UI 之外的兜底。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`AgentInstallRow` 支持 `locked`（`disabled` + 无障碍 disabled 态 + 0.72 透明度 + 专属徽标）；`AgentPickerPanel` / `MySkillDetailSheet` 新增可选 `lockedAgentIds`，只有自建技能传入——系统内置技能仍可自由安装 / 卸载。
+- 两个详情页（「应用与能力 → 我的技能」与 Agent 详情 → 技能）计算锁定列表并传 `guard`；`blocked` 时弹 `agent.skillShareBlockedToast`，不再误报「已移除」。
+- 锁定的「来源」取详情页上下文：「我的技能」用汇总条目的 agentId（最近更新的那份副本），Agent 详情用当前 Agent；数据模型未记录技能最初创建于哪个 Agent，注释已说明这一近似。
+- [i18n] 新增 `agent.skillShareLocked`（已添加 · 不可移除 / Added · locked）与 `agent.skillShareBlockedToast`，zh-Hans 与 en 同步；`agent.skillInstallHint` 补一句锁定说明。
+- [skill-sharing.test.ts](../apps/mobile/test/skill-sharing.test.ts)：新增锁定判定 2 例（来源 + 最后一份、多副本只锁来源）与 `blocked` 分支 1 例。
+
+**验证**
+
+- 本次会话仍无本地命令执行通道，`tsc --noEmit` / `biome check` / 单测未运行，待本机补跑（命令同前：`pnpm --dir apps/mobile typecheck`、`pnpm exec biome check <改动文件>`、`pnpm exec tsx --test apps/mobile/test/skill-sharing.test.ts apps/mobile/test/i18n.test.ts`）。
+- 静态核对：`lockedAgentIds` 在两处调用点均已接线、`SkillDetailSheet` 未传锁定列表、zh/en 新增 key 一一对应且无占位符。
+
+### 2026-11-07 · 技能页新增「创建技能」入口与自建技能删除（删除需二次确认）
+
+**背景**
+
+「应用与能力 → 技能」里，「创建技能」只在「我的技能」子页内容区出现，切到「技能市场」就看不到；自建技能卡片只能点开详情，没有删除入口。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`HubTabBar` 增加 `action` 槽位，「创建技能」按钮常驻二级标签栏右上角（两个子 tab 均可见），窄屏换行避免挤出屏幕；`MySkillsList` 每张卡片新增红色「删除」按钮，`stopPropagation` 防止同时打开详情。
+- [skill-editor.tsx](../apps/mobile/src/skill-editor.tsx)：新增可选 `onSaved`，从技能市场创建并保存后自动切到「我的技能」展示结果；Agent 详情技能页不传该回调，行为不变。
+- [skill-sharing.ts](../apps/mobile/src/skill-sharing.ts)：新增 `deleteSkillEverywhere`，按内容指纹清掉所有 Agent 上的副本——「我的技能」是去重汇总，只删一条会让其它副本重新出现；删除后给出 Toast。
+- [i18n] zh-Hans / en 同步新增 `agent.mySkillDeletedToast`；[skill-sharing.test.ts](../apps/mobile/test/skill-sharing.test.ts) 新增「清掉全部同内容副本」与「不误删不同内容技能」用例。
+- 删除前二次确认：[capability-hub.tsx](../apps/mobile/src/capability-hub.tsx) 导出共用 `SkillDeleteConfirm`（`ModalOverlay` + `s.card`，点遮罩取消，取消 / 危险确认双按钮）；「我的技能」卡片点击只打开确认层，确认后才执行 `deleteSkillEverywhere`；[skills.tsx](../apps/mobile/src/bot-pages/skills.tsx) Agent 详情技能页的删除入口同样改为先确认，确认后删当前 Agent 那一份并给 Toast。新增 zh/en `agent.mySkillDeleteConfirmTitle` / `NoteAll`（会清掉所有智能体副本）/ `NoteOne`（只删当前智能体），按钮文案复用 `agentSpace.deleteConfirmAction` 与 `common.cancel`。
+
+**验证**
+
+- 本次会话无本地命令执行通道，待本机补跑：`pnpm exec biome check --write`（上述改动文件）、`pnpm typecheck`、`pnpm test`。
+- 已静态核对：新增导入 / 导出与调用点一致，zh/en key 集合、占位符 `{title}` 一致。
+
+### 2026-11-07 · 技能详情「添加到智能体」展示全部智能体（含技能来源 Agent）
+
+**背景**
+
+「应用与能力 → 技能」里，系统内置技能详情的「添加到智能体」已列出 `agentList` 全部智能体；但自建技能详情用 `skillTargetAgents` 主动排除了创建该技能的来源 Agent——技能 A 创建于智能体 B 时列表里看不到 B，无法确认这份技能的归属。要求两类技能详情都展示全部智能体，来源 Agent 也要出现。
+
+**处理**
+
+- [skill-sharing.ts](../apps/mobile/src/skill-sharing.ts#L36-L42)：移除 `skillTargetAgents`，新增 `skillHolderAgentIds`——按内容指纹返回已持有该技能的 Agent id（含来源 Agent），用于行内「已添加」徽标与底部计数。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L1172-L1176)：「我的技能」详情弹层 `agents` 直接传 `agentList`，`mySkillAddedAgentIds` 改用 `skillHolderAgentIds`；来源 Agent 因此显示为「已添加」且计入计数。系统内置技能详情原本就传 `agentList`，保持不变。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L249-L250)：Agent 详情 → 技能 的自建技能详情同步改为 `agents={agentList}`，不再排除当前 Agent，保证两处共用同一套判定。
+- 切换仍复用 `toggleSkillShare`：点击来源 Agent 会移除它持有的那份副本（与技能市场逐行开关一致）；若它是最后一个持有者，该技能会从「我的技能」列表消失。
+- [i18n] `agent.skillShareNoTargets` 文案由「还没有其他智能体」改为「还没有智能体」，zh-Hans 与 en 同步；列表至少包含来源 Agent，该提示仅在完全没有智能体时出现。
+- [skill-sharing.test.ts](../apps/mobile/test/skill-sharing.test.ts#L42-L51)：替换旧的「排除来源 Agent」用例，新增「已添加列表包含来源 Agent」与「未持有不计入」用例。
+
+**验证**
+
+- 本次会话无本地命令执行通道，以下校验待在本机终端运行：`pnpm --dir apps/mobile typecheck`、`pnpm exec biome check apps/mobile/src/skill-sharing.ts apps/mobile/src/capability-hub.tsx apps/mobile/src/bot-pages/skills.tsx apps/mobile/test/skill-sharing.test.ts apps/mobile/src/i18n/locales/zh-Hans/agent.ts apps/mobile/src/i18n/locales/en/agent.ts`、`pnpm exec tsx --test apps/mobile/test/skill-sharing.test.ts apps/mobile/test/i18n.test.ts`。
+- 已静态核对：`skillTargetAgents` / `mySkillTargets` / `shareTargets` 无残留引用（历史记录里的说明除外），改动文件的导入与调用点一致，zh/en 文案键同步。
+
+### 2026-11-07 · Agent 详情「技能库」技能详情新增「添加到智能体」
+
+**背景**
+
+Agent 详情 → 技能页里，自建技能详情右上角已有「安装到智能体」（用户称「添加到智能体」）入口；从技能库安装的技能点开详情仍是只读，右上角空白，无法把同一份目录技能复用到其他智能体。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L228)：`BotSkillsPage` 从 `useAgentSpace` 取出 `setSkillInstalled`。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L267-L281)：新增 `toggleCatalogSkillInstall`，按目标 `agent.installedSkills` 判定后切换安装状态，并复用 `skillInstalledToast` / `skillUninstalledToast` 弹提示。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx#L439-L446)：`SkillDetailSheet` 传入 `agents={agentList}` 与 `onToggleInstall`，右上角渲染与技能市场、自建技能详情同一个按钮，点开为智能体逐一开关面板（含当前 Agent，可在此直接移除）。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L600-L605)：更新组件注释，「Agent 详情页只传 skill 退化为只读」的描述已不再成立。
+- 未新增 i18n 键：按钮、面板标题、提示与计数全部复用既有 `agent.skillInstall*` 文案，与技能市场保持一致。
+
+**验证**
+
+- 静态复核：新增调用的 props 类型（`setSkillInstalled` 签名、`AgentDefinition`、Toast 插值参数）与调用链一致，未改动公共组件接口。
+- 本次环境未提供命令执行能力，`tsc --noEmit` / `biome check` / 单测未运行，需在本地补跑确认。
+
 ### 2026-11-07 · 「我的技能」不再按智能体分类，并支持直接创建技能
 
 **背景**

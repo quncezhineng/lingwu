@@ -69,6 +69,9 @@ export interface Config {
   trustProxy?: boolean;
   /** 覆盖 /api/* 全局限流的每分钟请求数（默认 120）。 */
   rateLimitMaxRequests?: number;
+  /** Hindsight 记忆引擎基地址（未配置时记忆引擎降级为本地关键词召回）。 */
+  hindsightBaseUrl?: string;
+  hindsightApiKey?: string;
 }
 
 export type ComputerProvider = "docker" | "e2b-desktop";
@@ -212,6 +215,8 @@ export function readConfig(): Config {
       process.env.RATE_LIMIT_MAX_REQUESTS,
       "RATE_LIMIT_MAX_REQUESTS",
     ),
+    hindsightBaseUrl: process.env.HINDSIGHT_BASE_URL?.trim(),
+    hindsightApiKey: process.env.HINDSIGHT_API_KEY?.trim(),
   };
   if (mode === "live" && !config.encryptionKey)
     throw new Error("Live mode requires TOKEN_ENCRYPTION_KEY (32-byte base64)");

@@ -4,15 +4,19 @@ import {
   type AgentArtifact,
   type AgentIdentity,
   type AgentMemory,
+  type AgentMemoryV2,
   type AgentNotification,
   type AgentTask,
   type AgentWorkspace,
   createTaskSchema,
+  type DealHabits,
   defaultAgentName,
   type Evidence,
+  type FinanceTerms,
   type Goal,
   goalInputSchema,
   type Idea,
+  type MemoryKind,
   type Monitor,
   monitorInputSchema,
   type RunEvent,
@@ -27,6 +31,7 @@ import type {
 import { resolveMonitorCurrency } from "../../../../packages/domain/src/monitor-currency.ts";
 import { MarketDataService } from "../../../../packages/integrations/src/market-data.ts";
 import type { ActionService } from "../actions.ts";
+import { agentIdForThread, type PersistedAgentSpace } from "../agent-space.ts";
 import type { BrowserService } from "../browser.ts";
 import { ComputerService } from "../computer.ts";
 import type { Config } from "../config.ts";
@@ -38,8 +43,10 @@ import { resolveTaskNotifications } from "../notifications.ts";
 import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
 import { createBriefingScheduler } from "./briefing-scheduler.ts";
+import { detectDealSignals } from "./deal-signal.ts";
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
+import { HindsightClient } from "./hindsight.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { executeModelTask } from "./model.ts";
 import { readMonitoredPrice } from "./monitor-price.ts";
@@ -62,6 +69,8 @@ const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 type MonitorPage = { id: string; hash?: string; timelessHash?: string; lines: string[] };
 const date = () => new Date().toISOString();
 const terminal = new Set(["succeeded", "failed", "cancelled"]);
+/** 存量记忆迁移每批处理的条数，控制单次 maintain tick 的耗时与内存。 */
+const MIGRATION_BATCH_SIZE = 200;
 
 /**
  * 计算下一次监控时间。每日/每周提醒按中国市场常用时区 Asia/Shanghai
@@ -107,6 +116,8 @@ export class AgentService {
   readonly notes: NotesService;
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
+  /** 多 Agent 记忆引擎（Hindsight），未配置时降级为本地关键词召回。 */
+  readonly memory: HindsightClient;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
   private maintenance?: ReturnType<typeof setInterval>;
   private refreshing = false;
@@ -128,6 +139,10 @@ export class AgentService {
     this.notes = new NotesService(db);
     this.financials = new FinancialsService(db);
     this.priceAlerts = new PriceAlertsService(db, market);
+    this.memory = new HindsightClient({
+      baseUrl: config.hindsightBaseUrl,
+      apiKey: config.hindsightApiKey,
+    });
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
       settled: (owner, task) => this.publishOutcome(owner, task),
     });
@@ -224,6 +239,14 @@ export class AgentService {
               `source-error:${Math.floor(Date.now() / 3600000)}`,
             );
           });
+      }
+      // 存量记忆迁移到 Hindsight：每 owner 每 tick 推进一小批，分批 + 断点续传。
+      if (this.memory.enabled) {
+        for (const owner of await this.db.owners("memories")) {
+          await this.migrateMemories(owner).catch((error) =>
+            backgroundFailure("memory migration", error),
+          );
+        }
       }
     } finally {
       this.refreshing = false;
@@ -507,6 +530,183 @@ export class AgentService {
     await resolveTaskNotifications(this.db, owner, id);
     return next;
   }
+  /**
+   * 写入一条结构化记忆（多 Agent 记忆系统的统一入口）。
+   *
+   * 供 `remember_fact` / `write_memory` 工具与投融资决策规则兜底共用：
+   *   - 幂等 id = sha256(agentId + kind + text)，insertIfAbsent 去重
+   *   - 双写 Hindsight 记忆引擎（retain 失败静默降级，不阻断主流程）
+   */
+  async saveMemory(
+    owner: string,
+    input: {
+      agentId: string;
+      kind: MemoryKind;
+      text: string;
+      body?: string;
+      source: string;
+      category?: AgentMemory["category"];
+      tags?: string[];
+      financeTerms?: FinanceTerms;
+      dealHabits?: DealHabits;
+      taskId?: string;
+      threadId?: string;
+      artifactId?: string;
+    },
+  ): Promise<AgentMemoryV2> {
+    const { agentId, kind, text } = input;
+    // 自动沉淀 / 对话生成的记忆常不携带 category；按 kind 推断默认类别，
+    // 避免记忆页面因缺失分类而全部回退到「关注领域」（前端兜底值）。
+    const DEFAULT_CATEGORY_BY_KIND: Partial<Record<MemoryKind, AgentMemory["category"]>> = {
+      fact: "关注领域",
+      thesis: "关注标的",
+      analysis: "分析习惯",
+      decision: "投资目标",
+    };
+    const category = input.category ?? DEFAULT_CATEGORY_BY_KIND[kind];
+    const value: AgentMemoryV2 = {
+      id: createHash("sha256").update(`${agentId}:${kind}:${text}`).digest("hex"),
+      agentId,
+      kind,
+      text,
+      ...(input.body ? { body: input.body } : {}),
+      source: input.source,
+      ...(category ? { category } : {}),
+      ...(input.tags?.length ? { tags: input.tags } : {}),
+      ...(input.financeTerms ? { financeTerms: input.financeTerms } : {}),
+      ...(input.dealHabits ? { dealHabits: input.dealHabits } : {}),
+      ...(input.taskId ? { taskId: input.taskId } : {}),
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      ...(input.artifactId ? { artifactId: input.artifactId } : {}),
+      createdAt: date(),
+    };
+    await this.db.insertIfAbsent(owner, "memories", value);
+    // 双写 Hindsight：document_id = value.id 让 retain 幂等（同 id 重写覆盖，天然去重）。
+    await this.memory.retain(owner, agentId, text, value.id).catch(() => {});
+    return value;
+  }
+
+  /**
+   * 删除一条记忆：从 records 移除，并同步删除 Hindsight 里对应的 document。
+   * Hindsight 删除失败不阻断本地删除（静默降级，Hindsight 侧残留由迁移幂等兜底）。
+   */
+  async forgetMemory(owner: string, id: string): Promise<boolean> {
+    const memory = await this.db.take<AgentMemoryV2>(owner, "memories", id);
+    if (!memory) return false;
+    const agentId = (memory.agentId ?? "").trim() || "default";
+    await this.memory.deleteDocument(owner, agentId, id).catch(() => {});
+    return true;
+  }
+
+  /**
+   * 全局记忆中枢（右侧栏）：聚合所有 Agent 的记忆，附按 Agent / 类型分布。
+   */
+  async memoryHub(owner: string): Promise<{
+    total: number;
+    byAgent: Record<string, number>;
+    byKind: Record<string, number>;
+    recent: AgentMemoryV2[];
+    memories: AgentMemoryV2[];
+  }> {
+    const memories = await this.db.list<AgentMemoryV2>(owner, "memories");
+    const byAgent: Record<string, number> = {};
+    const byKind: Record<string, number> = {};
+    for (const memory of memories) {
+      const agentId = memory.agentId?.trim() || "default";
+      byAgent[agentId] = (byAgent[agentId] ?? 0) + 1;
+      byKind[memory.kind ?? "fact"] = (byKind[memory.kind ?? "fact"] ?? 0) + 1;
+    }
+    // recent 按 createdAt 降序取前 10 条（list 已按 updated_at 降序，这里再按 createdAt 兜底）。
+    const sorted = [...memories].sort((a, b) =>
+      (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
+    );
+    return {
+      total: memories.length,
+      byAgent,
+      byKind,
+      recent: sorted.slice(0, 10),
+      memories: sorted,
+    };
+  }
+
+  /**
+   * 单 Agent 专属记忆（左侧栏 Agent 详情页）。
+   * 旧数据无 agentId 时归到 "default"，与写入/召回的回退口径一致。
+   */
+  async agentMemories(owner: string, agentId: string): Promise<AgentMemoryV2[]> {
+    const memories = await this.db.list<AgentMemoryV2>(owner, "memories");
+    const normalized = (m: AgentMemoryV2) => m.agentId?.trim() || "default";
+    return memories
+      .filter((m) => normalized(m) === agentId)
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+  }
+
+  /** Agent 空间里的 Agent 列表（供记忆中枢按名称展示归属）。 */
+  async listAgents(owner: string): Promise<{ id: string; name: string }[]> {
+    const saved = await this.db.get<PersistedAgentSpace & { id: string }>(
+      owner,
+      "agent-settings",
+      "space",
+    );
+    return (
+      saved?.agents.map((agent) => ({ id: agent.id, name: agent.name })) ?? [
+        { id: "default", name: "Default" },
+      ]
+    );
+  }
+
+  /**
+   * 存量记忆迁移到 Hindsight（M4）。
+   *
+   * 每次调用迁移一小批（MIGRATION_BATCH_SIZE 条），游标持久化到
+   * kind="memory-migration"、id=owner 的记录里，支持断点续传与分批推进。
+   *
+   * 约束：
+   *   - 仅在 Hindsight 已配置（memory.enabled）时执行，否则无意义直接返回。
+   *   - 按 data->>'id' 升序推进游标，每条 retain 到 `owner:agentId` bank。
+   *   - 单条 retain 失败不中断整批，累计 failedCount 供监控；游标仍推进，
+   *     避免单条坏数据永久卡死迁移。
+   *   - 返回值标识本批是否已完成全部存量（供调用方决定是否停止轮询）。
+   */
+  private async migrateMemories(owner: string): Promise<{ migrated: number; done: boolean }> {
+    if (!this.memory.enabled) return { migrated: 0, done: true };
+    const progress = await this.db.get<{ lastMigratedId?: string | null; failed?: number }>(
+      owner,
+      "memory-migration",
+      "cursor",
+    );
+    const cursor = progress?.lastMigratedId ?? null;
+    const batch = await this.db.listAfter<AgentMemoryV2>(
+      owner,
+      "memories",
+      cursor,
+      MIGRATION_BATCH_SIZE,
+    );
+    let migrated = 0;
+    let failed = progress?.failed ?? 0;
+    let lastId = cursor;
+    for (const memory of batch) {
+      const agentId = (memory.agentId ?? "").trim() || "default";
+      try {
+        // document_id = memory.id 让迁移幂等：重复迁移同一记忆会覆盖而非重复。
+        await this.memory.retain(owner, agentId, memory.text, memory.id);
+        migrated++;
+      } catch (error) {
+        failed++;
+        backgroundFailure("memory migration retain", error);
+      }
+      lastId = memory.id;
+    }
+    // 推进游标：即使有失败也推进，坏数据不阻塞后续迁移。
+    await this.db.put(owner, "memory-migration", {
+      id: "cursor",
+      lastMigratedId: lastId,
+      failed,
+      updatedAt: date(),
+    });
+    return { migrated, done: batch.length < MIGRATION_BATCH_SIZE };
+  }
+
   async createGoal(owner: string, raw: unknown, id?: string) {
     const input = goalInputSchema.parse(raw);
     const goal: Goal = {
@@ -1224,6 +1424,26 @@ export class AgentService {
         task.id,
         `task-done:${task.id}`,
       );
+      // 投融资决策规则兜底：模型未主动 write_memory 时，从任务结果捕捉决策信号落一条 decision 记忆。
+      if (task.result) {
+        const signals = detectDealSignals(task.result);
+        if (signals.length > 0) {
+          const stage = signals[0]?.stage ?? "决策";
+          const agentId = task.threadId
+            ? ((await agentIdForThread(this.db, owner, task.threadId)) ?? "default")
+            : "default";
+          await this.saveMemory(owner, {
+            agentId,
+            kind: "decision",
+            text: `${task.title}: ${task.result.slice(0, 160)}`,
+            body: task.result,
+            source: "Task result (deal signal)",
+            dealHabits: { stage },
+            taskId: task.id,
+            threadId: task.threadId,
+          });
+        }
+      }
       if (task.goalId && !task.milestoneId) {
         for (let attempt = 0; attempt < 8; attempt++) {
           const goal = await this.db.get<Goal>(owner, "goals", task.goalId);

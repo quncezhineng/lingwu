@@ -85,8 +85,18 @@ function InstructionsField({
  *
  * Agent 详情的技能页与「应用与能力 → 我的技能」共用同一份表单：
  * 技能归属于当前选中的 Agent，写入后所有读取 customSkills 的界面同步更新。
+ * `onSaved` 仅在保存成功后触发，关闭动作仍由 `onClose` 负责。
  */
-export function SkillEditor({ skill, onClose }: { skill?: AgentSkill; onClose: () => void }) {
+export function SkillEditor({
+  skill,
+  onClose,
+  onSaved,
+}: {
+  skill?: AgentSkill;
+  onClose: () => void;
+  /** 保存成功后的回调。 */
+  onSaved?: () => void;
+}) {
   const { t } = useTranslation();
   const { current, saveSkill } = useAgentSpace();
   const [name, setName] = useState(() => skill?.name ?? t("agentSpace.skillSampleName"));
@@ -126,6 +136,7 @@ export function SkillEditor({ skill, onClose }: { skill?: AgentSkill; onClose: (
         disabled={!name.trim() || !instructions.trim()}
         onPress={() => {
           saveSkill(current.id, { name, purpose, instructions, outputFormat }, skill?.id);
+          onSaved?.();
           onClose();
         }}
       >

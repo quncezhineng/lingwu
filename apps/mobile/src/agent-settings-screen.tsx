@@ -1,4 +1,4 @@
-import { type ComponentType, useState } from "react";
+import { type ComponentType, useEffect, useState } from "react";
 import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
@@ -18,7 +18,7 @@ import { HoverPressable, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** Agent 详情页的左栏分区，右栏渲染对应分区的设置内容。 */
-type AgentSettingsTab =
+export type AgentSettingsTab =
   | "profile"
   | "instructions"
   | "skills"
@@ -37,7 +37,7 @@ const TABS: ReadonlyArray<{
   { id: "skills", icon: Sparkles, labelKey: "agentSpace.skills" },
   { id: "resources", icon: FolderOpen, labelKey: "agentSpace.library" },
   { id: "history", icon: Clock3, labelKey: "agentSpace.analysisHistory" },
-  { id: "goals", icon: Target, labelKey: "agentSpace.goalsMemory" },
+  { id: "goals", icon: Target, labelKey: "agent.memory" },
   { id: "model", icon: Cpu, labelKey: "modelSettings.model" },
 ];
 
@@ -46,12 +46,27 @@ const TABS: ReadonlyArray<{
  *
  * 取代原先的 AgentManagerSheet 浮层，让每个设置项都有稳定的入口与可读的内容宽度。
  */
-export function AgentSettingsScreen() {
+export function AgentSettingsScreen({
+  tabIntent,
+  onTabIntentConsumed,
+}: {
+  /** 外部跳转意图：进入详情页时定位到指定分区（例如从「解锁更多功能」直达技能页）。 */
+  tabIntent?: AgentSettingsTab | null;
+  /** 分区意图被应用后通知调用方清除，避免下次进入详情页被再次定位。 */
+  onTabIntentConsumed?: () => void;
+}) {
   const { t } = useTranslation();
   const { current, updateAgent } = useAgentSpace();
   const { navigate, notify, workspace } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
   const [tab, setTab] = useState<AgentSettingsTab>("profile");
+  // 意图可能在页面挂载后才被设置（例如桌面端常驻侧栏），因此用 effect 监听
+  // 而不是只在首次渲染读取一次 props。
+  useEffect(() => {
+    if (!tabIntent) return;
+    setTab(tabIntent);
+    onTabIntentConsumed?.();
+  }, [tabIntent, onTabIntentConsumed]);
   // 三栏布局下内容列远窄于窗口，用实际列宽而不是窗口宽度决定左右分栏。
   const [width, setWidth] = useState(windowWidth);
   // 单列宽度下左栏收成横向分区条，避免挤压右侧内容。

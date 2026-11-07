@@ -91,6 +91,7 @@ const chat = {
   "chat.connectorPickerEmptyTitle": "还没有可用连接器",
   "chat.connectorPickerEmptyDetail": "连接 Gmail、日历等服务后，就能在对话里选择使用。",
   "chat.connectorPickerManage": "管理连接",
+  "chat.connectorPickerConnect": "去连接",
   "chat.removeSkill": "移除技能：{name}",
   "chat.removeConnector": "移除连接器：{name}",
   "chat.uploadMaterialDone": "已将「{name}」加入对话。",

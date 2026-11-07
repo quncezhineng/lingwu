@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, useWindowDimensions, View } from "react-native";
 import type { Monitor } from "../../../packages/domain/src/agent";
 import {
@@ -17,19 +17,7 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
-import {
-  ArrowUpRight,
-  Bell,
-  CalendarDays,
-  ChevronRight,
-  CircleAlert,
-  Clock3,
-  ListChecks,
-  Plus,
-  RefreshCw,
-  Sparkles,
-  Target,
-} from "./icons";
+import { Bell, CalendarDays, ChevronRight, type IconComponent, Plus, Target } from "./icons";
 import { monitorScheduleText } from "./monitor-text";
 import { PageHeader } from "./page-header";
 import { breakpoints, colors, fonts, radius } from "./theme";
@@ -38,7 +26,6 @@ import {
   type AttentionReason,
   buildTrackingView,
   type GoalTrack,
-  type RecentActivity,
 } from "./tracking-view";
 import { Button, Card, Chip, Empty, SectionHeading, Sheet, s } from "./ui";
 import { type PriceReminderIntent, useWorkspace } from "./workspace";
@@ -209,60 +196,103 @@ function OptionCard({
   );
 }
 
+/**
+ * 任务模板与目标分类共用同一张卡片：图标 + 标题 +（可选）说明。
+ * 右上角统一用 chevron 表示「进入下一步」；分类没有说明时自然收成更矮的卡片。
+ */
 function TemplateCard({
   icon: Icon,
   title,
   detail,
+  accessibilityLabel,
   onPress,
 }: {
-  icon: typeof Target;
+  icon: IconComponent;
   title: string;
-  detail: string;
+  detail?: string;
+  accessibilityLabel?: string;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={accessibilityLabel ?? title}
       onPress={onPress}
       style={({ pressed }) => ({
         flex: 1,
-        minWidth: 180,
-        minHeight: 132,
-        gap: 10,
-        padding: 16,
+        gap: 8,
+        padding: 14,
         borderWidth: 1,
         borderColor: pressed ? colors.lineStrong : colors.line,
-        borderRadius: 11,
+        borderRadius: radius.card,
         backgroundColor: pressed ? colors.overlay1 : colors.paper,
       })}
     >
       <View style={[s.between, { alignItems: "flex-start" }]}>
-        <View style={[s.iconBox, { width: 34, height: 34 }]}>
-          <Icon size={17} color={colors.primary} />
+        <View style={[s.iconBox, { width: 30, height: 30, backgroundColor: colors.sky }]}>
+          <Icon size={16} color={colors.primary} />
         </View>
-        <ArrowUpRight size={16} color={colors.muted} />
+        <ChevronRight size={16} color={colors.faint} />
       </View>
-      <View style={{ gap: 4 }}>
-        <Text style={[s.heading, { fontSize: 15 }]}>{title}</Text>
-        <Text style={[s.small, { lineHeight: 19 }]}>{detail}</Text>
+      <View style={{ gap: 3 }}>
+        <Text style={[s.heading, { fontSize: 14 }]} numberOfLines={1}>
+          {title}
+        </Text>
+        {!!detail && (
+          <Text style={[s.small, { lineHeight: 18 }]} numberOfLines={2}>
+            {detail}
+          </Text>
+        )}
       </View>
     </Pressable>
   );
 }
 
-function recentActivityText(
-  activity: RecentActivity | undefined,
-  t: (key: TranslationKey, params?: Record<string, string>) => string,
-) {
-  if (!activity) return t("agent.goalTrackNoRecent");
-  if (activity.source === "milestone")
-    return t("agent.goalTrackRecentMilestone", { time: relativeWhen(activity.at) });
-  if (activity.source === "task")
-    return t("agent.goalTrackRecentTask", {
-      status: statusLabel(activity.status ?? "succeeded"),
-    });
-  return t("agent.goalTrackRecentReminder", { time: relativeWhen(activity.at) });
+const GRID_GAP = 10;
+
+/**
+ * 卡片网格：按容器实测宽度自动分栏，保证每栏不小于 `minColumnWidth`。
+ *
+ * 页面内容宽度（扣掉侧栏）和弹层宽度都与窗口宽度差很多，用窗口宽度估算会让
+ * 卡片在窄栏里被挤压；这里统一按 onLayout 实测结果换算。
+ */
+function CardGrid<T>({
+  items,
+  minColumnWidth,
+  maxColumns = 2,
+  getKey,
+  render,
+}: {
+  items: readonly T[];
+  /** 单栏最小宽度：不足则减少列数。目标卡约 340，紧凑卡片约 200。 */
+  minColumnWidth: number;
+  maxColumns?: 1 | 2 | 3;
+  getKey: (item: T) => string;
+  render: (item: T) => ReactNode;
+}) {
+  const [width, setWidth] = useState(0);
+  const columns =
+    width > 0
+      ? Math.max(
+          1,
+          Math.min(maxColumns, Math.floor((width + GRID_GAP) / (minColumnWidth + GRID_GAP))),
+        )
+      : 1;
+  const cellWidth = width > 0 ? (width - GRID_GAP * (columns - 1)) / columns : 0;
+  // 实测到之前按目标栏数给百分比兜底，避免首帧挤成单列再跳变。
+  const fallback = maxColumns >= 3 ? "31%" : maxColumns === 2 ? "48%" : "100%";
+  return (
+    <View
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}
+    >
+      {items.map((item) => (
+        <View key={getKey(item)} style={cellWidth ? { width: cellWidth } : { width: fallback }}>
+          {render(item)}
+        </View>
+      ))}
+    </View>
+  );
 }
 
 function GoalTrackCard({
@@ -281,7 +311,7 @@ function GoalTrackCard({
   onCreateReminder: (milestoneId?: string) => void;
 }) {
   const { t } = useTranslation();
-  const { goal, nextAction, reminders, recentActivities, dailyActivities } = track;
+  const { goal, nextAction, reminders, dailyActivities } = track;
   const done = goal.milestones.filter((milestone) => milestone.done).length;
   const moreReminders = Math.max(0, reminders.length - 2);
   const pausedWithGoal = goal.status === "paused";
@@ -306,59 +336,60 @@ function GoalTrackCard({
   }
 
   return (
-    <Card style={{ gap: 15 }}>
-      <View style={[s.between, { alignItems: "flex-start", gap: 10 }]}>
-        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-          <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-            <Text
-              numberOfLines={2}
-              style={{
-                color: colors.text,
-                fontFamily: fonts.sans,
-                fontSize: 16,
-                lineHeight: 24,
-                fontWeight: "600",
-              }}
-            >
-              {goal.title}
-            </Text>
-            <Chip tint={goal.status === "active" ? colors.sky : colors.surface}>
-              {statusLabel(goal.status)}
-            </Chip>
-          </View>
-          <Text style={[s.small, s.metric]}>
-            {goal.milestones.length
-              ? t("agent.milestoneProgress", { done, total: goal.milestones.length })
-              : t("agent.goalTrackNoMilestones")}
+    <Card style={{ gap: 12, flex: 1 }}>
+      <View style={{ gap: 4 }}>
+        <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+          <Text
+            numberOfLines={2}
+            style={{
+              flexShrink: 1,
+              color: colors.text,
+              fontFamily: fonts.sans,
+              fontSize: 16,
+              lineHeight: 23,
+              fontWeight: "600",
+            }}
+          >
+            {goal.title}
           </Text>
+          <Chip tint={goal.status === "active" ? colors.sky : colors.surface}>
+            {statusLabel(goal.status)}
+          </Chip>
         </View>
+        <Text style={[s.small, s.metric]}>
+          {goal.milestones.length
+            ? t("agent.milestoneProgress", { done, total: goal.milestones.length })
+            : t("agent.goalTrackNoMilestones")}
+        </Text>
       </View>
 
-      <View
-        style={{
-          gap: 8,
-          padding: 13,
+      {/* 下一步整块可点，替掉原来块内那个全宽主按钮（与底部「查看目标」重复）。 */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={nextLabel}
+        onPress={runNext}
+        style={({ pressed }) => ({
+          gap: 5,
+          padding: 12,
           borderRadius: 10,
-          backgroundColor: colors.surfaceSoft,
-        }}
+          backgroundColor: pressed ? colors.overlay1 : colors.surfaceSoft,
+        })}
       >
-        <Text style={[s.small, { color: colors.faint }]}>{t("agent.goalTrackNextLabel")}</Text>
-        <Text style={[s.text, { fontWeight: "600" }]}>
+        <View style={[s.between, { gap: 8 }]}>
+          <Text style={[s.small, { color: colors.faint }]}>{t("agent.goalTrackNextLabel")}</Text>
+          <ChevronRight size={15} color={colors.faint} />
+        </View>
+        <Text numberOfLines={2} style={[s.text, { fontWeight: "600" }]}>
           {nextAction?.title ?? t("agent.goalTrackNoNext")}
         </Text>
         {nextAction && (
-          <Text style={[s.small, { color: colors.primaryStrong }]}>
+          <Text numberOfLines={1} style={[s.small, { color: colors.primaryStrong }]}>
             {t(REASON_KEYS[nextAction.reason])}
           </Text>
         )}
-        <View>
-          <Button small primary onPress={runNext}>
-            {nextLabel}
-          </Button>
-        </View>
-      </View>
+      </Pressable>
 
-      <View style={{ gap: 7 }}>
+      <View style={{ gap: 5 }}>
         <Text style={[s.small, { color: colors.faint }]}>{t("agent.goalTrackRhythmLabel")}</Text>
         {!reminders.length && <Text style={s.small}>{t("agent.goalTrackNoReminder")}</Text>}
         {reminders.slice(0, 2).map((monitor) => (
@@ -369,17 +400,12 @@ function GoalTrackCard({
             onPress={() => onOpenMonitor(monitor.id)}
             style={({ pressed }) => [
               s.row,
-              {
-                gap: 9,
-                minHeight: 38,
-                paddingVertical: 5,
-                borderRadius: 8,
-              },
+              { gap: 8, minHeight: 34, paddingVertical: 3, borderRadius: 8 },
               pressed && { backgroundColor: colors.overlay1 },
             ]}
           >
-            <CalendarDays size={16} color={colors.muted} />
-            <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+            <CalendarDays size={15} color={colors.muted} />
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text numberOfLines={1} style={[s.small, { color: colors.text }]}>
                 {monitor.title}
               </Text>
@@ -401,45 +427,21 @@ function GoalTrackCard({
         )}
       </View>
 
-      <View style={{ gap: 5 }}>
+      {/* 最近 7 天只留今日计数一行，完整时间线在「查看目标」的目标详情里。 */}
+      <View style={{ gap: 4 }}>
         <Text style={[s.small, { color: colors.faint }]}>{t("agent.goalTrackRecentLabel")}</Text>
-        {!!dailyActivities.length && (
-          <Text numberOfLines={2} style={[s.small, { color: colors.primaryStrong }]}>
-            {t("agent.goalTrackDailySummary", {
-              tasks: String(dailySummary.tasks),
-              reminders: String(dailySummary.reminders),
-              milestones: String(dailySummary.milestones),
-            })}
-          </Text>
-        )}
-        {recentActivities.length ? (
-          recentActivities.slice(0, 3).map((activity) => (
-            <View key={activity.id} style={[s.row, { gap: 8 }]}>
-              {activity.source === "monitor" ? (
-                <Bell size={15} color={colors.muted} />
-              ) : activity.status === "failed" ? (
-                <CircleAlert size={15} color={colors.danger} />
-              ) : activity.source === "milestone" ? (
-                <Target size={15} color={colors.primary} />
-              ) : (
-                <ListChecks size={15} color={colors.muted} />
-              )}
-              <Text numberOfLines={1} style={[s.small, { flex: 1 }]}>
-                {activity.title} · {recentActivityText(activity, t)}
-              </Text>
-            </View>
-          ))
-        ) : (
-          <View style={[s.row, { gap: 8 }]}>
-            <Clock3 size={15} color={colors.faint} />
-            <Text numberOfLines={1} style={[s.small, { flex: 1 }]}>
-              {t("agent.goalTrackNoRecent")}
-            </Text>
-          </View>
-        )}
+        <Text numberOfLines={2} style={[s.small, { color: colors.primaryStrong }]}>
+          {dailyActivities.length
+            ? t("agent.goalTrackDailySummary", {
+                tasks: String(dailySummary.tasks),
+                reminders: String(dailySummary.reminders),
+                milestones: String(dailySummary.milestones),
+              })
+            : t("agent.goalTrackNoRecent")}
+        </Text>
       </View>
 
-      <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+      <View style={[s.row, { gap: 8, flexWrap: "wrap", marginTop: "auto" }]}>
         <Button small onPress={onOpenGoal}>
           {t("agent.goalTrackViewGoal")}
         </Button>
@@ -572,7 +574,6 @@ export function TrackingScreen({
   function renderGoalTrack(track: GoalTrack) {
     return (
       <GoalTrackCard
-        key={track.goal.id}
         track={track}
         onOpenGoal={() => setSelectedGoal(track.goal.id)}
         onOpenTask={(taskId) => open({ type: "task", taskId })}
@@ -589,35 +590,38 @@ export function TrackingScreen({
         {tracks.map((track) => (
           <View key={track.goal.id} style={{ gap: 8 }}>
             <SectionHeading title={track.goal.title} count={track.reminders.length} />
-            <View style={{ gap: 10 }}>
-              {track.reminders.map((item) => (
-                <View key={item.id} style={{ gap: 5 }}>
-                  <Text style={[s.small, { color: colors.link }]}>
-                    {t("agent.taskGoalContext", { goal: track.goal.title })}
-                  </Text>
-                  <TrackingRow
-                    monitor={item}
-                    onOpen={() => setSelectedMonitor(item.id)}
-                    onEdit={() => setEditingMonitor(item.id)}
-                  />
-                </View>
-              ))}
-            </View>
+            <Text style={[s.small, { color: colors.link }]}>
+              {t("agent.taskGoalContext", { goal: track.goal.title })}
+            </Text>
+            <CardGrid
+              items={track.reminders}
+              minColumnWidth={340}
+              getKey={(item) => item.id}
+              render={(item) => (
+                <TrackingRow
+                  monitor={item}
+                  onOpen={() => setSelectedMonitor(item.id)}
+                  onEdit={() => setEditingMonitor(item.id)}
+                />
+              )}
+            />
           </View>
         ))}
         {!!orderedStandalone.length && (
           <View style={{ gap: 8 }}>
             <SectionHeading title={t("agent.standaloneRemindersHeading")} />
-            <View style={{ gap: 10 }}>
-              {orderedStandalone.map((item) => (
+            <CardGrid
+              items={orderedStandalone}
+              minColumnWidth={340}
+              getKey={(item) => item.id}
+              render={(item) => (
                 <TrackingRow
-                  key={item.id}
                   monitor={item}
                   onOpen={() => setSelectedMonitor(item.id)}
                   onEdit={() => setEditingMonitor(item.id)}
                 />
-              ))}
-            </View>
+              )}
+            />
           </View>
         )}
       </View>
@@ -648,14 +652,18 @@ export function TrackingScreen({
             <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
               {track.goal.title}
             </Text>
-            {track.reminders.map((item) => (
-              <TrackingRow
-                key={item.id}
-                monitor={item}
-                onOpen={() => setSelectedMonitor(item.id)}
-                onEdit={() => setEditingMonitor(item.id)}
-              />
-            ))}
+            <CardGrid
+              items={track.reminders}
+              minColumnWidth={340}
+              getKey={(item) => item.id}
+              render={(item) => (
+                <TrackingRow
+                  monitor={item}
+                  onOpen={() => setSelectedMonitor(item.id)}
+                  onEdit={() => setEditingMonitor(item.id)}
+                />
+              )}
+            />
           </View>
         ))}
     </View>
@@ -714,7 +722,12 @@ export function TrackingScreen({
           {!!activeTracks.length && (
             <View style={{ gap: 10 }}>
               <SectionHeading title={t("agent.goalTracksHeading")} count={activeTracks.length} />
-              {activeTracks.map(renderGoalTrack)}
+              <CardGrid
+                items={activeTracks}
+                minColumnWidth={340}
+                getKey={(track) => track.goal.id}
+                render={renderGoalTrack}
+              />
             </View>
           )}
           {!!restingTracks.length && (
@@ -724,7 +737,14 @@ export function TrackingScreen({
                   ? t("agent.showLess")
                   : t("agent.goalTracksShowResting", { count: restingTracks.length })}
               </Button>
-              {showResting && restingTracks.map(renderGoalTrack)}
+              {showResting && (
+                <CardGrid
+                  items={restingTracks}
+                  minColumnWidth={340}
+                  getKey={(track) => track.goal.id}
+                  render={renderGoalTrack}
+                />
+              )}
             </View>
           )}
         </View>
@@ -733,7 +753,12 @@ export function TrackingScreen({
           {!!activeTracks.length && (
             <View style={{ gap: 10 }}>
               <SectionHeading title={t("agent.goalTracksHeading")} count={activeTracks.length} />
-              {activeTracks.map(renderGoalTrack)}
+              <CardGrid
+                items={activeTracks}
+                minColumnWidth={340}
+                getKey={(track) => track.goal.id}
+                render={renderGoalTrack}
+              />
             </View>
           )}
           {!!restingTracks.length && (
@@ -746,7 +771,14 @@ export function TrackingScreen({
                     : t("agent.showMore", { count: restingTracks.length })}
                 </Button>
               </View>
-              {showResting && restingTracks.map(renderGoalTrack)}
+              {showResting && (
+                <CardGrid
+                  items={restingTracks}
+                  minColumnWidth={340}
+                  getKey={(track) => track.goal.id}
+                  render={renderGoalTrack}
+                />
+              )}
             </View>
           )}
           {!!orderedStandalone.length && (
@@ -755,14 +787,18 @@ export function TrackingScreen({
                 title={t("agent.standaloneRemindersHeading")}
                 count={orderedStandalone.length}
               />
-              {orderedStandalone.map((item) => (
-                <TrackingRow
-                  key={item.id}
-                  monitor={item}
-                  onOpen={() => setSelectedMonitor(item.id)}
-                  onEdit={() => setEditingMonitor(item.id)}
-                />
-              ))}
+              <CardGrid
+                items={orderedStandalone}
+                minColumnWidth={340}
+                getKey={(item) => item.id}
+                render={(item) => (
+                  <TrackingRow
+                    monitor={item}
+                    onOpen={() => setSelectedMonitor(item.id)}
+                    onEdit={() => setEditingMonitor(item.id)}
+                  />
+                )}
+              />
             </View>
           )}
         </View>
@@ -820,52 +856,43 @@ export function TrackingScreen({
             </View>
           )}
           {composer.kind === "goalCategories" && (
-            <View style={{ gap: 18 }}>
-              <View style={{ gap: 12 }}>
+            <View style={{ gap: 16 }}>
+              <View style={{ gap: 10 }}>
                 <SectionHeading title={t("agent.taskTemplates")} />
-                <View
-                  style={{
-                    flexDirection: width < 760 ? "column" : "row",
-                    flexWrap: "wrap",
-                    gap: 12,
-                  }}
-                >
-                  {TASK_TEMPLATES.map((template) => (
-                    <View key={template.kind} style={{ width: width < 760 ? "100%" : "48%" }}>
-                      <TemplateCard
-                        icon={template.icon}
-                        title={t(template.titleKey)}
-                        detail={t(template.detailKey)}
-                        onPress={() => {
-                          setComposer(undefined);
-                          open({ type: "delegate", kind: template.kind });
-                        }}
-                      />
-                    </View>
-                  ))}
-                </View>
+                <CardGrid
+                  items={TASK_TEMPLATES}
+                  minColumnWidth={240}
+                  getKey={(template) => template.kind}
+                  render={(template) => (
+                    <TemplateCard
+                      icon={template.icon}
+                      title={t(template.titleKey)}
+                      detail={t(template.detailKey)}
+                      onPress={() => {
+                        setComposer(undefined);
+                        open({ type: "delegate", kind: template.kind });
+                      }}
+                    />
+                  )}
+                />
               </View>
-              <View style={{ gap: 4 }}>
+              <View style={{ gap: 10 }}>
                 <SectionHeading title={t("agent.goalCategoriesHeading")} />
-                {GOAL_CATEGORIES.map((item) => (
-                  <Pressable
-                    key={item.name}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("agent.createGoalA11y", {
-                      category: t(item.labelKey),
-                    })}
-                    onPress={() => setComposer({ kind: "goalForm", category: item.name })}
-                    style={({ pressed }) => [
-                      s.row,
-                      { gap: 12, minHeight: 46, borderRadius: 10, paddingHorizontal: 2 },
-                      pressed && { backgroundColor: colors.overlay1 },
-                    ]}
-                  >
-                    <item.icon size={20} color={colors.muted} />
-                    <Text style={[s.text, { flex: 1 }]}>{t(item.labelKey)}</Text>
-                    <ChevronRight size={18} color={colors.muted} />
-                  </Pressable>
-                ))}
+                <CardGrid
+                  items={GOAL_CATEGORIES}
+                  minColumnWidth={200}
+                  getKey={(item) => item.name}
+                  render={(item) => (
+                    <TemplateCard
+                      icon={item.icon}
+                      title={t(item.labelKey)}
+                      accessibilityLabel={t("agent.createGoalA11y", {
+                        category: t(item.labelKey),
+                      })}
+                      onPress={() => setComposer({ kind: "goalForm", category: item.name })}
+                    />
+                  )}
+                />
               </View>
             </View>
           )}
@@ -879,73 +906,32 @@ export function TrackingScreen({
             />
           )}
           {composer.kind === "reminderOptions" && (
-            <View style={{ gap: 16 }}>
-              <Card
-                style={{
-                  flexDirection: "row",
-                  alignItems: "flex-start",
-                  gap: 14,
-                  padding: 18,
-                  backgroundColor: colors.sky,
-                  borderColor: colors.accentLine,
-                }}
-              >
-                <View
-                  style={[
-                    s.iconBox,
-                    {
-                      width: 38,
-                      height: 38,
-                      backgroundColor: colors.paper,
-                      borderWidth: 1,
-                      borderColor: colors.accentLine,
-                    },
-                  ]}
-                >
-                  <Sparkles size={19} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1, gap: 5 }}>
-                  <Text style={[s.heading, { fontSize: 15 }]}>
-                    {t("agent.monitorContextTitle")}
-                  </Text>
-                  <Text style={[s.muted, { lineHeight: 21 }]}>
-                    {t("agent.monitorContextDetail")}
-                  </Text>
-                </View>
-              </Card>
-              <View style={{ gap: 12 }}>
-                <SectionHeading title={t("agent.reminderTemplates")} />
-                <View style={{ flexDirection: width < 760 ? "column" : "row", gap: 12 }}>
-                  {REMINDER_TEMPLATES.map((template) => {
-                    const Icon =
-                      template.id === "close-review"
-                        ? CalendarDays
-                        : template.id === "filing-watch"
-                          ? Bell
-                          : RefreshCw;
-                    return (
-                      <TemplateCard
-                        key={template.id}
-                        icon={Icon}
-                        title={t(template.titleKey)}
-                        detail={t(template.detailKey)}
-                        onPress={() =>
-                          setComposer({
-                            kind: "reminderForm",
-                            template,
-                            goalId: composer.goalId,
-                            milestoneId: composer.milestoneId,
-                          })
-                        }
-                      />
-                    );
-                  })}
-                </View>
-              </View>
-              <OptionCard
-                icon={Plus}
-                title={t("agent.customReminder")}
-                detail={t("agent.customReminderDetail")}
+            <View style={{ gap: 12 }}>
+              {/* 标题栏已经写了「提醒模板」，副标题也说明了用法，这里不再重复小标题。 */}
+              <CardGrid
+                items={REMINDER_TEMPLATES}
+                minColumnWidth={200}
+                maxColumns={3}
+                getKey={(template) => template.id}
+                render={(template) => (
+                  <TemplateCard
+                    icon={template.icon}
+                    title={t(template.titleKey)}
+                    detail={t(template.detailKey)}
+                    onPress={() =>
+                      setComposer({
+                        kind: "reminderForm",
+                        template,
+                        goalId: composer.goalId,
+                        milestoneId: composer.milestoneId,
+                      })
+                    }
+                  />
+                )}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("agent.customReminder")}
                 onPress={() =>
                   setComposer({
                     kind: "reminderForm",
@@ -953,7 +939,24 @@ export function TrackingScreen({
                     milestoneId: composer.milestoneId,
                   })
                 }
-              />
+                style={({ pressed }) => ({
+                  minHeight: 43,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  borderWidth: 1,
+                  borderStyle: "dashed",
+                  borderColor: colors.lineStrong,
+                  borderRadius: radius.card,
+                  backgroundColor: pressed ? colors.overlay1 : "transparent",
+                })}
+              >
+                <Plus size={16} color={colors.faint} />
+                <Text style={{ fontSize: 13, color: colors.faint }}>
+                  {t("agent.customReminder")}
+                </Text>
+              </Pressable>
             </View>
           )}
           {composer.kind === "reminderForm" && (

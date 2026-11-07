@@ -28,6 +28,11 @@ services:
         value: /var/data/lingwu
       - key: TASK_WORKER_ENABLED
         value: "true"
+      # Per-minute /api/* request cap per client IP. The web app polls several
+      # screens at once; raise the local default (120) to avoid self-inflicted
+      # 429s. Value mirrors .env.
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "1200"
       # Daily market briefing scheduler (O2): the embedded task worker creates one
       # durable `market_briefing` task per owner with a watchlist per UTC date
       # (catch-up after downtime, at most 3 attempts/day). Must stay true for
@@ -94,8 +99,9 @@ services:
         generateValue: true
       - key: DEEPSEEK_API_KEY
         sync: false
+      # 公开的 OpenAI 兼容端点，非密钥，直接固定无需在控制台填入。
       - key: DEEPSEEK_BASE_URL
-        sync: false
+        value: https://api.deepseek.com/v1
       # Live Google workspace (Gmail/Calendar): enable the OAuth consent screen and
       # set the redirect URI to PUBLIC_API_URL + /api/google/callback (PUBLIC_API_URL
       # is already the live Render URL above).
@@ -109,6 +115,16 @@ services:
         sync: false
       # Use the CLI-issued identity for the same Intelligence project as the key.
       - key: CPK_TELEMETRY_ID
+        sync: false
+      # Opt out of CopilotKit SDK telemetry (same as .env).
+      - key: COPILOTKIT_TELEMETRY_DISABLED
+        value: "true"
+      # Hindsight 记忆引擎（多 Agent 长时记忆）。Base URL 留空时引擎不启用，
+      # 走本地关键词召回降级。自托管：http://<host>:8888（无需 key）；云端：
+      # https://api.hindsight.vectorize.io（需 HINDSIGHT_API_KEY）。
+      - key: HINDSIGHT_BASE_URL
+        sync: false
+      - key: HINDSIGHT_API_KEY
         sync: false
       # Delete these two entries, and the lingwu-browser service below, to
       # deploy without browsing. The API boots either way.

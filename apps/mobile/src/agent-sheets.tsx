@@ -8,13 +8,15 @@ import {
   AGENT_CAPABILITY_LABELS,
   AGENT_TEMPLATES,
   type AgentAvatarId,
+  type AgentSkill,
   type AgentTemplateId,
   parsePreferenceFocus,
 } from "./agent-space-model";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
-import { CapabilityHubScreen } from "./capability-hub";
+import { CapabilityHubScreen, MySkillDetailSheet, SkillDetailSheet } from "./capability-hub";
+import { skillDisplayName } from "./capability-picker";
 import { useTranslation } from "./i18n";
 import {
   ChevronRight,
@@ -31,6 +33,7 @@ import {
 import { InsightCard } from "./insight-card";
 import { PreferencesScreen } from "./preferences-screen";
 import { FilesScreen } from "./screens";
+import { skillCatalog } from "./skill-catalog";
 import { TaskHubScreen } from "./task-hub";
 import { Button, colors, Field, HoverPressable, radius, Sheet, s } from "./ui";
 import { WatchlistAddSheet } from "./watchlist";
@@ -137,11 +140,17 @@ function SheetSection({ children }: { children: React.ReactNode }) {
 export function AgentMoreContent({
   onPanel,
   onOpenApps,
+  onOpenAgentSkills,
+  onInspectSkill,
   compact = true,
 }: {
   onPanel: (panel: AgentPanel) => void;
   /** 应用与能力是独立页面，不走浮层：由调用方负责跳转。 */
   onOpenApps: () => void;
+  /** 解锁更多功能：进入当前 Agent 详情设置的「技能」分区，由调用方负责跳转。 */
+  onOpenAgentSkills: () => void;
+  /** 点击能力卡片展示该技能的只读详情，由调用方作为兄弟节点挂载弹层，避免嵌套 Modal。 */
+  onInspectSkill?: (skillId: string) => void;
   compact?: boolean;
 }) {
   const { t, locale } = useTranslation();
@@ -151,15 +160,19 @@ export function AgentMoreContent({
   const activeTasks = tasks.filter(
     (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
   );
-  const capabilityPriority = ["reminder", "research", "financials"];
-  const capabilityRank = (id: string) => {
-    const index = capabilityPriority.indexOf(id);
-    return index < 0 ? capabilityPriority.length : index;
-  };
-  const capabilities = current.skills
-    .filter((skill) => !["quote", "brief", "notes"].includes(skill))
-    .sort((a, b) => capabilityRank(a) - capabilityRank(b))
-    .slice(0, 4);
+  // 「更多能力」展示当前 Agent 的独有能力：优先用该 Agent 自定义 + 从技能目录
+  // 专门安装的技能（这才是真正区分不同 Agent 的东西）；没有独有能力时回退到
+  // 该 Agent 模板的核心投研能力，避免落入通用的 research/files/memory/search 文案。
+  const distinctive = [
+    ...current.customSkills.map((skill) => skill.id),
+    ...current.installedSkills,
+  ];
+  const capabilities =
+    distinctive.length > 0
+      ? distinctive.slice(0, 4)
+      : current.skills
+          .filter((skill) => !["files", "memory", "search", "notes"].includes(skill))
+          .slice(0, 4);
   return (
     <View style={{ gap: 6 }}>
       <SheetSection>
@@ -224,12 +237,20 @@ export function AgentMoreContent({
       )}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {capabilities.map((capability) => {
-          const label = AGENT_CAPABILITY_LABELS[capability];
+          // 系统能力查固定标签表；独有能力（安装/自建技能）走技能目录的展示名。
+          const displayName =
+            AGENT_CAPABILITY_LABELS[capability]?.[locale === "zh-Hans" ? "zh" : "en"] ||
+            skillDisplayName(capability, current.customSkills);
+          // 判定该能力是否有对应的详情：优先自建技能，其次技能目录；
+          // 其余系统能力没有详情页，维持打开「技能中心」面板的原行为。
+          const inspectable =
+            current.customSkills.some((skill) => skill.id === capability) ||
+            skillCatalog.some((skill) => skill.id === capability);
           return (
             <Pressable
               key={capability}
               accessibilityRole="button"
-              onPress={() => onPanel("capabilities")}
+              onPress={() => (inspectable ? onInspectSkill?.(capability) : onPanel("capabilities"))}
               style={({ pressed }) => ({
                 width: "47%",
                 minHeight: 60,
@@ -243,7 +264,7 @@ export function AgentMoreContent({
             >
               <Sparkles size={15} color={colors.primary} />
               <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]} numberOfLines={2}>
-                {label ? label[locale === "zh-Hans" ? "zh" : "en"] : capability}
+                {displayName}
               </Text>
             </Pressable>
           );
@@ -251,7 +272,7 @@ export function AgentMoreContent({
       </View>
       <Pressable
         accessibilityRole="button"
-        onPress={() => onPanel("capabilities")}
+        onPress={onOpenAgentSkills}
         style={({ pressed }) => ({
           minHeight: 43,
           marginTop: 8,
@@ -278,9 +299,13 @@ export function AgentMoreContent({
 function AgentMoreSheet({
   onClose,
   onPanel,
+  onOpenAgentSkills,
+  onInspectSkill,
 }: {
   onClose: () => void;
   onPanel: (panel: AgentPanel) => void;
+  onOpenAgentSkills: () => void;
+  onInspectSkill?: (skillId: string) => void;
 }) {
   const { t } = useTranslation();
   const { navigate } = useWorkspace();
@@ -288,9 +313,14 @@ function AgentMoreSheet({
     <Sheet botLayout title={t("agentSpace.more")} onClose={onClose} wide>
       <AgentMoreContent
         onPanel={onPanel}
+        onInspectSkill={onInspectSkill}
         onOpenApps={() => {
           onClose();
           navigate("apps");
+        }}
+        onOpenAgentSkills={() => {
+          onClose();
+          onOpenAgentSkills();
         }}
       />
     </Sheet>
@@ -582,23 +612,66 @@ function InsightsSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
+/**
+ * 基于 skillId 渲染技能的只读详情：
+ * 自建技能 → MySkillDetailSheet；目录技能 → SkillDetailSheet（不传 agents/onToggleInstall，
+ * 右上角无「添加到智能体」按钮）；均查不到（系统能力）返回 null，由调用方保持原行为。
+ */
+export function AgentSkillInspectSheet({
+  skillId,
+  onClose,
+}: {
+  skillId: string;
+  onClose: () => void;
+}) {
+  const { current } = useAgentSpace();
+  const custom = current.customSkills.find((skill) => skill.id === skillId);
+  if (custom) {
+    return <MySkillDetailSheet title={custom.name} skill={custom} onClose={onClose} />;
+  }
+  const entry = skillCatalog.find((skill) => skill.id === skillId);
+  if (!entry) return null;
+  return <SkillDetailSheet skill={entry} onClose={onClose} />;
+}
+
 export function AgentSheets({
   panel,
   onClose,
   onPanel,
   onSignOut,
   onDismiss,
+  onOpenAgentSkills,
 }: {
   panel?: AgentPanel;
   onDismiss: () => void;
   onClose: () => void;
   onPanel: (panel: AgentPanel) => void;
   onSignOut: () => void;
+  /** 解锁更多功能：进入当前 Agent 详情设置的「技能」分区，由 AgentProductShell 持有实现。 */
+  onOpenAgentSkills: () => void;
 }) {
   const { t } = useTranslation();
   const { current } = useAgentSpace();
+  // 能力卡片点击后展示的技能详情 id；作为兄弟节点挂载，避免与 AgentMoreSheet 嵌套 Modal。
+  const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
   if (!panel) return null;
-  if (panel === "more") return <AgentMoreSheet onClose={onClose} onPanel={onPanel} />;
+  if (panel === "more")
+    return (
+      <>
+        <AgentMoreSheet
+          onClose={onClose}
+          onPanel={onPanel}
+          onOpenAgentSkills={onOpenAgentSkills}
+          onInspectSkill={setInspectSkillId}
+        />
+        {inspectSkillId && (
+          <AgentSkillInspectSheet
+            skillId={inspectSkillId}
+            onClose={() => setInspectSkillId(null)}
+          />
+        )}
+      </>
+    );
   if (panel === "create") return <CreateAgentSheet onClose={onClose} onCreated={onClose} />;
   if (panel === "preferences") return <PreferencesSheet onClose={onClose} />;
   if (panel === "memory")

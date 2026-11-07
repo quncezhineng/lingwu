@@ -1,43 +1,19 @@
-import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { ArrowRight, Bell, X } from "./icons";
 import { Button, Card, colors, ErrorNotice, resultSummary, s } from "./ui";
+import { useNotificationActions } from "./use-notification-actions";
 import { useWorkspace } from "./workspace";
 
 export function BackgroundUpdates() {
-  const { data, mutate } = useAgentWorkspace();
+  const { data } = useAgentWorkspace();
   const { open } = useWorkspace();
   const { t } = useTranslation();
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const updates = data?.notifications.filter((item) => !item.read && item.taskId) || [];
+  const { updates, error, busy, markRead, openNotification } = useNotificationActions();
   const update = updates[0];
   if (!update || data?.identity.showChatUpdates === false) return null;
-  async function markRead() {
-    if (!update) return false;
-    setBusy(true);
-    try {
-      await mutate(`/notifications/${update.id}/read`, {});
-      setError("");
-      return true;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function dismiss() {
-    await markRead();
-  }
-  // 打开任务就等于看过这条更新：和「通知」里一致地标为已读，右上角的提示随之收起。
-  async function view() {
-    if (!update?.taskId) return;
-    if (await markRead()) open({ type: "task", taskId: update.taskId });
-  }
   return (
     <Card style={{ padding: 16, gap: 10 }}>
       <View style={[s.between, { gap: 12 }]}>
@@ -49,7 +25,7 @@ export function BackgroundUpdates() {
           accessibilityRole="button"
           accessibilityLabel={t("tools.dismissBackgroundUpdate")}
           disabled={busy}
-          onPress={() => void dismiss()}
+          onPress={() => void markRead(update.id)}
           hitSlop={10}
           style={{ padding: 6 }}
         >
@@ -59,7 +35,7 @@ export function BackgroundUpdates() {
       <Text style={s.heading}>{update.title}</Text>
       <Text style={s.text}>{resultSummary(update.body)}</Text>
       <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-        <Button small icon={ArrowRight} busy={busy} onPress={() => void view()}>
+        <Button small icon={ArrowRight} busy={busy} onPress={() => void openNotification(update)}>
           {t("tools.viewTask")}
         </Button>
         {updates.length > 1 && (

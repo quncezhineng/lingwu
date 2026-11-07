@@ -2,15 +2,18 @@ import { useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import {
   type AgentMemory,
+  type AgentMemoryV2,
   DEFAULT_MEMORY_CATEGORY,
   MEMORY_CATEGORIES,
   type MemoryCategory,
 } from "../../../packages/domain/src/agent";
+import { useAgentSpace } from "./agent-space";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
   Activity,
+  Brain,
   Check,
   FileText,
   Heart,
@@ -18,6 +21,7 @@ import {
   Pencil,
   Plus,
   ShieldCheck,
+  Star,
   Target,
   Trash2,
 } from "./icons";
@@ -33,6 +37,8 @@ const CATEGORY_META: Record<MemoryCategory, { icon: IconComponent; label: Transl
   风险偏好: { icon: ShieldCheck, label: "preferences.categoryRisk" },
   关注领域: { icon: Activity, label: "preferences.categoryFocus" },
   分析习惯: { icon: FileText, label: "preferences.categoryHabit" },
+  关注标的: { icon: Star, label: "preferences.categoryWatch" },
+  复盘教训: { icon: Brain, label: "preferences.categoryLesson" },
 };
 
 function categoryOf(memory: AgentMemory): MemoryCategory {
@@ -290,7 +296,14 @@ function MemoryEditorSheet({
   );
 }
 
-export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) {
+export function PreferencesScreen({
+  embedded = false,
+  agentId,
+}: {
+  embedded?: boolean;
+  /** 传入时只展示该 Agent 专属记忆（多 Agent 隔离）；不传则展示账户级全部记忆。 */
+  agentId?: string;
+}) {
   const { data, mutate, error: workspaceError } = useAgentWorkspace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
@@ -332,6 +345,7 @@ export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) 
             : {
                 ...value,
                 source: t("preferences.addedByYou"),
+                ...(agentId ? { agentId } : {}),
               },
         ),
       t("preferences.savedNotice"),
@@ -347,7 +361,27 @@ export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) 
     });
   };
 
-  const memories = data?.memories ?? [];
+  const memories = agentId
+    ? (data?.memories ?? []).filter(
+        (m) => (((m as AgentMemoryV2).agentId ?? "").trim() || "default") === agentId,
+      )
+    : (data?.memories ?? []);
+  // 全局模式下按 Agent 聚合，展示「每个 Agent 记住了多少」。
+  const { agents } = useAgentSpace();
+  const byAgent = agentId
+    ? null
+    : (() => {
+        const counts = new Map<string, number>();
+        for (const m of memories) {
+          const id = ((m as AgentMemoryV2).agentId ?? "").trim() || "default";
+          counts.set(id, (counts.get(id) ?? 0) + 1);
+        }
+        return [...counts.entries()].map(([id, count]) => ({
+          id,
+          name: agents.find((a) => a.id === id)?.name ?? id,
+          count,
+        }));
+      })();
   // 记忆卡片：按容器实际宽度分列（宽浮层三列、页面两列、手机单列）。
   const layoutWidth = gridWidth || width;
   const columns = layoutWidth >= 860 ? 3 : layoutWidth >= 560 ? 2 : 1;
@@ -399,6 +433,29 @@ export function PreferencesScreen({ embedded = false }: { embedded?: boolean }) 
         <Text style={s.heading}>{t("preferences.memoryHeading")}</Text>
         <Text style={s.small}>{t("preferences.count", { count: memories.length })}</Text>
       </View>
+
+      {byAgent && byAgent.length > 0 && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {byAgent.map((entry) => (
+            <View
+              key={entry.id}
+              style={[
+                s.card,
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 7,
+                  paddingHorizontal: 11,
+                  paddingVertical: 7,
+                },
+              ]}
+            >
+              <Text style={[s.small, { fontWeight: "600" }]}>{entry.name}</Text>
+              <Text style={[s.small, { color: colors.muted }]}>{entry.count}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {memories.length ? (
         <View

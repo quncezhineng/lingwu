@@ -81,6 +81,7 @@ import {
   Sheet,
   s,
 } from "./ui";
+import { useNotificationActions } from "./use-notification-actions";
 import { type PriceReminderIntent, useWorkspace } from "./workspace";
 
 /**
@@ -1849,12 +1850,7 @@ export function GoalsScreen({
                 <SectionHeading title={t("agent.reminderTemplates")} />
                 <View style={{ flexDirection: width < 760 ? "column" : "row", gap: 12 }}>
                   {REMINDER_TEMPLATES.map((template) => {
-                    const Icon =
-                      template.id === "close-review"
-                        ? CalendarDays
-                        : template.id === "filing-watch"
-                          ? Bell
-                          : RefreshCw;
+                    const Icon = template.icon;
                     return (
                       <Pressable
                         key={template.id}
@@ -2218,6 +2214,7 @@ export const REMINDER_TEMPLATES: ReadonlyArray<{
   id: string;
   titleKey: TranslationKey;
   detailKey: TranslationKey;
+  icon: IconComponent;
   schedule: ReminderSchedule;
   timeOfDay: string;
   weekday?: number;
@@ -2226,6 +2223,7 @@ export const REMINDER_TEMPLATES: ReadonlyArray<{
     id: "close-review",
     titleKey: "agent.reminderTplCloseTitle",
     detailKey: "agent.reminderTplCloseDetail",
+    icon: CalendarDays,
     schedule: "daily",
     timeOfDay: "15:30",
   },
@@ -2233,16 +2231,43 @@ export const REMINDER_TEMPLATES: ReadonlyArray<{
     id: "filing-watch",
     titleKey: "agent.reminderTplFilingTitle",
     detailKey: "agent.reminderTplFilingDetail",
+    icon: Bell,
     schedule: "daily",
     timeOfDay: "09:00",
+  },
+  {
+    id: "premarket-brief",
+    titleKey: "agent.reminderTplPremarketTitle",
+    detailKey: "agent.reminderTplPremarketDetail",
+    icon: Clock3,
+    schedule: "daily",
+    timeOfDay: "08:30",
+  },
+  {
+    id: "earnings-watch",
+    titleKey: "agent.reminderTplEarningsTitle",
+    detailKey: "agent.reminderTplEarningsDetail",
+    icon: FileText,
+    schedule: "daily",
+    timeOfDay: "20:00",
   },
   {
     id: "weekly-review",
     titleKey: "agent.reminderTplWeeklyTitle",
     detailKey: "agent.reminderTplWeeklyDetail",
+    icon: RefreshCw,
     schedule: "weekly",
     timeOfDay: "18:00",
     weekday: 5,
+  },
+  {
+    id: "policy-watch",
+    titleKey: "agent.reminderTplPolicyTitle",
+    detailKey: "agent.reminderTplPolicyDetail",
+    icon: Globe2,
+    schedule: "weekly",
+    timeOfDay: "09:00",
+    weekday: 1,
   },
 ];
 
@@ -2650,7 +2675,7 @@ export function TrackingRow({
   }
 
   return (
-    <Card style={{ gap: 6, borderRadius: 11, padding: 14 }}>
+    <Card style={{ gap: 6, borderRadius: 11, padding: 14, flex: 1 }}>
       <View style={[s.row, { gap: 10 }]}>
         <Pressable
           accessibilityRole="button"
@@ -2865,38 +2890,22 @@ export function MonitorCard({
 }
 export function NotificationsSheet() {
   const { t } = useTranslation();
-  const { data, mutate } = useAgentWorkspace();
+  const { data } = useAgentWorkspace();
   const { close, open } = useWorkspace();
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { unreadCount, error, busy, readAll, openNotification } = useNotificationActions();
   const groups = useMemo(() => (data ? buildNotificationGroups(data) : []), [data]);
-  async function read(id: string, taskId?: string) {
-    try {
-      await mutate(`/notifications/${id}/read`, {});
-      if (taskId) open({ type: "task", taskId });
-    } catch (e) {
-      setError(errorText(e));
-    }
-  }
-  const unread = data?.notifications.filter((item) => !item.read).length || 0;
-  async function readAll() {
-    if (!unread || busy) return;
-    setBusy(true);
-    try {
-      await mutate("/notifications/read-all", {});
-      setError("");
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <Sheet
       title={t("agent.notificationsTitle")}
       subtitle={t("agent.notificationsSubtitle")}
       headerAction={
-        <Button small quietBusy busy={busy} disabled={!unread} onPress={() => void readAll()}>
+        <Button
+          small
+          quietBusy
+          busy={busy}
+          disabled={!unreadCount || busy}
+          onPress={() => void readAll()}
+        >
           {t("agent.markAllRead")}
         </Button>
       }
@@ -2963,7 +2972,7 @@ export function NotificationsSheet() {
                   )}
                   <View style={[s.between, { gap: 10 }]}>
                     <Text style={[s.small, s.metric]}>{stamp(item.createdAt)}</Text>
-                    <Button small onPress={() => void read(item.id, item.taskId)}>
+                    <Button small onPress={() => void openNotification(item)}>
                       {item.taskId
                         ? t("agent.viewTask")
                         : item.read

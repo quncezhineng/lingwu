@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { type ReactNode, useState } from "react";
+import { Pressable, useWindowDimensions, View } from "react-native";
 import { useAgentSpace } from "../agent-space";
 import { useAgentWorkspace } from "../agent-workspace";
 import { Text } from "../app-text";
@@ -29,6 +29,40 @@ export function BotPage({
 
 export function BotEmpty({ children }: { children: ReactNode }) {
   return <Text style={[s.muted, { paddingVertical: 24, lineHeight: 22 }]}>{children}</Text>;
+}
+
+/** 内容列宽达到该值才排两列，窄屏退回单列，避免卡片被挤没。 */
+const TWO_COLUMN_MIN_WIDTH = 400;
+const TWO_COLUMN_GAP = 10;
+
+/**
+ * 双列网格容器：宽屏两列、窄屏单列，用 `onLayout` 实测内容列宽决定。
+ *
+ * 三栏布局里内容列远窄于窗口，所以不能只依赖 `useWindowDimensions`；
+ * 首帧用窗口宽做初值，随后以真实列宽为准。子项通过 `columns` 拿到列数，
+ * 用 `itemWidth`（两列时的固定列宽，或单列时 undefined 撑满）自行排布。
+ */
+export function TwoColumnGrid({
+  children,
+}: {
+  children: (columns: number, itemWidth: number | undefined) => ReactNode;
+}) {
+  const { width: windowWidth } = useWindowDimensions();
+  const [width, setWidth] = useState(windowWidth);
+  const columns = width >= TWO_COLUMN_MIN_WIDTH ? 2 : 1;
+  const itemWidth = columns === 2 ? (width - TWO_COLUMN_GAP) / 2 : undefined;
+  return (
+    <View
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={
+        columns === 2
+          ? { flexDirection: "row", flexWrap: "wrap", gap: TWO_COLUMN_GAP }
+          : { gap: 10 }
+      }
+    >
+      {children(columns, itemWidth)}
+    </View>
+  );
 }
 
 /**

@@ -21,7 +21,13 @@ import { skillCatalog } from "./skill-catalog";
 import { Button, colors, Empty, IconButton, radius, SectionHeading, Sheet, s } from "./ui";
 
 /** 无关键词时目录一次渲染的技能上限，避免把 180+ 条技能全部铺进滚动列表。 */
-const SKILL_PAGE_SIZE = 60;
+const SKILL_PAGE_SIZE = 80;
+
+/** 技能网格列间距。 */
+const OPTION_GRID_GAP = 8;
+
+/** 列宽达到这个值才在格子里补一行说明；窄格子只留标题，避免被挤成省略号。 */
+const OPTION_CELL_DETAIL_MIN_WIDTH = 240;
 
 const noFocusRing =
   Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : undefined;
@@ -166,6 +172,8 @@ function OptionRow({
   first,
   accessibilityLabel,
   onPress,
+  onConnect,
+  connectLabel,
 }: {
   checked: boolean;
   disabled?: boolean;
@@ -176,14 +184,21 @@ function OptionRow({
   first: boolean;
   accessibilityLabel: string;
   onPress: () => void;
+  /** 未连接的连接器行提供「去连接」引导：整行可点击并交给外层进入连接流程。 */
+  onConnect?: () => void;
+  /** 「去连接」引导文字，仅在 disabled 且提供了 onConnect 时展示。 */
+  connectLabel?: string;
 }) {
+  // 仅当既未连接、又没有连接引导时才真正屏蔽点击；
+  // 提供 onConnect 的行保留整行点击，交给上层引导用户去完成连接。
+  const blocked = disabled && !onConnect;
   return (
     <Pressable
-      accessibilityRole="checkbox"
+      accessibilityRole={blocked ? "checkbox" : "button"}
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ checked, disabled: !!disabled }}
-      disabled={disabled}
-      onPress={onPress}
+      accessibilityState={{ checked, disabled: blocked }}
+      disabled={blocked}
+      onPress={() => (disabled && onConnect ? onConnect() : onPress())}
       style={({ pressed }) => [
         s.row,
         {
@@ -193,7 +208,7 @@ function OptionRow({
           paddingVertical: 10,
           borderTopWidth: first ? 0 : 1,
           borderTopColor: colors.line,
-          backgroundColor: pressed && !disabled ? colors.surface : colors.paper,
+          backgroundColor: pressed && !blocked ? colors.surface : colors.paper,
           opacity: disabled ? 0.5 : 1,
         },
       ]}
@@ -231,7 +246,13 @@ function OptionRow({
         </View>
       </View>
       {disabled ? (
-        <Text style={{ fontSize: 11, color: colors.faint }}>—</Text>
+        onConnect && connectLabel ? (
+          <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>
+            {connectLabel}
+          </Text>
+        ) : (
+          <Text style={{ fontSize: 11, color: colors.faint }}>—</Text>
+        )
       ) : (
         <SelectionBox checked={checked} />
       )}
@@ -309,6 +330,113 @@ function OptionList({ children }: { children: ReactNode }) {
 }
 
 /**
+ * 技能两列网格：用 onLayout 实测容器宽度换算列宽——弹层在桌面端最宽 760、
+ * 手机上接近满宽，用窗口宽度估算会让格子在首帧错位。
+ * 实测到之前用 48% 兜底，保证一开始就是两列。
+ */
+function OptionGrid({ children }: { children: (cellWidth: number) => ReactNode }) {
+  const [width, setWidth] = useState(0);
+  const cellWidth = width > 0 ? (width - OPTION_GRID_GAP) / 2 : 0;
+  return (
+    <View
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: "row", flexWrap: "wrap", gap: OPTION_GRID_GAP }}
+    >
+      {children(cellWidth)}
+    </View>
+  );
+}
+
+/**
+ * 网格单元：两列时把原来的「整行 + 分隔线」压成独立小卡片，
+ * 勾选态用底色 + 描边表达（不再依赖行间分隔线）。
+ */
+function OptionCard({
+  checked,
+  disabled,
+  icon: Icon,
+  title,
+  detail,
+  status,
+  cellWidth,
+  accessibilityLabel,
+  onPress,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  icon: IconComponent;
+  title: string;
+  detail?: string;
+  status?: string;
+  /** 由 OptionGrid 实测出的列宽，格子据此撑满半栏。 */
+  cellWidth: number;
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  // 状态（如「已停用」）比描述更重要，窄格子也要保留；描述只在宽格子补一行。
+  const sub = status ?? (cellWidth >= OPTION_CELL_DETAIL_MIN_WIDTH ? detail : undefined);
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked, disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        s.row,
+        {
+          width: cellWidth || "48%",
+          gap: 9,
+          minHeight: 52,
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          borderWidth: 1,
+          borderColor: checked ? colors.primary : colors.line,
+          borderRadius: radius.field,
+          backgroundColor:
+            checked && !disabled
+              ? colors.sky
+              : pressed && !disabled
+                ? colors.surface
+                : colors.paper,
+          opacity: disabled ? 0.5 : 1,
+        },
+      ]}
+    >
+      <View
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 8,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.line,
+        }}
+      >
+        <Icon size={14} color={colors.muted} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>
+          {title}
+        </Text>
+        {!!sub && (
+          <Text numberOfLines={1} style={{ fontSize: 11, lineHeight: 15, color: colors.faint }}>
+            {sub}
+          </Text>
+        )}
+      </View>
+      {disabled ? (
+        <Text style={{ fontSize: 11, color: colors.faint }}>—</Text>
+      ) : (
+        <SelectionBox checked={checked} />
+      )}
+    </Pressable>
+  );
+}
+
+/**
  * 技能选择弹层：把 Agent 的自定义技能与技能目录合并成一个可搜索的多选列表，
  * 勾选即时写入对话选择，关闭或点「应用」收起弹层。
  */
@@ -355,47 +483,51 @@ export function SkillPickerSheet({
         {custom.length > 0 && (
           <View style={{ gap: 8 }}>
             <SectionHeading title={t("chat.skillPickerMineHeading")} count={custom.length} />
-            <OptionList>
-              {custom.map((skill, index) => {
-                const checked = selectedIds.includes(skill.id);
-                return (
-                  <OptionRow
-                    key={skill.id}
-                    first={index === 0}
-                    checked={checked}
-                    icon={Brain}
-                    title={skill.name}
-                    detail={skill.purpose}
-                    status={skill.enabled ? undefined : t("agentSpace.skillDisabled")}
-                    accessibilityLabel={skill.name}
-                    onPress={() => onToggle(skill.id)}
-                  />
-                );
-              })}
-            </OptionList>
+            <OptionGrid>
+              {(cellWidth) =>
+                custom.map((skill) => {
+                  const checked = selectedIds.includes(skill.id);
+                  return (
+                    <OptionCard
+                      key={skill.id}
+                      cellWidth={cellWidth}
+                      checked={checked}
+                      icon={Brain}
+                      title={skill.name}
+                      detail={skill.purpose}
+                      status={skill.enabled ? undefined : t("agentSpace.skillDisabled")}
+                      accessibilityLabel={skill.name}
+                      onPress={() => onToggle(skill.id)}
+                    />
+                  );
+                })
+              }
+            </OptionGrid>
           </View>
         )}
         {visible.length > 0 && (
           <View style={{ gap: 8 }}>
             <SectionHeading title={t("chat.skillPickerCatalogHeading")} count={filtered.length} />
-            <OptionList>
-              {visible.map((skill, index) => {
-                const checked = selectedIds.includes(skill.id);
-                const title = zh ? skill.titleZh : skill.titleEn;
-                return (
-                  <OptionRow
-                    key={skill.id}
-                    first={index === 0}
-                    checked={checked}
-                    icon={Brain}
-                    title={title}
-                    detail={zh ? skill.descriptionZh : skill.descriptionEn}
-                    accessibilityLabel={title}
-                    onPress={() => onToggle(skill.id)}
-                  />
-                );
-              })}
-            </OptionList>
+            <OptionGrid>
+              {(cellWidth) =>
+                visible.map((skill) => {
+                  const checked = selectedIds.includes(skill.id);
+                  const title = zh ? skill.titleZh : skill.titleEn;
+                  return (
+                    <OptionCard
+                      key={skill.id}
+                      cellWidth={cellWidth}
+                      checked={checked}
+                      icon={Brain}
+                      title={title}
+                      detail={zh ? skill.descriptionZh : skill.descriptionEn}
+                      accessibilityLabel={title}
+                      onPress={() => onToggle(skill.id)}
+                    />
+                  );
+                })
+              }
+            </OptionGrid>
             {hidden > 0 && (
               <Text style={s.small}>{t("chat.skillPickerMore", { count: hidden })}</Text>
             )}
@@ -428,6 +560,7 @@ export function ConnectorPickerSheet({
   onConfirm,
   onClose,
   onManage,
+  onConnect,
 }: {
   options: readonly ConnectorOption[];
   selectedIds: readonly string[];
@@ -435,6 +568,8 @@ export function ConnectorPickerSheet({
   onConfirm: () => void;
   onClose: () => void;
   onManage?: () => void;
+  /** 点击未连接的连接器行时触发的「去连接」引导（如进入连接管理页）。 */
+  onConnect?: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const selectedCount = selectedIds.length;
@@ -463,6 +598,8 @@ export function ConnectorPickerSheet({
                 )}
                 accessibilityLabel={option.name}
                 onPress={() => onToggle(option.id)}
+                onConnect={option.connected ? undefined : () => onConnect?.(option.id)}
+                connectLabel={option.connected ? undefined : t("chat.connectorPickerConnect")}
               />
             ))}
           </OptionList>

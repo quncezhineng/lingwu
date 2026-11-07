@@ -134,3 +134,24 @@ export async function agentModelForThread(
   );
   return saved?.agents.find((agent) => agent.threadId === id)?.model;
 }
+
+/**
+ * 线程所属 Agent 的 id（= agentSpaceSchema.agents[].id）。
+ *
+ * 多 Agent 记忆系统的隔离维度：记忆写入 / 召回时用它反查当前 Agent，
+ * 旧数据（无对应线程映射）由调用方回退到 "default"。
+ */
+export async function agentIdForThread(
+  db: { get: <T>(owner: string, kind: string, id: string) => Promise<T | null> },
+  owner: string,
+  threadId?: string | null,
+): Promise<string | undefined> {
+  const id = threadId?.trim();
+  if (!id) return undefined;
+  const saved = await db.get<PersistedAgentSpace & { id: string }>(
+    owner,
+    "agent-settings",
+    "space",
+  );
+  return saved?.agents.find((agent) => agent.threadId === id)?.id;
+}

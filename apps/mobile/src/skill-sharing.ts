@@ -4,6 +4,10 @@
  * 「应用与能力 → 我的技能」与 Agent 详情的技能页共用同一套判定：
  * 自建技能属于某个 Agent，复制到其他 Agent 时是同内容的新副本（id 不同），
  * 因此按内容指纹判断目标 Agent 是否已经持有这份技能。
+ *
+ * 「添加到智能体」展示全部 Agent，包括创建该技能的来源 Agent——
+ * 它天然持有这份技能，在列表里显示为「已添加」且只读；
+ * 无论从哪个入口打开，都禁止移除最后一份副本，避免自建技能彻底消失。
  */
 import type { AgentDefinition, AgentSkill } from "./agent-space-model";
 
@@ -30,12 +34,35 @@ export function findSkillCopy(
   return target.customSkills.find((candidate) => skillFingerprint(candidate) === fingerprint);
 }
 
-/** 可作为添加目标的 Agent：排除技能来源 Agent（它本来就持有这份技能）。 */
-export function skillTargetAgents(agents: AgentDefinition[], sourceAgentId: string) {
-  return agents.filter((agent) => agent.id !== sourceAgentId);
+/**
+ * 已持有该技能的 Agent id（按内容指纹判定，含创建该技能的来源 Agent）。
+ * 「添加到智能体」面板据此标记「已添加」与底部计数，面板本身展示全部 Agent。
+ */
+export function skillHolderAgentIds(agents: AgentDefinition[], skill: SkillContent): string[] {
+  return agents.filter((agent) => findSkillCopy(agent, skill)).map((agent) => agent.id);
 }
 
-/** 「我的技能」条目：技能本身 + 它所在的 Agent（添加 / 移除副本时需要）。 */
+/**
+ * 「添加到智能体」里不可移除的 Agent id（只锁定已持有的行）：
+ * - 来源 Agent 的那份副本只读，始终保留；
+ * - 只剩一个持有者时禁止移除最后一份，避免技能彻底消失。
+ *
+ * 「来源」由调用方给出：「我的技能」用汇总条目的 agentId，Agent 详情用当前 Agent。
+ * 数据模型没有记录技能最初创建于哪个 Agent，因此锁定的是详情页上下文里的那份原始副本。
+ */
+export function skillLockedAgentIds(
+  agents: AgentDefinition[],
+  skill: SkillContent,
+  sourceAgentId?: string,
+): string[] {
+  const holders = skillHolderAgentIds(agents, skill);
+  const locked = new Set<string>();
+  if (sourceAgentId && holders.includes(sourceAgentId)) locked.add(sourceAgentId);
+  if (holders.length === 1) locked.add(holders[0]);
+  return holders.filter((id) => locked.has(id));
+}
+
+/** 「我的技能」条目：技能本身 + 它所在的 Agent（来源 Agent，用于列表标识）。 */
 export type SharedSkillEntry = {
   skill: AgentSkill;
   agentId: string;
@@ -66,15 +93,23 @@ export function collectSharedSkills(agents: AgentDefinition[]): SharedSkillEntry
 /**
  * 在目标 Agent 上切换该技能的持有状态：没有副本就复制一份，已有副本就删掉。
  *
- * 返回本次动作，调用方据此给出提示文案。
+ * 传入 `guard` 时启用只读保护：命中 `skillLockedAgentIds` 的副本不删除，返回 `blocked`，
+ * 防止来源 Agent 或最后一份副本被移除。返回本次动作，调用方据此给出提示文案。
  */
 export function toggleSkillShare(
   store: SkillStore,
   target: AgentDefinition,
   skill: SkillContent,
-): "added" | "removed" {
+  guard?: { agents: AgentDefinition[]; sourceAgentId?: string },
+): "added" | "removed" | "blocked" {
   const existing = findSkillCopy(target, skill);
   if (existing) {
+    if (
+      guard &&
+      skillLockedAgentIds(guard.agents, skill, guard.sourceAgentId).includes(target.id)
+    ) {
+      return "blocked";
+    }
     store.deleteSkill(target.id, existing.id);
     return "removed";
   }
@@ -85,4 +120,28 @@ export function toggleSkillShare(
     outputFormat: skill.outputFormat,
   });
   return "added";
+}
+
+/**
+ * 删除一份自建技能及其在所有 Agent 下的副本。
+ *
+ * 「我的技能」按内容指纹去重汇总，只删列表里那一条会让其它 Agent 的副本
+ * 立刻重新出现在列表里，因此删除操作按内容清掉全部副本。
+ * 返回实际删除的副本数量。
+ */
+export function deleteSkillEverywhere(
+  store: Pick<SkillStore, "deleteSkill">,
+  agents: AgentDefinition[],
+  skill: SkillContent,
+): number {
+  const fingerprint = skillFingerprint(skill);
+  let removed = 0;
+  for (const agent of agents) {
+    for (const copy of agent.customSkills) {
+      if (skillFingerprint(copy) !== fingerprint) continue;
+      store.deleteSkill(agent.id, copy.id);
+      removed += 1;
+    }
+  }
+  return removed;
 }

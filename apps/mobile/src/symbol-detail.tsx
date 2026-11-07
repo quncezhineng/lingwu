@@ -34,6 +34,7 @@ import { directionOf, formatPercent } from "./market-format";
 import { monitorConditionText, monitorScheduleText } from "./monitor-text";
 import { SymbolNotesSection } from "./note-ui";
 import { setNotesIntent } from "./notes";
+import { markNotificationRead } from "./notification-actions";
 import {
   checkPriceAlert,
   deletePriceAlert,
@@ -631,7 +632,7 @@ export function SymbolDetailSheet({
   const { api, close, prefillPrompt, navigate, notify, open, refresh, requestPriceReminder } =
     useWorkspace();
   const { t } = useTranslation();
-  const { data: agentData } = useAgentWorkspace();
+  const { data: agentData, mutate } = useAgentWorkspace();
   const [alerts, setAlerts] = useState<PriceAlertRecord[]>();
   const [alertsError, setAlertsError] = useState("");
   const [alertBusyId, setAlertBusyId] = useState<string>();
@@ -841,9 +842,7 @@ export function SymbolDetailSheet({
       notify(t(key));
       // 触发后后端已写入通知：用真实通知主键标记已读，并刷新未读角标。
       if (result.notificationId) {
-        await api
-          .request(`/api/agent/notifications/${encodeURIComponent(result.notificationId)}/read`, {})
-          .catch(() => undefined);
+        await markNotificationRead(mutate, result.notificationId).catch(() => undefined);
         void refresh().catch(() => undefined);
       }
       await loadAlerts();

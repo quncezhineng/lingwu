@@ -110,8 +110,15 @@ export interface Idea {
   taskId?: string;
   createdAt: string;
 }
-/** Demo 投资偏好页固定使用四类记忆，值直接作为稳定的持久化契约。 */
-export const MEMORY_CATEGORIES = ["投资目标", "风险偏好", "关注领域", "分析习惯"] as const;
+/** Demo 投资偏好页固定使用多类记忆，值直接作为稳定的持久化契约。 */
+export const MEMORY_CATEGORIES = [
+  "投资目标",
+  "风险偏好",
+  "关注领域",
+  "分析习惯",
+  "关注标的",
+  "复盘教训",
+] as const;
 export type MemoryCategory = (typeof MEMORY_CATEGORIES)[number];
 export const DEFAULT_MEMORY_CATEGORY: MemoryCategory = "投资目标";
 export interface AgentMemory {
@@ -122,6 +129,54 @@ export interface AgentMemory {
   /** 旧版记忆没有分类；界面读取时回退到默认分类。 */
   category?: MemoryCategory;
   updatedAt?: string;
+}
+
+// ─── 多 Agent 记忆系统（M1）───
+
+/** 记忆类型：事实 / 投研论点 / 分析过程 / 投融资决策。 */
+export type MemoryKind = "fact" | "thesis" | "analysis" | "decision";
+
+/** 投研术语：结构化字段，供召回 / 筛选 / 分析复用。 */
+export interface FinanceTerms {
+  assetClass?: "股票" | "债券" | "基金" | "外汇" | "大宗商品" | "数字资产" | "RWA";
+  market?: "US" | "CN" | "HK";
+  symbol?: string;
+  sector?: string;
+  strategy?: string;
+  timeHorizon?: string;
+  valuation?: string;
+  riskLevel?: "低" | "中" | "高";
+}
+
+/** 个人投融资习惯：针对「投融资决策」记忆的固定术语。 */
+export interface DealHabits {
+  stage?: "发现" | "尽调" | "谈判" | "决策" | "交割" | "退出";
+  counterparty?: string;
+  amount?: string;
+  terms?: string;
+  decision?: string;
+  rationale?: string;
+}
+
+/**
+ * 多 Agent 记忆文件。相比旧 `AgentMemory`，新增：
+ *   - agentId：归属 Agent（= agentSpaceSchema.agents[].id），旧数据回退 "default"
+ *   - kind：记忆类型（fact/thesis/analysis/decision），旧 category 映射到 fact
+ *   - financeTerms / dealHabits：金融投研 / 投融资结构化术语
+ * 旧 `AgentMemory` 字段（text/source/category）继续保留以兼容存量数据与现有 UI。
+ */
+export interface AgentMemoryV2 extends AgentMemory {
+  agentId: string;
+  kind: MemoryKind;
+  /** 正文（分析过程 / 投融资详情，Markdown）。 */
+  body?: string;
+  financeTerms?: FinanceTerms;
+  dealHabits?: DealHabits;
+  tags?: string[];
+  privacy?: "user_only" | "agent";
+  taskId?: string;
+  threadId?: string;
+  artifactId?: string;
 }
 export interface AgentArtifact {
   id: string;

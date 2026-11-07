@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
 import type {
@@ -21,6 +20,10 @@ const memorySchema = z.object({
   text,
   source: z.string().trim().min(1).max(200).optional(),
   category: z.enum(MEMORY_CATEGORIES).optional(),
+  /** 归属 Agent（多 Agent 隔离）；缺省归 "default"。 */
+  agentId: z.string().trim().min(1).max(128).optional(),
+  /** 记忆类型；缺省 fact。 */
+  kind: z.enum(["fact", "thesis", "analysis", "decision"]).optional(),
 });
 const goalPatchSchema = z.object({
   status: z.enum(["active", "paused", "completed"]).optional(),
@@ -111,14 +114,18 @@ export function agentRoutes(service: AgentService): Hono<{ Variables: { owner: s
   });
   app.post("/memories", async (c) => {
     const body = memorySchema.parse(await c.req.json());
-    const memory: AgentMemory = {
-      id: randomUUID(),
-      text: body.text,
-      source: body.source ?? "You",
-      category: body.category ?? DEFAULT_MEMORY_CATEGORY,
-      createdAt: new Date().toISOString(),
-    };
-    return c.json(await service.db.put(c.get("owner"), "memories", memory), 201);
+    // 统一走 saveMemory：带 agentId / kind，并双写 Hindsight。
+    return c.json(
+      await service.saveMemory(c.get("owner"), {
+        agentId: body.agentId ?? "default",
+        kind: body.kind ?? "fact",
+        text: body.text,
+        source: body.source ?? "You",
+        category: body.category ?? DEFAULT_MEMORY_CATEGORY,
+        tags: body.category ? [body.category] : [],
+      }),
+      201,
+    );
   });
   app.post("/memories/:id", async (c) => {
     const body = memorySchema.parse(await c.req.json());
@@ -133,9 +140,19 @@ export function agentRoutes(service: AgentService): Hono<{ Variables: { owner: s
     return c.json(memory);
   });
   app.post("/memories/:id/forget", async (c) => {
-    if (!(await service.db.take(c.get("owner"), "memories", c.req.param("id"))))
+    if (!(await service.forgetMemory(c.get("owner"), c.req.param("id"))))
       throw new AppError("Memory not found", 404);
     return c.json({ ok: true });
+  });
+  // 全局记忆中枢（右侧栏）：聚合所有 Agent 的记忆与分布。
+  app.get("/memory-hub", async (c) => {
+    const owner = c.get("owner");
+    const [hub, agents] = await Promise.all([service.memoryHub(owner), service.listAgents(owner)]);
+    return c.json({ ...hub, agents });
+  });
+  // 单 Agent 专属记忆（左侧栏 Agent 详情页）。
+  app.get("/agents/:agentId/memories", async (c) => {
+    return c.json(await service.agentMemories(c.get("owner"), c.req.param("agentId")));
   });
   app.post("/identity", async (c) => {
     const body = z

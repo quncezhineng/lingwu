@@ -16,8 +16,13 @@ import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-h
 import { agentLayout } from "./agent-layout";
 import { AgentOnboarding } from "./agent-onboarding";
 import { AgentOrb } from "./agent-orb";
-import { AgentSettingsScreen } from "./agent-settings-screen";
-import { AgentMoreContent, type AgentPanel, AgentSheets } from "./agent-sheets";
+import { AgentSettingsScreen, type AgentSettingsTab } from "./agent-settings-screen";
+import {
+  AgentMoreContent,
+  type AgentPanel,
+  AgentSheets,
+  AgentSkillInspectSheet,
+} from "./agent-sheets";
 import { AgentSideDrawer } from "./agent-side-drawer";
 import { useAgentSpace } from "./agent-space";
 import {
@@ -56,6 +61,7 @@ import {
   X,
 } from "./icons";
 import { ModalOverlay } from "./modal-overlay";
+import { unreadCount } from "./notification-actions";
 import { PreferencesScreen } from "./preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./screens";
 import { GlobalSearchSheet } from "./search-sheet";
@@ -632,7 +638,7 @@ function AgentRail({
   }, [orderedAgents]);
   const { navigate, open, workspace } = useWorkspace();
   const { data: agentData } = useAgentWorkspace();
-  const unreadNotifications = (agentData?.notifications ?? []).filter((item) => !item.read).length;
+  const unreadNotifications = unreadCount(agentData?.notifications);
   const accountNickname = workspace.profile.name.trim() || t("agentSpace.account");
   const choose = (agent: AgentDefinition) => {
     selectAgent(agent.id);
@@ -966,96 +972,110 @@ function CapabilityRail({
   onClose,
   onOpen,
   onCollapse,
+  onOpenAgentSkills,
   compact = false,
 }: {
   onClose?: () => void;
   onOpen: (panel: AgentPanel) => void;
   onCollapse?: () => void;
+  onOpenAgentSkills: () => void;
   compact?: boolean;
 }) {
   const { t } = useTranslation();
   const { navigate } = useWorkspace();
   const { top: safeTop } = useSafeAreaInsets();
   const drawerTop = Math.max(safeTop, 12);
+  // 点击能力卡片展示的技能详情 id；作为兄弟节点挂载，避免与侧栏容器嵌套问题。
+  const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
   return (
-    <View
-      style={{
-        flex: 1,
-        minHeight: 0,
-        backgroundColor: colors.surfaceRaised,
-        borderLeftWidth: compact ? 0 : 1,
-        borderLeftColor: colors.line,
-      }}
-    >
-      {compact && (
-        <View
-          style={{
-            minHeight: drawerTop + 44,
-            paddingTop: drawerTop,
-            paddingHorizontal: 18,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 10,
-          }}
-        >
-          {onClose && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("ui.closeDetails")}
-              onPress={onClose}
-              style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center" }}
-            >
-              <X size={18} color={colors.muted} />
-            </Pressable>
-          )}
-        </View>
-      )}
-      {!compact && onCollapse && (
-        <View
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            zIndex: 2,
-            borderRadius: radius.control,
-            backgroundColor: colors.surfaceRaised,
-          }}
-        >
-          <RailToggleButton onPress={onCollapse} />
-        </View>
-      )}
-      <ScrollView
-        style={{ flex: 1, minHeight: 0 }}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 14,
-          paddingTop: 18,
-          paddingBottom: 24,
+    <>
+      <View
+        style={{
+          flex: 1,
+          minHeight: 0,
+          backgroundColor: colors.surfaceRaised,
+          borderLeftWidth: compact ? 0 : 1,
+          borderLeftColor: colors.line,
         }}
       >
-        <Text
-          style={{
-            marginBottom: 14,
-            paddingHorizontal: 6,
-            fontSize: 15,
-            fontFamily: fonts.serif,
-            fontWeight: "600",
-            color: colors.text,
+        {compact && (
+          <View
+            style={{
+              minHeight: drawerTop + 44,
+              paddingTop: drawerTop,
+              paddingHorizontal: 18,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: 10,
+            }}
+          >
+            {onClose && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("ui.closeDetails")}
+                onPress={onClose}
+                style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center" }}
+              >
+                <X size={18} color={colors.muted} />
+              </Pressable>
+            )}
+          </View>
+        )}
+        {!compact && onCollapse && (
+          <View
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              zIndex: 2,
+              borderRadius: radius.control,
+              backgroundColor: colors.surfaceRaised,
+            }}
+          >
+            <RailToggleButton onPress={onCollapse} />
+          </View>
+        )}
+        <ScrollView
+          style={{ flex: 1, minHeight: 0 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 14,
+            paddingTop: 18,
+            paddingBottom: 24,
           }}
         >
-          {t("agentSpace.more")}
-        </Text>
-        <AgentMoreContent
-          onPanel={onOpen}
-          compact={compact}
-          onOpenApps={() => {
-            onClose?.();
-            navigate("apps");
-          }}
-        />
-      </ScrollView>
-    </View>
+          <Text
+            style={{
+              marginBottom: 14,
+              paddingHorizontal: 6,
+              fontSize: 15,
+              fontFamily: fonts.serif,
+              fontWeight: "600",
+              color: colors.text,
+            }}
+          >
+            {t("agentSpace.more")}
+          </Text>
+          <AgentMoreContent
+            onPanel={onOpen}
+            compact={compact}
+            onInspectSkill={setInspectSkillId}
+            onOpenApps={() => {
+              onClose?.();
+              navigate("apps");
+            }}
+            onOpenAgentSkills={() => {
+              onClose?.();
+              onOpenAgentSkills();
+            }}
+          />
+        </ScrollView>
+      </View>
+      {inspectSkillId && (
+        <AgentSkillInspectSheet skillId={inspectSkillId} onClose={() => setInspectSkillId(null)} />
+      )}
+    </>
   );
 }
 
@@ -1359,6 +1379,9 @@ export function AgentProductShell({
     [],
   );
   const [drawer, setDrawer] = useState<"agents" | "capabilities" | null>(null);
+  // 「解锁更多功能」跳转到 Agent 详情时携带的分区意图：让详情页直接定位到「技能」。
+  // 需要在页面可能已挂载的情况下响应，因此交给 AgentSettingsScreen 用 effect 消费后清除。
+  const [agentTabIntent, setAgentTabIntent] = useState<AgentSettingsTab | null>(null);
   const [mountedIds, setMountedIds] = useState<string[]>([current.id]);
 
   useEffect(() => {
@@ -1462,6 +1485,15 @@ export function AgentProductShell({
     setDrawer(null);
     setPanelStack([next]);
   };
+
+  // 「解锁更多功能」：收起浮层/抽屉，进入当前 Agent 详情设置的「技能」分区。
+  // navigate 对相同 Section 是无操作的，桌面端已停留在详情页时只更新分区意图。
+  const openAgentSkills = useCallback(() => {
+    setDrawer(null);
+    setPanelStack([]);
+    setAgentTabIntent("skills");
+    navigate("agent");
+  }, [navigate]);
 
   // Account initialization is a separate screen: no navigation, chat or task controls
   // mount until the first Agent is ready. Wait for saved progress before choosing a screen.
@@ -1571,7 +1603,10 @@ export function AgentProductShell({
                   })}
                 </>
               ) : section === "agent" ? (
-                <AgentSettingsScreen />
+                <AgentSettingsScreen
+                  tabIntent={agentTabIntent}
+                  onTabIntentConsumed={() => setAgentTabIntent(null)}
+                />
               ) : (
                 <SecondarySection onOpen={openPanel} onSignOut={onSignOut} />
               )}
@@ -1602,7 +1637,11 @@ export function AgentProductShell({
                   onResize={(value, finished) => resizeColumn("right", value, finished)}
                 />
                 <View style={{ width: columnWidths.right, flexShrink: 0, minHeight: 0 }}>
-                  <CapabilityRail onOpen={openPanel} onCollapse={toggleRail} />
+                  <CapabilityRail
+                    onOpen={openPanel}
+                    onCollapse={toggleRail}
+                    onOpenAgentSkills={openAgentSkills}
+                  />
                 </View>
               </>
             ))}
@@ -1624,7 +1663,12 @@ export function AgentProductShell({
                 onClose={() => setDrawer(null)}
               />
             ) : (
-              <CapabilityRail compact onOpen={openPanel} onClose={() => setDrawer(null)} />
+              <CapabilityRail
+                compact
+                onOpen={openPanel}
+                onClose={() => setDrawer(null)}
+                onOpenAgentSkills={openAgentSkills}
+              />
             )}
           </AgentSideDrawer>
         )}
@@ -1635,6 +1679,7 @@ export function AgentProductShell({
           onDismiss={dismissPanels}
           onPanel={pushPanel}
           onSignOut={onSignOut}
+          onOpenAgentSkills={openAgentSkills}
         />
         {searchOpen && <GlobalSearchSheet onClose={() => setSearchOpen(false)} />}
         {ideasOpen && <IdeasOverlay onClose={() => setIdeasOpen(false)} />}

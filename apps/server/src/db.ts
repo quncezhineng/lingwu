@@ -30,6 +30,24 @@ export class Store {
     );
     return result.rows.map((row) => row.data as T);
   }
+  /**
+   * 分页读取某 owner 下某 kind 的记录，按 data->>'id' 升序，且 id 严格大于游标。
+   * 用于存量迁移：游标即上次已处理的最大 id，天然支持断点续传、避免 OFFSET 深翻页。
+   */
+  async listAfter<T = Record<string, unknown>>(
+    owner: string,
+    kind: string,
+    afterId: string | null,
+    limit: number,
+  ): Promise<T[]> {
+    const result = await this.db.query(
+      afterId
+        ? `SELECT data FROM records WHERE owner=$1 AND kind=$2 AND data->>'id' > $3::text ORDER BY data->>'id' ASC LIMIT $4::int`
+        : `SELECT data FROM records WHERE owner=$1 AND kind=$2 ORDER BY data->>'id' ASC LIMIT $3::int`,
+      afterId ? [owner, kind, afterId, limit] : [owner, kind, limit],
+    );
+    return result.rows.map((row) => row.data as T);
+  }
   async listByGoalId<T = Record<string, unknown>>(
     owner: string,
     kind: string,
@@ -135,6 +153,14 @@ export class Store {
       [kind],
     );
     return result.rows.map((row) => row.data as { owner: string; value: T });
+  }
+  /** 某 kind 下去重后的 owner 列表（用于「对每个 owner 执行一次维护」的遍历）。 */
+  async owners(kind: string): Promise<string[]> {
+    const result = await this.db.query(
+      "SELECT DISTINCT jsonb_build_object('owner',owner) AS data FROM records WHERE kind=$1 ORDER BY owner",
+      [kind],
+    );
+    return result.rows.map((row) => (row.data as { owner: string }).owner);
   }
   async claim<T>(owner: string, id: string, status: string, now: string): Promise<T | null> {
     const result = await this.db.query(

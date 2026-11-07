@@ -101,6 +101,7 @@ const chat = {
   "chat.connectorPickerEmptyDetail":
     "Connect services such as Gmail or Calendar to use them in this conversation.",
   "chat.connectorPickerManage": "Manage connections",
+  "chat.connectorPickerConnect": "Connect",
   "chat.removeSkill": "Remove skill: {name}",
   "chat.removeConnector": "Remove connector: {name}",
   "chat.uploadMaterialDone": "Added “{name}” to the conversation.",

@@ -2134,6 +2134,10 @@ export function ChatScreen({
             setConnectorPickerOpen(false);
             navigate("connections");
           }}
+          onConnect={() => {
+            setConnectorPickerOpen(false);
+            navigate("connections");
+          }}
         />
       )}
       {filesOpen && (
