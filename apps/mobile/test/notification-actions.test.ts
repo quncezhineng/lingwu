@@ -9,10 +9,7 @@ import {
   unreadNotifications,
 } from "../src/notification-actions.ts";
 
-function notification(
-  id: string,
-  overrides: Partial<AgentNotification> = {},
-): AgentNotification {
+function notification(id: string, overrides: Partial<AgentNotification> = {}): AgentNotification {
   return {
     id,
     title: id,

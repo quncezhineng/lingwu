@@ -37,7 +37,7 @@ services:
       # DeepSeek 适合中国网络；若用 OpenAI 改成 HINDSIGHT_API_LLM_PROVIDER=openai + OPENAI key。
       HINDSIGHT_API_LLM_PROVIDER: ${HINDSIGHT_LLM_PROVIDER:-deepseek}
       HINDSIGHT_API_LLM_API_KEY: ${HINDSIGHT_LLM_API_KEY:?Set HINDSIGHT_LLM_API_KEY to your DeepSeek/OpenAI key}
-      HINDSIGHT_API_LLM_MODEL: ${HINDSIGHT_LLM_MODEL:-deepseek-chat}
+      HINDSIGHT_API_LLM_MODEL: ${HINDSIGHT_LLM_MODEL:-deepseek-flash}
       HINDSIGHT_API_LLM_BASE_URL: ${HINDSIGHT_LLM_BASE_URL:-https://api.deepseek.com}
       # ── Embedding（本地模型，中国网络友好，无需外接 embedding 服务）──
       HINDSIGHT_API_EMBEDDINGS_PROVIDER: ${HINDSIGHT_EMBEDDINGS_PROVIDER:-local}

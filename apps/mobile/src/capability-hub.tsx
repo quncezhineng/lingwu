@@ -899,7 +899,7 @@ function CategoryRail({
   }
 
   return (
-    <View style={{ width: 200, gap: 2 }}>
+    <View style={{ width: 180, gap: 2 }}>
       {options.map((option) => {
         const active = category === option.id;
         return (
@@ -1023,23 +1023,30 @@ function HubTabBar<T extends string>({
 }
 
 /**
- * 我的技能列表：所有 Agent 自建技能的汇总，点击查看详情。
+ * 我的技能列表：所有 Agent 自建技能的汇总，自适应分栏网格，点击卡片查看详情。
  *
  * 技能不按 Agent 归类——同一份技能在不同 Agent 下只出现一次，
- * 因此行内不显示来源 Agent，右侧给出删除入口与详情箭头。
+ * 因此行内不显示来源 Agent；删除入口放在详情弹层的底部，卡片保持干净。
  */
 function MySkillsList({
   entries,
   onSelect,
-  onDelete,
 }: {
   entries: MySkillEntry[];
   onSelect: (entry: MySkillEntry) => void;
-  onDelete: (entry: MySkillEntry) => void;
 }) {
   const { t } = useTranslation();
+  /** 用 onLayout 实测容器宽度换算卡片宽度，首帧用单列兜底，避免按窗口宽度估算造成错位。 */
+  const [containerWidth, setContainerWidth] = useState(0);
+  const columns = containerWidth >= 640 ? 3 : containerWidth >= 400 ? 2 : 1;
+  const gap = 10;
+  const itemWidth =
+    columns > 1 ? Math.floor((containerWidth - gap * (columns - 1)) / columns) : containerWidth;
   return (
-    <View style={{ gap: 8 }}>
+    <View
+      onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: "row", flexWrap: "wrap", gap }}
+    >
       {entries.map(({ skill, agentId }) => (
         <Pressable
           key={`${agentId}:${skill.id}`}
@@ -1047,65 +1054,39 @@ function MySkillsList({
           accessibilityLabel={`${t("agent.mySkills")} · ${skill.name}`}
           onPress={() => onSelect({ skill, agentId })}
           style={({ pressed }) => ({
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            paddingVertical: 11,
-            paddingHorizontal: 12,
+            width: itemWidth,
+            gap: 6,
+            paddingVertical: 12,
+            paddingHorizontal: 13,
             borderRadius: radius.card,
             borderWidth: 1,
             borderColor: colors.line,
             backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
           })}
         >
-          <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: colors.text,
-                fontSize: 13,
-                lineHeight: 18,
-                fontWeight: "600",
-                fontFamily: fonts.sans,
-              }}
-            >
-              {skill.name}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: colors.faint,
-                fontSize: 11,
-                lineHeight: 16,
-                fontFamily: fonts.sans,
-              }}
-            >
-              {skill.purpose}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${t("agentSpace.deleteSkill")} ${skill.name}`}
-            hitSlop={6}
-            onPress={(event) => {
-              event.stopPropagation();
-              onDelete({ skill, agentId });
+          <Text
+            numberOfLines={1}
+            style={{
+              color: colors.text,
+              fontSize: 13,
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: fonts.sans,
             }}
-            style={({ pressed }) => ({
-              height: 24,
-              justifyContent: "center",
-              paddingHorizontal: 9,
-              borderRadius: 6,
-              borderWidth: 1,
-              borderColor: colors.errorSoft,
-              backgroundColor: pressed ? colors.errorSoft : colors.paper,
-            })}
           >
-            <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
-              {t("agentSpace.deleteSkill")}
-            </Text>
-          </Pressable>
-          <ChevronRight size={16} strokeWidth={1.6} color={colors.faint} />
+            {skill.name}
+          </Text>
+          <Text
+            numberOfLines={2}
+            style={{
+              color: colors.faint,
+              fontSize: 11,
+              lineHeight: 16,
+              fontFamily: fonts.sans,
+            }}
+          >
+            {skill.purpose}
+          </Text>
         </Pressable>
       ))}
     </View>
@@ -1609,11 +1590,7 @@ export function CapabilityHubScreen({
             {typeFilter === "skills" && skillTab === "mine" ? (
               <View style={{ gap: 12 }}>
                 {mySkills.length ? (
-                  <MySkillsList
-                    entries={mySkills}
-                    onSelect={setSelectedMySkill}
-                    onDelete={requestDeleteMySkill}
-                  />
+                  <MySkillsList entries={mySkills} onSelect={setSelectedMySkill} />
                 ) : (
                   <View style={EMPTY_STATE_BOX}>
                     <Empty
@@ -1630,7 +1607,7 @@ export function CapabilityHubScreen({
 
                 <View style={{ flexDirection: useCategoryRail ? "row" : "column", gap: 20 }}>
                   {useCategoryRail && (
-                    <View style={{ width: 200, gap: 10 }}>
+                    <View style={{ width: 180, gap: 10 }}>
                       {searchField}
                       <CategoryRail
                         category={category}
@@ -1739,6 +1716,11 @@ export function CapabilityHubScreen({
           lockedAgentIds={mySkillLockedAgentIds}
           onToggleAdd={toggleMySkillInAgent}
           onClose={() => setSelectedMySkill(undefined)}
+          footer={
+            <Button danger onPress={() => requestDeleteMySkill(selectedMySkill)}>
+              {t("agent.mySkillDeleteAction")}
+            </Button>
+          }
         />
       )}
 

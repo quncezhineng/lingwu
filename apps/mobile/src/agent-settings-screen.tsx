@@ -177,7 +177,7 @@ export function AgentSettingsScreen({
             })}
           </ScrollView>
         ) : (
-          <View style={{ width: 236, flexShrink: 0, gap: space.sm }}>
+          <View style={{ width: 180, flexShrink: 0, gap: space.sm }}>
             <View
               style={{
                 padding: 13,

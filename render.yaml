@@ -126,6 +126,18 @@ services:
         sync: false
       - key: HINDSIGHT_API_KEY
         sync: false
+      # Hindsight 自托管容器所需的 LLM 配置（仅供 infra/hindsight.yaml 读取；
+      # 云端模式下 LingWu API 不读取这些变量）。密钥需在控制台手动填入。
+      - key: HINDSIGHT_LLM_PROVIDER
+        value: deepseek
+      - key: HINDSIGHT_LLM_API_KEY
+        sync: false
+      - key: HINDSIGHT_LLM_MODEL
+        value: deepseek-flash
+      - key: HINDSIGHT_LLM_BASE_URL
+        value: https://api.deepseek.com
+      - key: HF_ENDPOINT
+        value: https://hf-mirror.com
       # Delete these two entries, and the lingwu-browser service below, to
       # deploy without browsing. The API boots either way.
       - key: BROWSER_WORKER_URL

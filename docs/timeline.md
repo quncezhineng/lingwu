@@ -5,6 +5,96 @@
 
 ## 变更记录
 
+### 2026-11-08 · 配置：.env 与 render.yaml 对齐 .env.example（Hindsight 变量补全）
+
+**背景**
+
+以 `.env.example` 为基准校对本地 `.env`，最近一次提交（e654ff0）为 example 新增了 Hindsight 自托管 LLM 配置块并激活了每日简报调度，但 `.env` 未同步跟上；`render.yaml` 也缺少对应的 Hindsight LLM 变量。
+
+**处理**
+
+- [.env](../.env)（gitignore 保护，不入库）：
+  - 激活 `BRIEFING_SCHEDULE_ENABLED=true`（原为注释，开启每日简报调度）。
+  - 末尾新增 Hindsight 自托管 LLM 配置块：`HINDSIGHT_LLM_PROVIDER=deepseek`、`HINDSIGHT_LLM_API_KEY=`（留空，云端模式 LingWu API 不读取，仅自托管容器 infra/hindsight.yaml 需要）、`HINDSIGHT_LLM_MODEL=deepseek-flash`、`HINDSIGHT_LLM_BASE_URL=https://api.deepseek.com`、`HF_ENDPOINT=https://hf-mirror.com`。
+  - 经确认保留 `RATE_LIMIT_MAX_REQUESTS=1200`（本地多屏轮询共享 127.0.0.1 限流桶，避免自伤 429）与 `COPILOTKIT_TELEMETRY_DISABLED=true`（关闭 SDK 遥测），未删除。
+- [render.yaml](../render.yaml)：`lingwu-api` 服务 Hindsight 区块新增 `HINDSIGHT_LLM_PROVIDER`（value: deepseek）、`HINDSIGHT_LLM_API_KEY`（sync: false，需控制台手动填入）、`HINDSIGHT_LLM_MODEL`（value: deepseek-flash）、`HINDSIGHT_LLM_BASE_URL`（value: https://api.deepseek.com）、`HF_ENDPOINT`（value: https://hf-mirror.com）。
+
+**验证**
+
+- `git diff` 核对：render.yaml 新增 12 行；`.env` 变更经 Read 确认（gitignore 保护不显示于 diff）。
+
+### 2026-11-08 · 交互：我的技能列表改自适应分栏网格，删除入口移入详情弹层
+
+**背景**
+
+「应用与能力 → 技能 → 我的技能」列表是单列长条卡片（名称 + 用途 + 行内删除按钮），一屏只能看到寥寥数张；同页技能市场已是网格版式，两者不一致。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx) `MySkillsList` 改为自适应分栏网格：`onLayout` 实测容器宽度，宽屏 3 列、中屏 2 列、窄屏单列兜底（`Math.floor` 换算卡片宽度避免换行溢出）。卡片内只保留名称（1 行）与用途（2 行），点击打开详情。
+- 原卡片行内「删除」按钮与详情箭头已移除，删除入口移入 `MySkillDetailSheet` 底部的红色「删除技能」按钮（沿用既有 `footer` 插槽），确认弹窗逻辑不变。
+- 新增 i18n 键 `agent.mySkillDeleteAction`（zh-Hans：删除技能 / en：Delete skill）。
+
+**验证**
+
+- `npx biome check`（3 个改动文件）：通过。
+- i18n 键位测试（`apps/mobile/test/i18n.test.ts`）：16 个用例全部通过，中英文键位对齐。
+- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关，已通过 git stash 对比确认）。
+
+### 2026-11-08 · 交互：任务中心任务列表改两列，网格组件提到 ui 层
+
+**背景**
+
+任务中心「任务」标签下的列表（全部 / 进行中 / 待确认 / 已结束 / 已暂停五个筛选共用同一份渲染）是单列通栏，一屏只能看到 6 张任务卡；而同页的「追踪」标签、Agent 详情「任务」页都已是双列，同一产品里版式不一致。
+
+**处理**
+
+- [ui.tsx](../apps/mobile/src/ui.tsx) 新增导出 `CardGrid`：`onLayout` 实测容器宽度、按 `minColumnWidth` 自动分栏（实测前按目标栏数给百分比兜底），窄屏自动退回单列。此前它是 [tracking-screen.tsx](../apps/mobile/src/tracking-screen.tsx) 里的局部组件，但 `agent-ui.tsx` 也要用，而 `tracking-screen` 依赖 `agent-ui`，直接互相引用会成环，因此上提到 `ui` 层；`tracking-screen` 改为从 `./ui` 引入并删掉本地实现（`GRID_GAP` 一并移除，改为 `gap` 参数默认 10）。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx) `AgentActivityScreen` 的任务列表改为 `CardGrid`（`minColumnWidth={340}`，最多 2 列），五个筛选分支共用，切换筛选时列数不变。
+- `TaskCard` 新增可选 `fill`（`flex: 1`），仅在网格里传入，保证同一行卡片等高；其它调用点（会话内联、Agent 详情、任务详情）不传，行为不变。
+
+**验证**
+
+- `npx biome check`（3 个改动文件）：通过。
+- `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
+- `apps/mobile/test/*.test.ts`：282 个用例全部通过。
+
+### 2026-11-07 · 文案：智能体设置页删除按钮与确认标题统一为「移除」
+
+**背景**
+
+「智能体设置 → 技能」页自建技能卡片上的红色操作按钮文案为「删除」，但其操作实际是移除当前智能体中的这份技能（其他智能体不受影响），与确认弹窗介绍「将移除这个智能体中的这份技能」不一致；「我的技能」页的「删除」对应全量永久删除，语义正确需保留。
+
+**处理**
+
+- 新增 [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) `agentSpace.removeSkill` =「移除」、[en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts) `agentSpace.removeSkill` = "Remove"。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：卡片操作按钮文案与读屏标签由 `agentSpace.deleteSkill` 改为 `agentSpace.removeSkill`；注释同步更新。
+- 确认弹窗标题 `agent.mySkillDeleteConfirmTitleOne`（仅智能体设置页使用）由「确定删除技能」同步改为「确定移除技能」（en: "Remove \"{title}\"?"），与按钮及介绍文案保持一致。
+
+**验证**
+
+- `apps/mobile/test/i18n.test.ts`：16 例全部通过（中英 key 对齐）。
+- `pnpm exec biome check`：改动文件通过。
+
+### 2026-11-07 · 文案：删除技能确认弹窗拆分标题并强调「永久删除」
+
+**背景**
+
+「应用与能力 → 技能 → 我的技能」页删除自建技能（会连同所有智能体中的副本一起清掉，无法恢复）与「智能体设置 → 技能」页删除当前智能体副本是两种不同力度的操作，但此前共用同一个确认标题「确定删除技能「{title}」？」，介绍文案（`agent.mySkillDeleteConfirmNoteAll`）也未突出不可逆性。
+
+**处理**
+
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：
+  - `agent.mySkillDeleteConfirmTitle` 改为「确定永久删除技能「{title}」？」（Permanently delete），仅用于「我的技能」页的全量删除。
+  - 新增 `agent.mySkillDeleteConfirmTitleOne` =「确定删除技能「{title}」？」（Delete），用于「智能体设置 → 技能」页的按智能体删除。
+  - `agent.mySkillDeleteConfirmNoteAll` 改为「将永久删除这份技能及其在所有智能体中的副本，删除后无法恢复。」（This permanently deletes the skill and its copies from all agents. This can't be undone.）。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：智能体设置页的删除确认由共用的 `mySkillDeleteConfirmTitle` 改为 `mySkillDeleteConfirmTitleOne`。
+
+**验证**
+
+- `apps/mobile/test/i18n.test.ts`：16 例全部通过（中英 key 对齐，新增 `TitleOne` 键双语言同步）。
+- `pnpm exec biome check`：改动文件通过。
+
 ### 2026-11-07 · 交互：跟踪 / 目标 / 提醒三个列表改两列，目标卡片精简
 
 **背景**

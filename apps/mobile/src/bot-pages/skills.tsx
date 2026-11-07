@@ -412,10 +412,10 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
                         <Text style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>
                           {skill.name}
                         </Text>
-                        {/* 用户自建的技能不再提供启停开关，右侧直接给出删除入口。 */}
+                        {/* 用户自建的技能不再提供启停开关，右侧直接给出移除入口。 */}
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel={`${t("agentSpace.deleteSkill")} ${skill.name}`}
+                          accessibilityLabel={`${t("agentSpace.removeSkill")} ${skill.name}`}
                           hitSlop={6}
                           onPress={(event) => {
                             event.stopPropagation();
@@ -433,7 +433,7 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
                           })}
                         >
                           <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
-                            {t("agentSpace.deleteSkill")}
+                            {t("agentSpace.removeSkill")}
                           </Text>
                         </Pressable>
                       </View>

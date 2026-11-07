@@ -29,7 +29,7 @@ HINDSIGHT_BASE_URL=http://localhost:8888
 
 | 项 | 默认值 | 说明 |
 | --- | --- | --- |
-| LLM | DeepSeek `deepseek-chat` | 适合中国网络；可换 OpenAI/Groq |
+| LLM | DeepSeek `deepseek-flash` | 适合中国网络；可换 OpenAI/Groq |
 | Embedding | 本地 `BAAI/bge-small-zh-v1.5` | 中文友好，无需外接 embedding 服务 |
 | Reranker | 本地 `flashrank`（ONNX） | 无需外接 |
 | HF 镜像 | `hf-mirror.com` | 规避 Hugging Face 模型下载被墙 |
@@ -40,7 +40,7 @@ HINDSIGHT_BASE_URL=http://localhost:8888
 # LLM
 HINDSIGHT_LLM_PROVIDER=deepseek     # 或 openai / groq
 HINDSIGHT_LLM_API_KEY=sk-...
-HINDSIGHT_LLM_MODEL=deepseek-chat
+HINDSIGHT_LLM_MODEL=deepseek-flash
 HINDSIGHT_LLM_BASE_URL=https://api.deepseek.com
 
 # Embedding（默认本地；也可用 OpenAI 等外部服务）

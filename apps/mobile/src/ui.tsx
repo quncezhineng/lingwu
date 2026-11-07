@@ -291,6 +291,51 @@ export function IconButton({
 export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   return <View style={[s.card, style]}>{children}</View>;
 }
+
+/**
+ * 卡片网格：按容器实测宽度自动分栏，保证每栏不小于 `minColumnWidth`。
+ *
+ * 页面内容宽度（扣掉侧栏）与弹层宽度都和窗口宽度差很多，按窗口宽度估算会把
+ * 卡片挤成窄条；这里统一用 onLayout 的实测结果换算列宽。窄屏自动退回单列。
+ */
+export function CardGrid<T>({
+  items,
+  minColumnWidth,
+  maxColumns = 2,
+  gap = 10,
+  getKey,
+  render,
+}: {
+  items: readonly T[];
+  /** 单栏最小宽度：不足则减少列数。目标卡约 340，紧凑卡片约 200。 */
+  minColumnWidth: number;
+  maxColumns?: 1 | 2 | 3;
+  /** 卡片间距，默认 10。 */
+  gap?: number;
+  getKey: (item: T) => string;
+  render: (item: T) => ReactNode;
+}) {
+  const [width, setWidth] = useState(0);
+  const columns =
+    width > 0
+      ? Math.max(1, Math.min(maxColumns, Math.floor((width + gap) / (minColumnWidth + gap))))
+      : 1;
+  const cellWidth = width > 0 ? (width - gap * (columns - 1)) / columns : 0;
+  // 实测到之前按目标栏数给百分比兜底，避免首帧挤成单列再跳变。
+  const fallback = maxColumns >= 3 ? "31%" : maxColumns === 2 ? "48%" : "100%";
+  return (
+    <View
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: "row", flexWrap: "wrap", gap }}
+    >
+      {items.map((item) => (
+        <View key={getKey(item)} style={cellWidth ? { width: cellWidth } : { width: fallback }}>
+          {render(item)}
+        </View>
+      ))}
+    </View>
+  );
+}
 export function Chip({ children, tint }: { children: ReactNode; tint?: string }) {
   return (
     <View style={[s.chip, tint ? { backgroundColor: tint } : null]}>

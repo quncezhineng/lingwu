@@ -70,6 +70,7 @@ import { Toggle } from "./toggle";
 import {
   Button,
   Card,
+  CardGrid,
   CheckRow,
   Chip,
   colors,
@@ -247,11 +248,14 @@ function TaskProgress({ view }: { view: ReturnType<typeof presentTask> }) {
 export function TaskCard({
   task,
   compact = false,
+  fill = false,
   onOpen,
   showGoal = true,
 }: {
   task: AgentTask;
   compact?: boolean;
+  /** 网格布局里撑满单元高度，保证同一行的卡片等高。 */
+  fill?: boolean;
   onOpen?: () => void;
   showGoal?: boolean;
 }) {
@@ -277,6 +281,7 @@ export function TaskCard({
         open({ type: "task", taskId: task.id });
       }}
       style={({ pressed }) => ({
+        flex: fill ? 1 : undefined,
         padding: compact ? 12 : 14,
         gap: 10,
         borderWidth: 1,
@@ -456,9 +461,14 @@ export function AgentActivityScreen() {
           </Pressable>
         ))}
       </View>
-      {tasks.map((task) => (
-        <TaskCard key={task.id} task={task} />
-      ))}
+      {tasks.length > 0 && (
+        <CardGrid
+          items={tasks}
+          minColumnWidth={340}
+          getKey={(task) => task.id}
+          render={(task) => <TaskCard task={task} fill />}
+        />
+      )}
       {!tasks.length && (
         <Empty
           icon={ListChecks}

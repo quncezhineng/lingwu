@@ -569,11 +569,12 @@ const agent = {
     "No skills yet. Tap “Create skill” above to write one, or add one from the skill marketplace.",
   "agent.mySkillDeletedToast": "Deleted “{title}”.",
   "agent.mySkillDeleteConfirmTitle": "Permanently delete “{title}”?",
-  "agent.mySkillDeleteConfirmTitleOne": "Delete “{title}”?",
+  "agent.mySkillDeleteConfirmTitleOne": "Remove “{title}”?",
   "agent.mySkillDeleteConfirmNoteAll":
     "This permanently deletes the skill and its copies from all agents. This can't be undone.",
   "agent.mySkillDeleteConfirmNoteOne":
     "This removes the skill from this agent. Copies in other agents are unaffected.",
+  "agent.mySkillDeleteAction": "Delete skill",
   "agent.skillsDetail": "Enable reusable specialist actions for research and investment work.",
   "agent.connectorsHeading": "Connectors",
   "agent.connectorsDetail": "Bring models, mail, calendars and browsing into your workspace.",
@@ -733,7 +734,7 @@ const agent = {
   "agentSpace.deleteAgentNote":
     "Removes this Agent entry and local skills. The system default Agent cannot be deleted.",
   "agentSpace.deleteConfirmTitle": "Delete this Agent?",
-  "agentSpace.deleteConfirmAction": "Delete",
+  "agentSpace.deleteConfirmAction": "Confirm",
   "agentSpace.pinAgent": "Pin Agent",
   "agentSpace.unpinAgent": "Unpin Agent",
   "agentSpace.manageAgent": "Manage",
@@ -789,6 +790,7 @@ const agent = {
   "agentSpace.addSkillMore": "{count} more skills. Type a keyword to narrow the list.",
   "agentSpace.editSkill": "Edit skill",
   "agentSpace.deleteSkill": "Delete",
+  "agentSpace.removeSkill": "Remove",
   "agentSpace.skillName": "Skill name",
   "agentSpace.skillPurpose": "One-line purpose",
   "agentSpace.skillInstructions": "Work instructions",

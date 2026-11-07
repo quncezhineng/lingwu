@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, useWindowDimensions, View } from "react-native";
 import type { Monitor } from "../../../packages/domain/src/agent";
 import {
@@ -27,7 +27,7 @@ import {
   buildTrackingView,
   type GoalTrack,
 } from "./tracking-view";
-import { Button, Card, Chip, Empty, SectionHeading, Sheet, s } from "./ui";
+import { Button, Card, CardGrid, Chip, Empty, SectionHeading, Sheet, s } from "./ui";
 import { type PriceReminderIntent, useWorkspace } from "./workspace";
 
 type TrackingFilter = "all" | "goal" | "reminder";
@@ -245,53 +245,6 @@ function TemplateCard({
         )}
       </View>
     </Pressable>
-  );
-}
-
-const GRID_GAP = 10;
-
-/**
- * 卡片网格：按容器实测宽度自动分栏，保证每栏不小于 `minColumnWidth`。
- *
- * 页面内容宽度（扣掉侧栏）和弹层宽度都与窗口宽度差很多，用窗口宽度估算会让
- * 卡片在窄栏里被挤压；这里统一按 onLayout 实测结果换算。
- */
-function CardGrid<T>({
-  items,
-  minColumnWidth,
-  maxColumns = 2,
-  getKey,
-  render,
-}: {
-  items: readonly T[];
-  /** 单栏最小宽度：不足则减少列数。目标卡约 340，紧凑卡片约 200。 */
-  minColumnWidth: number;
-  maxColumns?: 1 | 2 | 3;
-  getKey: (item: T) => string;
-  render: (item: T) => ReactNode;
-}) {
-  const [width, setWidth] = useState(0);
-  const columns =
-    width > 0
-      ? Math.max(
-          1,
-          Math.min(maxColumns, Math.floor((width + GRID_GAP) / (minColumnWidth + GRID_GAP))),
-        )
-      : 1;
-  const cellWidth = width > 0 ? (width - GRID_GAP * (columns - 1)) / columns : 0;
-  // 实测到之前按目标栏数给百分比兜底，避免首帧挤成单列再跳变。
-  const fallback = maxColumns >= 3 ? "31%" : maxColumns === 2 ? "48%" : "100%";
-  return (
-    <View
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-      style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}
-    >
-      {items.map((item) => (
-        <View key={getKey(item)} style={cellWidth ? { width: cellWidth } : { width: fallback }}>
-          {render(item)}
-        </View>
-      ))}
-    </View>
   );
 }
 

@@ -178,7 +178,10 @@ export function BotEditPage({
                 <Text style={s.heading}>{t("agentSpace.deleteConfirmTitle")}</Text>
                 <Text style={s.muted}>{t("agentSpace.deleteAgentNote")}</Text>
                 <View style={[s.row, { gap: 10, marginTop: 8 }]}>
-                  <Button style={{ flex: 1, minHeight: 44 }} onPress={() => setConfirmDelete(false)}>
+                  <Button
+                    style={{ flex: 1, minHeight: 44 }}
+                    onPress={() => setConfirmDelete(false)}
+                  >
                     {t("common.cancel")}
                   </Button>
                   <Button
