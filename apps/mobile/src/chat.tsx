@@ -26,6 +26,7 @@ import type { ActionProposal, Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
+import { AgentSkillInspectSheet } from "./agent-sheets";
 import { useAgentSpace } from "./agent-space";
 import type { AgentAvatarId, AgentCommunication, AgentTone } from "./agent-space-model";
 import { ArtifactCard } from "./agent-ui";
@@ -589,6 +590,8 @@ export function ChatScreen({
   // 对话级能力选择：技能与连接器勾选后进入上下文，选中期间对本对话持续生效。
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
   const [connectorPickerOpen, setConnectorPickerOpen] = useState(false);
+  /** 选择技能弹层里正在查看的技能详情：作为兄弟节点挂载，避免与选择弹层嵌套 Modal。 */
+  const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [selectedConnectorIds, setSelectedConnectorIds] = useState<string[]>([]);
   const { current: currentAgent } = useAgentSpace();
@@ -605,6 +608,7 @@ export function ChatScreen({
     setSelectedSkillIds([]);
     setSelectedConnectorIds([]);
     setSkillPickerOpen(false);
+    setInspectSkillId(null);
     setConnectorPickerOpen(false);
   }, [threadId]);
   useAgentContext({
@@ -2107,17 +2111,32 @@ export function ChatScreen({
         />
       )}
       {skillPickerOpen && (
-        <SkillPickerSheet
-          customSkills={currentAgent.customSkills}
-          selectedIds={selectedSkillIds}
-          onToggle={(id) =>
-            setSelectedSkillIds((ids) =>
-              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
-            )
-          }
-          onConfirm={() => setSkillPickerOpen(false)}
-          onClose={() => setSkillPickerOpen(false)}
-        />
+        <>
+          <SkillPickerSheet
+            customSkills={currentAgent.customSkills}
+            selectedIds={selectedSkillIds}
+            onToggle={(id) =>
+              setSelectedSkillIds((ids) =>
+                ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+              )
+            }
+            onInspectSkill={setInspectSkillId}
+            onConfirm={() => {
+              setSkillPickerOpen(false);
+              setInspectSkillId(null);
+            }}
+            onClose={() => {
+              setSkillPickerOpen(false);
+              setInspectSkillId(null);
+            }}
+          />
+          {inspectSkillId && (
+            <AgentSkillInspectSheet
+              skillId={inspectSkillId}
+              onClose={() => setInspectSkillId(null)}
+            />
+          )}
+        </>
       )}
       {connectorPickerOpen && (
         <ConnectorPickerSheet

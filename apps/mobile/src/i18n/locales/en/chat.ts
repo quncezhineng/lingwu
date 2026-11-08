@@ -89,6 +89,7 @@ const chat = {
     "Try another keyword, or create your own skill on the Skills page first.",
   "chat.skillPickerSelected": "{count} skills selected",
   "chat.skillPickerConfirm": "Apply ({count})",
+  "chat.skillPickerDetail": "View skill details",
   "chat.connectorPickerTool": "Choose connectors",
   "chat.connectorPickerTitle": "Choose connectors",
   "chat.connectorPickerSubtitle":

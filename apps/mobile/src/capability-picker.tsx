@@ -9,6 +9,7 @@ import {
   Brain,
   CalendarDays,
   Check,
+  FileText,
   Globe2,
   type IconComponent,
   Link2,
@@ -361,6 +362,8 @@ function OptionCard({
   cellWidth,
   accessibilityLabel,
   onPress,
+  onViewDetail,
+  detailLabel,
 }: {
   checked: boolean;
   disabled?: boolean;
@@ -372,6 +375,9 @@ function OptionCard({
   cellWidth: number;
   accessibilityLabel: string;
   onPress: () => void;
+  /** 传入即在复选框左侧显示详情按钮；stopPropagation 保证点击不会顺带切换勾选。 */
+  onViewDetail?: () => void;
+  detailLabel?: string;
 }) {
   // 状态（如「已停用」）比描述更重要，窄格子也要保留；描述只在宽格子补一行。
   const sub = status ?? (cellWidth >= OPTION_CELL_DETAIL_MIN_WIDTH ? detail : undefined);
@@ -427,11 +433,36 @@ function OptionCard({
           </Text>
         )}
       </View>
-      {disabled ? (
-        <Text style={{ fontSize: 11, color: colors.faint }}>—</Text>
-      ) : (
-        <SelectionBox checked={checked} />
-      )}
+      <View style={[s.row, { gap: 6, flexShrink: 0 }]}>
+        {onViewDetail && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={detailLabel}
+            hitSlop={6}
+            onPress={(event) => {
+              event.stopPropagation();
+              onViewDetail();
+            }}
+            style={({ pressed }) => ({
+              width: 24,
+              height: 24,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: pressed ? colors.surface : colors.paper,
+            })}
+          >
+            <FileText size={13} color={colors.muted} />
+          </Pressable>
+        )}
+        {disabled ? (
+          <Text style={{ fontSize: 11, color: colors.faint }}>—</Text>
+        ) : (
+          <SelectionBox checked={checked} />
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -439,6 +470,7 @@ function OptionCard({
 /**
  * 技能选择弹层：把 Agent 的自定义技能与技能目录合并成一个可搜索的多选列表，
  * 勾选即时写入对话选择，关闭或点「应用」收起弹层。
+ * 每张卡片另有详情按钮，通过 onInspectSkill 交给调用方挂载只读详情弹层，避免嵌套 Modal。
  */
 export function SkillPickerSheet({
   customSkills,
@@ -446,12 +478,15 @@ export function SkillPickerSheet({
   onToggle,
   onConfirm,
   onClose,
+  onInspectSkill,
 }: {
   customSkills: readonly AgentSkill[];
   selectedIds: readonly string[];
   onToggle: (id: string) => void;
   onConfirm: () => void;
   onClose: () => void;
+  /** 点卡片上的详情按钮：由调用方作为兄弟节点挂载技能详情弹层。 */
+  onInspectSkill?: (id: string) => void;
 }) {
   const { t, locale } = useTranslation();
   const [query, setQuery] = useState("");
@@ -498,6 +533,8 @@ export function SkillPickerSheet({
                       status={skill.enabled ? undefined : t("agentSpace.skillDisabled")}
                       accessibilityLabel={skill.name}
                       onPress={() => onToggle(skill.id)}
+                      onViewDetail={onInspectSkill ? () => onInspectSkill(skill.id) : undefined}
+                      detailLabel={t("chat.skillPickerDetail")}
                     />
                   );
                 })
@@ -523,6 +560,8 @@ export function SkillPickerSheet({
                       detail={zh ? skill.descriptionZh : skill.descriptionEn}
                       accessibilityLabel={title}
                       onPress={() => onToggle(skill.id)}
+                      onViewDetail={onInspectSkill ? () => onInspectSkill(skill.id) : undefined}
+                      detailLabel={t("chat.skillPickerDetail")}
                     />
                   );
                 })

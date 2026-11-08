@@ -5,6 +5,174 @@
 
 ## 变更记录
 
+### 2026-11-08 · UI：全局记忆页按智能体分类筛选记忆卡片
+
+**背景**
+
+右侧栏「记忆」页面（`PreferencesScreen` 全局模式）顶部原有一行按 Agent 聚合的 chips（如 `default 13`、`交易 Agent 1`），只静态展示数量，下方始终铺出全部记忆卡片。用户希望点击不同智能体分类，只显示该分类下的记忆卡片。
+
+**处理**
+
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：抽出 `memoryAgentId(memory)`，让按 Agent 聚合、Agent 专属页过滤、分类筛选共用同一口径（服务端缺省 / 空白统一归 `default`），避免三处逻辑漂移。
+- 同文件新增 `activeAgentId` 状态与 `activeFilter` / `visibleMemories`：分类 chips 由 `View` 改为 `Pressable`（选中态蓝底蓝边、`accessibilityState.selected`），最前面补一个「全部 N」chip（复用既有 `agent.filterAll`，未新增 i18n key）。点击分类只渲染该 Agent 的记忆；再点已选中的分类或点「全部」回到全量；顶部「N 条记忆」随筛选结果变化。选中的分类若因记忆被删而消失，自动退回「全部」，不会停在空列表。
+- 只在全局模式（未传 `agentId`）出现 chips 与筛选；Agent 详情 → 记忆页仍是单 Agent 视图，编辑 / 删除 / 添加入口均不受影响。
+
+**验证**
+
+- `npx biome check --write`（preferences-screen.tsx）：无警告、无格式修复。
+- `pnpm --dir apps/mobile typecheck`：改动文件无类型错误；`bot-pages/connectors.tsx` 的 7 个报错为 HEAD 既有问题。
+- i18n / agent-space / skill-catalog / skill-sharing 共 47 例单测通过。
+
+### 2026-11-08 · 文案：区分 Agent 专属记忆与全局记忆的简介
+
+**背景**
+
+Agent 详情右侧栏 → 「记忆」浮层（`agent-sheets.tsx` 的 `panel === "memory"`）展示的是账户级全局记忆（未传 `agentId`），但顶部简介复用了「这些记忆由当下智能体产生…」，与实际内容不符。
+
+**处理**
+
+- [app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts)：新增 `preferences.contextDetailGlobal` =「这里汇总了你的所有记忆卡片，涵盖所有智能体。你可以随时查看、编辑或删除。」；[en/app.ts](../apps/mobile/src/i18n/locales/en/app.ts) 同步新增。
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：embedded 简介按 `agentId` 区分 —— 传 `agentId`（Agent 专属记忆页）显示 `contextDetail`；未传（全局记忆浮层）显示 `contextDetailGlobal`。
+
+**验证**
+
+- i18n 单测 16 例全部通过。
+- `biome check`（2 个语言包 + preferences-screen.tsx）：无警告。
+
+### 2026-11-08 · UI：Agent 详情「记忆」页恢复右上角「添加记忆」入口
+
+**背景**
+
+此前 Agent 详情 → 记忆页去掉了所有「添加记忆」入口。用户决定改回来：恢复右上角主按钮，同时保留之前对「空态重复按钮」的处理，避免同一屏出现两个同款按钮。
+
+**处理**
+
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：`canAdd` 语义收窄为「右上角主按钮」；新增可选 `emptyAdd?: boolean`（默认 `true`）单独控制空态按钮，空态入口条件改为 `canAdd && emptyAdd`。全局「偏好与记忆」页与记忆浮层不传参，两处入口维持现状。
+- [goals-memory.tsx](../apps/mobile/src/bot-pages/goals-memory.tsx)：`canAdd={false}` 改为 `emptyAdd={false}` —— 右上角「添加记忆」恢复展示，空态不再重复，注释同步更新。
+
+**验证**
+
+- `biome check`（2 个改动文件）：无警告。
+- `pnpm --dir apps/mobile typecheck`：无新增类型错误（`bot-pages/connectors.tsx` 的既有报错与本次改动无关）。
+
+### 2026-11-08 · 文案：Agent 专属模型选择说明精简
+
+**背景**
+
+Agent 设置 → 模型选择区的提示文案「选择后，这个 Agent 的对话与后台任务都会使用该模型及版本；不选则跟随工作区默认模型。」偏长，用户要求精简。
+
+**处理**
+
+- [agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agentSpace.modelHint` 精简为「选中后，该 Agent 的对话与后台任务使用此模型；不选则跟随工作区默认模型。」。
+- [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步精简为 "When selected, this Agent's chats and background tasks use that model; otherwise it follows the workspace default."。
+
+**验证**
+
+- i18n 单测 16 例全部通过。
+- `biome check` 对 2 个改动语言包文件：无警告。
+
+### 2026-11-08 · 文案：记忆页说明改为「由当下智能体产生」
+
+**背景**
+
+Agent 详情 → 记忆页（浮层嵌入模式）顶部的说明文字为「灵悟会在分析时参考这些记忆。你可以随时编辑或删除，更新后会自动用于后续分析。」。用户指出该页记忆由当下智能体产生，文案应表述准确。
+
+**处理**
+
+- [app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts)：`preferences.contextDetail` 改为「这些记忆由当下智能体产生，分析时会作为参考。你可以随时编辑或删除。」。
+- [en/app.ts](../apps/mobile/src/i18n/locales/en/app.ts)：同步更新为 "These memories are created by the current assistant and used as reference during analysis. You can edit or remove them at any time."。
+
+**验证**
+
+- i18n 单测 16 例全部通过。
+- `biome check` 对 2 个改动语言包文件：无警告。
+
+### 2026-11-08 · UI：移除记忆页底部「记忆用于补充分析上下文」提示
+
+**背景**
+
+偏好设置页（记忆页）底部有一行盾牌图标 +「记忆只用于补充你自己的分析上下文，随时可以编辑或删除。」的提示文案。用户要求删除该元素，让页面更精简。
+
+**处理**
+
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：删除列表下方的整行提示（`ShieldCheck` 图标 + `preferences.privacy` 文本）。`ShieldCheck` 图标在「风险偏好」分类元数据中另有使用，导入保持不变。
+- i18n：删除不再使用的 `preferences.privacy` key（zh / en 双侧同步移除）。
+
+**验证**
+
+- i18n 单测 16 例全部通过（中英 key 集合保持完全一致）。
+- `biome check` 对 3 个改动文件：无警告。
+
+### 2026-11-08 · UI：移除记忆页「全部记忆」区块标题
+
+**背景**
+
+偏好设置页（记忆页）的记忆卡片列表上方原有「全部记忆」标题，与条数计数并排显示。用户要求删除该标题，只保留计数，让列表上方更简洁。
+
+**处理**
+
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：删除 `s.between` 容器内的「全部记忆」标题 `<Text>`，保留 `preferences.count` 计数。
+- i18n：删除不再使用的 `preferences.memoryHeading` key（zh「全部记忆」/ en "All memories"），中英语言包双侧同步移除。
+
+**验证**
+
+- i18n 单测 16 例全部通过（中英 key 集合保持完全一致）。
+- `biome check` 对 3 个改动文件：无警告。
+- `tsc --noEmit`：无新增类型错误（`bot-pages/connectors.tsx` 的既有报错与本次改动无关）。
+
+### 2026-11-08 · UI：Agent 详情「记忆」页去掉「添加记忆」入口
+
+**背景**
+
+Agent 详情 → 记忆页（`BotGoalsMemoryPage`）复用 `PreferencesScreen`，右上方有「+ 添加记忆」主按钮，空态里还重复出现一个同款按钮。用户要求详情页去掉这个添加功能，只保留查看、编辑和删除已有记忆。
+
+**处理**
+
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：新增可选 `canAdd?: boolean`（默认 `true`），统一控制右上角主按钮与空态按钮两处「添加记忆」入口；记忆卡片的编辑 / 删除与 `MemoryEditorSheet` 不受影响。
+- [goals-memory.tsx](../apps/mobile/src/bot-pages/goals-memory.tsx)：Agent 详情记忆页传 `canAdd={false}`。其余两个调用点（全局「偏好与记忆」页 `<PreferencesScreen />`、记忆浮层 `<PreferencesScreen embedded />`）不传该参数，仍保留添加入口。
+- 未新增 / 删除 i18n key：`preferences.addPreference` / `addTitle` 在其它页面及编辑弹层继续使用。
+
+**验证**
+
+- `npx biome check --write`（2 个改动文件）：无警告、无格式修复。
+- `pnpm --dir apps/mobile typecheck`：改动文件无类型错误；`bot-pages/connectors.tsx` 的 7 个报错为 HEAD 既有问题。
+- i18n / agent-space / skill-catalog / skill-sharing 共 47 例单测通过。
+
+### 2026-11-08 · UI：工作区模式文案统一为「个人工作区」
+
+**背景**
+
+个人用户登录后，账号设置页「工作区」行与连接器弹窗「环境」行均显示「实时工作区」。用户希望登录的是个人账号时，标题明确展示为「个人工作区」。
+
+**处理**
+
+- [app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts)：`app.profileModeLive`「实时工作区」→「个人工作区」；`app.profileModeSample`「个人工作区」→「样例工作区」，与 `.env.example` 中 Sample mode（本地样例）语义对齐，同时避免两种模式显示相同文案。
+- [screens.ts](../apps/mobile/src/i18n/locales/zh-Hans/screens.ts)：`screens.connectionsEnvLive`「实时工作区」→「个人工作区」。
+- [en/app.ts](../apps/mobile/src/i18n/locales/en/app.ts) 与 [en/screens.ts](../apps/mobile/src/i18n/locales/en/screens.ts)：同步更新 "Live workspace" → "Personal workspace"、`profileModeSample` "Personal workspace" → "Sample workspace"。
+
+**验证**
+
+- i18n 单测 16 例全部通过（中英 key 集合保持一致）。
+- `biome check` 对 4 个改动语言包文件：无警告、无格式问题。
+
+### 2026-11-08 · UI：对话「选择技能」每张卡片新增技能详情入口
+
+**背景**
+
+对话框「选择技能」弹层（`SkillPickerSheet`）里，「我的技能」与「技能目录」的小卡片都只能勾选，看不到技能的完整说明。用户希望每张卡片加一个按钮，点击可查看该技能的详情页面。
+
+**处理**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx)：`OptionCard` 新增可选 `onViewDetail` / `detailLabel`，在复选框左侧渲染 24×24 的 `FileText` 图标按钮，`stopPropagation` 保证点击不会顺带切换勾选；`SkillPickerSheet` 新增 `onInspectSkill?: (id: string) => void`，自建技能与目录技能两类卡片都把技能 id 交给调用方。连接器选择弹层用 `OptionRow`，不受影响。
+- [chat.tsx](../apps/mobile/src/chat.tsx)：新增 `inspectSkillId` 状态，把 `SkillPickerSheet` 与 `AgentSkillInspectSheet` 作为**兄弟节点**挂载（沿用 `AgentSheets` 的既有模式，避免嵌套 Modal）；详情直接复用现成的只读弹层——自建技能走 `MySkillDetailSheet`、目录技能走 `SkillDetailSheet`（不传 `agents` 即为只读，不会在选择对话技能时改动 Agent 的安装配置）。关闭详情回到选择列表；「应用」/关闭选择弹层、切换对话时清空该状态。
+- [i18n] zh-Hans / en 同步新增 `chat.skillPickerDetail`（「查看技能详情」/ "View skill details"）作为按钮的无障碍标签。
+
+**验证**
+
+- `npx biome check --write`（4 个改动文件）：无警告、无格式修复。
+- `pnpm --dir apps/mobile typecheck`：改动文件无类型错误；`bot-pages/connectors.tsx` 的 7 个报错为 HEAD 既有问题。
+- i18n / icons / agent-space / skill-catalog / skill-sharing 共 53 例单测通过（i18n 用例确认中英 key 集合仍一致）。
+
 ### 2026-11-08 · UI：右侧栏「智能体能力」跟随真实技能配置，按钮改为「解锁更多的能力」
 
 **背景**

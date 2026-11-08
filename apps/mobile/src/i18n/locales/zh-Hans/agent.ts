@@ -668,8 +668,7 @@ const agent = {
   "agentSpace.agentDetails": "Agent 详情",
   "agentSpace.changesSaved": "已保存。",
   "agentSpace.modelFollowDefault": "跟随默认模型 · {model}",
-  "agentSpace.modelHint":
-    "选择后，这个 Agent 的对话与后台任务都会使用该模型及版本；不选则跟随工作区默认模型。",
+  "agentSpace.modelHint": "选中后，该 Agent 的对话与后台任务使用此模型；不选则跟随工作区默认模型。",
   "agentSpace.persona": "职责与人设",
   "agentSpace.editPersona": "编辑人设",
   "agentSpace.resources": "Agent 资源",
@@ -703,7 +702,7 @@ const agent = {
   "agentSpace.createAction": "创建 {name}",
   "agentSpace.avatar": "选择 Agent 形象",
   "agentSpace.skillCenter": "技能与能力",
-  "agentSpace.libraryEmpty": "这里还没有资料。这个 Bot 的任务文件与分析成果会显示在这里。",
+  "agentSpace.libraryEmpty": "这里还没有资料。这个 Agent 的任务文件与分析成果会显示在这里。",
   "agentSpace.createSkill": "创建技能",
   "agentSpace.addSkill": "添加技能",
   "agentSpace.addSkillHint": "点技能添加或移除（含自建技能）；点图标或长按看说明，输入关键词筛选。",

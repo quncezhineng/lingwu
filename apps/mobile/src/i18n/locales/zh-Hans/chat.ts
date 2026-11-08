@@ -81,6 +81,7 @@ const chat = {
   "chat.skillPickerEmptyDetail": "换个关键词试试，或者先在技能页创建自己的技能。",
   "chat.skillPickerSelected": "已选择 {count} 个技能",
   "chat.skillPickerConfirm": "应用（{count}）",
+  "chat.skillPickerDetail": "查看技能详情",
   "chat.connectorPickerTool": "连接器选择",
   "chat.connectorPickerTitle": "选择连接器",
   "chat.connectorPickerSubtitle": "选中的连接器会在当前对话中启用，可随时移除。",

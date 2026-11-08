@@ -8,6 +8,7 @@ import { BotPage, type BotPageProps } from "./shared";
  *
  * 目标内容统一由任务中心的「目标」标签维护，Agent 详情不重复承载；
  * 此页仅保留当前 Agent 的记忆（PreferencesScreen，传入 agentId）。
+ * 右上角提供「添加记忆」入口；空态不重复展示该按钮（由 emptyAdd 控制）。
  */
 export function BotGoalsMemoryPage({ onClose, embedded }: BotPageProps) {
   const { t } = useTranslation();
@@ -19,7 +20,7 @@ export function BotGoalsMemoryPage({ onClose, embedded }: BotPageProps) {
       onClose={onClose}
       embedded={embedded}
     >
-      <PreferencesScreen embedded agentId={current.id} />
+      <PreferencesScreen embedded agentId={current.id} emptyAdd={false} />
     </BotPage>
   );
 }

@@ -188,7 +188,7 @@ const screens = {
   "screens.connectionsDisconnectGoogle": "断开 Google 连接",
   "screens.connectionsEnvironmentLabel": "环境",
   "screens.connectionsEnvSample": "本地 · 示例数据",
-  "screens.connectionsEnvLive": "实时工作区",
+  "screens.connectionsEnvLive": "个人工作区",
   "screens.connectionsAssistantLabel": "助手",
   "screens.connectionsAssistantGuided": "引导式工作流",
   "screens.connectionsAssistantConnected": "模型已连接",

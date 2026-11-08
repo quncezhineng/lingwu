@@ -140,8 +140,8 @@ const app = {
   "app.profileSignInAccount": "Email account",
   "app.profileSignInKey": "Shared access key",
   "app.profileMode": "Workspace",
-  "app.profileModeSample": "Personal workspace",
-  "app.profileModeLive": "Live workspace",
+  "app.profileModeSample": "Sample workspace",
+  "app.profileModeLive": "Personal workspace",
   "app.profileSessionExpires": "Session expires",
   "app.profileUnset": "Not set",
   "app.profileLoading": "Loading your account…",
@@ -350,19 +350,18 @@ const app = {
   "preferences.whatToRemember": "What should LingWu remember?",
   "preferences.placeholder": "For example: a 3+ year horizon, with a focus on portfolio drawdown.",
   "preferences.characterCount": "{count}/4000",
-  "preferences.memoryHeading": "All memories",
   "preferences.count": "{count} memories",
   "preferences.toldOn": "You told me on {date}",
   "preferences.contextDetail":
-    "LingWu uses these memories during analysis. You can edit or remove them at any time.",
+    "These memories are created by the current assistant and used as reference during analysis. You can edit or remove them at any time.",
+  "preferences.contextDetailGlobal":
+    "Your all memory cards live here, covering all assistants. You can view, edit, or remove them at any time.",
   "preferences.deleteConfirmDetail": "LingWu will stop using this memory after deletion.",
   "preferences.emptyTitle": "No memories yet",
   "preferences.emptyDetail":
     "Start with your investment horizon, acceptable drawdown, or the areas you want to understand better.",
   "preferences.analysisStyle": "How LingWu analyzes",
   "preferences.manageAssistant": "Manage assistant",
-  "preferences.privacy":
-    "Memories are used only to add context to your own analysis and can be removed at any time.",
 } satisfies Dictionary;
 
 export default app;

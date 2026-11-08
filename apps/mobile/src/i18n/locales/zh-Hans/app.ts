@@ -124,8 +124,8 @@ const app = {
   "app.profileSignInAccount": "邮箱账号",
   "app.profileSignInKey": "共享访问密钥",
   "app.profileMode": "工作区",
-  "app.profileModeSample": "个人工作区",
-  "app.profileModeLive": "实时工作区",
+  "app.profileModeSample": "样例工作区",
+  "app.profileModeLive": "个人工作区",
   "app.profileSessionExpires": "会话到期",
   "app.profileUnset": "未设置",
   "app.profileLoading": "正在读取账号信息…",
@@ -317,17 +317,16 @@ const app = {
   "preferences.whatToRemember": "希望灵悟记住什么？",
   "preferences.placeholder": "例如：投资周期 3 年以上，重点关注组合回撤。",
   "preferences.characterCount": "{count}/4000",
-  "preferences.memoryHeading": "全部记忆",
   "preferences.count": "{count} 条记忆",
   "preferences.toldOn": "你在 {date} 告诉我",
-  "preferences.contextDetail":
-    "灵悟会在分析时参考这些记忆。你可以随时编辑或删除，更新后会自动用于后续分析。",
+  "preferences.contextDetail": "这些记忆由当下智能体产生，分析时会作为参考。你可以随时编辑或删除。",
+  "preferences.contextDetailGlobal":
+    "这里汇总了你的所有记忆卡片，涵盖所有智能体。你可以随时查看、编辑或删除。",
   "preferences.deleteConfirmDetail": "删除后，灵悟将不再参考这条记忆。",
   "preferences.emptyTitle": "还没有记忆",
   "preferences.emptyDetail": "可以先写下投资周期、可接受的回撤，或你最想持续弄懂的领域。",
   "preferences.analysisStyle": "灵悟的分析方式",
   "preferences.manageAssistant": "管理助手",
-  "preferences.privacy": "记忆只用于补充你自己的分析上下文，随时可以编辑或删除。",
 } satisfies Dictionary;
 
 export default app;

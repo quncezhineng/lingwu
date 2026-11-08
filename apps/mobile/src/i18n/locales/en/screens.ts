@@ -194,7 +194,7 @@ const screens = {
   "screens.connectionsDisconnectGoogle": "Disconnect Google",
   "screens.connectionsEnvironmentLabel": "Environment",
   "screens.connectionsEnvSample": "Local · example data",
-  "screens.connectionsEnvLive": "Live workspace",
+  "screens.connectionsEnvLive": "Personal workspace",
   "screens.connectionsAssistantLabel": "Assistant",
   "screens.connectionsAssistantGuided": "Guided workflows",
   "screens.connectionsAssistantConnected": "Model connected",

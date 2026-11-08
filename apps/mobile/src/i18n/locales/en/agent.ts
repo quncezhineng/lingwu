@@ -739,7 +739,7 @@ const agent = {
   "agentSpace.changesSaved": "Saved.",
   "agentSpace.modelFollowDefault": "Use the default model · {model}",
   "agentSpace.modelHint":
-    "This Agent's chats and background tasks use the selected model and version. Leave it unset to follow the workspace default.",
+    "When selected, this Agent's chats and background tasks use that model; otherwise it follows the workspace default.",
   "agentSpace.persona": "Role & persona",
   "agentSpace.editPersona": "Edit persona",
   "agentSpace.resources": "Agent resources",
@@ -775,7 +775,7 @@ const agent = {
   "agentSpace.avatar": "Choose an Agent avatar",
   "agentSpace.skillCenter": "Skills & capabilities",
   "agentSpace.libraryEmpty":
-    "No resources yet. Files and analysis produced by this Bot's tasks will appear here.",
+    "No resources yet. Files and analysis produced by this Agent's tasks will appear here.",
   "agentSpace.createSkill": "Create skill",
   "agentSpace.addSkill": "Add skill",
   "agentSpace.addSkillHint":

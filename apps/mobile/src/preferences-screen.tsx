@@ -47,6 +47,11 @@ function categoryOf(memory: AgentMemory): MemoryCategory {
     : "关注领域";
 }
 
+/** 记忆归属的 Agent id：缺省 / 空白统一归到 default，分组与筛选共用同一口径。 */
+function memoryAgentId(memory: AgentMemory): string {
+  return ((memory as AgentMemoryV2).agentId ?? "").trim() || "default";
+}
+
 function memoryDate(memory: AgentMemory) {
   const date = new Date(memory.createdAt);
   return Number.isNaN(date.getTime())
@@ -299,10 +304,16 @@ function MemoryEditorSheet({
 export function PreferencesScreen({
   embedded = false,
   agentId,
+  canAdd = true,
+  emptyAdd = true,
 }: {
   embedded?: boolean;
   /** 传入时只展示该 Agent 专属记忆（多 Agent 隔离）；不传则展示账户级全部记忆。 */
   agentId?: string;
+  /** 设为 false 隐藏右上角「添加记忆」主按钮；编辑 / 删除已有记忆不受影响。默认展示。 */
+  canAdd?: boolean;
+  /** 设为 false 隐藏空态里的「添加记忆」按钮，避免与右上角主按钮重复。默认展示。 */
+  emptyAdd?: boolean;
 }) {
   const { data, mutate, error: workspaceError } = useAgentWorkspace();
   const { t } = useTranslation();
@@ -314,6 +325,8 @@ export function PreferencesScreen({
   const [notice, setNotice] = useState("");
   /** 卡片网格实际宽度：浮层/页面容器宽度不同，按它决定列数。 */
   const [gridWidth, setGridWidth] = useState(0);
+  /** 全局模式下当前选中的 Agent 分类；null 表示「全部」。 */
+  const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
 
   const run = async (action: () => Promise<unknown>, success: string, rethrow = false) => {
     setBusy(true);
@@ -362,18 +375,16 @@ export function PreferencesScreen({
   };
 
   const memories = agentId
-    ? (data?.memories ?? []).filter(
-        (m) => (((m as AgentMemoryV2).agentId ?? "").trim() || "default") === agentId,
-      )
+    ? (data?.memories ?? []).filter((m) => memoryAgentId(m) === agentId)
     : (data?.memories ?? []);
-  // 全局模式下按 Agent 聚合，展示「每个 Agent 记住了多少」。
+  // 全局模式下按 Agent 聚合，作为可点击的分类筛选（每个分类带记忆条数）。
   const { agents } = useAgentSpace();
   const byAgent = agentId
     ? null
     : (() => {
         const counts = new Map<string, number>();
         for (const m of memories) {
-          const id = ((m as AgentMemoryV2).agentId ?? "").trim() || "default";
+          const id = memoryAgentId(m);
           counts.set(id, (counts.get(id) ?? 0) + 1);
         }
         return [...counts.entries()].map(([id, count]) => ({
@@ -382,6 +393,16 @@ export function PreferencesScreen({
           count,
         }));
       })();
+  // 选中的分类若因删除记忆已不存在，自动退回「全部」，避免停在空列表上。
+  const activeFilter =
+    activeAgentId !== null && byAgent?.some((entry) => entry.id === activeAgentId)
+      ? activeAgentId
+      : null;
+  // 卡片列表与计数都基于筛选结果；详情模式（传入 agentId）天然只有该 Agent 的记忆。
+  const visibleMemories =
+    activeFilter === null
+      ? memories
+      : memories.filter((memory) => memoryAgentId(memory) === activeFilter);
   // 记忆卡片：按容器实际宽度分列（宽浮层三列、页面两列、手机单列）。
   const layoutWidth = gridWidth || width;
   const columns = layoutWidth >= 860 ? 3 : layoutWidth >= 560 ? 2 : 1;
@@ -397,9 +418,12 @@ export function PreferencesScreen({
         }}
       >
         <View style={{ flex: 1, gap: 7 }}>
-          {/* 嵌入浮层时只保留简介，标题由浮层提供，避免重复。 */}
+          {/* 嵌入浮层时只保留简介，标题由浮层提供，避免重复。
+              传入 agentId 为 Agent 专属记忆页，未传则为账户级全局记忆页，简介区分两种场景。 */}
           {embedded ? (
-            <Text style={[s.small, { lineHeight: 20 }]}>{t("preferences.contextDetail")}</Text>
+            <Text style={[s.small, { lineHeight: 20 }]}>
+              {t(agentId ? "preferences.contextDetail" : "preferences.contextDetailGlobal")}
+            </Text>
           ) : (
             <>
               <Text
@@ -417,47 +441,71 @@ export function PreferencesScreen({
             </>
           )}
         </View>
-        <Button
-          primary
-          icon={Plus}
-          onPress={() => {
-            setConfirmId(undefined);
-            setEditor({});
-          }}
-        >
-          {t("preferences.addPreference")}
-        </Button>
+        {canAdd && (
+          <Button
+            primary
+            icon={Plus}
+            onPress={() => {
+              setConfirmId(undefined);
+              setEditor({});
+            }}
+          >
+            {t("preferences.addPreference")}
+          </Button>
+        )}
       </View>
 
       <View style={s.between}>
-        <Text style={s.heading}>{t("preferences.memoryHeading")}</Text>
-        <Text style={s.small}>{t("preferences.count", { count: memories.length })}</Text>
+        <Text style={s.small}>{t("preferences.count", { count: visibleMemories.length })}</Text>
       </View>
 
       {byAgent && byAgent.length > 0 && (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          {byAgent.map((entry) => (
-            <View
-              key={entry.id}
-              style={[
-                s.card,
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 7,
-                  paddingHorizontal: 11,
-                  paddingVertical: 7,
-                },
-              ]}
-            >
-              <Text style={[s.small, { fontWeight: "600" }]}>{entry.name}</Text>
-              <Text style={[s.small, { color: colors.muted }]}>{entry.count}</Text>
-            </View>
-          ))}
+          {[{ id: null, name: t("agent.filterAll"), count: memories.length }, ...byAgent].map(
+            (entry) => {
+              const active = activeFilter === entry.id;
+              return (
+                <Pressable
+                  key={entry.id ?? "all"}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${entry.name} · ${entry.count}`}
+                  accessibilityState={{ selected: active }}
+                  // 再点一次已选中的分类回到「全部」。
+                  onPress={() => setActiveAgentId(active ? null : entry.id)}
+                  style={({ pressed }) => [
+                    s.card,
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 7,
+                      paddingHorizontal: 11,
+                      paddingVertical: 7,
+                      borderColor: active ? colors.primary : colors.line,
+                      backgroundColor: active
+                        ? colors.sky
+                        : pressed
+                          ? colors.surface
+                          : colors.paper,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.small,
+                      { fontWeight: "600", color: active ? colors.primary : colors.text },
+                    ]}
+                  >
+                    {entry.name}
+                  </Text>
+                  <Text style={[s.small, { color: colors.muted }]}>{entry.count}</Text>
+                </Pressable>
+              );
+            },
+          )}
         </View>
       )}
 
-      {memories.length ? (
+      {visibleMemories.length ? (
         <View
           onLayout={(event) => {
             const next = Math.round(event.nativeEvent.layout.width);
@@ -465,7 +513,7 @@ export function PreferencesScreen({
           }}
           style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}
         >
-          {memories.map((memory) => (
+          {visibleMemories.map((memory) => (
             <View key={memory.id} style={{ width: cardWidth }}>
               <MemoryCard
                 memory={memory}
@@ -489,16 +537,14 @@ export function PreferencesScreen({
           <Text style={[s.muted, { textAlign: "center", maxWidth: 420 }]}>
             {t("preferences.emptyDetail")}
           </Text>
-          <Button primary icon={Plus} onPress={() => setEditor({})}>
-            {t("preferences.addPreference")}
-          </Button>
+          {canAdd && emptyAdd && (
+            <Button primary icon={Plus} onPress={() => setEditor({})}>
+              {t("preferences.addPreference")}
+            </Button>
+          )}
         </View>
       )}
 
-      <View style={[s.row, { gap: 7 }]}>
-        <ShieldCheck size={14} color={colors.faint} />
-        <Text style={[s.small, { flex: 1 }]}>{t("preferences.privacy")}</Text>
-      </View>
       <ErrorNotice error={error || workspaceError} />
       {!!notice && (
         <View
