@@ -95,8 +95,12 @@ services:
       # Only used when the Supabase variables above are unset (one owner per deploy).
       - key: LINGWU_ACCESS_KEY
         generateValue: true
+      # 手动固定的密钥：必须与本地 .env 的 TOKEN_ENCRYPTION_KEY 保持一致。
+      # sync: false 表示不从蓝图同步，需在 Render 控制台 Environment 中手动填入；
+      # 切勿改回 generateValue，否则自动生成的密钥在环境重建后会变化，
+      # 导致历史加密的用户数据无法解密。
       - key: TOKEN_ENCRYPTION_KEY
-        generateValue: true
+        sync: false
       - key: DEEPSEEK_API_KEY
         sync: false
       # 公开的 OpenAI 兼容端点，非密钥，直接固定无需在控制台填入。
@@ -120,24 +124,15 @@ services:
       - key: COPILOTKIT_TELEMETRY_DISABLED
         value: "true"
       # Hindsight 记忆引擎（多 Agent 长时记忆）。Base URL 留空时引擎不启用，
-      # 走本地关键词召回降级。自托管：http://<host>:8888（无需 key）；云端：
-      # https://api.hindsight.vectorize.io（需 HINDSIGHT_API_KEY）。
+      # 走本地关键词召回降级。Render 采用云端模式：
+      # https://api.hindsight.vectorize.io（需 HINDSIGHT_API_KEY，控制台手动填入）。
+      # 与 .env / .env.example 同步：HINDSIGHT_LLM_* 与 HF_ENDPOINT 仅供自托管容器
+      # （infra/hindsight.yaml）读取，云端模式下 LingWu API 不读取（见 config.ts），
+      # 因此不再在 Render 上配置这 5 个变量。
       - key: HINDSIGHT_BASE_URL
         sync: false
       - key: HINDSIGHT_API_KEY
         sync: false
-      # Hindsight 自托管容器所需的 LLM 配置（仅供 infra/hindsight.yaml 读取；
-      # 云端模式下 LingWu API 不读取这些变量）。密钥需在控制台手动填入。
-      - key: HINDSIGHT_LLM_PROVIDER
-        value: deepseek
-      - key: HINDSIGHT_LLM_API_KEY
-        sync: false
-      - key: HINDSIGHT_LLM_MODEL
-        value: deepseek-flash
-      - key: HINDSIGHT_LLM_BASE_URL
-        value: https://api.deepseek.com
-      - key: HF_ENDPOINT
-        value: https://hf-mirror.com
       # Delete these two entries, and the lingwu-browser service below, to
       # deploy without browsing. The API boots either way.
       - key: BROWSER_WORKER_URL

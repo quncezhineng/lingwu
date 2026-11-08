@@ -569,11 +569,8 @@ const agent = {
     "No skills yet. Tap “Create skill” above to write one, or add one from the skill marketplace.",
   "agent.mySkillDeletedToast": "Deleted “{title}”.",
   "agent.mySkillDeleteConfirmTitle": "Permanently delete “{title}”?",
-  "agent.mySkillDeleteConfirmTitleOne": "Remove “{title}”?",
   "agent.mySkillDeleteConfirmNoteAll":
     "This permanently deletes the skill and its copies from all agents. This can't be undone.",
-  "agent.mySkillDeleteConfirmNoteOne":
-    "This removes the skill from this agent. Copies in other agents are unaffected.",
   "agent.mySkillDeleteAction": "Delete skill",
   "agent.skillsDetail": "Enable reusable specialist actions for research and investment work.",
   "agent.connectorsHeading": "Connectors",
@@ -723,7 +720,7 @@ const agent = {
   "agentSpace.agentCapabilities": "{name}'s capabilities",
   "agentSpace.taskHistory": "Task history",
   "agentSpace.allCapabilities": "All capabilities",
-  "agentSpace.unlockMoreFeatures": "Unlock more features",
+  "agentSpace.unlockMoreFeatures": "Unlock more capabilities",
   "agentSpace.activeTasks": "{count} active tasks",
   "agentSpace.noActiveTasks": "No active tasks",
   "agentSpace.backToChat": "Back to chat",

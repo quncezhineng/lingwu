@@ -1193,7 +1193,7 @@ function SecondarySection({
     switch (section) {
       case "account":
         return (
-          <AccountScreen onSignOut={onSignOut} onOpenPreferences={() => onOpen("preferences")} />
+          <AccountScreen onSignOut={onSignOut} />
         );
       case "preferences":
         return <PreferencesScreen />;
@@ -1379,7 +1379,7 @@ export function AgentProductShell({
     [],
   );
   const [drawer, setDrawer] = useState<"agents" | "capabilities" | null>(null);
-  // 「解锁更多功能」跳转到 Agent 详情时携带的分区意图：让详情页直接定位到「技能」。
+  // 「解锁更多的能力」跳转到 Agent 详情时携带的分区意图：让详情页直接定位到「技能」。
   // 需要在页面可能已挂载的情况下响应，因此交给 AgentSettingsScreen 用 effect 消费后清除。
   const [agentTabIntent, setAgentTabIntent] = useState<AgentSettingsTab | null>(null);
   const [mountedIds, setMountedIds] = useState<string[]>([current.id]);
@@ -1486,7 +1486,7 @@ export function AgentProductShell({
     setPanelStack([next]);
   };
 
-  // 「解锁更多功能」：收起浮层/抽屉，进入当前 Agent 详情设置的「技能」分区。
+  // 「解锁更多的能力」：收起浮层/抽屉，进入当前 Agent 详情设置的「技能」分区。
   // navigate 对相同 Section 是无操作的，桌面端已停留在详情页时只更新分区意图。
   const openAgentSkills = useCallback(() => {
     setDrawer(null);

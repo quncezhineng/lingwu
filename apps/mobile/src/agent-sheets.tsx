@@ -148,7 +148,7 @@ export function AgentMoreContent({
   onPanel: (panel: AgentPanel) => void;
   /** 应用与能力是独立页面，不走浮层：由调用方负责跳转。 */
   onOpenApps: () => void;
-  /** 解锁更多功能：进入当前 Agent 详情设置的「技能」分区，由调用方负责跳转。 */
+  /** 解锁更多的能力：进入当前 Agent 详情设置的「技能」分区，由调用方负责跳转。 */
   onOpenAgentSkills: () => void;
   /** 点击能力卡片展示该技能的只读详情，由调用方作为兄弟节点挂载弹层，避免嵌套 Modal。 */
   onInspectSkill?: (skillId: string) => void;
@@ -161,19 +161,13 @@ export function AgentMoreContent({
   const activeTasks = tasks.filter(
     (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
   );
-  // 「更多能力」展示当前 Agent 的独有能力：优先用该 Agent 自定义 + 从技能目录
-  // 专门安装的技能（这才是真正区分不同 Agent 的东西）；没有独有能力时回退到
-  // 该 Agent 模板的核心投研能力，避免落入通用的 research/files/memory/search 文案。
-  const distinctive = [
+  // 「{name} 的能力」只展示这个 Agent 真正配置的技能：自建技能 + 从技能库安装的技能。
+  // 不再回退到模板自带的 current.skills —— 没配置技能时这一栏就应该完全为空，
+  // 与 Agent 详情 → 技能页的空态一致；底部按钮引导去技能页添加。
+  const capabilities = [
     ...current.customSkills.map((skill) => skill.id),
     ...current.installedSkills,
-  ];
-  const capabilities =
-    distinctive.length > 0
-      ? distinctive.slice(0, 4)
-      : current.skills
-          .filter((skill) => !["files", "memory", "search", "notes"].includes(skill))
-          .slice(0, 4);
+  ].slice(0, 4);
   return (
     <View style={{ gap: 6 }}>
       <SheetSection>
@@ -236,41 +230,44 @@ export function AgentMoreContent({
           {t("agentSpace.agentCapabilities", { name: current.name })}
         </Text>
       )}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        {capabilities.map((capability) => {
-          // 系统能力查固定标签表；独有能力（安装/自建技能）走技能目录的展示名。
-          const displayName =
-            AGENT_CAPABILITY_LABELS[capability]?.[locale === "zh-Hans" ? "zh" : "en"] ||
-            skillDisplayName(capability, current.customSkills);
-          // 判定该能力是否有对应的详情：优先自建技能，其次技能目录；
-          // 其余系统能力没有详情页，维持打开「技能中心」面板的原行为。
-          const inspectable =
-            current.customSkills.some((skill) => skill.id === capability) ||
-            skillCatalog.some((skill) => skill.id === capability);
-          return (
-            <Pressable
-              key={capability}
-              accessibilityRole="button"
-              onPress={() => (inspectable ? onInspectSkill?.(capability) : onPanel("capabilities"))}
-              style={({ pressed }) => ({
-                width: "47%",
-                minHeight: 60,
-                padding: 10,
-                borderRadius: radius.card,
-                borderWidth: 1,
-                borderColor: colors.line,
-                backgroundColor: pressed ? colors.surface : colors.paper,
-                gap: 8,
-              })}
-            >
-              <Brain size={15} color={colors.primary} />
-              <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]} numberOfLines={2}>
-                {displayName}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {!!capabilities.length && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {capabilities.map((capability) => {
+            // 展示名优先查固定标签表（兼容历史系统能力 id），否则按技能目录 / 自建技能取名。
+            const displayName =
+              AGENT_CAPABILITY_LABELS[capability]?.[locale === "zh-Hans" ? "zh" : "en"] ||
+              skillDisplayName(capability, current.customSkills);
+            // 配置过的技能都能点开只读详情；兜底仍可打开「技能中心」面板。
+            const inspectable =
+              current.customSkills.some((skill) => skill.id === capability) ||
+              skillCatalog.some((skill) => skill.id === capability);
+            return (
+              <Pressable
+                key={capability}
+                accessibilityRole="button"
+                onPress={() =>
+                  inspectable ? onInspectSkill?.(capability) : onPanel("capabilities")
+                }
+                style={({ pressed }) => ({
+                  width: "47%",
+                  minHeight: 60,
+                  padding: 10,
+                  borderRadius: radius.card,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  backgroundColor: pressed ? colors.surface : colors.paper,
+                  gap: 8,
+                })}
+              >
+                <Brain size={15} color={colors.primary} />
+                <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]} numberOfLines={2}>
+                  {displayName}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
       <Pressable
         accessibilityRole="button"
         onPress={onOpenAgentSkills}
@@ -648,7 +645,7 @@ export function AgentSheets({
   onClose: () => void;
   onPanel: (panel: AgentPanel) => void;
   onSignOut: () => void;
-  /** 解锁更多功能：进入当前 Agent 详情设置的「技能」分区，由 AgentProductShell 持有实现。 */
+  /** 解锁更多的能力：进入当前 Agent 详情设置的「技能」分区，由 AgentProductShell 持有实现。 */
   onOpenAgentSkills: () => void;
 }) {
   const { t } = useTranslation();

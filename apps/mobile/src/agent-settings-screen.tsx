@@ -50,7 +50,7 @@ export function AgentSettingsScreen({
   tabIntent,
   onTabIntentConsumed,
 }: {
-  /** 外部跳转意图：进入详情页时定位到指定分区（例如从「解锁更多功能」直达技能页）。 */
+  /** 外部跳转意图：进入详情页时定位到指定分区（例如从「解锁更多的能力」直达技能页）。 */
   tabIntent?: AgentSettingsTab | null;
   /** 分区意图被应用后通知调用方清除，避免下次进入详情页被再次定位。 */
   onTabIntentConsumed?: () => void;

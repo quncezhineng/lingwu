@@ -512,11 +512,8 @@ const agent = {
   "agent.mySkillsEmpty": "还没有技能。点右上角「创建技能」写一个，或去技能市场添加。",
   "agent.mySkillDeletedToast": "已删除技能「{title}」。",
   "agent.mySkillDeleteConfirmTitle": "确定永久删除技能「{title}」？",
-  "agent.mySkillDeleteConfirmTitleOne": "确定移除技能「{title}」？",
   "agent.mySkillDeleteConfirmNoteAll":
     "将永久删除这份技能及其在所有智能体中的副本，删除后无法恢复。",
-  "agent.mySkillDeleteConfirmNoteOne":
-    "将移除这个智能体中的这份技能，该技能在其他智能体中不受影响。",
   "agent.mySkillDeleteAction": "删除技能",
   "agent.skillsDetail": "为灵悟启用可复用的专业动作，直接处理研究与投研工作。",
   "agent.connectorsHeading": "连接器",
@@ -654,7 +651,7 @@ const agent = {
   "agentSpace.agentCapabilities": "{name} 的能力",
   "agentSpace.taskHistory": "任务历史",
   "agentSpace.allCapabilities": "全部能力",
-  "agentSpace.unlockMoreFeatures": "解锁更多功能",
+  "agentSpace.unlockMoreFeatures": "解锁更多的能力",
   "agentSpace.activeTasks": "{count} 个任务进行中",
   "agentSpace.noActiveTasks": "暂无进行中的任务",
   "agentSpace.backToChat": "返回对话",

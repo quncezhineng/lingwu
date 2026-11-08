@@ -3,7 +3,7 @@ import { Pressable, useWindowDimensions, View } from "react-native";
 import { useAgentSpace } from "../agent-space";
 import type { AgentDefinition, AgentSkill } from "../agent-space-model";
 import { Text, TextInput } from "../app-text";
-import { MySkillDetailSheet, SkillDeleteConfirm, SkillDetailSheet } from "../capability-hub";
+import { MySkillDetailSheet, SkillDetailSheet } from "../capability-hub";
 import { CardGrid } from "../card-grid";
 import { useTranslation } from "../i18n";
 import { FileText, Plus, Search } from "../icons";
@@ -37,6 +37,38 @@ type LibraryEntry = {
   catalog?: SkillCatalogEntry;
   custom?: AgentSkill;
 };
+
+/**
+ * 技能卡片右上角统一的「移除」入口：只从当前 Agent 移除这份技能，
+ * 不影响技能本身或其它智能体。stopPropagation 避免同时打开卡片详情。
+ */
+function SkillRemoveButton({ skillName, onRemove }: { skillName: string; onRemove: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${t("agentSpace.removeSkill")} ${skillName}`}
+      hitSlop={6}
+      onPress={(event) => {
+        event.stopPropagation();
+        onRemove();
+      }}
+      style={({ pressed }) => ({
+        height: 24,
+        justifyContent: "center",
+        paddingHorizontal: 9,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: colors.errorSoft,
+        backgroundColor: pressed ? colors.errorSoft : colors.paper,
+      })}
+    >
+      <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
+        {t("agentSpace.removeSkill")}
+      </Text>
+    </Pressable>
+  );
+}
 
 /**
  * 技能库条目：宽屏两列只留标题 + 状态，窄屏单列补一行说明。
@@ -289,8 +321,6 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
   const [adding, setAdding] = useState(false);
   /** 自建技能详情：与「应用与能力 → 我的技能」共用同一版式。 */
   const [viewingCustom, setViewingCustom] = useState<AgentSkill>();
-  /** 删除前二次确认：待删除的自建技能。 */
-  const [deletingSkill, setDeletingSkill] = useState<AgentSkill>();
   /** 技能库技能详情：与「应用与能力 → 技能市场」共用版式及「添加到智能体」。 */
   const [viewingCatalog, setViewingCatalog] = useState<SkillCatalogEntry>();
   const zh = locale === "zh-Hans";
@@ -329,6 +359,30 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
       t(installed ? "agent.skillUninstalledToast" : "agent.skillInstalledToast", {
         title: zh ? viewingCatalog.titleZh : viewingCatalog.titleEn,
         agent: agent.name,
+      }),
+    );
+  };
+
+  /**
+   * 卡片上的「移除」：自建技能删掉当前 Agent 的这一份副本，点击即生效、不弹确认。
+   * 其它智能体里的同内容副本不受影响，可在详情里用「添加到智能体」重新加回。
+   */
+  const removeCustomSkill = (skill: AgentSkill) => {
+    setViewingCustom(undefined);
+    deleteSkill(current.id, skill.id);
+    notify(t("agent.skillUninstalledToast", { title: skill.name, agent: current.name }));
+  };
+
+  /**
+   * 卡片上的「移除」：目录技能只取消当前 Agent 的安装状态，技能本身仍留在技能库，
+   * 其它智能体不受影响，随时可用「添加技能」重新装回来，同样点击即生效。
+   */
+  const removeCatalogSkill = (skill: SkillCatalogEntry) => {
+    setSkillInstalled(current.id, skill.id, false);
+    notify(
+      t("agent.skillUninstalledToast", {
+        title: zh ? skill.titleZh : skill.titleEn,
+        agent: current.name,
       }),
     );
   };
@@ -403,29 +457,7 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
           <View style={s.between}>
             <Text style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>{skill.name}</Text>
             {/* 用户自建的技能不再提供启停开关，右侧直接给出移除入口。 */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${t("agentSpace.removeSkill")} ${skill.name}`}
-              hitSlop={6}
-              onPress={(event) => {
-                event.stopPropagation();
-                setViewingCustom(undefined);
-                setDeletingSkill(skill);
-              }}
-              style={({ pressed }) => ({
-                height: 24,
-                justifyContent: "center",
-                paddingHorizontal: 9,
-                borderRadius: 6,
-                borderWidth: 1,
-                borderColor: colors.errorSoft,
-                backgroundColor: pressed ? colors.errorSoft : colors.paper,
-              })}
-            >
-              <Text style={[s.small, { color: colors.danger, fontWeight: "600" }]}>
-                {t("agentSpace.removeSkill")}
-              </Text>
-            </Pressable>
+            <SkillRemoveButton skillName={skill.name} onRemove={() => removeCustomSkill(skill)} />
           </View>
           <Text style={s.small}>{skill.purpose || t("agentSpace.skillInstructions")}</Text>
         </Pressable>
@@ -454,6 +486,7 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
               <Text numberOfLines={1} style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>
                 {title}
               </Text>
+              <SkillRemoveButton skillName={title} onRemove={() => removeCatalogSkill(skill)} />
             </View>
             <Text numberOfLines={2} style={s.small}>
               {zh ? skill.descriptionZh : skill.descriptionEn}
@@ -511,18 +544,6 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
           agents={agentList}
           onToggleInstall={toggleCatalogSkillInstall}
           onClose={() => setViewingCatalog(undefined)}
-        />
-      )}
-      {deletingSkill && (
-        <SkillDeleteConfirm
-          title={t("agent.mySkillDeleteConfirmTitleOne", { title: deletingSkill.name })}
-          detail={t("agent.mySkillDeleteConfirmNoteOne")}
-          onCancel={() => setDeletingSkill(undefined)}
-          onConfirm={() => {
-            deleteSkill(current.id, deletingSkill.id);
-            setDeletingSkill(undefined);
-            notify(t("agent.mySkillDeletedToast", { title: deletingSkill.name }));
-          }}
         />
       )}
     </BotPage>

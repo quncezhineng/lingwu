@@ -11,6 +11,7 @@ The demos follow a request from chat to the agent's inline browser, then show ho
 - [Quick start and architecture](../README.md)
 - [Native iOS / Android / web setup](../apps/mobile/README.md)
 - [Browser worker, API, persistence, and network boundary](../apps/worker/README.md)
+- [本地启用浏览器 Worker 无头浏览器指南](BROWSER-WORKER-本地启动指南.md)
 - [Linux computer, terminal, and workspace files](COMPUTER.md)
 - [CopilotKit Rich Threads](RICH-THREADS.md)
 - [Conversation streaming protocol and reliability](conversation-streaming.md)

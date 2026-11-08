@@ -5,6 +5,60 @@
 
 ## 变更记录
 
+### 2026-11-08 · UI：右侧栏「智能体能力」跟随真实技能配置，按钮改为「解锁更多的能力」
+
+**背景**
+
+全局页面右侧栏「全局能力」里的「小悟 的能力」卡片由 `AgentMoreContent` 渲染：当 Agent 没配置自建技能、也没从技能库安装技能时，会回退到模板自带的 `current.skills`，仍然显示「行情与自选 / 市场简报 / 标的研究 / 财报解析」四张写死的卡片，与 Agent 详情 → 技能页的空态不一致。用户要求没配置技能时这一栏为空，并把底部按钮改为「解锁更多的能力」，点击进详情页技能分区。
+
+**处理**
+
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：`capabilities` 去掉 `current.skills` 模板兜底，只取 `customSkills` + `installedSkills`（最多 4 张）；卡片网格连同「{name} 的能力」标题都按 `capabilities.length` 条件渲染，为空时整块不渲染。卡片显示名 / 详情点击逻辑保持不动，已配置技能时行为不变。
+- [i18n] `agentSpace.unlockMoreFeatures`：zh「解锁更多功能」→「解锁更多的能力」，en "Unlock more features" → "Unlock more capabilities"；key 名保持不变，`agent-sheets.tsx` / `agent-product.tsx` / `agent-settings-screen.tsx` 里的相关注释同步改名。
+- 点击跳转链路已存在，核对后未改动：`onOpenAgentSkills` → `AgentProductShell.openAgentSkills`（`setAgentTabIntent("skills")` + `navigate("agent")`）→ `AgentSettingsScreen` 的 effect 消费意图 → `BotSkillsPage embedded`。桌面端常驻详情页时也通过 intent 重新定位到「技能」。
+
+**验证**
+
+- `npx biome check --write`（5 个改动文件）：无警告、无格式修复。
+- `pnpm --dir apps/mobile typecheck`：改动文件无类型错误；`bot-pages/connectors.tsx` 的 7 个报错为 HEAD 既有问题。
+- i18n / agent-space / skill-catalog / skill-sharing 共 47 例单测通过；全仓库检索无「解锁更多功能 / Unlock more features」残留（历史记录除外）。
+
+### 2026-11-08 · UI：Agent 详情技能页自建技能「移除」取消二次确认
+
+**背景**
+
+上一条改动给每张技能卡片补齐了「移除」，但自建技能沿用旧逻辑：点「移除」先弹 `SkillDeleteConfirm`（「确定移除技能「X」？」），确认后才删。用户要求 Agent 详情技能板块的移除不再弹窗，点击即把技能从当下 Agent 移除。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：删掉 `deletingSkill` 状态、`SkillDeleteConfirm` 导入与页面底部的确认弹层；新增 `removeCustomSkill`，直接 `deleteSkill(current.id, skill.id)` 清掉当前 Agent 的这一份副本，并用 `agent.skillUninstalledToast` 给 Toast 反馈。连同 `removeCatalogSkill`，自建技能与目录技能两类卡片现在都是「点击即移除」，交互一致。
+- [i18n] zh-Hans / en 同步删除仅为该弹窗存在的 `agent.mySkillDeleteConfirmTitleOne` 与 `agent.mySkillDeleteConfirmNoteOne`；「应用与能力 → 我的技能」永久删除仍使用 `SkillDeleteConfirm` 及 `mySkillDeleteConfirmTitle` / `NoteAll` / `mySkillDeletedToast`，组件与文案均保留。
+- 只删当前 Agent 的副本这一语义不变，其它智能体的同内容副本不受影响，仍可在详情里用「添加到智能体」加回。
+
+**验证**
+
+- `npx biome check --write`（skills.tsx、zh-Hans/agent.ts、en/agent.ts）：无警告、无格式修复。
+- `pnpm --dir apps/mobile typecheck`：改动文件无类型错误；`bot-pages/connectors.tsx` 的 7 个报错为 HEAD 既有问题。
+- i18n / skill-sharing / skill-catalog / agent-space 共 47 例单测通过，i18n 用例确认中英 key 集合仍一一对应。
+
+### 2026-11-08 · UI：Agent 详情技能页每张卡片补齐「移除」入口
+
+**背景**
+
+Agent 详情 → 技能页的卡片分两类：用户自建技能（`current.customSkills`，排在最前）右上角已有「移除」按钮；从技能库安装的目录技能（`current.installedSkills`）只有标题 + 描述，没有移除入口，只能点开详情弹层、在「添加到智能体」里逐行取消安装。用户要求每张技能卡片右上角都有「移除」，语义是把技能从当前 Agent 移除。
+
+**处理**
+
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：抽出共用 `SkillRemoveButton`（红色描边小按钮、`agentSpace.removeSkill` 中英文案、无障碍标签、`stopPropagation` 防止同时打开卡片详情），两类技能卡片使用同一枚按钮，视觉与交互一致；自建技能卡片里原先内联的按钮替换为该组件，行为不变。
+- 同文件新增 `removeCatalogSkill`：目录技能点「移除」执行 `setSkillInstalled(current.id, skill.id, false)` 取消当前 Agent 的安装，并用 `agent.skillUninstalledToast` 给出提示。技能本身仍留在技能库、其它 Agent 不受影响，可随时用「添加技能」装回，因此直接生效不弹确认；自建技能仍走 `SkillDeleteConfirm` 二次确认（那一份可能是技能最后一份副本），`deleteSkill(current.id, ...)` 行为不变。
+- 未新增 i18n key：按钮与 Toast 复用既有 `agentSpace.removeSkill` / `agent.skillUninstalledToast`，中英两侧均已存在。
+
+**验证**
+
+- `npx biome check apps/mobile/src/bot-pages/skills.tsx`：无警告。
+- `pnpm --dir apps/mobile typecheck`：改动文件无类型错误（`bot-pages/connectors.tsx` 的 7 个报错为 HEAD 既有问题，与本次无关）。
+- i18n / skill-sharing / skill-catalog / agent-space 共 47 例单测通过。
+
 ### 2026-11-08 · 图标：Agent 详情页左侧栏「记忆」同心圆图标换为心形
 
 **背景**
@@ -2662,3 +2716,69 @@ allowHeaders: ["Content-Type", "Authorization", "Accept", "Last-Event-ID", "Cach
 根因：修改 `app.ts` 触发 `tsx watch` 热重载，服务端重启的 1~2 秒内连接被拒绝。服务恢复后所有请求均返回 `200`，报错不再复现。
 
 另外，`wss://realtime.intelligence.copilotkit.ai` 的 WebSocket 连接警告为 CopilotKit 云端（Intelligence）实时推送通道的间歇性网络失败，CopilotKit 内置优雅降级（最多重试 5 次后回退到 REST 轮询），不影响线程列表与记忆功能。
+
+### 2026-11-08 · 环境变量文件安全审查与本地部署精简
+
+**背景**
+
+以 `.env.example` 为基准核对本地部署用的 `.env`，发现并处理了两类问题：仓库内残留的密钥文件、以及本地部署（云端 Hindsight 模式）下用不到的配置项。
+
+**处理**
+
+1. **`.env.example` 确认无密钥**：核对 `git show HEAD:.env.example` 与工作区文件，均已是不含真实密钥的占位符模板，无需改动。
+2. **移除误暂存的 `.env copy`**：该备份副本曾被 `git add` 暂存（状态 `AD`），工作区文件已缺失。执行 `git reset` + `git rm --cached` 彻底移出索引，`git ls-files` 已不再跟踪。
+3. **`.env` 注释掉本地部署不需要的变量**：
+   - `HINDSIGHT_LLM_PROVIDER` / `HINDSIGHT_LLM_API_KEY` / `HINDSIGHT_LLM_MODEL` / `HINDSIGHT_LLM_BASE_URL` / `HF_ENDPOINT`：仅供 `infra/hindsight.yaml` 自托管容器读取；云端模式（`HINDSIGHT_BASE_URL=https://api.hindsight.vectorize.io`）下 LingWu API 不读取，见 `apps/server/src/config.ts`。
+   - `WORKER_DATA_DIR` / `WORKER_HOST`：本地未启用浏览器 worker（`BROWSER_WORKER_URL` 已注释）。
+4. **`.gitignore` 增加防护**：新增 `.env copy` 规则，防止编辑器/系统生成的备份副本再次入库。
+
+**验证**
+
+- `git ls-files` 中环境相关文件仅剩 `.env.example`。
+- `git status` 无异常残留；`.env` 保持 gitignore 忽略状态。
+- DeepSeek / Supabase / CopilotKit / Hindsight 的真实密钥仅存在于 `.env` 与 Render 控制台。
+
+### 2026-11-08 · 新增本地浏览器 Worker 启动指南文档
+
+**背景**
+
+用户在上一轮确认本地未启用浏览器 worker（`BROWSER_WORKER_URL` 已注释）。为便于日后开启「读网页做研究」场景，补充本地启动说明文档。
+
+**处理**
+
+- 新增 `docs/BROWSER-WORKER-本地启动指南.md`：说明 worker 用途与启用判定（`BROWSER_WORKER_URL` + `WORKER_TOKEN` 同时配置才启用 `browse_web` 工具）、方式 A（`pnpm dev:browser` 本地直接运行）与方式 B（`docker compose -f infra/compose.yaml up --build -d`）的完整步骤、验证方法、停止与恢复、常见问题与安全注意。
+- `docs/README.md` 的 Guides 列表增加该指南入口，保留对 `apps/worker/README.md` 的引用（该文件为 API/持久化/网络边界的权威说明）。
+
+**验证**
+
+- 启动命令 `pnpm dev:browser`（即 `node --env-file=.env --import tsx apps/worker/src/index.ts`）与 Docker 配置均取自根目录 `package.json` / `apps/worker/README.md` / `infra/compose.yaml`，与代码一致。
+
+### 2026-11-08 · Render 配置与 .env 同步（移除云端模式下无用的 Hindsight LLM 变量）
+
+**背景**
+
+部署前以最新 `.env` / `.env.example` 为准复核 `render.yaml`：`.env.example` 已把 `HINDSIGHT_LLM_PROVIDER` / `HINDSIGHT_LLM_API_KEY` / `HINDSIGHT_LLM_MODEL` / `HINDSIGHT_LLM_BASE_URL` / `HF_ENDPOINT` 全部注释（仅供自托管容器 `infra/hindsight.yaml` 读取；云端模式下 LingWu API 不读取，见 `apps/server/src/config.ts`）。
+
+**处理**
+
+- 从 `render.yaml` 的 `lingwu-api` 服务中删除上述 5 个变量；`HINDSIGHT_BASE_URL` / `HINDSIGHT_API_KEY` 保持 `sync: false`（云端模式控制台手动填入）。
+- 保留 `RATE_LIMIT_MAX_REQUESTS=1200` 等已同步项；`WORKER_DATA_DIR` / `WORKER_HOST` 仅影响本地（`.env` 已注释），`lingwu-browser` 容器的 `WORKER_DATA_DIR=/data`、`WORKER_HOST=0.0.0.0` 不受影响。
+
+**验证**
+
+- `python3 -c "import yaml..."` 解析通过：3 个服务（lingwu-api / lingwu-browser / lingwu-web），lingwu-api 共 40 个环境变量。
+
+### 2026-11-08 · TOKEN_ENCRYPTION_KEY 改为手动固定（防止环境重建导致加密数据失效）
+
+**背景**
+
+Render Blueprint 部署时若 `TOKEN_ENCRYPTION_KEY` 使用 `generateValue: true`，Render 会在环境重建时重新生成随机值，导致此前用旧密钥加密的用户令牌无法解密。需改为手动固定、与本地 `.env` 保持一致的值。
+
+**处理**
+
+- `render.yaml` 的 `lingwu-api` 服务中，`TOKEN_ENCRYPTION_KEY` 由 `generateValue: true` 改为 `sync: false`（不在蓝图中同步值，需在 Render 控制台 Environment 手动填入与本地 `.env` 相同的值）。已补充中文注释说明原因。
+- 注意点：`generateValue` 仅支持 `true` 表达「自动生成」，`sync: false` 才是「手动填写」的正确写法。
+
+**验证**
+
+- `python3 -c "import yaml..."` 解析通过，`TOKEN_ENCRYPTION_KEY` 仍在 lingwu-api 服务环境变量列表中。
