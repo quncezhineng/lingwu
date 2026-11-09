@@ -9,12 +9,7 @@ import { useTranslation } from "../i18n";
 import { FileText, Plus, Search } from "../icons";
 import { type SkillCatalogEntry, skillCatalog } from "../skill-catalog";
 import { SkillEditor } from "../skill-editor";
-import {
-  collectSharedSkills,
-  findSkillCopy,
-  skillHolderAgentIds,
-  toggleSkillShare,
-} from "../skill-sharing";
+import { findSkillCopy, skillHolderAgentIds, toggleSkillShare } from "../skill-sharing";
 import { StatusBadge } from "../status-badge";
 import { Button, colors, radius, s } from "../ui";
 import { useWorkspace } from "../workspace";
@@ -196,7 +191,7 @@ function SkillLibraryPanel({
   onViewCustomDetail: (skill: AgentSkill) => void;
 }) {
   const { t, locale } = useTranslation();
-  const { agents: agentList, current, deleteSkill, saveSkill, setSkillInstalled } = useAgentSpace();
+  const { current, deleteSkill, saveSkill, setSkillInstalled, skillLibrary } = useAgentSpace();
   const { notify } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
   // 三栏布局下列宽远小于窗口宽，用 onLayout 的真实列宽决定单双列。
@@ -208,11 +203,10 @@ function SkillLibraryPanel({
   const matches = (...values: string[]) =>
     !keyword || values.some((value) => value.toLowerCase().includes(keyword));
 
-  const customEntries: LibraryEntry[] = collectSharedSkills(agentList)
-    .filter(({ skill }) =>
-      matches(skill.name, skill.purpose, skill.instructions, skill.outputFormat),
-    )
-    .map(({ skill }) => ({
+  // 自建技能来自账户级技能库：创建后即使没有任何 Agent 持有，也能在这里被添加到当前智能体。
+  const customEntries: LibraryEntry[] = skillLibrary
+    .filter((skill) => matches(skill.name, skill.purpose, skill.instructions, skill.outputFormat))
+    .map((skill) => ({
       key: `custom:${skill.id}`,
       title: skill.name,
       description: skill.purpose || skill.instructions,
@@ -364,13 +358,16 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
   };
 
   /**
-   * 卡片上的「移除」：自建技能删掉当前 Agent 的这一份副本，点击即生效、不弹确认。
-   * 其它智能体里的同内容副本不受影响，可在详情里用「添加到智能体」重新加回。
+   * 卡片上的「移除」：只是把这份技能从**当前智能体的能力**里摘掉，点击即生效、不弹确认。
+   *
+   * 走 `deleteSkill`（= `detachSkillFromAgent`），只删当前 Agent 的副本：
+   * 「应用与能力 → 我的技能」里的技能库原件、以及其它智能体上的副本都不受影响，
+   * 需要时随时可以用「添加技能」把它重新挂回来。提示文案特意点明这一点。
    */
   const removeCustomSkill = (skill: AgentSkill) => {
     setViewingCustom(undefined);
     deleteSkill(current.id, skill.id);
-    notify(t("agent.skillUninstalledToast", { title: skill.name, agent: current.name }));
+    notify(t("agent.skillDetachedToast", { title: skill.name, agent: current.name }));
   };
 
   /**

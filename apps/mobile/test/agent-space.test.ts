@@ -9,6 +9,7 @@ import {
   createCustomSkill,
   createSystemAgent,
   DEFAULT_PREFERENCES,
+  detachSkillFromAgent,
   normalizeAgentSpace,
   onboardingPreferenceContext,
   onboardingSummary,
@@ -356,4 +357,94 @@ test("onboarding model context includes a supplied time horizon", () => {
   assert.match(context, /preferred name: Friend/);
   assert.match(context, /markets and focus areas: not restricted/);
   assert.match(context, /stated time horizon: 3年以上/);
+});
+
+const librarySkillInput = {
+  name: "现金流质量检查",
+  purpose: "核对利润与现金流的同步性",
+  instructions: "先提取营业收入，再比较变化方向。",
+  outputFormat: "结论先行。",
+};
+
+test("old state without a skill library migrates custom skills from Agents", () => {
+  const older = createCustomSkill(librarySkillInput, undefined, "2026-01-01T00:00:00.000Z");
+  const newer = createCustomSkill(
+    librarySkillInput,
+    { ...older, id: "copy" },
+    "2026-02-01T00:00:00.000Z",
+  );
+  const other = createCustomSkill({ ...librarySkillInput, name: "另一份技能" });
+  const state = normalizeAgentSpace(
+    {
+      agents: [
+        { id: "agent-a", customSkills: [older] },
+        { id: "agent-b", customSkills: [newer, other] },
+      ],
+    },
+    MAIN_THREAD,
+  );
+  // 同内容副本只保留最近更新的一份，不同内容的技能也一起进入库里。
+  assert.equal(state.skillLibrary.length, 2);
+  assert.equal(state.skillLibrary.find((skill) => skill.name === "现金流质量检查")?.id, "copy");
+  assert.ok(state.skillLibrary.some((skill) => skill.name === "另一份技能"));
+});
+
+test("a skill library survives normalization without being attached to any Agent", () => {
+  const librarySkill = createCustomSkill(librarySkillInput);
+  const state = normalizeAgentSpace({ agents: [], skillLibrary: [librarySkill] }, MAIN_THREAD);
+  assert.deepEqual(
+    state.skillLibrary.map((skill) => skill.id),
+    [librarySkill.id],
+  );
+  // 创建技能只入库，不会自动挂到智能体。
+  assert.ok(state.agents.every((agent) => agent.customSkills.length === 0));
+  assert.deepEqual(normalizeAgentSpace(state, MAIN_THREAD).skillLibrary, state.skillLibrary);
+});
+
+test("an existing skill library is preserved instead of re-migrating Agent copies", () => {
+  const librarySkill = createCustomSkill(librarySkillInput, undefined, "2026-03-01T00:00:00.000Z");
+  const agentCopy = createCustomSkill(librarySkillInput, undefined, "2026-01-01T00:00:00.000Z");
+  const state = normalizeAgentSpace(
+    { agents: [{ id: "agent-a", customSkills: [agentCopy] }], skillLibrary: [librarySkill] },
+    MAIN_THREAD,
+  );
+  assert.deepEqual(
+    state.skillLibrary.map((skill) => skill.id),
+    [librarySkill.id],
+  );
+});
+
+test("removing a skill from an Agent only detaches that Agent's copy", () => {
+  const librarySkill = createCustomSkill(librarySkillInput);
+  const copy = createCustomSkill(librarySkillInput, { ...librarySkill, id: "copy" });
+  const otherCopy = createCustomSkill(librarySkillInput, { ...librarySkill, id: "other-copy" });
+  const state = normalizeAgentSpace(
+    {
+      agents: [
+        { id: "agent-a", customSkills: [copy] },
+        { id: "agent-b", customSkills: [otherCopy] },
+      ],
+      skillLibrary: [librarySkill],
+    },
+    MAIN_THREAD,
+  );
+
+  const next = detachSkillFromAgent(state, "agent-a", "copy");
+  // 这个 Agent 不再具备该能力…
+  assert.deepEqual(next.agents.find((agent) => agent.id === "agent-a")?.customSkills, []);
+  // …但「我的技能」里的库原件、以及其它 Agent 的副本都还在。
+  assert.deepEqual(
+    next.skillLibrary.map((skill) => skill.id),
+    [librarySkill.id],
+  );
+  assert.deepEqual(
+    next.agents.find((agent) => agent.id === "agent-b")?.customSkills.map((skill) => skill.id),
+    ["other-copy"],
+  );
+});
+
+test("detaching a skill the Agent does not hold leaves the state untouched", () => {
+  const state = normalizeAgentSpace({ agents: [], skillLibrary: [] }, MAIN_THREAD);
+  assert.equal(detachSkillFromAgent(state, SYSTEM_AGENT_ID, "missing-skill"), state);
+  assert.equal(detachSkillFromAgent(state, "missing-agent", "missing-skill"), state);
 });

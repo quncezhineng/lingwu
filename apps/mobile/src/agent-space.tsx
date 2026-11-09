@@ -23,6 +23,7 @@ import {
   createAgentFromTemplate,
   createCustomSkill,
   DEFAULT_PREFERENCES,
+  detachSkillFromAgent,
   normalizeAgentSpace,
   resolveRemoteAgentSpace,
   type SelectionLike,
@@ -66,8 +67,17 @@ type AgentSpaceContextValue = {
     input: Pick<AgentSkill, "name" | "purpose" | "instructions" | "outputFormat">,
     skillId?: string,
   ) => void;
+  /** 账户级技能库：创建技能只写入这里，不会自动挂到任何 Agent。 */
+  skillLibrary: AgentSkill[];
+  /** 新建 / 编辑技能库里的技能（skillId 为空表示新建）。 */
+  saveLibrarySkill: (
+    input: Pick<AgentSkill, "name" | "purpose" | "instructions" | "outputFormat">,
+    skillId?: string,
+  ) => void;
+  /** 删除技能库里的技能；Agent 上的副本由调用方用 deleteSkillEverywhere 清理。 */
+  deleteLibrarySkill: (skillId: string) => void;
   toggleSkill: (agentId: string, skillId: string) => void;
-  /** 删除用户自建的技能：所有读取 customSkills 的界面（Agent 详情、应用与能力、对话选择）同步移除。 */
+  /** 删除某个 Agent 上的自建技能副本；账户级技能库里的原件不受影响。 */
   deleteSkill: (agentId: string, skillId: string) => void;
   /** 从技能目录安装 / 卸载某个技能到指定 Agent；已安装时不重复写入。 */
   setSkillInstalled: (agentId: string, skillId: string, installed: boolean) => void;
@@ -299,6 +309,34 @@ export function AgentSpaceProvider({
     });
   }, []);
 
+  const saveLibrarySkill = useCallback<AgentSpaceContextValue["saveLibrarySkill"]>(
+    (input, skillId) => {
+      setState((value) => {
+        const existing = value.skillLibrary.find((skill) => skill.id === skillId);
+        const skill = createCustomSkill(input, existing);
+        return {
+          ...value,
+          skillLibrary: existing
+            ? value.skillLibrary.map((candidate) =>
+                candidate.id === existing.id ? skill : candidate,
+              )
+            : [...value.skillLibrary, skill],
+        };
+      });
+    },
+    [],
+  );
+
+  const deleteLibrarySkill = useCallback<AgentSpaceContextValue["deleteLibrarySkill"]>(
+    (skillId) => {
+      setState((value) => ({
+        ...value,
+        skillLibrary: value.skillLibrary.filter((skill) => skill.id !== skillId),
+      }));
+    },
+    [],
+  );
+
   const toggleSkill = useCallback((agentId: string, skillId: string) => {
     setState((value) => ({
       ...value,
@@ -322,22 +360,9 @@ export function AgentSpaceProvider({
     }));
   }, []);
 
+  // 只摘掉该 Agent 的副本：账户级技能库（「我的技能」）的原件一字不动。
   const deleteSkill = useCallback<AgentSpaceContextValue["deleteSkill"]>((agentId, skillId) => {
-    setState((value) => {
-      const target = value.agents.find((agent) => agent.id === agentId);
-      if (!target?.customSkills.some((skill) => skill.id === skillId)) return value;
-      return {
-        ...value,
-        agents: value.agents.map((agent) =>
-          agent.id === agentId
-            ? {
-                ...agent,
-                customSkills: agent.customSkills.filter((skill) => skill.id !== skillId),
-              }
-            : agent,
-        ),
-      };
-    });
+    setState((value) => detachSkillFromAgent(value, agentId, skillId));
   }, []);
 
   const setSkillInstalled = useCallback<AgentSpaceContextValue["setSkillInstalled"]>(
@@ -392,6 +417,9 @@ export function AgentSpaceProvider({
       finishOnboarding,
       replayOnboarding,
       saveSkill,
+      skillLibrary: state.skillLibrary,
+      saveLibrarySkill,
+      deleteLibrarySkill,
       toggleSkill,
       deleteSkill,
       setSkillInstalled,
@@ -414,6 +442,8 @@ export function AgentSpaceProvider({
       finishOnboarding,
       replayOnboarding,
       saveSkill,
+      saveLibrarySkill,
+      deleteLibrarySkill,
       toggleSkill,
       deleteSkill,
       setSkillInstalled,

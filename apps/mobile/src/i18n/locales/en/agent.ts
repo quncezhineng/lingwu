@@ -627,6 +627,7 @@ const agent = {
     "This copy can't be removed — the skill must stay in at least one Agent.",
   "agent.skillInstalledToast": "“{title}” added to {agent}.",
   "agent.skillUninstalledToast": "“{title}” removed from {agent}.",
+  "agent.skillDetachedToast": "“{title}” removed from {agent}. It's still in My Skills.",
   "agent.onYourComputer": "On your computer",
   "agent.shortcutPortfolioDetail": "Holdings, P/L and allocation",
   "agent.shortcutNotesDetail": "Buy/sell reasons, research notes and thesis tracking",

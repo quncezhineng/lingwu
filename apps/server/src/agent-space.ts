@@ -67,6 +67,9 @@ export const agentSpaceSchema = z
     version: z.literal(1),
     currentAgentId: identifier,
     agents: z.array(agentSchema).min(1).max(20),
+    // 账户级自建技能库：创建技能只入库，不自动挂到 Agent。旧客户端不带该字段，
+    // 保持可选以兼容；顶层是 .strict()，缺了它新版客户端的整个 PUT 都会被拒绝。
+    skillLibrary: z.array(skillSchema).max(200).optional(),
     preferences: preferencesSchema,
     onboardingDone: z.boolean(),
     onboardingStep: z.number().int().min(0).max(4),

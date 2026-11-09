@@ -1192,9 +1192,7 @@ function SecondarySection({
   const content = (() => {
     switch (section) {
       case "account":
-        return (
-          <AccountScreen onSignOut={onSignOut} />
-        );
+        return <AccountScreen onSignOut={onSignOut} />;
       case "preferences":
         return <PreferencesScreen />;
       case "watchlist":

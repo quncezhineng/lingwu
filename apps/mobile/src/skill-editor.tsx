@@ -83,22 +83,26 @@ function InstructionsField({
 /**
  * 自建技能的创建 / 编辑表单。
  *
- * Agent 详情的技能页与「应用与能力 → 我的技能」共用同一份表单：
- * 技能归属于当前选中的 Agent，写入后所有读取 customSkills 的界面同步更新。
+ * `library` 模式写进账户级技能库（「应用与能力 → 我的技能」的创建与编辑）：
+ * 技能只入库，不会自动挂到任何 Agent，需要用户在详情里「添加到智能体」。
+ * 默认模式写进当前选中 Agent 的 customSkills，用于 Agent 详情技能页编辑已有副本。
  * `onSaved` 仅在保存成功后触发，关闭动作仍由 `onClose` 负责。
  */
 export function SkillEditor({
   skill,
   onClose,
   onSaved,
+  library = false,
 }: {
   skill?: AgentSkill;
   onClose: () => void;
   /** 保存成功后的回调。 */
   onSaved?: () => void;
+  /** 写入账户级技能库（创建技能）；不传则写入当前 Agent 的技能副本。 */
+  library?: boolean;
 }) {
   const { t } = useTranslation();
-  const { current, saveSkill } = useAgentSpace();
+  const { current, saveSkill, saveLibrarySkill } = useAgentSpace();
   const [name, setName] = useState(() => skill?.name ?? t("agentSpace.skillSampleName"));
   const [purpose, setPurpose] = useState(
     () => skill?.purpose ?? t("agentSpace.skillSamplePurpose"),
@@ -135,7 +139,9 @@ export function SkillEditor({
         primary
         disabled={!name.trim() || !instructions.trim()}
         onPress={() => {
-          saveSkill(current.id, { name, purpose, instructions, outputFormat }, skill?.id);
+          const input = { name, purpose, instructions, outputFormat };
+          if (library) saveLibrarySkill(input, skill?.id);
+          else saveSkill(current.id, input, skill?.id);
           onSaved?.();
           onClose();
         }}

@@ -74,6 +74,8 @@ export interface AgentSpaceState {
   version: 1;
   currentAgentId: string;
   agents: AgentDefinition[];
+  /** 账户级自建技能库：创建技能只入库，是否挂到某个 Agent 由「添加到智能体」决定。 */
+  skillLibrary: AgentSkill[];
   preferences: AgentUserPreferences;
   onboardingDone: boolean;
   onboardingStep: number;
@@ -338,6 +340,30 @@ function normalizePreferences(value: unknown): AgentUserPreferences {
   };
 }
 
+/** 与 skill-sharing 的 skillFingerprint 同口径：按内容去重，保留最近更新的一份。 */
+function skillContentKey(skill: AgentSkill) {
+  return [skill.name, skill.purpose, skill.instructions, skill.outputFormat].join("\u0000");
+}
+
+/**
+ * 账户级技能库 normalize：老版本没有该字段，从各 Agent 的自建技能按内容去重迁移，
+ * 保证升级后已有技能仍出现在「我的技能」里；已带字段时按同样口径清洗并去重。
+ */
+function normalizeSkillLibrary(value: unknown, agents: AgentDefinition[]): AgentSkill[] {
+  const source: unknown[] = Array.isArray(value)
+    ? value
+    : agents.flatMap((agent) => agent.customSkills);
+  const byContent = new Map<string, AgentSkill>();
+  for (const item of source) {
+    const skill = normalizeSkill(item);
+    if (!skill) continue;
+    const key = skillContentKey(skill);
+    const seen = byContent.get(key);
+    if (!seen || skill.updatedAt > seen.updatedAt) byContent.set(key, skill);
+  }
+  return [...byContent.values()];
+}
+
 /** Parses persisted state and always guarantees exactly one system Agent. */
 export function normalizeAgentSpace(value: unknown, mainThreadId: string): AgentSpaceState {
   const record = isRecord(value) ? value : {};
@@ -365,6 +391,7 @@ export function normalizeAgentSpace(value: unknown, mainThreadId: string): Agent
     version: 1,
     currentAgentId,
     agents,
+    skillLibrary: normalizeSkillLibrary(record.skillLibrary, agents),
     preferences: normalizePreferences(record.preferences),
     onboardingDone: record.onboardingDone === true,
     onboardingStep: Math.max(0, Math.min(4, Math.trunc(Number(record.onboardingStep) || 0))),
@@ -461,6 +488,30 @@ export function createCustomSkill(
     version: existing ? existing.version + 1 : 1,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
+  };
+}
+
+/**
+ * 把某个 Agent 上的自建技能副本摘掉，**完全不碰账户级技能库**。
+ *
+ * 语义就是 Agent 详情技能卡片的「移除」：这个 Agent 不再具备该能力，
+ * 但「应用与能力 → 我的技能」里的原件仍然在，随时可以再「添加到智能体」。
+ * 目标 Agent 没有这份副本时原样返回，避免无意义的状态更新与重渲染。
+ */
+export function detachSkillFromAgent(
+  state: AgentSpaceState,
+  agentId: string,
+  skillId: string,
+): AgentSpaceState {
+  const target = state.agents.find((agent) => agent.id === agentId);
+  if (!target?.customSkills.some((skill) => skill.id === skillId)) return state;
+  return {
+    ...state,
+    agents: state.agents.map((agent) =>
+      agent.id === agentId
+        ? { ...agent, customSkills: agent.customSkills.filter((skill) => skill.id !== skillId) }
+        : agent,
+    ),
   };
 }
 

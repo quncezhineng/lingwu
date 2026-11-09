@@ -5,6 +5,59 @@
 
 ## 变更记录
 
+### 2026-11-08 · 修复：Agent 详情「移除」只摘掉副本，不清「我的技能」
+
+**背景**
+
+用户反馈（截图）：Agent 详情技能卡片点「移除」后，技能从「应用与能力 → 我的技能」里一起消失了。期望语义是「只把这个技能从当下智能体的能力中移除」，技能库里的原件应该保留。
+
+**原因**
+
+两条路径都会造成这个现象：
+
+1. 已提交版本（`1e1e00d`）里「我的技能」是 `collectSharedSkills(agentList)` 的**汇总视图**——库 = 所有 Agent 副本的并集，删掉最后一个副本，技能自然从「我的技能」消失。
+2. 换到账户级 `skillLibrary` 后，如果服务端仍是旧 schema（顶层 `.strict()` 且没有 `skillLibrary`），PUT 会被 422 拒绝、移动端 `.catch(() => undefined)` 静默吞掉；下次加载退回「从 Agent 副本迁移」，库里的原件又因为副本已删而消失。
+
+**处理**
+
+- [agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)：抽出纯函数 `detachSkillFromAgent(state, agentId, skillId)`——只过滤目标 Agent 的 `customSkills`，`skillLibrary` 一字不动；目标 Agent 没有这份副本时返回**原 state 引用**，避免无意义重渲染。
+- [agent-space.tsx](../apps/mobile/src/agent-space.tsx)：`deleteSkill` 改为调用该函数，语义收敛为「摘掉某个 Agent 的副本」，不再有内联的过滤逻辑。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：`removeCustomSkill` 的提示改用 `agent.skillDetachedToast`，明确告知「技能仍保留在『我的技能』中」，点完就能看出没有被删。
+- [i18n] zh-Hans / en 同步新增 `agent.skillDetachedToast`。
+- [agent-space.test.ts](../apps/mobile/test/agent-space.test.ts)：+2 例回归——只摘目标 Agent 的副本、库原件与其它 Agent 副本都不受影响；摘不存在的副本时返回同一引用。
+
+**验证**
+
+- `npx biome check --write`（6 文件）：无警告，1 处格式自动修复。
+- `pnpm --dir apps/mobile typecheck`：改动文件无类型错误，仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错。
+- 定向单测 58 例通过（agent-space / skill-sharing / i18n / skill-catalog / icons）。
+
+**注意**：旧构建或未带上 `skillLibrary` schema 的服务端仍会复现「删了就没」，必须同时重启后端。
+
+### 2026-11-08 · 数据模型：「我的技能」改为账户级技能库，创建技能只入库
+
+**背景**
+
+用户反馈「应用与能力 → 技能 → 我的技能」里创建技能后只应出现在「我的技能」，不应自动挂到当下智能体；经确认目标行为为「只入库，不自动挂 Agent」。原模型里 `customSkills` 挂在 Agent 上，「我的技能」只是 `collectSharedSkills(agentList)` 的跨 Agent 汇总视图：没有任何 Agent 持有的技能无法存在，且「来源 Agent / 最后一份副本只读」保护与技能库语义冲突。
+
+**处理**
+
+- [agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)：`AgentSpaceState` 新增 `skillLibrary: AgentSkill[]`（`version` 保持 1）。`normalizeSkillLibrary(value, agents)` 按四项内容指纹去重并保留最近更新的一份；老状态缺字段时从所有 Agent 的 `customSkills` 迁移，已带字段（含空数组）不重新迁移，避免把用户主动清空的库又填回去。
+- [agent-space.tsx](../apps/mobile/src/agent-space.tsx)：新增 `saveLibrarySkill(input, skillId?)` / `deleteLibrarySkill(skillId)`，只操作库、不写任何 Agent；`deleteSkill` 语义收窄为「删除某个 Agent 上的副本，库原件不受影响」。
+- [skill-editor.tsx](../apps/mobile/src/skill-editor.tsx)：新增 `library?: boolean`。`library` 模式写入账户级技能库（创建 / 编辑「我的技能」），默认模式仍写当前 Agent 的副本（Agent 详情页编辑已有副本）。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`MySkillEntry` 简化为 `{ skill }`，列表 / 详情 / 删除全部改读 `skillLibrary`；去掉 `skillLockedAgentIds`、`guard` 与 `blocked` 分支；详情 footer 补「编辑」按钮（只改库原件）；删除时先 `deleteSkillEverywhere` 清掉所有 Agent 副本，再 `deleteLibrarySkill` 删原件。
+- [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：Agent 详情「添加技能」面板的自建技能列表改读 `skillLibrary`，`installed` 仍用 `findSkillCopy(current, skill)` 判定；库里没有任何 Agent 持有的技能也能被搜到并添加。
+- [agent-space.ts](../apps/server/src/agent-space.ts)：`agentSpaceSchema` 顶层是 `.strict()`，新增可选 `skillLibrary: z.array(skillSchema).max(200)`。**这是必须的集成修复**：移动端把整个 state PUT 到 `/api/agent-space`，漏掉该字段会让新版客户端的每次写入都被 422 拒绝，且移动端 `.catch(() => undefined)` 会静默吞掉错误，导致云端同步全量失效。
+- 兼容处理：`skill-sharing.ts` 的 `collectSharedSkills` / `skillLockedAgentIds` / `guard` 分支与对应单测保留，仅供旧数据与兼容使用，注释明确不要在新界面启用；`capability-hub.tsx` 的 `lockedAgentIds` 可选 prop 同理保留但当前 UI 不再传入。旧 i18n「不可移除」文案保留为兼容，当前界面统一走 `agent.skillInstallHintNoLock`。
+- 已知行为：Agent 上的技能是**内容快照**，在库里编辑原件不会回写已挂载副本；内容变化后该副本不再按内容指纹命中「已添加」，可在 Agent 详情里单独编辑或重新添加。
+
+**验证**
+
+- `npx biome check --write`（本轮 9 个改动文件）：无警告、无格式修复。
+- `npx tsc --noEmit`（根层）：通过。`pnpm --dir apps/mobile typecheck`：改动文件无类型错误，仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错。
+- 定向单测 56 例通过（agent-space / skill-sharing / i18n / skill-catalog / icons），其中新增 3 例覆盖老数据迁移去重、已有库不重新迁移、库技能独立存在且不自动挂 Agent。
+- 服务端 schema 用独立脚本验证：无 `skillLibrary` 通过、带 `skillLibrary` 通过并保留、非法技能被拒绝；[agent-space-api.test.ts](../tests/agent-space-api.test.ts) 新增 PUT/GET 往返用例。当前沙箱里 `createStore` 会卡住（服务端 API 单测与全量 `pnpm test` 均被 SIGTERM），属环境限制，与本改动无关。
+
 ### 2026-11-08 · UI：全局记忆页按智能体分类筛选记忆卡片
 
 **背景**

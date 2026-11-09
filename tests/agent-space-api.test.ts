@@ -190,6 +190,36 @@ test("Agent spaces persist independently for each authenticated owner", async ()
   );
 });
 
+test("the account-level skill library is accepted and persisted", async () => {
+  const state = {
+    ...agentState("Library", "library-thread"),
+    skillLibrary: [
+      {
+        id: "library-skill",
+        name: "估值复核",
+        purpose: "复核 DCF 关键假设",
+        instructions: "检查 WACC、终值增长率与收入 CAGR。",
+        outputFormat: "结论、假设、疑点",
+        enabled: true,
+        version: 1,
+        createdAt: "2026-11-08T00:00:00.000Z",
+        updatedAt: "2026-11-08T00:00:00.000Z",
+      },
+    ],
+  };
+  const saved = await server.app.request("/api/agent-space", {
+    method: "PUT",
+    headers: headers(alice),
+    body: JSON.stringify(state),
+  });
+  // 顶层 schema 是 .strict()：漏掉 skillLibrary 时新版客户端的整个状态会被判 422。
+  assert.equal(saved.status, 200);
+  assert.deepEqual(
+    await (await server.app.request("/api/agent-space", { headers: headers(alice) })).json(),
+    state,
+  );
+});
+
 test("the saved Agent space survives an application restart", async () => {
   const restartRoot = await mkdtemp(join(tmpdir(), "lingwu-agent-space-restart-"));
   try {

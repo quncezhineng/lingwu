@@ -1,13 +1,12 @@
 /**
  * 自建技能的「添加到智能体」共享逻辑。
  *
- * 「应用与能力 → 我的技能」与 Agent 详情的技能页共用同一套判定：
- * 自建技能属于某个 Agent，复制到其他 Agent 时是同内容的新副本（id 不同），
- * 因此按内容指纹判断目标 Agent 是否已经持有这份技能。
+ * 「我的技能」现在是账户级技能库：创建技能只入库，不自动挂到任何 Agent；
+ * 复制到目标 Agent 时是同内容的新副本（id 不同），因此按内容指纹判断
+ * 目标 Agent 是否已经持有这份技能。
  *
- * 「添加到智能体」展示全部 Agent，包括创建该技能的来源 Agent——
- * 它天然持有这份技能，在列表里显示为「已添加」且只读；
- * 无论从哪个入口打开，都禁止移除最后一份副本，避免自建技能彻底消失。
+ * `guard` / `skillLockedAgentIds` 是库化之前「来源 Agent / 最后一份副本只读」的兼容逻辑：
+ * 库里始终保留原件，当前 UI 不再传入，保留供旧数据与单测使用。
  */
 import type { AgentDefinition, AgentSkill } from "./agent-space-model";
 
@@ -49,6 +48,9 @@ export function skillHolderAgentIds(agents: AgentDefinition[], skill: SkillConte
  *
  * 「来源」由调用方给出：「我的技能」用汇总条目的 agentId，Agent 详情用当前 Agent。
  * 数据模型没有记录技能最初创建于哪个 Agent，因此锁定的是详情页上下文里的那份原始副本。
+ *
+ * 库化后的兼容逻辑：技能库始终保留原件，当前 UI 不再传 `guard`，此函数与相关文案
+ * 只服务于旧数据与单测，不要再在账户级技能库的新界面里启用。
  */
 export function skillLockedAgentIds(
   agents: AgentDefinition[],
@@ -62,15 +64,15 @@ export function skillLockedAgentIds(
   return holders.filter((id) => locked.has(id));
 }
 
-/** 「我的技能」条目：技能本身 + 它所在的 Agent（来源 Agent，用于列表标识）。 */
+/** 库化前的「我的技能」条目：技能本身 + 来源 Agent；现仅供旧数据与单测使用。 */
 export type SharedSkillEntry = {
   skill: AgentSkill;
   agentId: string;
 };
 
 /**
- * 跨 Agent 汇总自建技能：技能不以 Agent 为类别，同内容的副本只保留最近更新的一条，
- * 避免同一技能被复制到多个 Agent 后在列表里重复成行。
+ * 库化前跨 Agent 汇总自建技能：同内容的副本只保留最近更新的一条，避免列表重复成行。
+ * 现在「我的技能」直接读账户级 `AgentSpaceState.skillLibrary`，此函数仅保留给旧数据与单测。
  */
 export function collectSharedSkills(agents: AgentDefinition[]): SharedSkillEntry[] {
   const entries: SharedSkillEntry[] = [];
@@ -95,6 +97,7 @@ export function collectSharedSkills(agents: AgentDefinition[]): SharedSkillEntry
  *
  * 传入 `guard` 时启用只读保护：命中 `skillLockedAgentIds` 的副本不删除，返回 `blocked`，
  * 防止来源 Agent 或最后一份副本被移除。返回本次动作，调用方据此给出提示文案。
+ * 账户级技能库下无需传 `guard`：原件始终在库里，任何一个 Agent 副本都可以自由移除。
  */
 export function toggleSkillShare(
   store: SkillStore,

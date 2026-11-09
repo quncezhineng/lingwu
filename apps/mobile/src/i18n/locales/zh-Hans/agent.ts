@@ -560,6 +560,7 @@ const agent = {
   "agent.skillShareBlockedToast": "该副本不可移除，技能需至少保留在一个智能体中。",
   "agent.skillInstalledToast": "已将「{title}」添加到{agent}。",
   "agent.skillUninstalledToast": "已将「{title}」从{agent}移除。",
+  "agent.skillDetachedToast": "已将「{title}」从{agent}移除，技能仍保留在「我的技能」中。",
   "agent.onYourComputer": "在你的电脑上",
   "agent.shortcutPortfolioDetail": "持仓、盈亏与配置分析",
   "agent.shortcutNotesDetail": "买入/卖出理由、研究心得与论点追踪",

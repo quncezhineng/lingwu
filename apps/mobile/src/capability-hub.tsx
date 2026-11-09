@@ -36,14 +36,7 @@ import { ModalOverlay } from "./modal-overlay";
 import { FilesScreen } from "./screens";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
 import { SkillEditor } from "./skill-editor";
-import {
-  collectSharedSkills,
-  deleteSkillEverywhere,
-  type SharedSkillEntry,
-  skillHolderAgentIds,
-  skillLockedAgentIds,
-  toggleSkillShare,
-} from "./skill-sharing";
+import { deleteSkillEverywhere, skillHolderAgentIds, toggleSkillShare } from "./skill-sharing";
 import { StatusBadge, type StatusTone } from "./status-badge";
 import { breakpoints, radius } from "./theme";
 import { appBrands, Button, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
@@ -51,8 +44,8 @@ import { useWorkspace } from "./workspace";
 
 type CapabilityType = "plugins" | "skills" | "connectors" | "workspace";
 type ConfigSheet = "openbot";
-/** 「我的技能」条目：用户自建的技能，附带它所在的 Agent（定义见 skill-sharing）。 */
-type MySkillEntry = SharedSkillEntry;
+/** 「我的技能」条目：账户级技能库里的一份自建技能，与 Agent 是否持有无关。 */
+type MySkillEntry = { skill: AgentSkill };
 type CapabilityCategoryId =
   | "research"
   | "analysis"
@@ -465,7 +458,7 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
   );
 }
 
-/** 安装面板里的一行智能体：已安装的用底色 + 徽标区分，未安装保留空选中圈；锁定行只读。 */
+/** 安装面板里的一行智能体：已安装的用底色 + 徽标区分，未安装保留空选中圈。 */
 function AgentInstallRow({
   agent,
   installed,
@@ -476,7 +469,7 @@ function AgentInstallRow({
   agent: AgentDefinition;
   installed: boolean;
   first: boolean;
-  /** 只读：这份副本需保留（来源 Agent / 最后一份），不可点击移除。 */
+  /** 库化前「来源 Agent / 最后一份副本」的只读行；账户级技能库下当前 UI 不再传入。 */
   locked?: boolean;
   onPress: () => void;
 }) {
@@ -572,7 +565,7 @@ function AgentPickerPanel({
 }: {
   agents: AgentDefinition[];
   isAdded: (agent: AgentDefinition) => boolean;
-  /** 只读的已添加 Agent：来源 Agent 与最后一份副本（仅自建技能传入）。 */
+  /** 兼容旧数据的只读 Agent 列表；账户级技能库下当前 UI 不再传入。 */
   lockedAgentIds?: string[];
   onToggle: (agent: AgentDefinition) => void;
 }) {
@@ -765,7 +758,7 @@ export function MySkillDetailSheet({
   agents?: AgentDefinition[];
   /** 已持有该技能的智能体 id，用于行内「已添加」标记与计数。 */
   addedAgentIds?: string[];
-  /** 需保留的副本所在的智能体 id：行只读，不可点击移除。 */
+  /** 兼容旧数据：需保留的副本所在智能体 id；账户级技能库下当前 UI 不再传入。 */
   lockedAgentIds?: string[];
   /** 切换某个智能体是否持有该技能。 */
   onToggleAdd?: (agent: AgentDefinition) => void;
@@ -1048,12 +1041,12 @@ function MySkillsList({
       onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
       style={{ flexDirection: "row", flexWrap: "wrap", gap }}
     >
-      {entries.map(({ skill, agentId }) => (
+      {entries.map(({ skill }) => (
         <Pressable
-          key={`${agentId}:${skill.id}`}
+          key={skill.id}
           accessibilityRole="button"
           accessibilityLabel={`${t("agent.mySkills")} · ${skill.name}`}
-          onPress={() => onSelect({ skill, agentId })}
+          onPress={() => onSelect({ skill })}
           style={({ pressed }) => ({
             width: itemWidth,
             gap: 6,
@@ -1147,7 +1140,14 @@ export function CapabilityHubScreen({
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const { navigate, workspace, api, refresh, notify, open, prefillPrompt } = useWorkspace();
-  const { agents: agentList, setSkillInstalled, saveSkill, deleteSkill } = useAgentSpace();
+  const {
+    agents: agentList,
+    setSkillInstalled,
+    saveSkill,
+    deleteSkill,
+    skillLibrary,
+    deleteLibrarySkill,
+  } = useAgentSpace();
   const [category, setCategory] = useState<CategoryId>("all");
   const [typeFilter, setTypeFilter] = useState<CapabilityType>("plugins");
   const [query, setQuery] = useState("");
@@ -1159,6 +1159,8 @@ export function CapabilityHubScreen({
   const [selectedMySkill, setSelectedMySkill] = useState<MySkillEntry>();
   /** 「我的技能」里正在创建新技能。 */
   const [creatingSkill, setCreatingSkill] = useState(false);
+  /** 「我的技能」里正在编辑库中的技能（编辑不产生 Agent 副本）。 */
+  const [editingMySkill, setEditingMySkill] = useState<AgentSkill>();
   /** 技能 tab 的二级视角：「技能市场」技能目录 / 「我的技能」。 */
   const [skillTab, setSkillTab] = useState<"all" | "mine">("all");
   /** 删除前二次确认：待删除的「我的技能」条目。 */
@@ -1214,19 +1216,13 @@ export function CapabilityHubScreen({
     ? skillCatalog.find((skill) => skill.id === selectedSkillId)
     : undefined;
   /**
-   * 我的技能：汇总所有 Agent 下用户自建的技能。
-   *
-   * 技能不以 Agent 为类别——同内容的技能（含复制到多个 Agent 的副本）只保留一条，
-   * 与市场里的系统技能区分开。
+   * 我的技能：账户级技能库里的自建技能，与是否被某个 Agent 持有无关。
+   * 创建技能只入库，是否挂到智能体由详情里的「添加到智能体」决定。
    */
-  const mySkills = collectSharedSkills(agentList);
-  /** 「添加到智能体」展示全部 Agent，含创建该技能的来源 Agent（它天然已添加）。 */
+  const mySkills: MySkillEntry[] = skillLibrary.map((skill) => ({ skill }));
+  /** 「添加到智能体」按内容指纹标记已持有该技能副本的 Agent。 */
   const mySkillAddedAgentIds = selectedMySkill
     ? skillHolderAgentIds(agentList, selectedMySkill.skill)
-    : [];
-  /** 只读副本：来源 Agent 与最后一份，禁止通过「添加到智能体」把技能移除到消失。 */
-  const mySkillLockedAgentIds = selectedMySkill
-    ? skillLockedAgentIds(agentList, selectedMySkill.skill, selectedMySkill.agentId)
     : [];
 
   async function openGoogleConnector(id: "gmail" | "calendar") {
@@ -1266,20 +1262,12 @@ export function CapabilityHubScreen({
   }
 
   /**
-   * 自建技能的「添加到智能体」：把技能复制到目标 Agent，已有副本则移除。
-   * 判定与切换逻辑与 Agent 详情页共用 `skill-sharing`；传入 guard 后，
-   * 来源 Agent 与最后一份副本只读，删除技能请用列表里的删除入口。
+   * 库技能的「添加到智能体」：把库里的技能复制一份到目标 Agent，已有副本则移除。
+   * 库里始终保留原件，因此不再需要「最后一份副本」只读保护；删除请走列表里的删除入口。
    */
   function toggleMySkillInAgent(agent: AgentDefinition) {
     if (!selectedMySkill) return;
-    const action = toggleSkillShare({ saveSkill, deleteSkill }, agent, selectedMySkill.skill, {
-      agents: agentList,
-      sourceAgentId: selectedMySkill.agentId,
-    });
-    if (action === "blocked") {
-      notify(t("agent.skillShareBlockedToast"));
-      return;
-    }
+    const action = toggleSkillShare({ saveSkill, deleteSkill }, agent, selectedMySkill.skill);
     notify(
       t(action === "added" ? "agent.skillInstalledToast" : "agent.skillUninstalledToast", {
         title: selectedMySkill.skill.name,
@@ -1295,11 +1283,12 @@ export function CapabilityHubScreen({
   }
 
   /**
-   * 删除「我的技能」：列表按内容去重，所以按内容指纹清掉所有 Agent 上的副本，
-   * 否则只删一条后其它 Agent 的副本会立刻回到列表里。
+   * 删除「我的技能」：从账户级技能库删掉原件，并按内容指纹清掉所有 Agent 上的副本，
+   * 否则删完库里的条目后，Agent 上的副本仍会以「已添加」状态留在各自的技能页里。
    */
   function deleteMySkill(entry: MySkillEntry) {
     deleteSkillEverywhere({ deleteSkill }, agentList, entry.skill);
+    deleteLibrarySkill(entry.skill.id);
     setDeletingMySkill(undefined);
     setSelectedMySkill(undefined);
     notify(t("agent.mySkillDeletedToast", { title: entry.skill.name }));
@@ -1702,8 +1691,24 @@ export function CapabilityHubScreen({
       {creatingSkill && (
         <Sheet title={t("agentSpace.createSkill")} onClose={() => setCreatingSkill(false)} narrow>
           <SkillEditor
+            library
             onClose={() => setCreatingSkill(false)}
             onSaved={() => setSkillTab("mine")}
+          />
+        </Sheet>
+      )}
+
+      {/* 库里的技能编辑同样只改原件，不会自动挂到任何 Agent。 */}
+      {editingMySkill && (
+        <Sheet
+          title={t("agentSpace.editSkill")}
+          onClose={() => setEditingMySkill(undefined)}
+          narrow
+        >
+          <SkillEditor
+            library
+            skill={editingMySkill}
+            onClose={() => setEditingMySkill(undefined)}
           />
         </Sheet>
       )}
@@ -1714,13 +1719,27 @@ export function CapabilityHubScreen({
           skill={selectedMySkill.skill}
           agents={agentList}
           addedAgentIds={mySkillAddedAgentIds}
-          lockedAgentIds={mySkillLockedAgentIds}
           onToggleAdd={toggleMySkillInAgent}
           onClose={() => setSelectedMySkill(undefined)}
           footer={
-            <Button danger onPress={() => requestDeleteMySkill(selectedMySkill)}>
-              {t("agent.mySkillDeleteAction")}
-            </Button>
+            <View style={[s.row, { gap: 10 }]}>
+              <Button
+                style={{ flex: 1 }}
+                onPress={() => {
+                  setEditingMySkill(selectedMySkill.skill);
+                  setSelectedMySkill(undefined);
+                }}
+              >
+                {t("agentSpace.editSkill")}
+              </Button>
+              <Button
+                danger
+                style={{ flex: 1 }}
+                onPress={() => requestDeleteMySkill(selectedMySkill)}
+              >
+                {t("agent.mySkillDeleteAction")}
+              </Button>
+            </View>
           }
         />
       )}
