@@ -22,7 +22,19 @@ const agentSchema = z
   .object({
     id: identifier,
     threadId: identifier,
-    template: z.enum(["general", "market", "asset", "custom"]),
+    // 模板枚举必须与移动端 `AgentTemplateId` 同步：这里是 .strict() 的对象，
+    // 客户端新增模板而服务端没加，整次 PUT 会被 422 拒绝且被前端静默吞掉。
+    template: z.enum([
+      "general",
+      "market",
+      "asset",
+      "research",
+      "earnings",
+      "macro",
+      "risk",
+      "review",
+      "custom",
+    ]),
     name: z.string().trim().min(1).max(20),
     role: z.string().trim().min(1).max(30),
     persona: z.string().trim().min(1).max(1000),

@@ -7,7 +7,16 @@
  * its presentation/skills, while user-level resources remain global.
  */
 
-export type AgentTemplateId = "general" | "market" | "asset" | "custom";
+export type AgentTemplateId =
+  | "general"
+  | "market"
+  | "asset"
+  | "research"
+  | "earnings"
+  | "macro"
+  | "risk"
+  | "review"
+  | "custom";
 export type AgentAvatarId = "orb" | "bloom" | "moon" | "planet" | "cat";
 /** 说话语气（人设页「语气」）。取值与 i18n `status.*` 一一对应。 */
 export type AgentTone = "formal" | "casual" | "playful" | "concise" | "warm";
@@ -127,6 +136,41 @@ export const AGENT_TEMPLATES: Record<
     avatar: "planet",
     skills: ["portfolio", "risk", "goals", "notes", "files", "memory", "finance", "reminder"],
   },
+  research: {
+    name: "研究 Agent",
+    role: "个股研究员",
+    persona: "从商业模式、竞争格局和估值三件事回答。不确定的地方直接说不知道，不为了完整而编数据。",
+    avatar: "orb",
+    skills: ["research", "financials", "search", "brief", "files", "notes", "memory"],
+  },
+  earnings: {
+    name: "财报 Agent",
+    role: "财报解读者",
+    persona: "读财报和业绩会，先看这一季有没有兑现上一季的指引，再判断变化是结构性还是季节性。",
+    avatar: "cat",
+    skills: ["financials", "research", "calendar", "files", "notes", "memory"],
+  },
+  macro: {
+    name: "宏观 Agent",
+    role: "宏观观察员",
+    persona: "关注利率、汇率和大宗商品的传导，先讲机制再讲结论，不用宏观叙事替代对具体标的的判断。",
+    avatar: "bloom",
+    skills: ["brief", "search", "research", "reminder", "notes", "memory"],
+  },
+  risk: {
+    name: "风控 Agent",
+    role: "风险官",
+    persona: "先想下跌时会发生什么。盯集中度、回撤和相关性，宁可保守也不给虚假的安全感。",
+    avatar: "moon",
+    skills: ["risk", "portfolio", "goals", "files", "notes", "memory"],
+  },
+  review: {
+    name: "复盘 Agent",
+    role: "复盘教练",
+    persona: "陪用户复盘已经发生的交易，区分运气和能力，指出能重复执行的纪律问题，不事后诸葛亮。",
+    avatar: "moon",
+    skills: ["portfolio", "notes", "ideas", "goals", "files", "memory"],
+  },
   custom: {
     name: "我的 Agent",
     role: "自定义研究助理",
@@ -200,7 +244,17 @@ export const AGENT_CAPABILITY_LABELS: Record<string, { zh: string; en: string }>
 };
 
 const AVATARS: readonly AgentAvatarId[] = ["orb", "bloom", "moon", "planet", "cat"];
-const TEMPLATES: readonly AgentTemplateId[] = ["general", "market", "asset", "custom"];
+const TEMPLATES: readonly AgentTemplateId[] = [
+  "general",
+  "market",
+  "asset",
+  "research",
+  "earnings",
+  "macro",
+  "risk",
+  "review",
+  "custom",
+];
 
 export function createSystemAgent(
   threadId: string,

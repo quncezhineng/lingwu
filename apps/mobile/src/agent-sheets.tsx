@@ -16,17 +16,23 @@ import { Text } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
 import { CapabilityHubScreen, MySkillDetailSheet, SkillDetailSheet } from "./capability-hub";
 import { skillDisplayName } from "./capability-picker";
+import type { TranslationKey } from "./i18n";
 import { useTranslation } from "./i18n";
 import {
   Brain,
   ChevronRight,
   Clock3,
+  FileText,
   FolderOpen,
+  Globe2,
   Heart,
   type MessageCircle,
   Newspaper,
   Plus,
+  RotateCcw,
+  Search,
   Shapes,
+  ShieldAlert,
   Sparkles,
   Star,
   Target,
@@ -325,6 +331,69 @@ function AgentMoreSheet({
   );
 }
 
+/**
+ * 创建 Agent 的模板入口列表。
+ *
+ * 名称 / 角色 / 人设正文的默认值放在 `AGENT_TEMPLATES`（模型侧），这里只管
+ * 入口卡片的图标与文案。数组顺序即展示顺序：先放日常用得上的观察类，
+ * 再放专题类，「自定义」固定留在最后作为兜底出口。
+ */
+const CREATE_TEMPLATE_ENTRIES: readonly {
+  id: Exclude<AgentTemplateId, "general">;
+  icon: typeof MessageCircle;
+  titleKey: TranslationKey;
+  detailKey: TranslationKey;
+}[] = [
+  {
+    id: "market",
+    icon: Star,
+    titleKey: "agentSpace.templateMarket",
+    detailKey: "agentSpace.templateMarketDetail",
+  },
+  {
+    id: "asset",
+    icon: Target,
+    titleKey: "agentSpace.templateAsset",
+    detailKey: "agentSpace.templateAssetDetail",
+  },
+  {
+    id: "research",
+    icon: Search,
+    titleKey: "agentSpace.templateResearch",
+    detailKey: "agentSpace.templateResearchDetail",
+  },
+  {
+    id: "earnings",
+    icon: FileText,
+    titleKey: "agentSpace.templateEarnings",
+    detailKey: "agentSpace.templateEarningsDetail",
+  },
+  {
+    id: "macro",
+    icon: Globe2,
+    titleKey: "agentSpace.templateMacro",
+    detailKey: "agentSpace.templateMacroDetail",
+  },
+  {
+    id: "risk",
+    icon: ShieldAlert,
+    titleKey: "agentSpace.templateRisk",
+    detailKey: "agentSpace.templateRiskDetail",
+  },
+  {
+    id: "review",
+    icon: RotateCcw,
+    titleKey: "agentSpace.templateReview",
+    detailKey: "agentSpace.templateReviewDetail",
+  },
+  {
+    id: "custom",
+    icon: Sparkles,
+    titleKey: "agentSpace.templateCustom",
+    detailKey: "agentSpace.templateCustomDetail",
+  },
+];
+
 function CreateAgentSheet({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { t } = useTranslation();
   const { createAgent } = useAgentSpace();
@@ -354,28 +423,16 @@ function CreateAgentSheet({ onClose, onCreated }: { onClose: () => void; onCreat
         small
       >
         <View style={{ gap: 7 }}>
-          <PanelButton
-            icon={Star}
-            title={t("agentSpace.templateMarket")}
-            detail={t("agentSpace.templateMarketDetail")}
-            onPress={() => choose("market")}
-          />
-          <PanelButton
-            icon={Target}
-            title={t("agentSpace.templateAsset")}
-            detail={t("agentSpace.templateAssetDetail")}
-            onPress={() => choose("asset")}
-          />
-          <PanelButton
-            icon={Sparkles}
-            title={t("agentSpace.templateCustom")}
-            detail={t("agentSpace.templateCustomDetail")}
-            onPress={() => choose("custom")}
-          />
+          {CREATE_TEMPLATE_ENTRIES.map((entry) => (
+            <PanelButton
+              key={entry.id}
+              icon={entry.icon}
+              title={t(entry.titleKey)}
+              detail={t(entry.detailKey)}
+              onPress={() => choose(entry.id)}
+            />
+          ))}
         </View>
-        <Text style={[s.small, { color: colors.faint, marginTop: 14, lineHeight: 18 }]}>
-          {t("agentSpace.sampleNote")}
-        </Text>
       </Sheet>
     );
   }
@@ -729,7 +786,7 @@ export function AgentSheets({
         onClose={onClose}
         wide
       >
-        <CapabilityHubScreen mode="embedded" onOpenChat={onClose} />
+        <CapabilityHubScreen />
       </Sheet>
     );
   if (panel === "account")

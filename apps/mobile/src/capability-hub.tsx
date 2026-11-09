@@ -17,7 +17,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Download,
-  FolderOpen,
   Globe2,
   Hand,
   type IconComponent,
@@ -34,7 +33,6 @@ import {
 } from "./icons";
 import { instructionsMarkdownStyle } from "./instructions-markdown";
 import { ModalOverlay } from "./modal-overlay";
-import { FilesScreen } from "./screens";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
 import { SkillEditor } from "./skill-editor";
 import { deleteSkillEverywhere, skillHolderAgentIds, toggleSkillShare } from "./skill-sharing";
@@ -43,7 +41,7 @@ import { breakpoints, radius } from "./theme";
 import { appBrands, Button, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
 import { useWorkspace } from "./workspace";
 
-type CapabilityType = "plugins" | "skills" | "connectors" | "workspace";
+type CapabilityType = "plugins" | "skills" | "connectors";
 type ConfigSheet = "openbot";
 /** 「我的技能」条目：账户级技能库里的一份自建技能，与 Agent 是否持有无关。 */
 type MySkillEntry = { skill: AgentSkill };
@@ -77,7 +75,7 @@ type CatalogItem = {
 };
 
 type Shortcut = {
-  id: CapabilityType | "knowledge";
+  id: CapabilityType;
   title: string;
   detail: string;
   icon: IconComponent;
@@ -109,7 +107,6 @@ const CATEGORY_OPTIONS_BY_TYPE: Record<CapabilityType, CategoryOption[]> = {
   plugins: CAPABILITY_CATEGORY_OPTIONS,
   skills: SKILL_CATEGORY_OPTIONS,
   connectors: CAPABILITY_CATEGORY_OPTIONS,
-  workspace: CAPABILITY_CATEGORY_OPTIONS,
 };
 
 const FILLER_KEYS = ["a", "b", "c", "d", "e", "f"] as const;
@@ -129,28 +126,24 @@ const TYPE_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.pluginsHeading",
   skills: "agent.skillsHeading",
   connectors: "agent.connectorsHeading",
-  workspace: "agent.hubCategoryWorkspace",
 };
 
 const HUB_SEARCH_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubSearchPlugins",
   skills: "agent.hubSearchSkills",
   connectors: "agent.hubSearchConnectors",
-  workspace: "agent.hubSearchCapabilities",
 };
 
 const HUB_COUNT_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubPluginCount",
   skills: "agent.hubSkillCount",
   connectors: "agent.hubConnectorCount",
-  workspace: "agent.hubCapabilityCount",
 };
 
 const HUB_EMPTY_TITLE_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubPluginNoMatchTitle",
   skills: "agent.hubSkillNoMatchTitle",
   connectors: "agent.hubConnectorNoMatchTitle",
-  workspace: "agent.hubNoMatchTitle",
 };
 
 const SKILL_CATEGORY_LABELS: Record<SkillCategory, TranslationKey> = {
@@ -1156,14 +1149,7 @@ export function SkillDeleteConfirm({
   );
 }
 
-export function CapabilityHubScreen({
-  mode = "page",
-  onOpenChat,
-}: {
-  mode?: "page" | "embedded";
-  /** 预填提示词后跳转对话：弹层内使用时由调用方关闭弹层。 */
-  onOpenChat?: () => void;
-} = {}) {
+export function CapabilityHubScreen() {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const { navigate, workspace, api, refresh, notify, open, prefillPrompt } = useWorkspace();
@@ -1201,7 +1187,6 @@ export function CapabilityHubScreen({
   const gridWidth = contentWidth - (useCategoryRail ? 220 : 0);
   const gridColumns = gridWidth >= 660 ? 3 : gridWidth >= 430 ? 2 : 1;
   const shortcutsAsCarousel = contentWidth < 680;
-  const shortcutColumns = contentWidth >= 1000 ? 4 : contentWidth >= 680 ? 3 : 2;
 
   const googleConnected = workspace.connections.some(
     (connection) =>
@@ -1444,17 +1429,16 @@ export function CapabilityHubScreen({
       icon: Link2,
       onPress: () => selectType("connectors"),
     },
-    {
-      id: "knowledge",
-      title: t("agent.hubKnowledgeTitle"),
-      detail: t("agent.hubKnowledgeDetail"),
-      icon: FolderOpen,
-      onPress: () => {
-        if (mode === "embedded") selectType("workspace");
-        else navigate("files");
-      },
-    },
   ];
+  /**
+   * 快捷卡列数上限取「屏宽档位」与「快捷卡数量」的较小值。
+   * 宽屏档位是 4 列，但快捷卡目前只有 3 张 —— 按 4 列排会剩下一个空列，
+   * 三张卡各自只占 1/4 宽、右边缘与下方内容对不齐。取 min 后三张卡等分整行。
+   */
+  const shortcutColumns = Math.min(
+    Math.max(shortcuts.length, 1),
+    contentWidth >= 1000 ? 4 : contentWidth >= 680 ? 3 : 2,
+  );
 
   const scopedItems = items.filter((item) => item.type === typeFilter);
   const cardsForCategory = (item: CatalogItem, nextCategory: CategoryId) =>
@@ -1553,10 +1537,7 @@ export function CapabilityHubScreen({
             <ShortcutCard
               key={shortcut.id}
               item={shortcut}
-              active={
-                shortcut.id === typeFilter ||
-                (shortcut.id === "knowledge" && typeFilter === "workspace")
-              }
+              active={shortcut.id === typeFilter}
               compact
             />
           ))}
@@ -1569,10 +1550,7 @@ export function CapabilityHubScreen({
                 <ShortcutCard
                   key={shortcut.id}
                   item={shortcut}
-                  active={
-                    shortcut.id === typeFilter ||
-                    (shortcut.id === "knowledge" && typeFilter === "workspace")
-                  }
+                  active={shortcut.id === typeFilter}
                 />
               ))}
               {FILLER_KEYS.slice(0, shortcutColumns - row.length).map((key) => (
@@ -1583,128 +1561,124 @@ export function CapabilityHubScreen({
         </View>
       )}
 
-      {mode === "embedded" && typeFilter === "workspace" ? (
-        <FilesScreen onOpenChat={onOpenChat} />
-      ) : (
-        <View>
-          <View style={{ gap: 14 }}>
-            {/* 技能 tab 的二级标签页：技能市场 / 我的技能，切换时整块内容替换。 */}
-            {typeFilter === "skills" && (
-              <HubTabBar
-                tabs={[
-                  { id: "all", label: t("agent.skillMarketAll") },
-                  { id: "mine", label: t("agent.mySkills") },
-                ]}
-                active={skillTab}
-                onChange={setSkillTab}
-                action={
-                  <Button small icon={Plus} onPress={() => setCreatingSkill(true)}>
-                    {t("agentSpace.createSkill")}
-                  </Button>
-                }
-              />
-            )}
-            {typeFilter === "skills" && skillTab === "mine" ? (
-              <View style={{ gap: 12 }}>
-                {mySkills.length ? (
-                  <MySkillsList
-                    entries={mySkills}
-                    onSelect={setSelectedMySkill}
-                    onRequestDelete={requestDeleteMySkill}
+      <View>
+        <View style={{ gap: 14 }}>
+          {/* 技能 tab 的二级标签页：技能市场 / 我的技能，切换时整块内容替换。 */}
+          {typeFilter === "skills" && (
+            <HubTabBar
+              tabs={[
+                { id: "all", label: t("agent.skillMarketAll") },
+                { id: "mine", label: t("agent.mySkills") },
+              ]}
+              active={skillTab}
+              onChange={setSkillTab}
+              action={
+                <Button small icon={Plus} onPress={() => setCreatingSkill(true)}>
+                  {t("agentSpace.createSkill")}
+                </Button>
+              }
+            />
+          )}
+          {typeFilter === "skills" && skillTab === "mine" ? (
+            <View style={{ gap: 12 }}>
+              {mySkills.length ? (
+                <MySkillsList
+                  entries={mySkills}
+                  onSelect={setSelectedMySkill}
+                  onRequestDelete={requestDeleteMySkill}
+                />
+              ) : (
+                <View style={EMPTY_STATE_BOX}>
+                  <Empty
+                    icon={Sparkles}
+                    title={t("agent.mySkills")}
+                    detail={t("agent.mySkillsEmpty")}
                   />
-                ) : (
-                  <View style={EMPTY_STATE_BOX}>
-                    <Empty
-                      icon={Sparkles}
-                      title={t("agent.mySkills")}
-                      detail={t("agent.mySkillsEmpty")}
-                    />
-                  </View>
-                )}
-              </View>
-            ) : (
-              <>
-                {!useCategoryRail && searchField}
+                </View>
+              )}
+            </View>
+          ) : (
+            <>
+              {!useCategoryRail && searchField}
 
-                <View style={{ flexDirection: useCategoryRail ? "row" : "column", gap: 20 }}>
-                  {useCategoryRail && (
-                    <View style={{ width: 180, gap: 10 }}>
-                      {searchField}
-                      <CategoryRail
-                        category={category}
-                        counts={counts}
-                        onChange={setCategory}
-                        options={categoryOptions}
-                      />
-                    </View>
-                  )}
-                  {!useCategoryRail && (
+              <View style={{ flexDirection: useCategoryRail ? "row" : "column", gap: 20 }}>
+                {useCategoryRail && (
+                  <View style={{ width: 180, gap: 10 }}>
+                    {searchField}
                     <CategoryRail
                       category={category}
                       counts={counts}
                       onChange={setCategory}
                       options={categoryOptions}
-                      horizontal
                     />
-                  )}
-
-                  <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
-                    <View style={[s.between, { minHeight: 21 }]}>
-                      <Text
-                        style={{
-                          color: colors.text,
-                          fontSize: 14,
-                          lineHeight: 20,
-                          fontWeight: "500",
-                          fontFamily: fonts.sans,
-                        }}
-                      >
-                        {t(activeCategoryLabel)}
-                      </Text>
-                      <Text
-                        style={{
-                          color: colors.faint,
-                          fontSize: 11,
-                          lineHeight: 16,
-                          fontFamily: fonts.sans,
-                        }}
-                      >
-                        {t(HUB_COUNT_LABELS[typeFilter], { count: visibleItems.length })}
-                      </Text>
-                    </View>
-
-                    {visibleRows.length ? (
-                      <View style={{ gap: 12 }}>
-                        {visibleRows.map((row) => (
-                          <View
-                            key={row[0].id}
-                            style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
-                          >
-                            {row.map((item) => (
-                              <CapabilityCard key={item.id} item={item} />
-                            ))}
-                            {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
-                              <View key={key} style={{ flex: 1 }} />
-                            ))}
-                          </View>
-                        ))}
-                      </View>
-                    ) : (
-                      <View style={EMPTY_STATE_BOX}>
-                        <Empty
-                          icon={Search}
-                          title={t(HUB_EMPTY_TITLE_LABELS[typeFilter])}
-                          detail={t("agent.hubNoMatchDetail")}
-                        />
-                      </View>
-                    )}
                   </View>
+                )}
+                {!useCategoryRail && (
+                  <CategoryRail
+                    category={category}
+                    counts={counts}
+                    onChange={setCategory}
+                    options={categoryOptions}
+                    horizontal
+                  />
+                )}
+
+                <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
+                  <View style={[s.between, { minHeight: 21 }]}>
+                    <Text
+                      style={{
+                        color: colors.text,
+                        fontSize: 14,
+                        lineHeight: 20,
+                        fontWeight: "500",
+                        fontFamily: fonts.sans,
+                      }}
+                    >
+                      {t(activeCategoryLabel)}
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.faint,
+                        fontSize: 11,
+                        lineHeight: 16,
+                        fontFamily: fonts.sans,
+                      }}
+                    >
+                      {t(HUB_COUNT_LABELS[typeFilter], { count: visibleItems.length })}
+                    </Text>
+                  </View>
+
+                  {visibleRows.length ? (
+                    <View style={{ gap: 12 }}>
+                      {visibleRows.map((row) => (
+                        <View
+                          key={row[0].id}
+                          style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
+                        >
+                          {row.map((item) => (
+                            <CapabilityCard key={item.id} item={item} />
+                          ))}
+                          {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
+                            <View key={key} style={{ flex: 1 }} />
+                          ))}
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={EMPTY_STATE_BOX}>
+                      <Empty
+                        icon={Search}
+                        title={t(HUB_EMPTY_TITLE_LABELS[typeFilter])}
+                        detail={t("agent.hubNoMatchDetail")}
+                      />
+                    </View>
+                  )}
                 </View>
-              </>
-            )}
-          </View>
+              </View>
+            </>
+          )}
         </View>
-      )}
+      </View>
 
       {configSheet && (
         <Sheet

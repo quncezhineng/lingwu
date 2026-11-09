@@ -164,7 +164,7 @@ const app = {
   "app.navGoals": "Scheduled",
   "app.navGoalsShort": "Scheduled",
   "app.navPreferences": "Memory",
-  "app.navApps": "Apps & capabilities",
+  "app.navApps": "Apps & skills",
   "app.navAccount": "Account",
   "app.titleToday": "Workbench",
   "app.subtitleToday":
@@ -187,7 +187,7 @@ const app = {
   "app.titleMemories": "Memory",
   "app.subtitleMemories":
     "Keep your goals, risk preferences and focus areas as durable context for LingWu.",
-  "app.titleApps": "Apps & capabilities",
+  "app.titleApps": "Apps & skills",
   "app.subtitleApps":
     "Extend how you work with plugins, complete specialist tasks with skills, and bring in external context through connectors.",
   "app.moreHeading": "More",
@@ -202,7 +202,7 @@ const app = {
   "app.taskHubReminders": "Tracking",
   "app.personalContextHeading": "Personal context",
   "app.memoryShortcutDetail": "{count} memories · goals, risks and focus areas",
-  "app.titleConnections": "Apps & capabilities",
+  "app.titleConnections": "Apps & skills",
   "app.subtitleConnections": "Combine plugins, skills and connectors into your way of working.",
   "app.titleMail": "Mail",
   "app.subtitleMail": "The conversations behind your work.",
@@ -219,7 +219,7 @@ const app = {
   "app.openConversations": "Open conversations and menu",
   "app.openActivity": "Open {name} activity and approvals",
   "app.notificationsLabel": "Notifications, {count} unread or pending",
-  "app.backToApps": "Back to capabilities",
+  "app.backToApps": "Back to apps & skills",
   "app.sideChat": "Side chat",
   "app.retryMainChat": "Retry system default Agent",
   "app.dismissNotification": "Dismiss notification",

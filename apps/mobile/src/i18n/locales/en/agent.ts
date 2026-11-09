@@ -579,9 +579,6 @@ const agent = {
   "agent.hubPluginsDetail": "Compose reusable research workflows",
   "agent.hubSkillsDetail": "Run specialist research skills",
   "agent.hubConnectorsShortDetail": "External tools and services",
-  "agent.hubKnowledgeTitle": "Materials",
-  "agent.hubKnowledgeDetail": "Files, insight cards and research notes",
-  "agent.hubSearchCapabilities": "Search capabilities",
   "agent.hubSearchPlugins": "Search plugins",
   "agent.hubSearchSkills": "Search skills",
   "agent.hubSearchConnectors": "Search connectors",
@@ -601,7 +598,6 @@ const agent = {
   "agent.hubSkillCategoryDealsPrivateCapital": "Deals & Private Capital",
   "agent.hubSkillCategoryWealthRisk": "Wealth & Risk",
   "agent.hubSkillCategoryResearchTools": "Research & Tools",
-  "agent.hubCapabilityCount": "{count} capabilities",
   "agent.hubPluginCount": "{count} plugins",
   "agent.hubSkillCount": "{count} skills",
   "agent.hubConnectorCount": "{count} connectors",
@@ -613,7 +609,6 @@ const agent = {
   "agent.hubStateOpen": "Open",
   "agent.hubConnectorStateConnected": "Connected",
   "agent.hubConnectorStateDisconnected": "Not connected",
-  "agent.hubNoMatchTitle": "No matching capabilities",
   "agent.hubPluginNoMatchTitle": "No matching plugins",
   "agent.hubSkillNoMatchTitle": "No matching skills",
   "agent.hubConnectorNoMatchTitle": "No matching connectors",
@@ -846,6 +841,16 @@ const agent = {
   "agentSpace.templateMarketDetail": "Quotes, briefings and meaningful changes",
   "agentSpace.templateAsset": "Portfolio Agent",
   "agentSpace.templateAssetDetail": "Allocation, risk and reviews",
+  "agentSpace.templateResearch": "Research Agent",
+  "agentSpace.templateResearchDetail": "Dig into a company: business, moat, valuation",
+  "agentSpace.templateEarnings": "Earnings Agent",
+  "agentSpace.templateEarningsDetail": "Read filings and calls, track guidance shifts",
+  "agentSpace.templateMacro": "Macro Agent",
+  "agentSpace.templateMacroDetail": "Rates, FX and policy, with the transmission path",
+  "agentSpace.templateRisk": "Risk Agent",
+  "agentSpace.templateRiskDetail": "Drawdowns, concentration and stress tests",
+  "agentSpace.templateReview": "Review Agent",
+  "agentSpace.templateReviewDetail": "Review trades and expose discipline gaps",
   "agentSpace.templateCustom": "Custom Agent",
   "agentSpace.templateCustomDetail": "Define its name, persona and capabilities",
   "agentSpace.customizeTitle": "Meet your new Agent",
@@ -967,8 +972,6 @@ const agent = {
   "agentSpace.noTasks": "No tasks yet. Return to chat and let an Agent start a piece of work.",
   "agentSpace.noInsights":
     "No insight cards yet. Completed research keeps its conclusion and source here.",
-  "agentSpace.sampleNote":
-    "Live chat uses the configured model and workspace capabilities. Unconnected services never report fake results.",
 } satisfies Dictionary;
 
 export default agent;

@@ -5,6 +5,65 @@
 
 ## 变更记录
 
+### 2026-11-09 · 界面：删除「创建 Agent」模板选择面板底部的提示文案
+
+**背景**
+
+用户选中「创建 Agent」面板底部一小段灰色说明文字「真实对话由当前模型与工作区能力执行；未连接的服务不会伪造结果。」（`color #6f6f6f`、`margin-top 14px`、`line-height 18px`），要求删除该元素内的内容。该提示为创建流程起始面板的兜底说明。
+
+**处理**
+
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：删除模板选择 `Sheet` 底部的 `<Text>` 元素（引用 `agentSpace.sampleNote`），面板现在只保留三个模板 PanelButton。
+- i18n 中英同步删除 `agentSpace.sampleNote` key（zh 值「真实对话由当前模型与工作区能力执行；未连接的服务不会伪造结果。」、en 值 "Live chat uses the configured model and workspace capabilities. Unconnected services never report fake results."）。
+
+**验证**
+
+- `npx biome check --write`（agent-sheets.tsx、zh-Hans/agent.ts、en/agent.ts）：通过，无 fix。
+- `npx tsx --import ./tests/setup.ts --test apps/mobile/test/i18n.test.ts`：16 例全部通过（中英 key 集合一致）。
+- `npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错）。
+
+### 2026-11-09 · 功能：删除「应用与技能」页面的「资料」入口
+
+**背景**
+
+用户选中「应用与技能」页面入口卡片区的「资料」按钮（aria-label「资料 · 文件资料、领悟卡与研究笔记」，与插件/技能/连接器并列），要求删除该入口及其整条能力闭环。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - `shortcuts` 数组删除 `knowledge` 项（原在 embedded 模式下 `selectType("workspace")` 切换到文件/资料、页面模式下 `navigate("files")`）；数组现仅剩 plugins/skills/connectors 三项。
+  - 删除两处 `active` 判定中 `shortcut.id === "knowledge"` 死分支，简化为 `active={shortcut.id === typeFilter}`。
+  - 移除 `FolderOpen` 图标 import（仅被资料入口使用）。
+  - 清理 workspace 类型死代码：`CapabilityType` 去掉 `"workspace"`、`Shortcut.id` 去掉 `| "knowledge"`、`CATEGORY_OPTIONS_BY_TYPE`/`TYPE_LABELS`/`HUB_SEARCH_LABELS`/`HUB_COUNT_LABELS`/`HUB_EMPTY_TITLE_LABELS` 去掉 workspace 项。
+  - 删除 `mode === "embedded" && typeFilter === "workspace"` 分支与其唯一的 `FilesScreen` 渲染：`CapabilityHubScreen` 移除不再使用的 `mode` / `onOpenChat` props。
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：技能中心面板内 `<CapabilityHubScreen mode="embedded" onOpenChat={onClose} />` 改为 `<CapabilityHubScreen />`（两 props 已删除）。
+- i18n 中英同步删除死 key：`agent.hubKnowledgeTitle` / `agent.hubKnowledgeDetail`（资料入口），及仅 workspace 类型使用的 `agent.hubSearchCapabilities` / `agent.hubCapabilityCount` / `agent.hubNoMatchTitle`；保留仍在连接器分类过滤使用的 `agent.hubCategoryWorkspace` 与来源标签 `agent.hubSourceWorkspace`。
+- **保留** 「工作区」能力分类（`hubCategoryWorkspace`）：连接器（Gmail/日历/浏览器等）仍带 `workspace` 标签，分类过滤不受影响。
+
+**验证**
+
+- `npx biome check --write`（capability-hub.tsx、agent-sheets.tsx、zh-Hans/agent.ts、en/agent.ts）：通过，1 个文件自动格式化。
+- `npx tsx --import ./tests/setup.ts --test apps/mobile/test/i18n.test.ts`：16 例全部通过（中英 key 集合一致）。
+- `npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错）。
+
+### 2026-11-09 · 文案：「应用与能力」分区标题改为「应用与技能」
+
+**背景**
+
+用户选中全局页面顶栏的「应用与能力」标题（衬线、15px、600），要求改为「应用与技能」。「应用与能力」同时作为底部导航标签与插件/技能能力弹窗标题，改动时需区分标题与导航两处来源。
+
+**处理**
+
+- [i18n/locales/zh-Hans/app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts)：`app.titleApps` 值「应用与能力」→「应用与技能」，服务全局页面顶栏。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：`sectionTitle` 的 apps/connections 分支复用底部导航的 `app.navApps`，改为 `t("app.titleApps")`，与 account/memories 等分区使用独立 title key 的写法一致。
+- **不动** `app.navApps`：仍服务 `shell.tsx` 底部导航标签与 `agent-sheets.tsx` 能力面板弹窗标题，「应用与能力」文案保留。
+- 英文包 `app.titleApps` 保持 "Apps & capabilities" 不变。
+
+**验证**
+
+- `npx biome check`（agent-product.tsx、zh-Hans/app.ts）：通过。
+- `npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错）。
+
 ### 2026-11-09 · 文案：移动端顶栏「我的」标题统一为「账号与数据」
 
 **背景**
@@ -20,6 +79,48 @@
 
 - `npx biome check apps/mobile/src/agent-product.tsx`：通过。
 - `npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错）。
+
+### 2026-11-09 · 功能：创建 Agent 的模板从 3 个扩到 8 个
+
+**背景**
+
+「创建一个新 Agent」浮层原本只有行情 / 资产 / 自定义三个模板，覆盖不到研究、财报、宏观、风控、复盘这些真实用法。用户要求多加几个。
+
+**处理**
+
+- **模型层**（[agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)）：`AgentTemplateId` 增加 `research` / `earnings` / `macro` / `risk` / `review`；`AGENT_TEMPLATES` 补齐对应的 `name` / `role` / `persona` / `avatar` / `skills`；`TEMPLATES`（`normalizeAgentSpace` 用来校验旧数据的白名单）同步。
+- **入口卡片**（[agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)）：三个写死的 `PanelButton` 抽成 `CREATE_TEMPLATE_ENTRIES` 数组（`id` / `icon` / `titleKey` / `detailKey`），按数组顺序渲染。以后加模板只需加一条数据。
+- **服务端 schema**（[apps/server/src/agent-space.ts](../apps/server/src/agent-space.ts)）：`template` 的 `z.enum` 同步扩到 9 个取值。**这一步不能漏** —— 外层是 `.strict()`，客户端带上服务端不认识的枚举值会让整次 PUT 被 422，而移动端 `.catch(() => undefined)` 会静默吞掉，表现为「云端同步莫名失效」。
+- **i18n**：新增 5 组 `agentSpace.templateXxx` / `templateXxxDetail`，中英同步。
+- 排序：行情 → 资产 → 研究 → 财报 → 宏观 → 风控 → 复盘 → 自定义。前两个是日常观察类，中间五个是专题类，「自定义」固定留最后作为兜底出口。
+- 图标全部取自既有 `ICON_KEYS`（`Search` / `FileText` / `Globe2` / `ShieldAlert` / `RotateCcw`），没有新增图形资产。
+
+**验证**
+
+- `npx biome check --write`（5 个改动文件）：通过，fix 2 个。
+- 根层 `npx tsc --noEmit`：通过；`cd apps/mobile && npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错）。
+- `test/i18n.test.ts` 16 例、`test/agent-space.test.ts` 22 例全部通过（中英 key 集合一致、模板白名单校验未破）。
+
+### 2026-11-09 · 修复：应用与能力顶部三张快捷卡不撑满整行
+
+**背景**
+
+「应用与能力」页顶部三张入口卡（插件 / 技能 / 连接器）在宽屏下宽度只占整行的 3/4，右侧留出一条与下方内容对不齐的空白。
+
+**成因**
+
+[capability-hub.tsx](../apps/mobile/src/capability-hub.tsx) 的 `shortcutColumns` 只按屏宽分档（≥1000 给 4 列、≥680 给 3 列、其余 2 列），没有和快捷卡实际数量对齐。宽屏走 4 列、卡片只有 3 张，`chunk` 分出的那一行只有 3 个 `flex: 1` 的卡片，剩余 1 列由 `FILLER_KEYS` 补一个空 `View` 占住，于是每张卡只分到 1/4 宽、第 4 列全空。
+
+**处理**
+
+- `shortcutColumns` 改为 `Math.min(快捷卡数量, 屏宽档位)`：宽屏仍是 3 张 → 3 列，三张卡各占 1/3、等分整行，右边缘与下方卡片网格对齐。
+- 该常量原先声明在 `shortcuts` 数组之前，改成依赖 `shortcuts.length` 后移到数组之后。
+- `FILLER_KEYS` 补位逻辑保留：将来快捷卡变成 4 张时宽屏回到 4 列，若不足一行仍能补齐。
+
+**验证**
+
+- `npx biome check --write apps/mobile/src/capability-hub.tsx`：通过，无 fix。
+- `cd apps/mobile && npx tsc --noEmit`：`capability-hub.tsx` 0 错（剩余报错仍在 `bot-pages/connectors.tsx`）。
 
 ### 2026-11-09 · 回退：称呼与投资偏好浮层的字段恢复单列
 

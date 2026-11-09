@@ -1131,7 +1131,7 @@ function AgentHeader({
                           : section === "computer"
                             ? t("threads.agentComputer")
                             : section === "apps" || section === "connections"
-                              ? t("app.navApps")
+                              ? t("app.titleApps")
                               : section === "settings"
                                 ? t("details.settingsTitle")
                                 : t("app.navChat");
