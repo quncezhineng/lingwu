@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Pressable, View } from "react-native";
 import { AgentOrb } from "../agent-orb";
 import { useAgentSpace } from "../agent-space";
@@ -56,7 +56,20 @@ function PersonaChip({
   );
 }
 
-function PersonaEditor({ onSaved }: { onSaved: () => void }) {
+/**
+ * 人设表单。
+ *
+ * `secondaryAction` 与「保存人设」并排成双列（等宽）：目前用于「删除 Agent」，
+ * 不传时保存按钮仍独占一行，避免系统默认 Agent 这类不可删除的场景留下半列空位。
+ */
+function PersonaEditor({
+  onSaved,
+  secondaryAction,
+}: {
+  onSaved: () => void;
+  /** 与保存按钮并排的次要操作；不传则保存按钮独占整行。 */
+  secondaryAction?: ReactNode;
+}) {
   const { t } = useTranslation();
   const { current, updateAgent } = useAgentSpace();
   const [name, setName] = useState(current.name);
@@ -65,6 +78,19 @@ function PersonaEditor({ onSaved }: { onSaved: () => void }) {
   const [communication, setCommunication] = useState<AgentCommunication>(current.communication);
   const [persona, setPersona] = useState(current.persona);
   const [avatar, setAvatar] = useState(current.avatar);
+  /** 主操作：保存人设。单独提出来，才能按需与次要操作并排或独占一行。 */
+  const saveButton = (
+    <Button
+      primary
+      disabled={!name.trim() || !persona.trim()}
+      onPress={() => {
+        updateAgent(current.id, { name, role, tone, communication, persona, avatar });
+        onSaved();
+      }}
+    >
+      {t("agentSpace.savePersona")}
+    </Button>
+  );
   return (
     <View style={{ gap: 2 }}>
       <View style={{ alignItems: "center", marginBottom: 8 }}>
@@ -130,16 +156,15 @@ function PersonaEditor({ onSaved }: { onSaved: () => void }) {
         maxLength={1000}
         multiline
       />
-      <Button
-        primary
-        disabled={!name.trim() || !persona.trim()}
-        onPress={() => {
-          updateAgent(current.id, { name, role, tone, communication, persona, avatar });
-          onSaved();
-        }}
-      >
-        {t("agentSpace.savePersona")}
-      </Button>
+      {secondaryAction ? (
+        // 双列等宽：左保存、右删除；两个按钮同一行，高度由 stretch 对齐。
+        <View style={[s.row, { gap: 10, alignItems: "stretch" }]}>
+          <View style={{ flex: 1 }}>{saveButton}</View>
+          <View style={{ flex: 1 }}>{secondaryAction}</View>
+        </View>
+      ) : (
+        saveButton
+      )}
     </View>
   );
 }
@@ -154,13 +179,18 @@ export function BotEditPage({
   const [confirmDelete, setConfirmDelete] = useState(false);
   return (
     <BotPage title={t("agentSpace.editPersona")} onClose={onClose} embedded={embedded}>
-      <PersonaEditor onSaved={onClose} />
+      {/* 「保存人设」与「删除 Agent」双列并排：删除是不可恢复操作，等宽但用 danger 色区分。 */}
+      <PersonaEditor
+        onSaved={onClose}
+        secondaryAction={
+          current.system ? undefined : (
+            <Button danger onPress={() => setConfirmDelete(true)}>
+              {t("agentSpace.deleteAgent")}
+            </Button>
+          )
+        }
+      />
       <View style={{ marginTop: 12 }}>
-        {!current.system && (
-          <Button danger onPress={() => setConfirmDelete(true)}>
-            {t("agentSpace.deleteAgent")}
-          </Button>
-        )}
         {current.system && (
           <Text style={[s.small, { color: colors.faint, marginTop: 10 }]}>
             {t("agentSpace.systemCannotDelete")}

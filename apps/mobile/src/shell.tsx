@@ -275,7 +275,7 @@ export function Rail() {
   ).length;
   const accountLabel = workspace.profile.name.trim() || t(ACCOUNT_NAV.labelKey);
   const accountActive =
-    section === ACCOUNT_NAV.id || ["preferences", "apps", "connections"].includes(section);
+    section === ACCOUNT_NAV.id || ["memories", "apps", "connections"].includes(section);
   return (
     <SidebarTooltipContext.Provider value={{ show: showTooltip, hide: hideTooltip }}>
       <View

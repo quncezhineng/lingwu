@@ -85,7 +85,7 @@ const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: T
     activity: { titleKey: "app.titleActivity", subtitleKey: "app.subtitleActivity" },
     ideas: { titleKey: "app.titleIdeas", subtitleKey: "app.subtitleIdeas" },
     goals: { titleKey: "app.titleGoals", subtitleKey: "app.subtitleGoals" },
-    preferences: { titleKey: "app.titlePreferences", subtitleKey: "app.subtitlePreferences" },
+    memories: { titleKey: "app.titleMemories", subtitleKey: "app.subtitleMemories" },
     apps: { titleKey: "app.titleApps", subtitleKey: "app.subtitleApps" },
     account: { titleKey: "app.titleAccount", subtitleKey: "app.subtitleAccount" },
     settings: { titleKey: "details.settingsTitle", subtitleKey: "details.settingsSubtitle" },
@@ -727,7 +727,7 @@ function WorkspaceShell({
                 ? TaskHubScreen
                 : section === "ideas"
                   ? IdeasScreen
-                  : section === "preferences"
+                  : section === "memories"
                     ? PreferencesScreen
                     : section === "settings"
                       ? SettingsScreen
@@ -1007,7 +1007,7 @@ function WorkspaceShell({
                         (item.id === "today" && ["watchlist", "portfolio"].includes(section)) ||
                         (item.id === "files" && section === "notes") ||
                         (item.id === "account" &&
-                          ["preferences", "apps", "connections"].includes(section));
+                          ["memories", "apps", "connections"].includes(section));
                       return (
                         <Pressable
                           key={item.id}

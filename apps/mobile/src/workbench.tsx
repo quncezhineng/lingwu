@@ -298,7 +298,7 @@ function PreferenceRail() {
       )}
       <Pressable
         accessibilityRole="button"
-        onPress={() => navigate("preferences")}
+        onPress={() => navigate("memories")}
         style={[s.row, { gap: 3 }]}
       >
         <Text style={{ fontSize: 11, color: colors.muted }}>{t("workbench.viewPreferences")}</Text>

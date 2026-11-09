@@ -229,7 +229,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
         return;
       }
       case "memory":
-        navigate("preferences");
+        navigate("memories");
         return;
       case "monitor":
         navigate("goals");
