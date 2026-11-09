@@ -376,11 +376,19 @@ function Sparkline({
 }
 
 /**
- * 六列表格列宽（1000 宽时内容区约 684）：
- * 名称 ≥132 + 市场 76 + 价格 84 + 涨跌 66 + 走势 72 + 操作 88
- * + 5 × 8 gap + 左右 padding 24 → 606，不挤压主信息。
+ * 六列表格列宽。
+ *
+ * 每个列都是「最小宽度 + flex 份额」：名称拿 2 份，其余各 1 份。
+ * 这样宽屏下多出来的空间按比例摊到各列，名称列不会把空出来的几百像素全吞掉
+ * （之前是 `flex: 1.7` 且无上限，1920 宽时名称列能拉到 700+，中间一片空白）。
+ * 窄屏时各列回落到最小宽度：132 + 76 + 84 + 66 + 72 + 88 + 5×8 + 24 = 582。
  */
 const TABLE_NAME_MIN = 132;
+const TABLE_MARKET_MIN = 76;
+const TABLE_PRICE_MIN = 84;
+const TABLE_CHANGE_MIN = 66;
+const TABLE_TREND_MIN = 72;
+const TABLE_ACTION_MIN = 88;
 const TABLE_GAP = 8;
 const TABLE_PAD = 12;
 
@@ -422,12 +430,28 @@ function WatchTable({
       }}
     >
       <View style={[s.row, headerRow]}>
-        {header(t("markets.tableName"), { flex: 1.7, minWidth: TABLE_NAME_MIN })}
-        {header(t("markets.tableMarketType"), { width: 76 })}
-        {header(t("markets.tableLatestValue"), { width: 84, textAlign: "right" })}
-        {header(t("markets.tableChangePercent"), { width: 66, textAlign: "right" })}
-        {header(t("markets.tableTrend"), { width: 72, textAlign: "center" })}
-        {header(t("markets.tableActions"), { width: 88, textAlign: "right" })}
+        {header(t("markets.tableName"), { flex: 2, minWidth: TABLE_NAME_MIN })}
+        {header(t("markets.tableMarketType"), { flex: 1, minWidth: TABLE_MARKET_MIN })}
+        {header(t("markets.tableLatestValue"), {
+          flex: 1,
+          minWidth: TABLE_PRICE_MIN,
+          textAlign: "right",
+        })}
+        {header(t("markets.tableChangePercent"), {
+          flex: 1,
+          minWidth: TABLE_CHANGE_MIN,
+          textAlign: "right",
+        })}
+        {header(t("markets.tableTrend"), {
+          flex: 1,
+          minWidth: TABLE_TREND_MIN,
+          textAlign: "center",
+        })}
+        {header(t("markets.tableActions"), {
+          flex: 1,
+          minWidth: TABLE_ACTION_MIN,
+          textAlign: "right",
+        })}
       </View>
       {rows.map(({ item, quote }, index) => {
         const currency = quote?.currency ?? defaultCurrency(item.symbol.market);
@@ -451,7 +475,7 @@ function WatchTable({
             ]}
           >
             <View
-              style={[s.row, { flex: 1.7, minWidth: TABLE_NAME_MIN, gap: 10, paddingVertical: 12 }]}
+              style={[s.row, { flex: 2, minWidth: TABLE_NAME_MIN, gap: 10, paddingVertical: 12 }]}
             >
               <View style={[s.glyph, { width: 32, height: 36 }]}>
                 {item.symbol.market === "ETF" || item.symbol.market === "FUND" ? (
@@ -477,7 +501,7 @@ function WatchTable({
                 )}
               </View>
             </View>
-            <View style={{ width: 76, gap: 2 }}>
+            <View style={{ flex: 1, minWidth: TABLE_MARKET_MIN, gap: 2 }}>
               <Text numberOfLines={1} style={{ fontSize: 11, color: colors.text }}>
                 {labels.market}
               </Text>
@@ -485,7 +509,7 @@ function WatchTable({
                 {labels.asset}
               </Text>
             </View>
-            <View style={{ width: 84, alignItems: "flex-end", gap: 2 }}>
+            <View style={{ flex: 1, minWidth: TABLE_PRICE_MIN, alignItems: "flex-end", gap: 2 }}>
               <Text
                 numberOfLines={1}
                 style={[s.metric, { fontSize: 13, color: colors.text, textAlign: "right" }]}
@@ -502,11 +526,20 @@ function WatchTable({
             </View>
             <Text
               numberOfLines={1}
-              style={[s.metric, { width: 66, textAlign: "right", fontSize: 12, color }]}
+              style={[
+                s.metric,
+                {
+                  flex: 1,
+                  minWidth: TABLE_CHANGE_MIN,
+                  textAlign: "right",
+                  fontSize: 12,
+                  color,
+                },
+              ]}
             >
               {changePercent === undefined ? "—" : formatPercent(changePercent)}
             </Text>
-            <View style={{ width: 72, alignItems: "center" }}>
+            <View style={{ flex: 1, minWidth: TABLE_TREND_MIN, alignItems: "center" }}>
               <Sparkline points={quote?.sparkline} width={68} height={22} />
               {!quote?.sparkline && (
                 <Text style={{ fontSize: 10, color: colors.faint }}>
@@ -514,7 +547,12 @@ function WatchTable({
                 </Text>
               )}
             </View>
-            <View style={[s.row, { width: 88, justifyContent: "flex-end", gap: 8 }]}>
+            <View
+              style={[
+                s.row,
+                { flex: 1, minWidth: TABLE_ACTION_MIN, justifyContent: "flex-end", gap: 8 },
+              ]}
+            >
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("markets.watchlistAnalyze")}

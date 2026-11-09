@@ -49,6 +49,10 @@ function InstructionsField({
           </Text>
         </Pressable>
       </View>
+      {/* 说明这段是 Markdown 源码，而不是纯文本，避免用户以为只能写一段白话。 */}
+      <Text style={[s.small, { color: colors.faint }]}>
+        {t("agentSpace.skillInstructionsMarkdownHint")}
+      </Text>
       {previewing ? (
         <View style={[s.input, { minHeight: 120 }]}>
           {value.trim() ? (

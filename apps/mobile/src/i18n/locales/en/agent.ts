@@ -241,6 +241,81 @@ const agent = {
     "Map catalysts, timing and invalidation risks across earnings, policy and product events.",
   "agent.templateCatalystPrompt":
     "Build an event-driven watchlist: identify upcoming earnings, policy decisions, M&A, product launches and industry conferences, then assess each event's possible impact, timing and invalidation conditions, with the evidence to keep tracking.",
+  "agent.templateQualityTitle": "Spot red flags in the financials",
+  "agent.templateQualityDescription":
+    "Cross-check the three statements, receivables and inventory growth and cash flow for window dressing.",
+  "agent.templateQualityPrompt":
+    "Screen the target company's financials for red flags: cross-check the income statement, balance sheet and cash flow statement, focus on receivables and inventory growing faster than revenue, operating cash flow diverging from net income, the share of non-recurring items and any change in audit opinion, then list the items most worth verifying in the filings. Ask me for the ticker first.",
+  "agent.templateCallTitle": "Read the earnings call",
+  "agent.templateCallDescription":
+    "Pull guidance, wording changes and dodged questions, separating facts from management's view.",
+  "agent.templateCallPrompt":
+    "Break down the target company's latest earnings call: extract the guidance management gave and any change in definitions, review the questions that were pressed and the ones that were dodged, separate verifiable facts from management claims, and list what to check next quarter. Ask me for the transcript or the company first.",
+  "agent.templateRiskTitle": "Build a risk checklist",
+  "agent.templateRiskDescription":
+    "Policy, litigation, customer concentration, FX and debt maturities, ranked by impact and likelihood.",
+  "agent.templateRiskPrompt":
+    "Build a risk checklist for the target company: cover policy and regulation, litigation and compliance, customer and supplier concentration, FX and input costs, debt maturities and share pledges. Rank them by impact and likelihood, and give each one a metric I can keep tracking. Ask me for the ticker first.",
+  "agent.templateHoldersTitle": "Track ownership shifts",
+  "agent.templateHoldersDescription":
+    "Top holders, fund positions, buybacks and insider trades — see which way the chips are moving.",
+  "agent.templateHoldersPrompt":
+    "Track changes in the target company's shareholder base: summarize moves among the top holders and institutional positions, buyback and insider trading filings, and the lock-up expiry schedule, judge whether money is flowing in or out, and flag which changes are worth following. Ask me for the ticker first.",
+  "agent.templateTargetPriceTitle": "Estimate fair value",
+  "agent.templateTargetPriceDescription":
+    "DCF plus relative valuation across bear, base and bull cases — a range, not a single number.",
+  "agent.templateTargetPricePrompt":
+    "Estimate the target company's fair value: run a DCF and a peer relative valuation, give a price range for the bear, base and bull cases, spell out the key assumptions and most sensitive variables in each, and compute the margin of safety at the current price against the base case. Ask me for the ticker first.",
+  "agent.templateEtfTitle": "Compare ETFs and index funds",
+  "agent.templateEtfDescription":
+    "Fees, tracking error, size, liquidity and holdings overlap — pick the better long-term vehicle.",
+  "agent.templateEtfPrompt":
+    "Compare a few ETFs or index funds: weigh management and custody fees, tracking error, size and liquidity, holdings overlap and distribution policy, then recommend the one that better suits my holding period and purpose, explaining the trade-offs. Ask me which products to compare first.",
+  "agent.templateBondTitle": "Check convertible bond terms",
+  "agent.templateBondDescription":
+    "Conversion price, reset and put clauses, yield to maturity and rating — worst case first.",
+  "agent.templateBondPrompt":
+    "Check the terms and risks of a convertible or credit bond: summarize the conversion price and premium, reset and put clauses, yield to maturity, rating changes and the underlying stock's fundamentals. Work out the worst-case gain and loss first, then conclude whether it is worth buying. Ask me for the code first.",
+  "agent.templateTradeReviewTitle": "Review a trade I made",
+  "agent.templateTradeReviewDescription":
+    "Rebuild the original thesis, the execution and the gap to the outcome, then distill reusable rules.",
+  "agent.templateTradeReviewPrompt":
+    "Review one of my trades: rebuild the thesis I had when buying and the market context at the time, compare it with the actual outcome, separate judgement error, execution error and luck, and distill reusable rules plus a checklist for next time. Ask me for the trade details first.",
+  "agent.templateMacroTitle": "Watch macro surprises",
+  "agent.templateMacroDescription":
+    "CPI, PMI, credit and payroll calendars against consensus, and how a surprise hits assets.",
+  "agent.templateMacroPrompt":
+    "Watch the macro data coming up: build a calendar of CPI, PMI, credit and payroll releases with consensus expectations, explain how a surprise would feed through to rates, FX and equities, and flag the dates that matter most and the likely market reaction.",
+  "agent.templateFxTitle": "Map FX and commodity exposure",
+  "agent.templateFxDescription":
+    "Sensitivity to the dollar, oil and copper across my holdings, ranked by impact.",
+  "agent.templateFxPrompt":
+    "Analyze how FX and commodities feed through to my holdings: estimate the sensitivity of revenue, costs and valuation to moves in the dollar index, oil and copper, identify the most exposed positions, and suggest price levels to watch plus possible hedges. Ask me for my holdings first.",
+  "agent.templateMemoTitle": "Write an investment memo",
+  "agent.templateMemoDescription":
+    "Thesis, key evidence, strongest counter-argument and valuation — one page, decision ready.",
+  "agent.templateMemoPrompt":
+    "Turn my current research into a one-page investment memo: state the thesis in a paragraph, then list three pieces of key evidence, the strongest counter-argument, the valuation conclusion, and the specific conditions that would trigger a buy or an exit. Keep it short enough to hand to a decision maker. Ask me for the ticker first.",
+  "agent.templateIpoTitle": "Break down a new listing",
+  "agent.templateIpoDescription":
+    "Use of proceeds, ownership and lock-ups, related-party deals and peer valuation.",
+  "agent.templateIpoPrompt":
+    "Break down a new listing's prospectus: summarize the use of proceeds, ownership structure and lock-up periods, related-party transactions, customer concentration, gross margin trends and peer valuation, judge the upside from the IPO and the long-term value, and flag clauses worth worrying about. Ask me for the name first.",
+  "agent.templateScreenerTitle": "Screen a basket of stocks",
+  "agent.templateScreenerDescription":
+    "Combine valuation, growth, quality and momentum filters, then verify the shortlist one by one.",
+  "agent.templateScreenerPrompt":
+    "Run a screen for me: combine valuation, revenue and profit growth, ROE and cash flow quality, and recent momentum into a set of filters, explain the criteria and where the data comes from, give the reason each name made the cut, then pick 3-5 for a deeper look.",
+  "agent.templateCrossMarketTitle": "Compare cross-market prices",
+  "agent.templateCrossMarketDescription":
+    "A/H/US spreads, liquidity, dividend tax and FX — where is the same asset cheaper?",
+  "agent.templateCrossMarketPrompt":
+    "Compare how the same company is priced on the A-share, Hong Kong and US markets: calculate the cross-market spread, weigh liquidity, trading activity, dividend tax and FX, judge which market is the better place to buy, and explain what it would take for the spread to converge. Ask me for the company or ticker first.",
+  "agent.templateWeeklyMoversTitle": "Explain this week's movers",
+  "agent.templateWeeklyMoversDescription":
+    "Attribute each move to sector beta, company news or flows, and flag what to keep tracking.",
+  "agent.templateWeeklyMoversPrompt":
+    "Summarize this week's moves across my watchlist: explain why each name moved, separate sector-wide moves from company news and flow-driven trading, flag the ones to keep tracking with key price levels, and finish with a one-page review. Ask me for the watchlist first.",
   "agent.ideasForYou": "Signals you follow",
   "agent.ideaSuggestions": "Research ideas",
   "agent.tplIdeaStockTitle": "Deep-dive a stock",
@@ -796,6 +871,8 @@ const agent = {
   "agentSpace.skillInstructionsEdit": "Edit",
   "agentSpace.skillInstructionsPreviewEmpty":
     "Nothing to preview yet. Switch back to edit and write some Markdown.",
+  "agentSpace.skillInstructionsMarkdownHint":
+    "Markdown is supported (headings, lists, tables, code blocks). Tap Preview to render.",
   "agentSpace.skillOutput": "Output format",
   "agentSpace.skillSampleName": "Cash flow quality check",
   "agentSpace.skillSamplePurpose":

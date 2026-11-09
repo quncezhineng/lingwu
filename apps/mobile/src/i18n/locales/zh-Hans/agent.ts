@@ -218,6 +218,69 @@ const agent = {
     "围绕财报、政策、并购与产品发布，梳理催化剂、时间窗口和风险。",
   "agent.templateCatalystPrompt":
     "构建一个事件驱动的观察清单：识别未来一段时间的重要财报、政策、并购、产品发布和行业会议，评估每项事件的可能影响、时间窗口与失效条件，并标注需要持续跟踪的证据。",
+  "agent.templateQualityTitle": "排查财报里的异常信号",
+  "agent.templateQualityDescription":
+    "勾稽三张表、应收与存货增速、经营现金流，找出可能被粉饰的科目。",
+  "agent.templateQualityPrompt":
+    "排查目标公司财报里的异常信号：勾稽利润表、资产负债表与现金流量表，重点看应收账款与存货增速是否明显快于营收、经营现金流与净利润是否持续背离、非经常性损益占比和审计意见有无变化，最后列出最值得回到原文核实的科目。请先询问公司名称或代码。",
+  "agent.templateCallTitle": "读业绩会与管理层指引",
+  "agent.templateCallDescription": "提取业绩指引、口径变化与问答回避点，区分事实与管理层判断。",
+  "agent.templateCallPrompt":
+    "解读目标公司最新业绩会：提取管理层给出的业绩指引与统计口径变化，梳理问答环节被反复追问和刻意回避的问题，区分可核验的事实与管理层表态，并列出下一季度需要验证的要点。请先让我提供业绩会材料或公司名称。",
+  "agent.templateRiskTitle": "给公司列一份风险清单",
+  "agent.templateRiskDescription": "政策、诉讼、客户集中、汇率与债务到期，按影响和概率排序。",
+  "agent.templateRiskPrompt":
+    "为目标公司列一份风险清单：覆盖政策与监管、诉讼与合规、客户与供应商集中度、汇率与原材料成本、债务到期与股权质押，按影响程度和发生概率排序，并为每项风险给出可以持续跟踪的观察指标。请先询问公司名称或代码。",
+  "agent.templateHoldersTitle": "追踪机构与股东持仓变化",
+  "agent.templateHoldersDescription": "看十大股东、机构持仓、回购与增减持，判断筹码在往哪边挪。",
+  "agent.templateHoldersPrompt":
+    "追踪目标公司的筹码结构变化：整理十大股东与机构持仓变动、回购与增减持公告、限售解禁时间表，判断资金整体是在流入还是流出，并指出哪些变化最值得继续跟进。请先询问公司名称或代码。",
+  "agent.templateTargetPriceTitle": "测算目标价与安全边际",
+  "agent.templateTargetPriceDescription":
+    "用 DCF 与相对估值做悲观、中性、乐观三情景，给出区间而非单点。",
+  "agent.templateTargetPricePrompt":
+    "测算目标公司的合理价值：用 DCF 与可比公司相对估值，分别给出悲观、中性、乐观三种情景下的价格区间，说明每个情景的关键假设与最敏感的变量，并计算当前价格相对中性情景的安全边际。请先询问公司名称或代码。",
+  "agent.templateEtfTitle": "对比 ETF 与指数基金",
+  "agent.templateEtfDescription":
+    "比较费率、跟踪误差、规模流动性与成分重叠，选出更适合长期持有的。",
+  "agent.templateEtfPrompt":
+    "对比几只 ETF 或指数基金：比较管理费率与托管费率、跟踪误差、规模与流动性、成分股重叠度和分红方式，结合我的持有期限与用途，给出更适合长期配置的那一只，并说明取舍理由。请先询问我想对比的产品。",
+  "agent.templateBondTitle": "检查可转债条款与风险",
+  "agent.templateBondDescription": "转股价、下修、回售与信用评级，先把最差情形算清楚。",
+  "agent.templateBondPrompt":
+    "检查一只可转债或信用债的条款与风险：整理转股价与转股溢价率、下修与回售条款、到期收益率、评级变化和正股基本面，先算出最差情形下的收益与损失，再给出是否值得配置的结论。请先询问标的代码。",
+  "agent.templateTradeReviewTitle": "复盘一笔交易的得失",
+  "agent.templateTradeReviewDescription": "还原判断依据、执行过程与结果偏差，沉淀成可复用规则。",
+  "agent.templateTradeReviewPrompt":
+    "复盘我的一笔交易：还原买入时的判断依据和当时的市场环境，对照最终结果，区分判断偏差、执行偏差和运气成分，最后提炼成可以复用的规则和下一次的检查项。请先让我提供交易细节。",
+  "agent.templateMacroTitle": "盯住宏观数据与预期差",
+  "agent.templateMacroDescription": "汇总 CPI、PMI、社融与非农日历，比较预期与实际，判断资产影响。",
+  "agent.templateMacroPrompt":
+    "盯住未来一段时间的宏观数据：整理 CPI、PMI、社融、非农等关键指标的公布日历与市场预期，说明预期差会如何影响利率、汇率和权益资产，并标注最需要关注的时点与可能的市场反应。",
+  "agent.templateFxTitle": "算清汇率与大宗商品传导",
+  "agent.templateFxDescription": "做美元、油价与铜价的敏感度分析，看哪些持仓受影响最大。",
+  "agent.templateFxPrompt":
+    "分析汇率与大宗商品对我持仓的传导：测算美元指数、油价和铜价波动对相关标的收入、成本与估值的影响，找出敏感度最高的持仓，并给出需要跟踪的价格区间和对冲思路。请先让我提供持仓。",
+  "agent.templateMemoTitle": "写一页投资备忘录",
+  "agent.templateMemoDescription": "论点、关键证据、反面观点与估值结论，压缩到一页供决策。",
+  "agent.templateMemoPrompt":
+    "帮我把当前研究写成一页投资备忘录：用一段话讲清投资论点，列出三条关键证据、最强的反面观点、估值结论，以及触发买入或放弃的具体条件，控制在可以直接给决策者看的长度。请先询问标的。",
+  "agent.templateIpoTitle": "拆解新股招股书要点",
+  "agent.templateIpoDescription": "募投项目、股东结构、关联交易与估值，判断打新与长期价值。",
+  "agent.templateIpoPrompt":
+    "拆解一只新股的招股书要点：整理募投项目与资金用途、股东结构与锁定期、关联交易、客户集中度、毛利率水平和可比公司估值，判断打新收益空间与长期投资价值，并指出需要警惕的条款。请先询问标的。",
+  "agent.templateScreenerTitle": "用条件筛选一篮子标的",
+  "agent.templateScreenerDescription": "用估值、成长、盈利质量与动量组合条件，筛出候选再逐个核验。",
+  "agent.templateScreenerPrompt":
+    "帮我做一次条件筛选：用估值水平、营收与利润增速、ROE 与现金流质量、近期动量等条件组合筛选候选标的，说明筛选口径与参数来源，给出每只股票的入选理由，再挑 3-5 只深入核验。",
+  "agent.templateCrossMarketTitle": "对比同一公司的跨市场价差",
+  "agent.templateCrossMarketDescription": "跨市场价差、流动性与股息税差异，判断在哪边买更划算。",
+  "agent.templateCrossMarketPrompt":
+    "对比同一家公司在 A 股、港股和美股的定价：计算跨市场价差，比较流动性、成交活跃度、股息税与汇率因素，判断在哪个市场买入更划算，并说明价差收敛需要什么条件。请先询问公司名称或代码。",
+  "agent.templateWeeklyMoversTitle": "整理本周自选异动原因",
+  "agent.templateWeeklyMoversDescription": "逐只解释涨跌归因，区分行业共振、公司事件与资金行为。",
+  "agent.templateWeeklyMoversPrompt":
+    "整理我自选股的本周异动：逐只解释涨跌原因，区分行业共振、公司事件和资金行为，标出需要继续跟踪的标的与关键价位，最后给出一页复盘小结。请先让我提供自选列表。",
   "agent.ideasForYou": "来自你关注的线索",
   "agent.ideaSuggestions": "投研灵感",
   "agent.tplIdeaStockTitle": "深度研究一只股票",
@@ -721,6 +784,8 @@ const agent = {
   "agentSpace.skillInstructionsPreview": "预览",
   "agentSpace.skillInstructionsEdit": "编辑",
   "agentSpace.skillInstructionsPreviewEmpty": "还没有内容，切回编辑输入 Markdown 后再查看预览。",
+  "agentSpace.skillInstructionsMarkdownHint":
+    "支持 Markdown 语法（标题、列表、表格、代码块），点「预览」查看效果。",
   "agentSpace.skillOutput": "输出格式",
   "agentSpace.skillSampleName": "现金流质量检查",
   "agentSpace.skillSamplePurpose": "从财报中核对利润与现金流的同步性",

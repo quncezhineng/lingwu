@@ -5,6 +5,80 @@
 
 ## 变更记录
 
+### 2026-11-09 · UI：自选列表「名称/代码」列宽收敛
+
+**背景**
+
+「自选与组合 → 自选」的六列表格里，「名称/代码」列用 `flex: 1.7` 且没有上限，宽屏下会把整行剩余宽度全部吃掉（约 1030 宽时已达 550px+，1920 宽更夸张），名称与代码后面留出一大片空白，右侧数据列被推得很远。
+
+**处理**
+
+- [watchlist.tsx](../apps/mobile/src/watchlist.tsx)：列宽模型从「名称 `flex: 1.7` + 其余固定 px」改成「每列 = 最小宽度 + flex 份额」——名称 2 份，市场/类型、最新价、涨跌幅、走势、操作各 1 份。新增 `TABLE_MARKET_MIN` / `TABLE_PRICE_MIN` / `TABLE_CHANGE_MIN` / `TABLE_TREND_MIN` / `TABLE_ACTION_MIN`，数值沿用原固定宽度，因此**窄屏最小宽度完全不变**（132+76+84+66+72+88 + 5×8 + 24 = 582）。
+- 表头 6 处与行内 6 处单元格同步改，表头与数据列仍然严格对齐（之前是两边各写一遍 `width`，容易漂移，现在统一走 `flex + minWidth`）。
+- 效果：约 1030 宽下名称列从 ~556 收敛到 ~253，其余五列各分到 ~130–150，多余宽度被摊平而不是堆在名称列。
+
+**验证**
+
+- `npx biome check --write`（watchlist.tsx）：无警告。
+- 自选 / 组合相关单测 18 例通过（watchlist-symbol-view / watchlist-menu-position / portfolio）。
+- `pnpm --dir apps/mobile typecheck`：仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错。
+
+### 2026-11-09 · 内容：灵感页研究模板从 15 个扩到 30 个
+
+**背景**
+
+用户反馈灵感页（`IdeasScreen`）只有 15 个研究模板，数量太少，希望再补十几个方向。
+
+**处理**
+
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：`RESEARCH_TEMPLATES` 追加 15 个模板，沿用同一结构（`titleKey` / `descriptionKey` / `promptKey` / `icon`）。原有 15 个顺序与编号保持不动，新卡片编号 16–30。
+  新增方向：财报异常信号排雷、业绩会与管理层指引、公司风险清单、机构与股东持仓变化、目标价与安全边际、ETF / 指数基金对比、可转债条款与风险、单笔交易复盘、宏观数据预期差、汇率与大宗商品传导、一页投资备忘录、新股招股书拆解、条件选股筛选、同一公司跨市场价差、自选股本周异动归因。
+- 新增 13 个图标导入（`AlertTriangle` / `CalendarClock` / `FilePlus2` / `Funnel` / `IdCard` / `Link2` / `MessageCircleQuestion` / `Newspaper` / `PanelsTopLeft` / `RotateCcw` / `Search` / `ShieldAlert` / `Tag`），全部来自既有 `icons` 注册表，没有引入新资产；新模板之间、以及与原有 15 个模板之间都不重复图标。
+- [i18n] zh-Hans / en 各新增 45 个 key（每个模板 Title / Description / Prompt），中英 key 集合保持一致。文案风格对齐既有模板：标题 8–12 字、描述一句话讲清交付物、Prompt 2–3 句并以「请先询问 / 请先让我提供…」收尾，保证点卡片只预填输入框、不立刻开跑。
+
+**验证**
+
+- `npx biome check --write`（3 文件）：无警告，1 处格式自动修复（导入排序）。
+- i18n + icons 单测 22 例通过。
+- `pnpm --dir apps/mobile typecheck`：仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错。
+- 模板计数 30（`RESEARCH_TEMPLATES` 内 `titleKey` 条数）。
+
+### 2026-11-09 · 功能：我的技能卡片右上角增加删除按钮
+
+**背景**
+
+「应用与能力 → 我的技能」的技能卡片此前删除入口只在详情弹层底部（红色「删除技能」），列表页操作路径过长，用户期望每张卡片右上角有直接删除入口。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx) 的 `MySkillsList`：
+  - 新增 `onRequestDelete` 回调，卡片右上角渲染 Trash2 删除按钮，点击直接复用现有 `requestDeleteMySkill` 确认流（居中二次确认弹层，标题「确定永久删除技能…」，确认后按内容指纹清掉所有 Agent 副本）。
+  - 删除按钮以绝对定位盖在卡片右上角，与卡片 Pressable 互为兄弟节点而非嵌套，遵循「禁止嵌套交互组件」约束，避免 react-native-web 冒泡问题；标题行加 `paddingRight` 防止文字与按钮重叠。
+  - 入口接线：列表调用处传入 `onRequestDelete={requestDeleteMySkill}`，详情弹层底部的删除按钮保留不变。
+
+**验证**
+
+- `npx biome check apps/mobile/src/capability-hub.tsx`：无警告。
+- `npx tsc --noEmit`：改动文件无类型错误（`bot-pages/connectors.tsx` 报错为 HEAD 既有问题，与本次无关）。
+
+### 2026-11-09 · UI：创建技能的「工作提示词」提示支持 Markdown
+
+**背景**
+
+用户要求「应用与能力 → 创建技能」表单里，「工作提示词」输入框要提示支持 Markdown 语法。该字段本来就是 Markdown 源码（右上角有「预览 / 编辑」切换，预览走 `assistantMarkdown` 渲染），但界面没有任何说明，用户容易以为只能写一段纯文本。
+
+**处理**
+
+- [skill-editor.tsx](../apps/mobile/src/skill-editor.tsx)：`InstructionsField` 在标签行与输入框之间补一行 `faint` 小字提示，编辑与预览两种状态都显示，顺带解释了右上角「预览」是干什么的。
+- [i18n] zh-Hans / en 同步新增 `agentSpace.skillInstructionsMarkdownHint`（「支持 Markdown 语法（标题、列表、表格、代码块），点「预览」查看效果。」）。
+- 没有改共用的 `Field` 组件，避免这条提示扩散到其它纯文本表单。
+
+**验证**
+
+- `npx biome check`（3 文件）：无警告。
+- i18n 单测 16 例通过（中英 key 集合一致）。
+- `pnpm --dir apps/mobile typecheck`：仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错。
+
 ### 2026-11-08 · 修复：Agent 详情「移除」只摘掉副本，不清「我的技能」
 
 **背景**

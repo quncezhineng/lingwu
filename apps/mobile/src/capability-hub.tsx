@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  Trash2,
   X,
 } from "./icons";
 import { instructionsMarkdownStyle } from "./instructions-markdown";
@@ -1020,14 +1021,18 @@ function HubTabBar<T extends string>({
  * 我的技能列表：所有 Agent 自建技能的汇总，自适应分栏网格，点击卡片查看详情。
  *
  * 技能不按 Agent 归类——同一份技能在不同 Agent 下只出现一次，
- * 因此行内不显示来源 Agent；删除入口放在详情弹层的底部，卡片保持干净。
+ * 因此行内不显示来源 Agent；删除入口在卡片右上角（Trash2），点击打开确认层，
+ * 详情弹层里也保留同一删除按钮。
  */
 function MySkillsList({
   entries,
   onSelect,
+  onRequestDelete,
 }: {
   entries: MySkillEntry[];
   onSelect: (entry: MySkillEntry) => void;
+  /** 卡片右上角删除按钮：点击后由外层打开确认层，不在卡片内直接删。 */
+  onRequestDelete?: (entry: MySkillEntry) => void;
 }) {
   const { t } = useTranslation();
   /** 用 onLayout 实测容器宽度换算卡片宽度，首帧用单列兜底，避免按窗口宽度估算造成错位。 */
@@ -1042,46 +1047,68 @@ function MySkillsList({
       style={{ flexDirection: "row", flexWrap: "wrap", gap }}
     >
       {entries.map(({ skill }) => (
-        <Pressable
-          key={skill.id}
-          accessibilityRole="button"
-          accessibilityLabel={`${t("agent.mySkills")} · ${skill.name}`}
-          onPress={() => onSelect({ skill })}
-          style={({ pressed }) => ({
-            width: itemWidth,
-            gap: 6,
-            paddingVertical: 12,
-            paddingHorizontal: 13,
-            borderRadius: radius.card,
-            borderWidth: 1,
-            borderColor: colors.line,
-            backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
-          })}
-        >
-          <Text
-            numberOfLines={1}
-            style={{
-              color: colors.text,
-              fontSize: 13,
-              lineHeight: 18,
-              fontWeight: "600",
-              fontFamily: fonts.sans,
-            }}
+        <View key={skill.id} style={{ width: itemWidth }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t("agent.mySkills")} · ${skill.name}`}
+            onPress={() => onSelect({ skill })}
+            style={({ pressed }) => ({
+              width: "100%",
+              gap: 6,
+              paddingVertical: 12,
+              paddingHorizontal: 13,
+              borderRadius: radius.card,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
+            })}
           >
-            {skill.name}
-          </Text>
-          <Text
-            numberOfLines={2}
-            style={{
-              color: colors.faint,
-              fontSize: 11,
-              lineHeight: 16,
-              fontFamily: fonts.sans,
-            }}
-          >
-            {skill.purpose}
-          </Text>
-        </Pressable>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: colors.text,
+                fontSize: 13,
+                lineHeight: 18,
+                fontWeight: "600",
+                fontFamily: fonts.sans,
+                paddingRight: 26,
+              }}
+            >
+              {skill.name}
+            </Text>
+            <Text
+              numberOfLines={2}
+              style={{
+                color: colors.faint,
+                fontSize: 11,
+                lineHeight: 16,
+                fontFamily: fonts.sans,
+              }}
+            >
+              {skill.purpose}
+            </Text>
+          </Pressable>
+          {/* 删除按钮与卡片互为兄弟节点：绝对定位盖在右上角，避免在卡片 Pressable 内嵌套交互组件。 */}
+          {onRequestDelete ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t("agent.mySkillDeleteAction")} · ${skill.name}`}
+              onPress={() => onRequestDelete({ skill })}
+              hitSlop={8}
+              style={({ pressed }) => ({
+                position: "absolute",
+                top: 5,
+                right: 5,
+                zIndex: 2,
+                padding: 6,
+                borderRadius: radius.control,
+                backgroundColor: pressed ? colors.overlay1 : "transparent",
+              })}
+            >
+              <Trash2 size={14} color={colors.faint} />
+            </Pressable>
+          ) : null}
+        </View>
       ))}
     </View>
   );
@@ -1580,7 +1607,11 @@ export function CapabilityHubScreen({
             {typeFilter === "skills" && skillTab === "mine" ? (
               <View style={{ gap: 12 }}>
                 {mySkills.length ? (
-                  <MySkillsList entries={mySkills} onSelect={setSelectedMySkill} />
+                  <MySkillsList
+                    entries={mySkills}
+                    onSelect={setSelectedMySkill}
+                    onRequestDelete={requestDeleteMySkill}
+                  />
                 ) : (
                   <View style={EMPTY_STATE_BOX}>
                     <Empty
