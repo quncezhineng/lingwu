@@ -13,7 +13,7 @@ export type Section =
   | "connections"
   | "ideas"
   | "goals"
-  | "preferences"
+  | "memories"
   | "watchlist"
   | "portfolio"
   | "notes"

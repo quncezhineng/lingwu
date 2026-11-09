@@ -5,6 +5,160 @@
 
 ## 变更记录
 
+### 2026-11-09 · 文案：移动端顶栏「我的」标题统一为「账号与数据」
+
+**背景**
+
+上一轮把全局顶栏标题（`app.titleAccount`）改为「账号与数据」，但移动端 stacked 模式下进入「我的」分区，顶栏标题仍显示「我的」。其来源是 `agent-product.tsx` 的 `sectionTitle` 三元链，account 分支复用了底部导航的 `app.navAccount`。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：`sectionTitle` 的 account 分支由 `t("app.navAccount")` 改为 `t("app.titleAccount")`，与 memories/notes 等分区使用独立 title key 的写法一致。
+- **不动** `app.navAccount`：仍服务 `shell.tsx` 底部导航标签「我的」，避免导航文案变成 5 字。
+
+**验证**
+
+- `npx biome check apps/mobile/src/agent-product.tsx`：通过。
+- `npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错）。
+
+### 2026-11-09 · 回退：称呼与投资偏好浮层的字段恢复单列
+
+**背景**
+
+同日的「称呼与投资偏好浮层的字段、底部按钮改双列」里，把「怎么称呼你」+「投资风格」并排了。用户看实际效果后认为字段不需要双列，要求改回去。
+
+**处理**
+
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：删掉两个 `Field` 外层的 `flexDirection: "row"` 容器与各自的 `flex: 1` 包裹，恢复成上下各占一行的原始写法；注释同步删除。
+- **保留底部双列按钮**（「保存偏好」/「清空偏好」+ 整行替换的确认态）：用户这次只点名字段，按钮部分上一轮已认可。
+- 快捷胶囊行本来就未改，无需回退。
+
+**验证**
+
+- `npx biome check --write apps/mobile/src/agent-sheets.tsx`：通过，无 fix。
+- `cd apps/mobile && npx tsc --noEmit`：`agent-sheets.tsx` 0 错（剩余报错仍在 `bot-pages/connectors.tsx`，HEAD 既有）。
+
+### 2026-11-09 · 样式：称呼与投资偏好浮层的字段、底部按钮改双列
+
+**背景**
+
+「账号与数据 → 称呼与投资偏好」浮层（`PreferencesSheet`）自上而下全是单列：两个短文本字段各占一行，底部「保存偏好」「清空偏好」也是各占一整行，浮层被拉得很长。用户要求改成双列。
+
+**处理**
+
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：`PreferencesSheet` 内两处调整。
+- **字段**：「怎么称呼你」+「投资风格」两个 `Field` 用 `<View style={{ flexDirection: "row", gap: 12 }}>` 各包一层 `flex: 1` 并排；沿用 `details.tsx` 邮件 CC/BCC 的既有写法，不引入新布局方式。
+- **按钮**：底部改成一个两列行 —— 左「保存偏好」（`primary`）、右「清空偏好」（outline），外层 `gap: 10` + `alignItems: "stretch"` 保证等高。
+- **清空的两步确认保留，改为整行替换**：点「清空偏好」后，确认文案显示在按钮行**上方**，整行换成「取消 / 确认清空」。
+  - 不采用「只把右列换成确认按钮」：左列会只剩保存按钮、右列被确认按钮占着，视觉上变成半列错位，且取消按钮无处可放。
+  - 也不采用「确认块另起一行」：确认文案会跑到按钮下方，读起来像按钮的脚注。整行替换后语义是「这一步只在保存 / 清空之间做选择」，且不可恢复操作固定在最右端。
+- **不动**「投资风格」下方的快捷胶囊行：它仍占满整行。放进右半列会被挤成两行、并与左侧只放一个输入框的列高对齐不良；维持在字段行下方，点选后右边那个字段会实时更新，关联可读。
+
+**验证**
+
+- `npx biome check --write apps/mobile/src/agent-sheets.tsx`：通过，无 fix。
+- `cd apps/mobile && npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 7 个 HEAD 既有报错）。
+- 行为未变：字段编辑 → 保存写 `setPreferences` 并关闭；清空仍需二次确认后才 `resetPreferences`。
+
+### 2026-11-09 · 样式：Agent 详情「保存人设」与「删除 Agent」改双列并排
+
+**背景**
+
+Agent 详情的人设页底部，两个按钮原先上下排列：主操作「保存人设」占满整行，不可恢复的「删除 Agent」另起一块放在下方，视线要往下多扫一段才找得到。用户要求改成双列并排。
+
+**处理**
+
+- [bot-pages/edit.tsx](../apps/mobile/src/bot-pages/edit.tsx)：`PersonaEditor` 新增可选参数 `secondaryAction?: ReactNode`，并加文档注释说明「不传则保存按钮独占整行」。
+- 把「保存人设」的 JSX 提成 `saveButton` 变量（内容不变），底部按是否有 `secondaryAction` 走两种布局：
+  - 有：`<View style={[s.row, { gap: 10, alignItems: "stretch" }]}>` 内两个 `<View style={{ flex: 1 }}>` 各包一个按钮 —— 等宽两列且高度对齐。
+  - 无：直接渲染 `saveButton`，保持整行。
+- `BotEditPage` 改为把「删除 Agent」作为 `secondaryAction` 传入，`current.system` 时传 `undefined`。原先包在 `<View style={{ marginTop: 12 }}>` 里的独立删除按钮已移除，该 View 只保留系统 Agent 的不可删除提示与删除确认弹窗。
+- **用外层 `<View style={{ flex: 1 }}>` 而不是给 `Button` 传 `style={{ flex: 1 }}`**：`secondaryAction` 是任意 ReactNode，只能从外部约束宽度；两侧写法统一，避免一边靠 props 一边靠容器导致行为不一致。
+- 系统默认 Agent 不可删除，因此仍走单列——不传次要操作就不会留半列空位（与「可选回调 + 条件渲染」同一思路）。
+
+**验证**
+
+- `npx biome check --write apps/mobile/src/bot-pages/edit.tsx`：通过，无 fix。
+- `cd apps/mobile && npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错）。
+- 交互未变：删除仍弹二次确认弹窗，确认后才 `deleteAgent` 并 `onDeleted()`。
+
+### 2026-11-09 · 文案：全局「账户」分区标题「我的」改为「账号与数据」
+
+**背景**
+
+用户选中全局页面顶栏的「我的」标题（衬线、15px、600），要求改为「账号与数据」。该标题由 `app.titleAccount` 渲染，出现在全局页面顶栏与详情页 header。
+
+**处理**
+
+- [i18n/locales/zh-Hans/app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts)：`app.titleAccount` 值「我的」→「账号与数据」。
+- **不动** `app.navAccount`：该 key 同时服务 `shell.tsx` 的底部导航标签「我的」，若一并改动会导致导航文案变长，与本次「改标题」意图不符。
+- 英文包 `app.titleAccount` 保持 "Account" 不变，仅改中文。
+
+**验证**
+
+- `npx biome check`（zh-Hans/app.ts、en/app.ts）：通过。
+- `npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错）。
+- i18n 单测 16 例全部通过（中英 key 集合一致、无空文案、无英文残留等）。
+
+### 2026-11-09 · 重构：记忆页 section 由 `preferences` 正名为 `memories`
+
+**背景**
+
+`preferences` 这个 section 名与「偏好」语义撞车，但它实际渲染的是 `PreferencesScreen`（记忆卡片列表）。上一轮「称呼与投资偏好」入口就是因为这个名字接错了目标；更糟的是该分区的顶栏标题还复用了 `agentSpace.preferences`（「称呼与投资偏好」），名实不符，排查时极具误导。
+
+**处理**
+
+- [packages/domain/src/index.ts](../packages/domain/src/index.ts)：`Section` 联合类型里 `"preferences"` → `"memories"`。页面 section 不做持久化也无路由库，直接改名，不留兼容别名。
+- 调用点全部跟进：`agent-product.tsx`（`sectionTitle` 改 `app.titleMemories`、`case "memories"` 渲染 `PreferencesScreen`）、`shell.tsx`（底部导航 active 判定列表）、`search-sheet.tsx`（记忆搜索结果跳转）、`workbench.tsx`（「查看记忆」入口）、`App.tsx`（`titles` 映射、Screen 分流、tab active 判定）。
+- i18n：`app.titlePreferences` / `app.subtitlePreferences` → `app.titleMemories` / `app.subtitleMemories`，中英同步。中文值本来就是「记忆」，这轮只是把 key 名纠正过来。
+- **不动** `AgentPanel` 里的 `"preferences"`：那是 `PreferencesSheet`（称呼 / 投资风格 / 投资时间 / 目标 / 关注方向）的 panel id，语义本来就对。
+- 改完后两条链路语义清晰：`navigate("memories")` → 记忆页；`onOpen("preferences")` → 称呼与投资偏好浮层。
+
+**验证**
+
+- `npx tsc --noEmit`（根层，含 `packages/domain`）：通过。
+- `pnpm --dir apps/mobile typecheck`：仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错。
+- 改名过程中 `App.tsx` 有两处漏改（`titles` 映射、Screen 分流）被 tsc 抓出，已一并修正；`grep` 复检确认剩余 `"preferences"` 全部属于 `AgentPanel`。
+- i18n / navigation / global-search / icons 共 31 例单测通过。
+
+### 2026-11-09 · 修复：「称呼与投资偏好」入口跳错页面
+
+**背景**
+
+上一条修复把「我的 → 称呼与投资偏好」接上了，但接到了 `preferences` 分区——该分区渲染的是 `PreferencesScreen`（偏好与记忆的**记忆卡片列表**），点进去看到的是记忆页，而不是称呼与投资偏好。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：`SecondarySection` 的 `case "account"` 改为 `onOpenPreferences={() => onOpen("preferences")}`，走 `AgentSheets` 的 panel 通道 → [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx) 的 `PreferencesSheet`。
+- 该表单正是用户要的内容：怎么称呼你（`agentSpace.userName`，英文 "What should Agents call you?"）、投资风格、时间偏好、投资目标、关注市场与领域，保存走 `setPreferences`，账户级共用一份。
+- 佐证：入口标题用的 `agentSpace.preferences`（「称呼与投资偏好」）与 `PreferencesSheet` 的 `title` 是同一个 key，说明本来就该指向这个浮层。
+
+**验证**
+
+- `npx biome check --write`（agent-product.tsx）：无警告，1 处格式修复。
+- `pnpm --dir apps/mobile typecheck`：仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错。
+
+### 2026-11-09 · 修复：「我的」页面丢失「称呼与投资偏好」入口
+
+**背景**
+
+用户反馈个人信息页（「我的」）底部的「称呼与投资偏好」入口不见了。
+
+**原因**
+
+该入口在 [account.tsx](../apps/mobile/src/account.tsx) 里是条件渲染：`{onOpenPreferences && (<Card><LinkRow … /></Card>)}`。整页版由 [agent-product.tsx](../apps/mobile/src/agent-product.tsx) 的 `SecondarySection` 渲染，那里只传了 `onSignOut`、**漏传 `onOpenPreferences`**，整块因此被跳过。浮层版 [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx) 传了 `onPanel("preferences")`，所以浮层里还能看到，只有整页版消失。
+
+**处理**
+
+- `SecondarySection` 从 `useWorkspace()` 多取一个 `navigate`，`case "account"` 改为 `onOpenPreferences={() => navigate("preferences")}`。
+- 跳转目标是同一个 shell 里的 `preferences` 分区（`case "preferences"` 渲染 `PreferencesScreen`），点进去就是「称呼 + 投资偏好」的完整表单，桌面三栏与移动端单栏共用同一条链路。
+- 同时给 `case "account"` 补了注释，说明这个入口是条件渲染，漏传 prop 会整块消失。
+
+**验证**
+
+- `npx biome check --write`（agent-product.tsx）：无警告。
+- `pnpm --dir apps/mobile typecheck`：仅 `bot-pages/connectors.tsx` 的 7 个 HEAD 既有报错。
+
 ### 2026-11-09 · UI：自选列表「名称/代码」列宽收敛
 
 **背景**

@@ -184,8 +184,8 @@ const app = {
   "app.titleGoals": "Scheduled",
   "app.subtitleGoals":
     "Manage research goals and conditional reminders so LingWu can keep tracking progress.",
-  "app.titlePreferences": "Memory",
-  "app.subtitlePreferences":
+  "app.titleMemories": "Memory",
+  "app.subtitleMemories":
     "Keep your goals, risk preferences and focus areas as durable context for LingWu.",
   "app.titleApps": "Apps & capabilities",
   "app.subtitleApps":

@@ -1112,9 +1112,9 @@ function AgentHeader({
     section === "agent"
       ? t("agentSpace.agentDetails")
       : section === "account"
-        ? t("app.navAccount")
-        : section === "preferences"
-          ? t("agentSpace.preferences")
+        ? t("app.titleAccount")
+        : section === "memories"
+          ? t("app.titleMemories")
           : section === "files"
             ? t("app.navFiles")
             : section === "notes"
@@ -1192,8 +1192,12 @@ function SecondarySection({
   const content = (() => {
     switch (section) {
       case "account":
-        return <AccountScreen onSignOut={onSignOut} />;
-      case "preferences":
+        // 「称呼与投资偏好」= PreferencesSheet（称呼 / 投资风格 / 投资时间 / 关注方向），
+        // 不是 memories 分区的记忆页；入口挂在 onOpenPreferences 上，不传整块不渲染。
+        return (
+          <AccountScreen onSignOut={onSignOut} onOpenPreferences={() => onOpen("preferences")} />
+        );
+      case "memories":
         return <PreferencesScreen />;
       case "watchlist":
       case "portfolio":

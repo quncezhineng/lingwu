@@ -533,47 +533,62 @@ function PreferencesSheet({ onClose }: { onClose: () => void }) {
         placeholder={t("agentSpace.followingPlaceholder")}
         maxLength={600}
       />
-      <Button
-        primary
-        onPress={() => {
-          setPreferences({
-            name: name.trim(),
-            risk,
-            horizon,
-            goal,
-            ...parsePreferenceFocus(following),
-          });
-          onClose();
-        }}
-      >
-        {t("agentSpace.savePreferences")}
-      </Button>
-      {confirmingClear ? (
-        <>
-          <Text style={[s.small, { textAlign: "center", marginTop: 14 }]}>
-            {t("agentSpace.clearPreferencesConfirm")}
-          </Text>
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-            <Button
-              danger
-              style={{ flex: 1 }}
-              onPress={() => {
-                resetPreferences();
-                onClose();
-              }}
-            >
-              {t("agentSpace.clearPreferencesAction")}
-            </Button>
-            <Button style={{ flex: 1 }} onPress={() => setConfirmingClear(false)}>
-              {t("common.cancel")}
-            </Button>
-          </View>
-        </>
-      ) : (
-        <Button style={{ marginTop: 8 }} onPress={() => setConfirmingClear(true)}>
-          {t("agentSpace.clearPreferences")}
-        </Button>
+      {confirmingClear && (
+        <Text style={[s.small, { textAlign: "center", marginBottom: 8 }]}>
+          {t("agentSpace.clearPreferencesConfirm")}
+        </Text>
       )}
+      {/*
+        底部双列：左「保存偏好」、右「清空偏好」。
+        进入确认态时整行换成「取消 / 确认清空」—— 只在右列做替换会留下半列空位，
+        放到下面另起一行又会把确认文案挤到按钮之外；整行替换既保持等宽，
+        也把不可恢复的操作固定在最右端。
+      */}
+      <View style={[s.row, { gap: 10, alignItems: "stretch" }]}>
+        {confirmingClear ? (
+          <>
+            <View style={{ flex: 1 }}>
+              <Button onPress={() => setConfirmingClear(false)}>{t("common.cancel")}</Button>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                danger
+                onPress={() => {
+                  resetPreferences();
+                  onClose();
+                }}
+              >
+                {t("agentSpace.clearPreferencesAction")}
+              </Button>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={{ flex: 1 }}>
+              <Button
+                primary
+                onPress={() => {
+                  setPreferences({
+                    name: name.trim(),
+                    risk,
+                    horizon,
+                    goal,
+                    ...parsePreferenceFocus(following),
+                  });
+                  onClose();
+                }}
+              >
+                {t("agentSpace.savePreferences")}
+              </Button>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button onPress={() => setConfirmingClear(true)}>
+                {t("agentSpace.clearPreferences")}
+              </Button>
+            </View>
+          </>
+        )}
+      </View>
     </Sheet>
   );
 }
