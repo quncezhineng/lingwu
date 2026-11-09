@@ -8,6 +8,7 @@ import {
   type AgentNotification,
   type AgentTask,
   type AgentWorkspace,
+  artifactChatBrief,
   createTaskSchema,
   type DealHabits,
   defaultAgentName,
@@ -31,7 +32,7 @@ import type {
 import { resolveMonitorCurrency } from "../../../../packages/domain/src/monitor-currency.ts";
 import { MarketDataService } from "../../../../packages/integrations/src/market-data.ts";
 import type { ActionService } from "../actions.ts";
-import { agentIdForThread, type PersistedAgentSpace } from "../agent-space.ts";
+import { agentIdForThread, agentModelForThread, type PersistedAgentSpace } from "../agent-space.ts";
 import type { BrowserService } from "../browser.ts";
 import { ComputerService } from "../computer.ts";
 import type { Config } from "../config.ts";
@@ -60,6 +61,7 @@ import {
 } from "./page-diff.ts";
 import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
+import { summarizeReport } from "./report-brief.ts";
 import { generateResearchReport, researchSymbolSchema } from "./research.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
@@ -121,6 +123,7 @@ export class AgentService {
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
   private maintenance?: ReturnType<typeof setInterval>;
   private refreshing = false;
+  private readonly briefInflight = new Map<string, Promise<AgentArtifact>>();
   constructor(
     readonly db: Store,
     readonly config: Config,
@@ -1224,6 +1227,47 @@ export class AgentService {
     };
     await this.db.put(owner, "agent-artifacts", value);
     return value;
+  }
+  /** 用当前模型为报告写一段对话摘要，并写回产物。已有摘要时直接返回。 */
+  async ensureChatBrief(owner: string, artifactId: string): Promise<AgentArtifact> {
+    const key = `${owner}:${artifactId}`;
+    const pending = this.briefInflight.get(key);
+    if (pending) return pending;
+    const run = this.writeChatBrief(owner, artifactId).finally(() => {
+      this.briefInflight.delete(key);
+    });
+    this.briefInflight.set(key, run);
+    return run;
+  }
+  /** 测试可替换，避免摘要测试打到真实模型。 */
+  summarizeForChat = summarizeReport;
+  private async writeChatBrief(owner: string, artifactId: string): Promise<AgentArtifact> {
+    const current = await this.db.get<AgentArtifact>(owner, "agent-artifacts", artifactId);
+    if (!current) throw new AppError("Report not found", 404);
+    if (current.kind !== "report" && current.kind !== "research_report")
+      throw new AppError("Only a finished report can be summarized", 422);
+    if (artifactChatBrief(current.data)) return current;
+    const task = await this.db.get<AgentTask>(owner, "tasks", current.taskId);
+    const model = await this.workspace.models.resolve(
+      owner,
+      await agentModelForThread(this.db, owner, task?.threadId),
+    );
+    if (!model.configured || !model.model)
+      throw new AppError("Configure a model before summarizing a report", 503);
+    const brief = await this.summarizeForChat({
+      model: model.model,
+      connection: model.connection,
+      title: current.title,
+      body: current.summary,
+      signal: AbortSignal.timeout(45_000),
+    });
+    const saved = await this.db.get<AgentArtifact>(owner, "agent-artifacts", artifactId);
+    const next: AgentArtifact = {
+      ...(saved ?? current),
+      data: { ...(saved ?? current).data, chatBrief: brief },
+    };
+    await this.db.put(owner, "agent-artifacts", next);
+    return next;
   }
   async prepare(
     owner: string,

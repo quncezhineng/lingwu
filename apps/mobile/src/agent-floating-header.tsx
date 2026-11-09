@@ -1,11 +1,14 @@
+import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import type { AgentAvatarId } from "./agent-space-model";
+import { AgentWorkDialog, type WorkAnchor } from "./agent-work-dialog";
 import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
-import { Menu, MoreHorizontal } from "./icons";
+import { ChevronRight, Menu, MoreHorizontal } from "./icons";
 import { colors, radius, shadow } from "./theme";
+import { HoverPressable } from "./ui";
 
 const top = 12;
 const height = 44;
@@ -29,7 +32,6 @@ export function AgentFloatingHeader({
   avatar,
   persistentNavigation,
   onMenu,
-  onManage,
   onMore,
 }: {
   name: string;
@@ -37,11 +39,18 @@ export function AgentFloatingHeader({
   avatar: AgentAvatarId;
   persistentNavigation: boolean;
   onMenu: () => void;
-  onManage: () => void;
   onMore: () => void;
 }) {
   const { t } = useTranslation();
   const label = role ? `${name} · ${role}` : name;
+  const trigger = useRef<View>(null);
+  const [hovered, setHovered] = useState(false);
+  const [anchor, setAnchor] = useState<WorkAnchor | null>(null);
+  const openWork = () => {
+    trigger.current?.measureInWindow((x, y, width, height) => {
+      setAnchor({ x, y, width, height });
+    });
+  };
   return (
     <View
       testID="agent-floating-header"
@@ -82,41 +91,47 @@ export function AgentFloatingHeader({
           )}
         </View>
         <View pointerEvents="box-none" style={{ flex: 1, minWidth: 0, alignItems: "center" }}>
-          <Pressable
-            testID="agent-management-capsule"
-            accessibilityRole="button"
-            accessibilityLabel={`${label}，${t("agentSpace.agentDetails")}`}
-            onPress={onManage}
-            style={({ pressed }) => ({
-              maxWidth: "100%",
-              minHeight: 38,
-              paddingLeft: 6,
-              paddingRight: 14,
-              paddingVertical: 4,
-              borderRadius: radius.full,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              borderWidth: 1,
-              borderColor: colors.lineSoft,
-              backgroundColor: pressed ? colors.surface : colors.paper,
-              ...shadow.card,
-            })}
-          >
-            <AgentOrb avatar={avatar} size={28} />
-            <Text
-              numberOfLines={1}
-              style={{
-                flexShrink: 1,
-                fontSize: 13,
-                lineHeight: 20,
-                fontWeight: "500",
-                color: colors.text,
-              }}
+          <View ref={trigger} collapsable={false}>
+            <HoverPressable
+              testID="agent-management-capsule"
+              accessibilityRole="button"
+              accessibilityLabel={`${label}，${t("agentSpace.delegatedWork")}`}
+              onPress={openWork}
+              onHoverIn={() => setHovered(true)}
+              onHoverOut={() => setHovered(false)}
+              style={({ pressed }) => ({
+                maxWidth: "100%",
+                minHeight: 38,
+                paddingLeft: 6,
+                paddingRight: hovered ? 10 : 14,
+                paddingVertical: 4,
+                borderRadius: radius.full,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                borderWidth: 1,
+                borderColor: colors.lineSoft,
+                backgroundColor: pressed ? colors.surface : colors.paper,
+                ...shadow.card,
+              })}
             >
-              {label}
-            </Text>
-          </Pressable>
+              <AgentOrb avatar={avatar} size={28} />
+              <Text
+                numberOfLines={1}
+                style={{
+                  flexShrink: 1,
+                  fontSize: 13,
+                  lineHeight: 20,
+                  fontWeight: "500",
+                  color: colors.text,
+                }}
+              >
+                {label}
+              </Text>
+              {hovered && <ChevronRight size={16} color={colors.muted} />}
+            </HoverPressable>
+          </View>
+          {anchor && <AgentWorkDialog anchor={anchor} onClose={() => setAnchor(null)} />}
         </View>
         <View pointerEvents="box-none" style={{ width: control, alignItems: "flex-end" }}>
           {!persistentNavigation && (

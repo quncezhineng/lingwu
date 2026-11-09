@@ -49,6 +49,11 @@ const chat = {
   "chat.streamIntegrityWarning":
     "The saved reply differed from the live text. Showing the saved version.",
   "chat.latestMessages": "Latest messages",
+  "chat.queuedBrief": "Queued",
+  "chat.taskDispatched": "Task dispatched",
+  "chat.summarizingReport": "Summarizing the report…",
+  "chat.summaryUnavailable": "The summary could not be written.",
+  "chat.retrySummary": "Try the summary again",
   "chat.localChatName": "Current chat",
   "chat.statusReady": "Connected and ready",
   "chat.openAttachment": "Open attachment: {name}",

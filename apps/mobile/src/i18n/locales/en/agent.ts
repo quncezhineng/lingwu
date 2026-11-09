@@ -831,6 +831,8 @@ const agent = {
     "Enter instructions to preview how the Markdown will render.",
   "agentSpace.saveInstructions": "Save instructions",
   "agentSpace.analysisHistory": "Tasks",
+  "agentSpace.delegatedWork": "Delegated work",
+  "agentSpace.delegatedWorkHint": "Tasks this Agent handed off, newest first.",
   "agentSpace.savePersona": "Save persona",
   "agentSpace.agentName": "Agent name",
   "agentSpace.agentRole": "Its responsibility",

@@ -42,6 +42,9 @@ const goalPatchSchema = z.object({
 export function agentRoutes(service: AgentService): Hono<{ Variables: { owner: string } }> {
   const app = new Hono<{ Variables: { owner: string } }>();
   app.get("/", async (c) => c.json(await service.snapshot(c.get("owner"))));
+  app.post("/artifacts/:id/brief", async (c) =>
+    c.json(await service.ensureChatBrief(c.get("owner"), c.req.param("id"))),
+  );
   app.post("/tasks", async (c) => {
     const { requestId, ...input } = createTaskSchema
       .extend({ requestId: z.string().min(1).max(200).optional() })

@@ -747,6 +747,8 @@ const agent = {
   "agentSpace.instructionsPreviewEmpty": "输入指令后，可在这里查看 Markdown 渲染效果。",
   "agentSpace.saveInstructions": "保存指令",
   "agentSpace.analysisHistory": "任务",
+  "agentSpace.delegatedWork": "委派与任务",
+  "agentSpace.delegatedWorkHint": "这个 Agent 交办的任务，最新的排在上面。",
   "agentSpace.savePersona": "保存人设",
   "agentSpace.agentName": "Agent 名字",
   "agentSpace.agentRole": "它的职责",

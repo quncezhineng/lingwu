@@ -330,6 +330,31 @@ export function tanstackAgent(options: {
   return agent;
 }
 
+/** 单轮文本补全，不注册工具，也不进入对话线程。 */
+export async function completeText(options: {
+  model: string;
+  connection?: ModelConnection;
+  system: string;
+  prompt: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const abortController = new AbortController();
+  const onAbort = () => abortController.abort();
+  options.signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const text = await chat({
+      adapter: adapter(options.model, options.connection),
+      systemPrompts: [options.system],
+      messages: [{ role: "user", content: options.prompt }],
+      stream: false,
+      abortController,
+    });
+    return typeof text === "string" ? text.trim() : "";
+  } finally {
+    options.signal?.removeEventListener("abort", onAbort);
+  }
+}
+
 /**
  * A tool can return TanStack content parts, e.g. text plus a screenshot. Inside the run
  * the adapters send them to the model as multimodal tool results. The AG-UI result event

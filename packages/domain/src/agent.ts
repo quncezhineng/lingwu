@@ -183,9 +183,16 @@ export interface AgentArtifact {
   taskId: string;
   kind: "plan" | "comparison" | "finance" | "report" | "market_briefing" | "research_report";
   title: string;
+  /** 报告全文。对话里的短摘要在 data.chatBrief，不从这里截取。 */
   summary: string;
   data: Record<string, unknown>;
   createdAt: string;
+}
+
+/** 模型为对话写的短摘要。没有这份字段时，界面应去请求生成，而不是截取 summary。 */
+export function artifactChatBrief(data: Record<string, unknown> | undefined): string {
+  const value = data?.chatBrief;
+  return typeof value === "string" ? value.trim() : "";
 }
 export interface AgentNotification {
   id: string;

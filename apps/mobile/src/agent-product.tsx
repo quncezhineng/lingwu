@@ -695,6 +695,39 @@ function AgentRail({
             </Text>
           </View>
         </Pressable>
+        <HoverPressable
+          accessibilityRole="button"
+          accessibilityLabel={t("app.notificationsLabel", { count: unreadNotifications })}
+          onPress={() => {
+            onClose?.();
+            open({ type: "notifications" });
+          }}
+          style={({ pressed, hovered }) => ({
+            width: 34,
+            height: 34,
+            borderRadius: radius.control,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: pressed ? colors.overlay3 : hovered ? colors.overlay2 : "transparent",
+          })}
+        >
+          <View>
+            <Bell size={16} strokeWidth={1.7} color={colors.muted} />
+            {unreadNotifications > 0 && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: -2,
+                  right: -2,
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: colors.primary,
+                }}
+              />
+            )}
+          </View>
+        </HoverPressable>
         <IconButton
           icon={Search}
           label={t("search.title")}
@@ -806,39 +839,6 @@ function AgentRail({
             <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
               {t("agentSpace.account")}
             </Text>
-          </View>
-        </HoverPressable>
-        <HoverPressable
-          accessibilityRole="button"
-          accessibilityLabel={t("app.notificationsLabel", { count: unreadNotifications })}
-          onPress={() => {
-            onClose?.();
-            open({ type: "notifications" });
-          }}
-          style={({ pressed, hovered }) => ({
-            width: 36,
-            height: 36,
-            borderRadius: radius.control,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: pressed ? colors.overlay3 : hovered ? colors.overlay2 : "transparent",
-          })}
-        >
-          <View>
-            <Bell size={17} strokeWidth={1.7} color={colors.muted} />
-            {unreadNotifications > 0 && (
-              <View
-                style={{
-                  position: "absolute",
-                  top: -3,
-                  right: -3,
-                  width: 7,
-                  height: 7,
-                  borderRadius: 4,
-                  backgroundColor: colors.primary,
-                }}
-              />
-            )}
           </View>
         </HoverPressable>
         <HoverPressable
@@ -1081,12 +1081,10 @@ function CapabilityRail({
 
 function AgentHeader({
   onMenu,
-  onManage,
   onMore,
   persistentNavigation = false,
 }: {
   onMenu: () => void;
-  onManage: () => void;
   onMore: () => void;
   persistentNavigation?: boolean;
 }) {
@@ -1104,7 +1102,6 @@ function AgentHeader({
         avatar={current.avatar}
         persistentNavigation={persistentNavigation}
         onMenu={onMenu}
-        onManage={onManage}
         onMore={onMore}
       />
     );
@@ -1541,7 +1538,6 @@ export function AgentProductShell({
           <View testID="agent-main-column" style={{ flex: 1, minWidth: 0, position: "relative" }}>
             <AgentHeader
               onMenu={() => setDrawer("agents")}
-              onManage={() => navigate("agent")}
               onMore={() => setDrawer("capabilities")}
               persistentNavigation={threeColumns}
             />

@@ -22,7 +22,7 @@ import {
 } from "react-native";
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import { z } from "zod";
-import type { ActionProposal, Artifact } from "../../../packages/domain/src";
+import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
@@ -32,10 +32,8 @@ import type { AgentAvatarId, AgentCommunication, AgentTone } from "./agent-space
 import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text, type TextInput } from "./app-text";
-import { ApprovalCard } from "./approval-card";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
-import { BackgroundUpdates } from "./background-updates";
 import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
 import {
   type ComposerSelection,
@@ -93,9 +91,12 @@ import { MailToolCard } from "./mail-tool-card";
 import { MemoryRecallCard } from "./memory-recall-card";
 import { ModalBackdrop } from "./modal-overlay";
 import { PromptComposer } from "./prompt-composer";
-import { QuestionCard, taskHasQuestion } from "./question-card";
+import { taskHasQuestion } from "./question-card";
+import { briefsForTasks, publishQueuedBriefs, queuedBrief } from "./queued-brief";
+import { QueuedBriefCard } from "./queued-brief-card";
 import { QuoteToolCard } from "./quote-tool-card";
 import { ReminderToolCard } from "./reminder-tool-card";
+import { ReportBriefCard } from "./report-brief-card";
 import { SearchToolCard } from "./search-tool-card";
 import { serverToolOutcome } from "./task-presentation";
 import { breakpoints, typography } from "./theme";
@@ -183,36 +184,6 @@ const serverToolNameKeys: Record<string, TranslationKey> = {
   Tracking: "chat.serverToolTracking",
   Memory: "chat.serverToolMemory",
 };
-
-type ThreadApproval = { action: ActionProposal; task: AgentTask };
-
-/** Reads the task created by a delegate_task tool call so its approvals can sit in the same turn. */
-function delegatedTaskIds(message: Message, messages: readonly Message[]): Set<string> {
-  const ids = new Set<string>();
-  for (const call of readableToolCalls(message)) {
-    if (call.function.name !== "delegate_task") continue;
-    const toolMessage = messages.find(
-      (candidate): candidate is ToolMessage =>
-        candidate.role === "tool" && candidate.toolCallId === call.id,
-    );
-    if (!toolMessage) continue;
-    let value: unknown = toolMessage.content;
-    if (typeof value === "string") {
-      try {
-        value = JSON.parse(value);
-      } catch {
-        continue;
-      }
-    }
-    if (!value || typeof value !== "object") continue;
-    const record = value as Record<string, unknown>;
-    for (const key of ["id", "taskId"]) {
-      const id = record[key];
-      if (typeof id === "string" && id) ids.add(id);
-    }
-  }
-  return ids;
-}
 
 export function WorkspaceTools() {
   const { workspace, section } = useWorkspace();
@@ -401,6 +372,95 @@ function parseTaskResult(result: unknown, tasks?: AgentTask[]): AgentTask | unde
     .safeParse(value);
   if (!parsed.success) return undefined;
   return tasks?.find((task) => task.id === parsed.data.id || task.id === parsed.data.taskId);
+}
+
+const HANDOFF_TOOLS = new Set(["delegate_task", "research_stock"]);
+
+function toolResultTaskId(result: unknown): string | undefined {
+  let value = result;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!value || typeof value !== "object") return undefined;
+  const parsed = z
+    .object({ id: z.string().optional(), taskId: z.string().optional() })
+    .safeParse(value);
+  if (!parsed.success) return undefined;
+  return parsed.data.id || parsed.data.taskId;
+}
+
+function handoffTaskIds(message: Message, messages: readonly Message[]): string[] {
+  const ids: string[] = [];
+  for (const call of readableToolCalls(message)) {
+    if (!HANDOFF_TOOLS.has(call.function.name)) continue;
+    const toolMessage = messages.find(
+      (candidate): candidate is ToolMessage =>
+        candidate.role === "tool" && candidate.toolCallId === call.id,
+    );
+    const id = toolResultTaskId(toolMessage?.content);
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+type ReportDelivery = { taskId: string; artifacts: AgentArtifact[] };
+
+/** 把已完成报告挂到创建它的那一轮最后一句下面，而不是挂回委派工具那一条。 */
+function reportDeliveries(
+  messages: readonly Message[],
+  textOf: (message: Message) => string,
+  artifacts: readonly AgentArtifact[],
+): Map<string, ReportDelivery[]> {
+  const byMessage = new Map<string, ReportDelivery[]>();
+  const used = new Set<string>();
+  let anchor: string | null = null;
+  let pending: string[] = [];
+  const flush = () => {
+    if (!anchor || pending.length === 0) {
+      pending = [];
+      anchor = null;
+      return;
+    }
+    const deliveries: ReportDelivery[] = [];
+    for (const taskId of pending) {
+      const reports = artifacts
+        .filter(
+          (artifact) =>
+            artifact.taskId === taskId &&
+            (artifact.kind === "report" || artifact.kind === "research_report"),
+        )
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+      const latest = reports.at(-1);
+      if (!latest) continue;
+      deliveries.push({
+        taskId,
+        artifacts: [latest],
+      });
+    }
+    if (deliveries.length) byMessage.set(anchor, deliveries);
+    pending = [];
+    anchor = null;
+  };
+  for (const message of messages) {
+    if (message.role === "user") {
+      flush();
+      continue;
+    }
+    if (message.role !== "assistant") continue;
+    if (textOf(message).trim()) anchor = message.id;
+    else if (!anchor) anchor = message.id;
+    for (const taskId of handoffTaskIds(message, messages)) {
+      if (used.has(taskId)) continue;
+      used.add(taskId);
+      pending.push(taskId);
+    }
+  }
+  flush();
+  return byMessage;
 }
 
 function ServerToolCard({
@@ -1052,20 +1112,11 @@ export function ChatScreen({
     setAttachments([]);
     setPicking(false);
   }
-  const decideAction = useCallback(
-    async (action: ActionProposal, decision: "approve" | "deny") => {
-      const result = await api.request<ActionProposal>(`/api/actions/${action.id}/decide`, {
-        decision,
-        hash: action.hash,
-      });
-      // The decision itself is complete once the API returns. Refresh both snapshots so the
-      // task and other screens follow, without turning a secondary read failure into a retry.
-      await Promise.all([refresh().catch(() => {}), refreshAgent().catch(() => {})]);
-      return result;
-    },
-    [api, refresh, refreshAgent],
-  );
   const messages = loaded ? visibleHistoryWindow(agent.messages || [], firstHistoryId) : [];
+  useEffect(() => {
+    publishQueuedBriefs(briefsForTasks(agent.messages || []));
+    return () => publishQueuedBriefs(new Map());
+  }, [agent.messages]);
   const latestPanelId = latestJevPanelId(messages, threadId);
   const latestUserIndex = messages.reduce(
     (last, message, index) => (message.role === "user" ? index : last),
@@ -1084,39 +1135,10 @@ export function ChatScreen({
     .join("|");
   // Workspace actions are not polled. Refresh them when a thread task gains an action or
   // changes approval status, so the card appears and advances without leaving the chat.
+  // 审批不在对话里展示，但任务获得审批时仍要刷新，对话框里才能看到最新状态。
   useEffect(() => {
     if (approvalTaskSignal) void refresh().catch(() => {});
   }, [approvalTaskSignal, refresh]);
-  const threadApprovals: ThreadApproval[] = w.actions
-    .flatMap((action) => {
-      const task = threadTasks.find(
-        (candidate) => candidate.id === action.taskId || candidate.actionId === action.id,
-      );
-      return task ? [{ action, task }] : [];
-    })
-    .sort((left, right) => left.action.createdAt.localeCompare(right.action.createdAt));
-  // Put a review under the delegate_task turn that created it. If replay data is incomplete,
-  // the remaining reviews still appear as standalone timeline events at the end.
-  const approvalsByMessage = new Map<string, ThreadApproval[]>();
-  const placedApprovalIds = new Set<string>();
-  for (const message of visible) {
-    const taskIds = delegatedTaskIds(message, messages);
-    if (!taskIds.size) continue;
-    const matches = threadApprovals.filter(
-      (entry) => !placedApprovalIds.has(entry.action.id) && taskIds.has(entry.task.id),
-    );
-    if (!matches.length) continue;
-    approvalsByMessage.set(message.id, matches);
-    for (const entry of matches) placedApprovalIds.add(entry.action.id);
-  }
-  const unplacedApprovals = threadApprovals.filter(
-    (entry) => !placedApprovalIds.has(entry.action.id),
-  );
-  const embeddedTaskIds = new Set<string>();
-  for (const message of visible) {
-    for (const taskId of delegatedTaskIds(message, messages)) embeddedTaskIds.add(taskId);
-  }
-  const unplacedTasks = threadTasks.filter((task) => !embeddedTaskIds.has(task.id));
   const integrity = verifyDrafts(stream.state.drafts, messages);
   const mismatchedDraftIds = new Set(integrity.mismatched.map((item) => item.id));
   const matchedByTextDraftIds = new Set(integrity.matchedByText.map((item) => item.id));
@@ -1140,6 +1162,7 @@ export function ChatScreen({
     if (!live || mismatchedDraftIds.has(live.id)) return content;
     return live.text.length > content.length ? live.text : content;
   };
+  const deliveries = reportDeliveries(messages, messageText, agentWorkspace?.artifacts ?? []);
   const latestDesktop = messages
     .flatMap((m) => readableToolCalls(m))
     .filter((call) => call.function.name === "use_desktop")
@@ -1502,8 +1525,19 @@ export function ChatScreen({
               const attachments = parsedUser?.attachments ?? [];
               const draft = user ? undefined : stream.state.drafts[message.id];
               const streaming = !!draft && !draft.done;
-              const toolCalls = readableToolCalls(message);
-              const approvals = approvalsByMessage.get(message.id) || [];
+              const toolCalls = readableToolCalls(message).filter(
+                (call) => call.function.name !== "delegate_task",
+              );
+              const reports = deliveries.get(message.id) ?? [];
+              const brief = !user && !streaming ? queuedBrief(text) : null;
+              // 委派条和任务卡不占对话位置；报告完成后，摘要和报告卡留在这一轮下面。
+              if (
+                !text &&
+                attachments.length === 0 &&
+                toolCalls.length === 0 &&
+                reports.length === 0
+              )
+                return null;
               return (
                 <View
                   key={message.id}
@@ -1558,35 +1592,44 @@ export function ChatScreen({
                       })}
                     </View>
                   )}
-                  {!!text && (
-                    <View
-                      style={{
-                        paddingHorizontal: 14,
-                        paddingVertical: 11,
-                        borderRadius: radius.card,
-                        borderWidth: user ? 0 : 1,
-                        borderColor: colors.line,
-                        backgroundColor: user ? colors.primary : colors.paper,
-                      }}
-                    >
-                      {user ? (
-                        <Markdown
-                          markdownit={assistantMarkdown}
-                          style={userMarkdownStyle}
-                          rules={userMarkdownRules}
-                          onLinkPress={openSafeLink}
-                        >
-                          {text}
-                        </Markdown>
-                      ) : (
-                        <AssistantResponse
-                          content={text}
-                          streaming={streaming}
-                          files={w.files}
-                          onOpenFile={(file) => open({ type: "file", file })}
-                        />
-                      )}
-                    </View>
+                  {brief ? (
+                    <QueuedBriefCard
+                      headline={t("chat.taskDispatched")}
+                      body={brief.body}
+                      files={w.files}
+                      onOpenFile={(file) => open({ type: "file", file })}
+                    />
+                  ) : (
+                    !!text && (
+                      <View
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 11,
+                          borderRadius: radius.card,
+                          borderWidth: user ? 0 : 1,
+                          borderColor: colors.line,
+                          backgroundColor: user ? colors.primary : colors.paper,
+                        }}
+                      >
+                        {user ? (
+                          <Markdown
+                            markdownit={assistantMarkdown}
+                            style={userMarkdownStyle}
+                            rules={userMarkdownRules}
+                            onLinkPress={openSafeLink}
+                          >
+                            {text}
+                          </Markdown>
+                        ) : (
+                          <AssistantResponse
+                            content={text}
+                            streaming={streaming}
+                            files={w.files}
+                            onOpenFile={(file) => open({ type: "file", file })}
+                          />
+                        )}
+                      </View>
+                    )
                   )}
                   <JevInteractionContext.Provider
                     value={{
@@ -1642,17 +1685,15 @@ export function ChatScreen({
                       })}
                     </BrowserRunContext>
                   </JevInteractionContext.Provider>
-                  {approvals.map(({ action, task }) => (
-                    <ApprovalCard
-                      key={action.id}
-                      action={action}
-                      task={task}
-                      agentName={agentWorkspace?.identity.name}
-                      agentNameCustomized={agentWorkspace?.identity.nameCustomized}
-                      files={w.files}
-                      onDecide={decideAction}
-                      onOpenDetails={(item) => open({ type: "review", action: item })}
-                    />
+                  {reports.map((delivery) => (
+                    <View key={delivery.taskId} style={{ width: "100%", gap: 8 }}>
+                      {delivery.artifacts[0] && (
+                        <ReportBriefCard artifact={delivery.artifacts[0]} />
+                      )}
+                      {delivery.artifacts.map((artifact) => (
+                        <ArtifactCard key={artifact.id} artifact={artifact} />
+                      ))}
+                    </View>
                   ))}
                 </View>
               );
@@ -1679,26 +1720,6 @@ export function ChatScreen({
                 />
               </View>
             </View>
-          ))}
-          {unplacedApprovals.map(({ action, task }) => (
-            <ApprovalCard
-              key={action.id}
-              action={action}
-              task={task}
-              agentName={agentWorkspace?.identity.name}
-              agentNameCustomized={agentWorkspace?.identity.nameCustomized}
-              files={w.files}
-              onDecide={decideAction}
-              onOpenDetails={(item) => open({ type: "review", action: item })}
-            />
-          ))}
-          {unplacedTasks.map((task) => (
-            <QuestionCard
-              key={`question-${task.id}`}
-              task={task}
-              agentName={agentWorkspace?.identity.name}
-              agentNameCustomized={agentWorkspace?.identity.nameCustomized}
-            />
           ))}
           {!!latestDesktop && (
             <DesktopToolCard
@@ -1768,7 +1789,6 @@ export function ChatScreen({
               )}
             </>
           )}
-          {(!richThreads || selection.id === mainId) && <BackgroundUpdates />}
           {stream.state.phase === "reconnecting" && (
             <Text accessibilityLiveRegion="polite" style={[s.small, { alignSelf: "flex-start" }]}>
               {t("chat.reconnectingLiveReply")}

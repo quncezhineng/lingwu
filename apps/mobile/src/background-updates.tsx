@@ -15,7 +15,7 @@ export function BackgroundUpdates() {
   const update = updates[0];
   if (!update || data?.identity.showChatUpdates === false) return null;
   return (
-    <Card style={{ padding: 16, gap: 10 }}>
+    <Card style={{ padding: 16, gap: 10, marginBottom: 16 }}>
       <View style={[s.between, { gap: 12 }]}>
         <View style={[s.row, { gap: 7 }]}>
           <Bell size={14} color={colors.primary} />
