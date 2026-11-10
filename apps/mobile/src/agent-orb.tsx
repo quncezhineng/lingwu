@@ -16,7 +16,6 @@ export function AgentOrb({ avatar = "orb", size = 32 }: { avatar?: AgentAvatarId
   if (avatar === "orb") {
     return (
       <View
-        accessible={false}
         style={{
           width: size,
           height: size,
@@ -56,7 +55,6 @@ export function AgentOrb({ avatar = "orb", size = 32 }: { avatar?: AgentAvatarId
   }
   return (
     <View
-      accessible={false}
       style={{
         width: size,
         height: size,

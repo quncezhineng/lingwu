@@ -474,6 +474,31 @@ export const PROJECT_ICONS: Record<string, IconDefinition> = {
       { tag: "path", d: "M12 19h8" },
     ],
   },
+  copy: {
+    source: "project",
+    elements: [
+      { tag: "rect", x: 8, y: 8, width: 14, height: 14, rx: 2 },
+      { tag: "path", d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" },
+    ],
+  },
+  "share-2": {
+    source: "project",
+    elements: [
+      { tag: "circle", cx: 18, cy: 5, r: 3 },
+      { tag: "circle", cx: 6, cy: 12, r: 3 },
+      { tag: "circle", cx: 18, cy: 19, r: 3 },
+      { tag: "path", d: "m8.59 13.51 6.83 3.98" },
+      { tag: "path", d: "m15.41 6.51-6.82 3.98" },
+    ],
+  },
+  image: {
+    source: "project",
+    elements: [
+      { tag: "rect", x: 3, y: 3, width: 18, height: 18, rx: 2 },
+      { tag: "circle", cx: 9, cy: 9, r: 2 },
+      { tag: "path", d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" },
+    ],
+  },
   upload: {
     source: "project",
     elements: [

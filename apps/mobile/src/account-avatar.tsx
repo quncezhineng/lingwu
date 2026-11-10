@@ -43,7 +43,6 @@ export function AccountAvatar({
         <Image
           source={{ uri: avatarUrl }}
           resizeMode="cover"
-          accessible={false}
           onError={() => setImageFailed(true)}
           style={{ width: size, height: size }}
         />

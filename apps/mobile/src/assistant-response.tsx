@@ -133,7 +133,6 @@ function StreamingCursor() {
   }, [opacity]);
   return (
     <Animated.View
-      accessible={false}
       style={{
         width: 7,
         height: 18,

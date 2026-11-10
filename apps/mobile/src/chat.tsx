@@ -89,6 +89,7 @@ import { confirmedJevSelection, displayJevUserMessage, latestJevPanelId } from "
 import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
 import { MemoryRecallCard } from "./memory-recall-card";
+import { MessageActions } from "./message-actions";
 import { ModalBackdrop } from "./modal-overlay";
 import { PromptComposer } from "./prompt-composer";
 import { taskHasQuestion } from "./question-card";
@@ -98,6 +99,7 @@ import { QuoteToolCard } from "./quote-tool-card";
 import { ReminderToolCard } from "./reminder-tool-card";
 import { ReportBriefCard } from "./report-brief-card";
 import { SearchToolCard } from "./search-tool-card";
+import { publishShare } from "./share-page";
 import { serverToolOutcome } from "./task-presentation";
 import { breakpoints, typography } from "./theme";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
@@ -1127,6 +1129,23 @@ export function ChatScreen({
       ? messages[latestUserIndex].content
       : null;
   const visible = messages.filter((m) => m.role === "user" || m.role === "assistant");
+  // 每条助手回复对应的用户提问：分享为图片 / 链接时一并带上，让分享内容自带上下文。
+  // 单次前向遍历维护「最近一条用户消息」，避免在渲染循环里反复切数组。
+  const promptByVisibleId = new Map<string, string>();
+  {
+    const preceding: unknown[] = [];
+    let lastPrompt = "";
+    for (const message of messages) {
+      if (message.role === "user") {
+        const raw = typeof message.content === "string" ? message.content : "";
+        lastPrompt = displayUserMessage(displayJevUserMessage(raw, preceding)).text.trim();
+      }
+      if (message.role === "user" || message.role === "assistant") {
+        promptByVisibleId.set(message.id, lastPrompt);
+      }
+      preceding.push(message);
+    }
+  }
   const threadTasks = (agentWorkspace?.tasks || []).filter((task) => task.threadId === threadId);
   const approvalTaskSignal = threadTasks
     .filter((task) => task.actionId)
@@ -1630,6 +1649,14 @@ export function ChatScreen({
                         )}
                       </View>
                     )
+                  )}
+                  {!user && !!text && (
+                    <MessageActions
+                      markdown={text}
+                      prompt={promptByVisibleId.get(message.id) ?? ""}
+                      onNotify={notify}
+                      onPublishShare={(input) => publishShare(api, input)}
+                    />
                   )}
                   <JevInteractionContext.Provider
                     value={{

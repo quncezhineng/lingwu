@@ -229,7 +229,6 @@ export function BrandMark({ size = 28 }: { size?: number }) {
       source={require("../assets/logo.png")}
       resizeMode="contain"
       style={{ width: size, height: size, flexShrink: 0 }}
-      accessible={false}
     />
   );
 }

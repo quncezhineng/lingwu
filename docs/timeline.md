@@ -5,6 +5,60 @@
 
 ## 变更记录
 
+### 2026-11-09 · 文案：消息操作栏「点赞」改为「喜欢」，点赞成功态显示「已喜欢」
+
+**背景**
+
+用户在对话消息操作栏选中「点赞」文字，要求标题改为「喜欢」，并在点赞成功（已选中）后显示「已喜欢」。
+
+**处理**
+
+- [chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts)：`chat.like` 「点赞」→「喜欢」；`chat.liked` 「已点赞」→「已喜欢」。
+- 交互逻辑不变：默认显示 `chat.like`，点击后（feedback === "like"）切换为 `chat.liked`，再次点击取消。英文侧 `Like` / `Liked` 语义不变。
+
+**验证**
+
+- `npx biome check --write`：通过，无修复。
+- `npx tsx --import ./tests/setup.ts --test apps/mobile/test/i18n.test.ts`：16 例全部通过（中英 key 集合一致）。
+
+### 2026-11-09 · 功能：持仓表单币种编辑新增「港币 HKD」选项
+
+**背景**
+
+用户在「持仓」表单车种编辑胶囊中只看到 CNY / USD，要求补上 HKD（港币）选项。经排查，HKD 的底层支持已齐全（`Currency` 类型、符号 `HK$`、市场推断 HK→HKD、CSV 校验均含 HKD），唯独表单里硬编码了 `["CNY", "USD"]`。
+
+**处理**
+
+- [portfolio-forms.tsx](../apps/mobile/src/portfolio-forms.tsx)：手动添加/编辑持仓表单的币种胶囊由硬编码 `(["CNY", "USD"] as Currency[])` 改为复用顶部已定义的 `CURRENCY_OPTIONS`（`["CNY", "USD", "HKD"]`），HKD 选项随之出现。
+- 无需新增 i18n key：胶囊直接渲染 `option` 文本（CNY/HKD/USD），非翻译文案。
+
+**验证**
+
+- `npx biome check --write`：通过，无修复。
+- `npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错）。
+
+### 2026-11-09 · 修复：移除 `accessible={false}` 引发的 react-native-web 控制台警告
+
+**背景**
+
+用户在预览控制台看到大量 `[error] Received "false" for a non-boolean attribute "accessible"`（该项在 React 开发模式下对非布尔 DOM 属性报警）。根因是项目在 10 处给 Image/View 显式传了 `accessible={false}`，react-native-web 会把它透传成 DOM 属性 `accessible`；另外 `icons/index.tsx` 中 `accessible={!!accessibilityLabel}` 也触发同类警告。
+
+**处理**
+
+- 删除全部显式 `accessible={false}` 传参（9 处）：
+  - `agent-orb.tsx`（orb 头像两种形态的装饰容器）
+  - `agent-product.tsx`、`threads.tsx`、`shell.tsx`、`ui.tsx`×2（品牌 logo / 头像 Image）
+  - `assistant-response.tsx`、`conversation-header.tsx`（打字指示动画的 Animated.View）
+  - `account-avatar.tsx`（用户头像）
+- `icons/index.tsx`：删除 `accessible={!!accessibilityLabel}`（true/false 都会触发该警告），只保留 `accessibilityLabel`——无 label 的装饰图标天然不进无障碍树，有 label 时 RN/RNW 会基于 label 自动建立可访问语义。
+- 因这些元素本身是装饰性的（无独立无障碍语义），移除后原生端与 web 端行为均与原先等效。
+
+**验证**
+
+- `npx biome check --write`：9 个文件通过，无修复。
+- `grep "accessible"`：src 下仅剩翻译文案字符串，无任何 prop 传参。
+- `npx tsc --noEmit`：通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错）。
+
 ### 2026-11-09 · 界面：删除「创建 Agent」模板选择面板底部的提示文案
 
 **背景**

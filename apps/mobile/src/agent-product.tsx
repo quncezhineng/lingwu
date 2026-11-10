@@ -677,7 +677,6 @@ function AgentRail({
           <Image
             source={require("../assets/logo.png")}
             resizeMode="contain"
-            accessible={false}
             style={{ width: 28, height: 28, flexShrink: 0 }}
           />
           <View style={{ flex: 1 }}>

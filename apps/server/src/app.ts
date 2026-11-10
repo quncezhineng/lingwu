@@ -47,6 +47,7 @@ import { resolveTaskNotifications } from "./notifications.ts";
 import { getPdfHealth } from "./pdf-health.ts";
 import { createRateLimitStore, rateLimit } from "./rate-limit.ts";
 import type { SearchService } from "./search.ts";
+import { shareApiRoutes, sharePageRoutes } from "./share-routes.ts";
 import { createSupabaseAuth } from "./supabase-auth.ts";
 import { createSupabaseData } from "./supabase-data.ts";
 import { WorkspaceService } from "./workspace.ts";
@@ -533,6 +534,9 @@ export async function createApp(
   app.route("/api/market", marketRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));
   app.route("/api/computer", computerRoutes(computer, files));
+  // 对话分享：`POST /api/shares` 需登录，`GET /s/:id` 是给收件人看的公开页面。
+  app.route("/api/shares", shareApiRoutes({ store: db, config }));
+  app.route("/s", sharePageRoutes({ store: db }));
   app.get("/api/calendars", async (c) => c.json(await workspace.calendars(c.get("owner"))));
   app.get("/api/calendar/events", async (c) => {
     const query = z

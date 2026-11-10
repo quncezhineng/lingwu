@@ -154,6 +154,22 @@ export class Store {
     );
     return result.rows.map((row) => row.data as { owner: string; value: T });
   }
+  /**
+   * 跨 owner 按 kind + id 取一条记录。
+   *
+   * 公开分享页访问者不知道记录属于谁，只能凭不可猜的随机 id 反查；
+   * id 由服务端生成（高熵随机串），因此不需要再结合 owner 做隔离。
+   */
+  async getByKindAndId<T = Record<string, unknown>>(
+    kind: string,
+    id: string,
+  ): Promise<{ owner: string; value: T } | null> {
+    const result = await this.db.query(
+      "SELECT jsonb_build_object('owner',owner,'value',data) AS data FROM records WHERE kind=$1 AND id=$2 LIMIT 1",
+      [kind, id],
+    );
+    return (result.rows[0]?.data as { owner: string; value: T } | undefined) ?? null;
+  }
   /** 某 kind 下去重后的 owner 列表（用于「对每个 owner 执行一次维护」的遍历）。 */
   async owners(kind: string): Promise<string[]> {
     const result = await this.db.query(

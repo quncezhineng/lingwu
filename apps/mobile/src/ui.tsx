@@ -872,7 +872,6 @@ export function Mascot({
         source={source}
         resizeMode="cover"
         style={{ width: size, height: size, borderRadius: size / 2 }}
-        accessible={false}
       />
     );
   }
@@ -903,7 +902,6 @@ export function Mascot({
         source={require("../assets/logo.png")}
         resizeMode="contain"
         style={{ width: size, height: size }}
-        accessible={false}
       />
     </View>
   );

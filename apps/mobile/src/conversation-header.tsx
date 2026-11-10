@@ -59,7 +59,6 @@ export function ConversationHeader({
       }}
     >
       <Animated.View
-        accessible={false}
         style={{
           width: 8,
           height: 8,

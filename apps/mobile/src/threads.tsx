@@ -159,7 +159,6 @@ export function ThreadsSheet({ onClose }: { onClose: () => void }) {
           source={require("../assets/logo.png")}
           resizeMode="contain"
           style={{ width: 24, height: 24 }}
-          accessible={false}
         />
       }
       onClose={onClose}

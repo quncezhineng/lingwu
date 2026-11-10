@@ -369,7 +369,7 @@ export function HoldingFormSheet({
       </View>
       {editCurrency && (
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 6 }}>
-          {(["CNY", "USD"] as Currency[]).map((option) => {
+          {CURRENCY_OPTIONS.map((option) => {
             const selected = currency === option;
             return (
               <Pressable

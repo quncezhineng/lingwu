@@ -122,8 +122,7 @@ function createIcon(name: string, key: string): IconComponent {
         strokeWidth={resolvedStrokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
-        // 装饰性图标对读屏隐藏；只有显式提供 label 的图标才参与无障碍树。
-        accessible={!!accessibilityLabel}
+        // 装饰性图标不参与无障碍树；只有显式提供 label 的图标才通过 accessibilityLabel 识别。
         accessibilityLabel={accessibilityLabel}
         testID={testID}
       >
@@ -181,6 +180,7 @@ export const CirclePlus = createIcon("CirclePlus", ICON_KEYS.CirclePlus);
 export const CircleUserRound = createIcon("CircleUserRound", ICON_KEYS.CircleUserRound);
 export const CircleX = createIcon("CircleX", ICON_KEYS.CircleX);
 export const Clock3 = createIcon("Clock3", ICON_KEYS.Clock3);
+export const Copy = createIcon("Copy", ICON_KEYS.Copy);
 export const Cpu = createIcon("Cpu", ICON_KEYS.Cpu);
 export const Download = createIcon("Download", ICON_KEYS.Download);
 export const Edit3 = createIcon("Edit3", ICON_KEYS.Edit3);
@@ -197,6 +197,7 @@ export const Hand = createIcon("Hand", ICON_KEYS.Hand);
 export const Heart = createIcon("Heart", ICON_KEYS.Heart);
 export const Home = createIcon("Home", ICON_KEYS.Home);
 export const IdCard = createIcon("IdCard", ICON_KEYS.IdCard);
+export const Image = createIcon("Image", ICON_KEYS.Image);
 export const Inbox = createIcon("Inbox", ICON_KEYS.Inbox);
 export const Languages = createIcon("Languages", ICON_KEYS.Languages);
 export const Lightbulb = createIcon("Lightbulb", ICON_KEYS.Lightbulb);
@@ -235,6 +236,7 @@ export const Search = createIcon("Search", ICON_KEYS.Search);
 export const Send = createIcon("Send", ICON_KEYS.Send);
 export const Settings2 = createIcon("Settings2", ICON_KEYS.Settings2);
 export const Shapes = createIcon("Shapes", ICON_KEYS.Shapes);
+export const Share2 = createIcon("Share2", ICON_KEYS.Share2);
 export const ShieldAlert = createIcon("ShieldAlert", ICON_KEYS.ShieldAlert);
 export const ShieldCheck = createIcon("ShieldCheck", ICON_KEYS.ShieldCheck);
 export const Sparkles = createIcon("Sparkles", ICON_KEYS.Sparkles);
