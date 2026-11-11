@@ -38,6 +38,7 @@ import {
   SectionHeading,
   Sheet,
   s,
+  semantic,
 } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -252,7 +253,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
               minHeight: 44,
               paddingHorizontal: 12,
               borderWidth: 1,
-              borderColor: colors.line,
+              borderColor: semantic.controlBorder,
               borderRadius: radius.field,
               backgroundColor: colors.paper,
             },

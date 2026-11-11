@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Linking, Platform, ScrollView, type TextStyle, View } from "react-native";
+import { memo, useCallback, useMemo, useState } from "react";
+import { Linking, Platform, ScrollView, type TextStyle, View } from "react-native";
 import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import type { Artifact } from "../../../packages/domain/src";
 import { Text } from "./app-text";
@@ -7,6 +7,7 @@ import {
   assistantMarkdown,
   inlineDocumentFileName,
   isSafeAssistantUrl,
+  presentAssistantMarkdown,
   scanInlineDocuments,
 } from "./assistant-markdown";
 import { findReferencedFile, markFileMentions } from "./chat-content";
@@ -120,32 +121,27 @@ function codeBlockRule(compact: boolean): RenderRules["fence"] {
 }
 
 function StreamingCursor() {
-  const opacity = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.18, duration: 480, useNativeDriver: false }),
-        Animated.timing(opacity, { toValue: 1, duration: 480, useNativeDriver: false }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [opacity]);
+  // The old opacity loop reflowed the transcript about twice a second. A fixed
+  // mark does not change layout, so an idle reply no longer bounces.
   return (
-    <Animated.View
+    <View
+      testID="assistant-stream-cursor"
+      pointerEvents="none"
       style={{
+        position: "absolute",
+        right: 2,
+        bottom: 4,
         width: 7,
         height: 18,
-        marginBottom: 3,
         borderRadius: 4,
         backgroundColor: colors.primary,
-        opacity,
+        opacity: 0.85,
       }}
     />
   );
 }
 
-export function AssistantResponse({
+export const AssistantResponse = memo(function AssistantResponse({
   content,
   streaming = false,
   compact = false,
@@ -159,7 +155,11 @@ export function AssistantResponse({
   onOpenFile?: (file: Artifact) => void;
 }) {
   const [linkError, setLinkError] = useState("");
-  const inlineDocuments = useMemo(() => scanInlineDocuments(content), [content]);
+  const presented = useMemo(
+    () => presentAssistantMarkdown(content, streaming),
+    [content, streaming],
+  );
+  const inlineDocuments = useMemo(() => scanInlineDocuments(presented), [presented]);
   const source = useMemo(
     () => markFileMentions(inlineDocuments.markdown, files),
     [files, inlineDocuments.markdown],
@@ -261,7 +261,7 @@ export function AssistantResponse({
   );
   return (
     <>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
+      <View style={{ position: "relative" }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Markdown
             markdownit={assistantMarkdown}
@@ -277,4 +277,4 @@ export function AssistantResponse({
       <ErrorNotice error={linkError} />
     </>
   );
-}
+});

@@ -5,6 +5,7 @@ import {
   inlineHtmlDocuments,
   inlineHtmlFileName,
   isSafeAssistantUrl,
+  presentAssistantMarkdown,
   scanInlineDocuments,
 } from "../src/assistant-markdown.ts";
 import { markFileMentions } from "../src/chat-content.ts";
@@ -18,6 +19,96 @@ test("assistant Markdown structures the reported response", () => {
   assert.match(html, /<li>/);
   assert.match(html, /href="https:\/\/docs\.copilotkit\.ai\/learning"/);
   assert.doesNotMatch(html, /\*\*Short answer/);
+});
+
+test("a finished message renders ##一 headings and a GFM table", () => {
+  const source = [
+    "##一、为什么现在特别难判断",
+    "",
+    "| 口径 | 价格 |",
+    "| --- | --- |",
+    "| 伦敦金 | 4036 |",
+    "",
+    "- 第一项",
+  ].join("\n");
+  const html = assistantMarkdown.render(presentAssistantMarkdown(source));
+  assert.match(html, /<h2>一、为什么现在特别难判断<\/h2>/);
+  assert.doesNotMatch(html, /##一/);
+  assert.match(html, /<th>口径<\/th>/);
+  assert.match(html, /<td>4036<\/td>/);
+  assert.match(html, /<li>/);
+});
+
+test("a GFM table renders, including a divider glued on by a stream chunk", () => {
+  const finished = presentAssistantMarkdown(
+    [
+      "先说结论。",
+      "",
+      "| 口径 | 价格 | 时间 |",
+      "| --- | --- | --- |",
+      "| 伦敦金 | 4036 | 2026-11-11 |",
+    ].join("\n"),
+  );
+  assert.match(assistantMarkdown.render(finished), /<table>/);
+  assert.match(assistantMarkdown.render(finished), /<th>口径<\/th>/);
+  assert.match(assistantMarkdown.render(finished), /<td>4036<\/td>/);
+
+  const glued = presentAssistantMarkdown("| 口径 | 价格 | 时间 |---|---|---|");
+  const gluedHtml = assistantMarkdown.render(glued);
+  assert.match(gluedHtml, /<th>口径<\/th>/);
+  assert.match(gluedHtml, /<th>时间<\/th>/);
+  assert.doesNotMatch(gluedHtml, /\|---\|/);
+});
+
+test("pipe rows without a divider still render as a table and no prices are invented", () => {
+  const source = ["| 口径 | 价格 |", "| 伦敦金 | 4036 |"].join("\n");
+  const html = assistantMarkdown.render(presentAssistantMarkdown(source));
+  assert.match(html, /<th>口径<\/th>/);
+  assert.match(html, /<td>伦敦金<\/td>/);
+  assert.match(html, /<td>4036<\/td>/);
+  assert.doesNotMatch(html, /<td>---<\/td>/);
+});
+
+test("a streaming chunk hides an unfinished pipe row and closes bold", () => {
+  const partial = presentAssistantMarkdown(
+    ["| 口径 | 价格 |", "| --- | --- |", "| 伦敦金 | 40"].join("\n"),
+    true,
+  );
+  const html = assistantMarkdown.render(partial);
+  assert.match(html, /<th>口径<\/th>/);
+  assert.doesNotMatch(html, /伦敦金/);
+  assert.doesNotMatch(html, /\| 口径/);
+
+  const bold = assistantMarkdown.render(presentAssistantMarkdown("关键位置是 **4000 美元", true));
+  assert.match(bold, /<strong>4000 美元<\/strong>/);
+  assert.doesNotMatch(bold, /\*\*/);
+});
+
+test("bold that starts after a bullet is not left as a trailing **", () => {
+  const paired = "- **买入时不会因为溢价多付钱**\n- **那时候买入是贵着买**";
+  const pairedHtml = assistantMarkdown.render(presentAssistantMarkdown(paired));
+  assert.match(pairedHtml, /<strong>买入时不会因为溢价多付钱<\/strong>/);
+  assert.match(pairedHtml, /<strong>那时候买入是贵着买<\/strong>/);
+  assert.doesNotMatch(pairedHtml, /\*\*/);
+
+  const lostOpening = "- 买入时不会因为溢价多付钱**\n- 那时候买入是贵着买**";
+  const lostHtml = assistantMarkdown.render(presentAssistantMarkdown(lostOpening));
+  assert.match(lostHtml, /<li><strong>买入时不会因为溢价多付钱<\/strong><\/li>/);
+  assert.match(lostHtml, /<li><strong>那时候买入是贵着买<\/strong><\/li>/);
+  assert.doesNotMatch(lostHtml, /\*\*/);
+});
+
+test("a settled message does not leave a literal ** between words", () => {
+  const html = assistantMarkdown.render(presentAssistantMarkdown("定价**不是降息"));
+  assert.doesNotMatch(html, /\*\*/);
+  assert.match(html, /定价不是降息/);
+  const paired = assistantMarkdown.render(
+    presentAssistantMarkdown("也没有明显的**抛压**，是个很中性的读数。"),
+  );
+  assert.match(paired, /<strong>抛压<\/strong>/);
+  assert.doesNotMatch(paired, /\*\*/);
+  const list = assistantMarkdown.render(presentAssistantMarkdown("- 第一项\n- 第二项"));
+  assert.match(list, /<li>/);
 });
 
 test("incomplete Markdown and raw HTML stay harmless", () => {

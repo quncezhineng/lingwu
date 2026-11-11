@@ -82,7 +82,14 @@ export function FileThreadCard({ file }: { file: Artifact }) {
   );
 }
 /** Hydrates task-linked artifacts by ID on replay; signed URLs are never stored in messages. */
-export function TaskThreadCard({ task }: { task: AgentTask }) {
+export function TaskThreadCard({
+  task,
+  quiet = false,
+}: {
+  task: AgentTask;
+  /** 侧栏和弹窗里的计划卡：正文号标题，默认收起步骤。 */
+  quiet?: boolean;
+}) {
   const { api } = useWorkspace();
   const { data } = useAgentWorkspace();
   const { t } = useTranslation();
@@ -123,7 +130,12 @@ export function TaskThreadCard({ task }: { task: AgentTask }) {
       {/* 计划卡独立视觉：有步骤就展示步骤列表，不再用任务卡冒充计划卡 */}
       {!hasQuestion &&
         (task.plan.length ? (
-          <PlanCard steps={task.plan} title={task.title} />
+          <PlanCard
+            steps={task.plan}
+            title={task.title}
+            defaultCollapsed={quiet}
+            quietTitle={quiet}
+          />
         ) : (
           <TaskCard task={task} compact />
         ))}

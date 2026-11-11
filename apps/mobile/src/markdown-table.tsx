@@ -3,7 +3,14 @@ import { ScrollView, View } from "react-native";
 import type { ASTNode, RenderRules } from "react-native-markdown-renderer";
 import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
-import { markdownTableRows, markdownTableWidths } from "./markdown-table-layout";
+import {
+  markdownTableRows,
+  markdownTableWidths,
+  nextTableViewport,
+  rememberedTableViewport,
+  rememberTableViewport,
+  tableViewportSignature,
+} from "./markdown-table-layout";
 import { colors, fonts } from "./theme";
 
 const TableLayout = createContext<{ widths: number[]; compact: boolean }>({
@@ -21,8 +28,11 @@ function MarkdownTable({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const [viewport, setViewport] = useState(0);
   const rows = useMemo(() => markdownTableRows(node), [node]);
+  const signature = useMemo(() => tableViewportSignature(rows), [rows]);
+  // A parent re-render reparses Markdown and remounts this table. Start from the
+  // last real width so the scroll hint does not vanish for a frame.
+  const [viewport, setViewport] = useState(() => rememberedTableViewport(signature));
   const widths = useMemo(
     () => markdownTableWidths(rows, Math.max(0, viewport - 2), compact),
     [rows, viewport, compact],
@@ -33,7 +43,14 @@ function MarkdownTable({
   return (
     <View
       testID="markdown-table"
-      onLayout={({ nativeEvent }) => setViewport(Math.floor(nativeEvent.layout.width))}
+      onLayout={({ nativeEvent }) => {
+        setViewport((current) => {
+          const next = nextTableViewport(current, nativeEvent.layout.width);
+          if (next === current) return current;
+          rememberTableViewport(signature, next);
+          return next;
+        });
+      }}
       style={{
         width: "100%",
         minWidth: 0,

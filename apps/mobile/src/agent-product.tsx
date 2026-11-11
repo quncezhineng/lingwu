@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { AccountScreen } from "./account";
 import { AccountAvatar } from "./account-avatar";
 import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-header";
@@ -31,6 +31,7 @@ import {
   onboardingSummary,
 } from "./agent-space-model";
 import { IdeasScreen } from "./agent-ui";
+import { AgentWorkList, AgentWorkModal } from "./agent-work-dialog";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
@@ -53,15 +54,17 @@ import {
   Lightbulb,
   LogOut,
   MoreHorizontal,
-  PanelRight,
   Plus,
   Search,
   Settings2,
   Trash2,
   X,
 } from "./icons";
+import { IosStack } from "./ios-stack";
+import { MobileBotsHome } from "./mobile-bots-home";
 import { ModalOverlay } from "./modal-overlay";
 import { unreadCount } from "./notification-actions";
+import { delegatedSectionTitle } from "./plan-card";
 import { PreferencesScreen } from "./preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./screens";
 import { GlobalSearchSheet } from "./search-sheet";
@@ -76,7 +79,9 @@ import {
   HoverPressable,
   IconButton,
   radius,
+  Sheet,
   s,
+  semantic,
   shadow,
   space,
   typography,
@@ -938,113 +943,176 @@ function AgentRail({
   );
 }
 
-/** 右侧栏折叠/展开按钮：固定在栏位右上角，折叠后原位保留以便恢复。 */
-function RailToggleButton({
-  collapsed = false,
-  onPress,
-}: {
-  collapsed?: boolean;
-  onPress: () => void;
-}) {
+/** 展开后的关闭按钮：圆形描边，只有一个关闭图形。 */
+function RailCloseButton({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation();
   return (
     <HoverPressable
+      testID="agent-rail-close"
       accessibilityRole="button"
-      accessibilityLabel={t(collapsed ? "agentSpace.expandRail" : "agentSpace.collapseRail")}
+      accessibilityLabel={t("agentSpace.closeRail")}
       onPress={onPress}
       style={({ pressed, hovered }) => ({
-        width: 30,
-        height: 30,
-        borderRadius: radius.control,
+        width: 32,
+        height: 32,
+        borderRadius: radius.full,
+        borderWidth: 1,
+        borderColor: semantic.controlBorder,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: pressed ? colors.overlay2 : hovered ? colors.overlay1 : "transparent",
+        backgroundColor: pressed ? colors.overlay2 : hovered ? colors.surface : colors.paper,
       })}
     >
-      <PanelRight size={17} color={colors.muted} />
+      <X size={15} color={colors.muted} />
     </HoverPressable>
   );
 }
 
+function RailIdentity({ onEdit }: { onEdit: () => void }) {
+  const { t } = useTranslation();
+  const { current } = useAgentSpace();
+  const [hovered, setHovered] = useState(false);
+  const label = current.role ? `${current.name} · ${current.role}` : current.name;
+  return (
+    <View
+      style={{ width: "100%", alignItems: "center", paddingTop: 6, paddingBottom: 20, gap: 12 }}
+    >
+      <View style={{ width: "100%", alignItems: "center" }}>
+        <HoverPressable
+          testID="agent-rail-avatar"
+          accessibilityRole="button"
+          accessibilityLabel={t("agentSpace.editAvatar")}
+          onPress={onEdit}
+          onHoverIn={() => setHovered(true)}
+          onHoverOut={() => setHovered(false)}
+          style={({ pressed }) => ({
+            borderRadius: radius.full,
+            opacity: pressed ? 0.88 : 1,
+          })}
+        >
+          <AgentOrb avatar={current.avatar} size={72} editing={hovered} />
+        </HoverPressable>
+        {hovered && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: 62,
+              left: 0,
+              right: 0,
+              zIndex: 3,
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: radius.control,
+                borderWidth: 1,
+                borderColor: colors.lineSoft,
+                backgroundColor: colors.paper,
+                ...shadow.card,
+              }}
+            >
+              <Text style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+                {t("agentSpace.editAvatar")}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+      <Text
+        style={{
+          textAlign: "center",
+          paddingHorizontal: 28,
+          fontFamily: fonts.serif,
+          fontSize: 16,
+          lineHeight: 24,
+          fontWeight: "600",
+          color: colors.text,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 function CapabilityRail({
-  onClose,
   onOpen,
   onCollapse,
   onOpenAgentSkills,
-  compact = false,
+  onNavigateAway,
+  page = false,
 }: {
-  onClose?: () => void;
   onOpen: (panel: AgentPanel) => void;
   onCollapse?: () => void;
   onOpenAgentSkills: () => void;
-  compact?: boolean;
+  /** 从全屏页跳走之前先把它收起来。 */
+  onNavigateAway?: () => void;
+  /** 手机全屏页：去掉左描边，关闭交给页眉的返回。 */
+  page?: boolean;
 }) {
   const { t } = useTranslation();
   const { navigate } = useWorkspace();
-  const { top: safeTop } = useSafeAreaInsets();
-  const drawerTop = Math.max(safeTop, 12);
-  // 点击能力卡片展示的技能详情 id；作为兄弟节点挂载，避免与侧栏容器嵌套问题。
   const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
+  const [workOpen, setWorkOpen] = useState(false);
+  const leave = () => onNavigateAway?.();
+  const editAgent = () => {
+    leave();
+    navigate("agent");
+  };
   return (
     <>
       <View
+        testID="agent-rail"
         style={{
           flex: 1,
           minHeight: 0,
           backgroundColor: colors.surfaceRaised,
-          borderLeftWidth: compact ? 0 : 1,
+          borderLeftWidth: page ? 0 : 1,
           borderLeftColor: colors.line,
         }}
       >
-        {compact && (
-          <View
-            style={{
-              minHeight: drawerTop + 44,
-              paddingTop: drawerTop,
-              paddingHorizontal: 18,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              gap: 10,
-            }}
-          >
-            {onClose && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("ui.closeDetails")}
-                onPress={onClose}
-                style={{ width: 38, height: 38, alignItems: "center", justifyContent: "center" }}
-              >
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            )}
-          </View>
-        )}
-        {!compact && onCollapse && (
-          <View
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              zIndex: 2,
-              borderRadius: radius.control,
-              backgroundColor: colors.surfaceRaised,
-            }}
-          >
-            <RailToggleButton onPress={onCollapse} />
+        {onCollapse && (
+          <View style={{ position: "absolute", top: 12, right: 12, zIndex: 2 }}>
+            <RailCloseButton onPress={onCollapse} />
           </View>
         )}
         <ScrollView
           style={{ flex: 1, minHeight: 0 }}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingHorizontal: 14,
-            paddingTop: 18,
+            paddingHorizontal: page ? 20 : 14,
+            paddingTop: 20,
             paddingBottom: 24,
           }}
         >
+          <RailIdentity onEdit={editAgent} />
           <Text
             style={{
+              ...delegatedSectionTitle,
+              paddingHorizontal: 6,
+            }}
+          >
+            {t("agentSpace.delegatedWork")}
+          </Text>
+          <View testID="agent-rail-tasks" style={{ marginTop: 10 }}>
+            <AgentWorkList />
+          </View>
+          <View testID="agent-rail-more-tasks" style={{ marginTop: 12 }}>
+            <Button
+              variant="outline"
+              style={{ alignSelf: "stretch" }}
+              onPress={() => setWorkOpen(true)}
+            >
+              {t("agentSpace.moreDelegated")}
+            </Button>
+          </View>
+          <Text
+            style={{
+              marginTop: 26,
               marginBottom: 14,
               paddingHorizontal: 6,
               fontSize: 15,
@@ -1057,14 +1125,14 @@ function CapabilityRail({
           </Text>
           <AgentMoreContent
             onPanel={onOpen}
-            compact={compact}
+            compact={false}
             onInspectSkill={setInspectSkillId}
             onOpenApps={() => {
-              onClose?.();
+              leave();
               navigate("apps");
             }}
             onOpenAgentSkills={() => {
-              onClose?.();
+              leave();
               onOpenAgentSkills();
             }}
           />
@@ -1073,18 +1141,27 @@ function CapabilityRail({
       {inspectSkillId && (
         <AgentSkillInspectSheet skillId={inspectSkillId} onClose={() => setInspectSkillId(null)} />
       )}
+      {workOpen && <AgentWorkModal onClose={() => setWorkOpen(false)} />}
     </>
   );
 }
 
 function AgentHeader({
   onMenu,
-  onMore,
+  onIdentity,
+  onBack,
   persistentNavigation = false,
+  railCollapsed = false,
+  onExpandRail,
 }: {
   onMenu: () => void;
-  onMore: () => void;
+  onIdentity: () => void;
+  /** 手机 bot 页返回 bots 首页。电脑版不传。 */
+  onBack?: () => void;
   persistentNavigation?: boolean;
+  /** 右侧栏收起后，非对话页没有悬浮头像，用同一颗头像把栏展开。 */
+  railCollapsed?: boolean;
+  onExpandRail?: () => void;
 }) {
   const { t } = useTranslation();
   const { current } = useAgentSpace();
@@ -1100,7 +1177,8 @@ function AgentHeader({
         avatar={current.avatar}
         persistentNavigation={persistentNavigation}
         onMenu={onMenu}
-        onMore={onMore}
+        onBack={onBack}
+        onIdentity={onIdentity}
       />
     );
   const sectionTitle =
@@ -1152,7 +1230,7 @@ function AgentHeader({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t("common.back")}
-          onPress={back}
+          onPress={onBack ?? back}
           style={({ pressed }) => ({
             width: 36,
             height: 36,
@@ -1168,7 +1246,26 @@ function AgentHeader({
       <View style={{ flex: 1, alignItems: "center" }}>
         <Text style={[typography.heading, { fontSize: 15 }]}>{sectionTitle}</Text>
       </View>
-      <View style={{ width: 40 }} />
+      <View style={{ width: 40, alignItems: "flex-end" }}>
+        {railCollapsed && onExpandRail && (
+          <Pressable
+            testID="agent-rail-expand-avatar"
+            accessibilityRole="button"
+            accessibilityLabel={t("agentSpace.expandRail")}
+            onPress={onExpandRail}
+            style={({ pressed }) => ({
+              width: 36,
+              height: 36,
+              borderRadius: radius.full,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: pressed ? colors.overlay1 : "transparent",
+            })}
+          >
+            <AgentOrb avatar={current.avatar} size={28} />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
@@ -1359,13 +1456,23 @@ export function AgentProductShell({
     resize: resizeColumn,
     railCollapsed,
     toggleRail,
+    expandRail,
   } = useDesktopColumns(availableWidth);
   const { t } = useTranslation();
-  const { section, close, reminderIntent, navigate } = useWorkspace();
-  const { agents, current, preferences, selection, loading, needsOnboarding, markThreadUsed } =
-    useAgentSpace();
+  const { section, close, back, reminderIntent, navigate, open } = useWorkspace();
+  const {
+    agents,
+    current,
+    selectAgent,
+    preferences,
+    selection,
+    loading,
+    needsOnboarding,
+    markThreadUsed,
+  } = useAgentSpace();
   const [panelStack, setPanelStack] = useState<AgentPanel[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [appsSheet, setAppsSheet] = useState(false);
   const [ideasOpen, setIdeasOpen] = useState(false);
   const panel = panelStack.at(-1);
   const closePanel = useCallback(() => setPanelStack((stack) => stack.slice(0, -1)), []);
@@ -1375,7 +1482,10 @@ export function AgentProductShell({
       setPanelStack((stack) => (stack.at(-1) === next ? stack : [...stack, next])),
     [],
   );
-  const [drawer, setDrawer] = useState<"agents" | "capabilities" | null>(null);
+  const [drawer, setDrawer] = useState<"agents" | null>(null);
+  const [sidePage, setSidePage] = useState(false);
+  const phone = width < breakpoints.mobile;
+  const [botOpen, setBotOpen] = useState(false);
   // 「解锁更多的能力」跳转到 Agent 详情时携带的分区意图：让详情页直接定位到「技能」。
   // 需要在页面可能已挂载的情况下响应，因此交给 AgentSettingsScreen 用 effect 消费后清除。
   const [agentTabIntent, setAgentTabIntent] = useState<AgentSettingsTab | null>(null);
@@ -1386,7 +1496,10 @@ export function AgentProductShell({
   }, [current.id]);
 
   useEffect(() => {
-    if (threeColumns) setDrawer(null);
+    if (threeColumns) {
+      setDrawer(null);
+      setSidePage(false);
+    }
   }, [threeColumns]);
 
   useEffect(() => {
@@ -1401,8 +1514,10 @@ export function AgentProductShell({
     if (!prompt?.draft) return;
     setPanelStack([]);
     setDrawer(null);
+    setSidePage(false);
     setSearchOpen(false);
     setIdeasOpen(false);
+    setAppsSheet(false);
   }, [prompt]);
 
   useEffect(() => {
@@ -1411,12 +1526,13 @@ export function AgentProductShell({
       if (event.key !== "Escape") return;
       // Each Modal owns Escape, including nested resource editors.
       if (panel) return;
+      else if (sidePage) setSidePage(false);
       else if (drawer) setDrawer(null);
       else if (detail) close();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [close, detail, drawer, panel]);
+  }, [close, detail, drawer, panel, sidePage]);
 
   const mounted = useMemo(
     () =>
@@ -1485,6 +1601,57 @@ export function AgentProductShell({
 
   // 「解锁更多的能力」：收起浮层/抽屉，进入当前 Agent 详情设置的「技能」分区。
   // navigate 对相同 Section 是无操作的，桌面端已停留在详情页时只更新分区意图。
+  const popTop = useCallback(() => {
+    if (sidePage) {
+      setSidePage(false);
+      return true;
+    }
+    if (section !== "chat") {
+      back();
+      return true;
+    }
+    if (botOpen) {
+      setBotOpen(false);
+      return true;
+    }
+    return false;
+  }, [back, botOpen, section, sidePage]);
+  const requestPop = useCallback(() => {
+    if (
+      Platform.OS === "web" &&
+      typeof history !== "undefined" &&
+      (history.state as { lingwuMobile?: number } | null)?.lingwuMobile &&
+      ((history.state as { lingwuMobile?: number }).lingwuMobile ?? 1) > 1
+    ) {
+      history.back();
+      return;
+    }
+    popTop();
+  }, [popTop]);
+  const mobileDepth = 1 + (botOpen ? 1 : 0) + (section !== "chat" ? 1 : 0) + (sidePage ? 1 : 0);
+  const depthRef = useRef(mobileDepth);
+  const historyPop = useRef(false);
+  useEffect(() => {
+    if (!phone || Platform.OS !== "web") return;
+    const state = history.state as { lingwuMobile?: number } | null;
+    if (!state?.lingwuMobile) history.replaceState({ lingwuMobile: 1 }, "");
+    const onPopState = () => {
+      historyPop.current = true;
+      if (!popTop()) historyPop.current = false;
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [phone, popTop]);
+  useEffect(() => {
+    if (!phone || Platform.OS !== "web") return;
+    if (historyPop.current) {
+      historyPop.current = false;
+      depthRef.current = mobileDepth;
+      return;
+    }
+    if (mobileDepth > depthRef.current) history.pushState({ lingwuMobile: mobileDepth }, "");
+    depthRef.current = mobileDepth;
+  }, [mobileDepth, phone]);
   const openAgentSkills = useCallback(() => {
     setDrawer(null);
     setPanelStack([]);
@@ -1508,6 +1675,84 @@ export function AgentProductShell({
       </SafeAreaView>
     );
   }
+
+  const chatPane = (
+    <>
+      <ErrorNotice error={error} />
+      {mounted.map((agent) => {
+        const active = agent.id === current.id;
+        return (
+          <View
+            key={agent.id}
+            style={{
+              display: active ? "flex" : "none",
+              flex: 1,
+              minHeight: 0,
+              paddingHorizontal: threeColumns ? 18 : desktop ? 24 : 17,
+            }}
+          >
+            <ChatScreen
+              thread={
+                active
+                  ? selection
+                  : {
+                      id: agent.threadId,
+                      existing: agent.system || agent.threadExists,
+                    }
+              }
+              active={active && section === "chat"}
+              prompt={active ? prompt : undefined}
+              hideHeader
+              contentTopInset={floatingHeaderClearance()}
+              agentContext={{
+                name: agent.name,
+                role: agent.role,
+                persona: agent.persona,
+                avatar: agent.avatar,
+                tone: agent.tone,
+                communication: agent.communication,
+                instructions: agent.instructions,
+                userPreferences: onboardingPreferenceContext(preferences),
+              }}
+              firstRunWelcome={agent.system ? firstRunWelcome : undefined}
+              emptyEyebrow={t("agentSpace.welcomeEyebrow")}
+              emptyTitleLead={t("agentSpace.welcomeTitle")}
+              emptyTitleTail={t("agentSpace.welcomeTail")}
+              emptySubtitle={null}
+              composerPlaceholder={t("agentSpace.composer", {
+                name: agent.name,
+              })}
+              showIdeasShortcut
+              onOpenIdeas={() => setIdeasOpen(true)}
+              onThreadUsed={() => markThreadUsed(agent.id)}
+            />
+          </View>
+        );
+      })}
+    </>
+  );
+  const sectionPane =
+    section === "agent" ? (
+      <AgentSettingsScreen
+        tabIntent={agentTabIntent}
+        onTabIntentConsumed={() => setAgentTabIntent(null)}
+      />
+    ) : (
+      <SecondarySection onOpen={openPanel} onSignOut={onSignOut} />
+    );
+  const framedPage = (pane: React.ReactNode) => (
+    <View style={{ flex: 1, minHeight: 0, backgroundColor: colors.canvas }}>
+      <AgentHeader
+        onMenu={() => setDrawer("agents")}
+        onBack={phone ? requestPop : undefined}
+        onIdentity={() => (threeColumns ? expandRail() : setSidePage(true))}
+        persistentNavigation={threeColumns}
+        railCollapsed={threeColumns && railCollapsed}
+        onExpandRail={expandRail}
+      />
+      <View style={{ flex: 1, minHeight: 0 }}>{pane}</View>
+    </View>
+  );
 
   return (
     <>
@@ -1538,135 +1783,180 @@ export function AgentProductShell({
             </>
           )}
           <View testID="agent-main-column" style={{ flex: 1, minWidth: 0, position: "relative" }}>
-            <AgentHeader
-              onMenu={() => setDrawer("agents")}
-              onMore={() => setDrawer("capabilities")}
-              persistentNavigation={threeColumns}
-            />
-            <View style={{ flex: 1, minHeight: 0 }}>
-              {section === "chat" ? (
-                <>
-                  <ErrorNotice error={error} />
-                  {mounted.map((agent) => {
-                    const active = agent.id === current.id;
-                    return (
-                      <View
-                        key={agent.id}
-                        style={{
-                          display: active ? "flex" : "none",
-                          flex: 1,
-                          minHeight: 0,
-                          paddingHorizontal: threeColumns ? 18 : desktop ? 24 : 17,
+            {phone ? (
+              <IosStack
+                onPop={requestPop}
+                screens={[
+                  {
+                    id: "bots",
+                    node: (
+                      <MobileBotsHome
+                        onOpenBot={(agent) => {
+                          selectAgent(agent.id);
+                          setBotOpen(true);
                         }}
-                      >
-                        <ChatScreen
-                          thread={
-                            active
-                              ? selection
-                              : {
-                                  id: agent.threadId,
-                                  existing: agent.system || agent.threadExists,
-                                }
-                          }
-                          active={active && section === "chat"}
-                          prompt={active ? prompt : undefined}
-                          hideHeader
-                          contentTopInset={floatingHeaderClearance()}
-                          agentContext={{
-                            name: agent.name,
-                            role: agent.role,
-                            persona: agent.persona,
-                            avatar: agent.avatar,
-                            tone: agent.tone,
-                            communication: agent.communication,
-                            instructions: agent.instructions,
-                            userPreferences: onboardingPreferenceContext(preferences),
-                          }}
-                          firstRunWelcome={agent.system ? firstRunWelcome : undefined}
-                          emptyEyebrow={t("agentSpace.welcomeEyebrow")}
-                          emptyTitleLead={t("agentSpace.welcomeTitle")}
-                          emptyTitleTail={t("agentSpace.welcomeTail")}
-                          emptySubtitle={null}
-                          composerPlaceholder={t("agentSpace.composer", {
-                            name: agent.name,
-                          })}
-                          showIdeasShortcut
-                          onOpenIdeas={() => setIdeasOpen(true)}
-                          onThreadUsed={() => markThreadUsed(agent.id)}
-                        />
-                      </View>
-                    );
-                  })}
-                </>
-              ) : section === "agent" ? (
-                <AgentSettingsScreen
-                  tabIntent={agentTabIntent}
-                  onTabIntentConsumed={() => setAgentTabIntent(null)}
-                />
-              ) : (
-                <SecondarySection onOpen={openPanel} onSignOut={onSignOut} />
-              )}
-            </View>
-          </View>
-          {threeColumns &&
-            (railCollapsed ? (
-              <View
-                style={{
-                  width: 44,
-                  flexShrink: 0,
-                  alignItems: "center",
-                  paddingTop: 10,
-                  backgroundColor: colors.canvas,
-                }}
-              >
-                <RailToggleButton collapsed onPress={toggleRail} />
-              </View>
+                        onCreate={() => openPanel("create")}
+                        onAccount={() => openPanel("account")}
+                        onNotifications={() => open({ type: "notifications" })}
+                        onConnections={() => setAppsSheet(true)}
+                      />
+                    ),
+                  },
+                  ...(botOpen ? [{ id: "bot", node: framedPage(chatPane) }] : []),
+                  ...(section !== "chat"
+                    ? [{ id: `section-${section}`, node: framedPage(sectionPane) }]
+                    : []),
+                  ...(sidePage
+                    ? [
+                        {
+                          id: "side",
+                          node: (
+                            <View
+                              testID="agent-side-page"
+                              style={{ flex: 1, backgroundColor: colors.canvas }}
+                            >
+                              <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+                                <View
+                                  style={{
+                                    height: 52,
+                                    paddingHorizontal: 12,
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <Pressable
+                                    testID="agent-side-back"
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t("common.back")}
+                                    onPress={requestPop}
+                                    style={({ pressed }) => ({
+                                      width: 36,
+                                      height: 36,
+                                      borderRadius: radius.full,
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      backgroundColor: pressed ? colors.overlay1 : "transparent",
+                                    })}
+                                  >
+                                    <ChevronLeft size={18} color={colors.muted} />
+                                  </Pressable>
+                                </View>
+                                <CapabilityRail
+                                  page
+                                  onOpen={openPanel}
+                                  onNavigateAway={() => setSidePage(false)}
+                                  onOpenAgentSkills={openAgentSkills}
+                                />
+                              </SafeAreaView>
+                            </View>
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             ) : (
               <>
-                <ColumnResizeHandle
-                  side="right"
-                  width={columnWidths.right}
-                  min={desktopColumns.right.min}
-                  max={columnMaxWidth(availableWidth, columnWidths, "right")}
-                  label={t("agentSpace.resizeCapabilities")}
-                  hint={t("agentSpace.resizeColumnHint")}
-                  onResize={(value, finished) => resizeColumn("right", value, finished)}
+                <AgentHeader
+                  onMenu={() => setDrawer("agents")}
+                  onIdentity={() => (threeColumns ? expandRail() : setSidePage(true))}
+                  persistentNavigation={threeColumns}
+                  railCollapsed={threeColumns && railCollapsed}
+                  onExpandRail={expandRail}
                 />
-                <View style={{ width: columnWidths.right, flexShrink: 0, minHeight: 0 }}>
-                  <CapabilityRail
-                    onOpen={openPanel}
-                    onCollapse={toggleRail}
-                    onOpenAgentSkills={openAgentSkills}
-                  />
+                <View style={{ flex: 1, minHeight: 0 }}>
+                  {section === "chat" ? chatPane : sectionPane}
                 </View>
               </>
-            ))}
+            )}
+          </View>
+          {threeColumns && !railCollapsed && (
+            <>
+              <ColumnResizeHandle
+                side="right"
+                width={columnWidths.right}
+                min={desktopColumns.right.min}
+                max={columnMaxWidth(availableWidth, columnWidths, "right")}
+                label={t("agentSpace.resizeCapabilities")}
+                hint={t("agentSpace.resizeColumnHint")}
+                onResize={(value, finished) => resizeColumn("right", value, finished)}
+              />
+              <View style={{ width: columnWidths.right, flexShrink: 0, minHeight: 0 }}>
+                <CapabilityRail
+                  onOpen={openPanel}
+                  onCollapse={toggleRail}
+                  onOpenAgentSkills={openAgentSkills}
+                />
+              </View>
+            </>
+          )}
         </View>
         <Toast toast={toast} onDismiss={clearToast} />
-        {!threeColumns && drawer && (
+        {!threeColumns && drawer === "agents" && (
           <AgentSideDrawer
-            key={drawer}
-            side={drawer === "agents" ? "left" : "right"}
+            side="left"
             onClose={() => setDrawer(null)}
             closeLabel={t("ui.closeDetails")}
           >
-            {drawer === "agents" ? (
-              <AgentRail
-                compact
-                onOpen={openPanel}
-                onSearch={() => setSearchOpen(true)}
-                onSignOut={onSignOut}
-                onClose={() => setDrawer(null)}
-              />
-            ) : (
+            <AgentRail
+              compact
+              onOpen={openPanel}
+              onSearch={() => setSearchOpen(true)}
+              onSignOut={onSignOut}
+              onClose={() => setDrawer(null)}
+            />
+          </AgentSideDrawer>
+        )}
+        {sidePage && !threeColumns && !phone && (
+          <View
+            testID="agent-side-page"
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              zIndex: 40,
+              backgroundColor: colors.canvas,
+            }}
+          >
+            <SafeAreaView
+              style={{ flex: 1, backgroundColor: colors.canvas }}
+              edges={["top", "bottom"]}
+            >
+              <View
+                style={{
+                  height: 52,
+                  paddingHorizontal: 12,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Pressable
+                  testID="agent-side-back"
+                  accessibilityRole="button"
+                  accessibilityLabel={t("common.back")}
+                  onPress={() => setSidePage(false)}
+                  style={({ pressed }) => ({
+                    width: 36,
+                    height: 36,
+                    borderRadius: radius.full,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: pressed ? colors.overlay1 : "transparent",
+                  })}
+                >
+                  <ChevronLeft size={18} color={colors.muted} />
+                </Pressable>
+              </View>
               <CapabilityRail
-                compact
+                page
                 onOpen={openPanel}
-                onClose={() => setDrawer(null)}
+                onNavigateAway={() => setSidePage(false)}
                 onOpenAgentSkills={openAgentSkills}
               />
-            )}
-          </AgentSideDrawer>
+            </SafeAreaView>
+          </View>
         )}
         <AgentSheets
           key={`${current.id}:${panel}`}
@@ -1678,6 +1968,11 @@ export function AgentProductShell({
           onOpenAgentSkills={openAgentSkills}
         />
         {searchOpen && <GlobalSearchSheet onClose={() => setSearchOpen(false)} />}
+        {appsSheet && (
+          <Sheet botLayout title={t("app.titleApps")} onClose={() => setAppsSheet(false)}>
+            <CapabilityHubScreen />
+          </Sheet>
+        )}
         {ideasOpen && <IdeasOverlay onClose={() => setIdeasOpen(false)} />}
         {detail && <Details detail={detail} />}
       </SafeAreaView>

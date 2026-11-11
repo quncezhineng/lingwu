@@ -1,6 +1,7 @@
 import { View } from "react-native";
 import type { AgentAvatarId } from "./agent-space-model";
 import { Text } from "./app-text";
+import { Pencil } from "./icons";
 import { colors, radius } from "./theme";
 
 const palette: Record<AgentAvatarId, { background: string; foreground: string; glyph: string }> = {
@@ -11,22 +12,51 @@ const palette: Record<AgentAvatarId, { background: string; foreground: string; g
   cat: { background: "#F0EEF8", foreground: "#8C80A8", glyph: "⌁" },
 };
 
-export function AgentOrb({ avatar = "orb", size = 32 }: { avatar?: AgentAvatarId; size?: number }) {
+export function AgentOrb({
+  avatar = "orb",
+  size = 32,
+  editing = false,
+}: {
+  avatar?: AgentAvatarId;
+  size?: number;
+  /** 悬停编辑态：深色底，眼睛保留，中间叠一支铅笔。 */
+  editing?: boolean;
+}) {
   const theme = palette[avatar] ?? palette.orb;
+  const background = editing ? colors.toast : theme.background;
+  const frame = {
+    width: size,
+    height: size,
+    borderRadius: radius.full,
+    backgroundColor: background,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  };
+  const pencil = editing ? (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Pencil
+        size={Math.max(11, Math.round(size * 0.2))}
+        color={colors.onToast}
+        strokeWidth={1.8}
+      />
+    </View>
+  ) : null;
   if (avatar === "orb") {
     return (
       <View
         style={{
-          width: size,
-          height: size,
-          borderRadius: radius.full,
-          backgroundColor: theme.background,
-          alignItems: "center",
-          justifyContent: "center",
+          ...frame,
           flexDirection: "row",
-          gap: Math.max(2, Math.round(size * 0.12)),
-          shadowColor: colors.primaryStrong,
-          shadowOpacity: 0.16,
+          gap: Math.max(2, Math.round(size * (editing ? 0.28 : 0.12))),
+          shadowColor: editing ? colors.toast : colors.primaryStrong,
+          shadowOpacity: editing ? 0.2 : 0.16,
           shadowRadius: size * 0.26,
           shadowOffset: { width: 0, height: size * 0.14 },
           elevation: 3,
@@ -50,32 +80,31 @@ export function AgentOrb({ avatar = "orb", size = 32 }: { avatar?: AgentAvatarId
             transform: [{ rotate: "-14deg" }],
           }}
         />
+        {pencil}
       </View>
     );
   }
   return (
     <View
       style={{
-        width: size,
-        height: size,
-        borderRadius: radius.full,
-        backgroundColor: theme.background,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
+        ...frame,
+        borderWidth: editing ? 0 : 1,
         borderColor: colors.lineSoft,
       }}
     >
-      <Text
-        style={{
-          color: theme.foreground,
-          fontSize: size * 0.5,
-          lineHeight: size * 0.66,
-          fontWeight: "500",
-        }}
-      >
-        {theme.glyph}
-      </Text>
+      {!editing && (
+        <Text
+          style={{
+            color: theme.foreground,
+            fontSize: size * 0.5,
+            lineHeight: size * 0.66,
+            fontWeight: "500",
+          }}
+        >
+          {theme.glyph}
+        </Text>
+      )}
+      {pencil}
     </View>
   );
 }

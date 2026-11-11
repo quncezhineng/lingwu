@@ -8,7 +8,16 @@ import {
   useRenderToolCall,
   useThreads,
 } from "@copilotkit/react-native/headless";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type ComponentProps,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -64,7 +73,14 @@ import {
   showsRunError,
   threadLocked,
 } from "./conversation-run";
-import { type PrependAnchor, restorePrependOffset } from "./conversation-scroll";
+import {
+  awayFromLatestSlack,
+  composerInsetNudge,
+  followLatestSlack,
+  type PrependAnchor,
+  pinnedTailNudge,
+  restorePrependOffset,
+} from "./conversation-scroll";
 import { type ConversationDraft, useConversationStream, verifyDrafts } from "./conversation-stream";
 import { DesktopToolCard } from "./desktop-tool-card";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
@@ -90,6 +106,7 @@ import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
 import { MemoryRecallCard } from "./memory-recall-card";
 import { MessageActions } from "./message-actions";
+import { edgeFadeMask } from "./mobile-chrome";
 import { ModalBackdrop } from "./modal-overlay";
 import { PromptComposer } from "./prompt-composer";
 import { taskHasQuestion } from "./question-card";
@@ -538,6 +555,39 @@ function titleFrom(text: string): string {
   if (!plain) return "";
   return plain.length > 24 ? `${plain.slice(0, 24)}…` : plain;
 }
+type ComposerHandle = {
+  setText: (value: string | ((current: string) => string)) => void;
+  read: () => string;
+  clear: () => void;
+  focus: () => void;
+};
+
+/** Owns the draft locally so keystrokes do not re-render the message list. */
+const IsolatedComposer = forwardRef<
+  ComposerHandle,
+  Omit<ComponentProps<typeof PromptComposer>, "value" | "onChangeText" | "inputRef">
+>(function IsolatedComposer(props, ref) {
+  const [value, setValue] = useState("");
+  const valueRef = useRef("");
+  const inputRef = useRef<TextInput>(null);
+  const setText = (next: string | ((current: string) => string)) => {
+    const resolved = typeof next === "function" ? next(valueRef.current) : next;
+    valueRef.current = resolved;
+    setValue(resolved);
+  };
+  useImperativeHandle(
+    ref,
+    () => ({
+      setText,
+      read: () => valueRef.current,
+      clear: () => setText(""),
+      focus: () => inputRef.current?.focus(),
+    }),
+    [],
+  );
+  return <PromptComposer {...props} inputRef={inputRef} value={value} onChangeText={setText} />;
+});
+
 export function ChatScreen({
   prompt,
   thread,
@@ -593,6 +643,12 @@ export function ChatScreen({
   onThreadUsed?: () => void;
 }) {
   const { api, workspace: w, refresh, navigate, open, notify } = useWorkspace();
+  const openReferencedFile = useCallback(
+    (file: Artifact) => {
+      open({ type: "file", file });
+    },
+    [open],
+  );
   const { width: windowWidth } = useWindowDimensions();
   // 宽屏（>= breakpoints.desktop，与 App 外壳的 desktop 判断一致）时文件产物面板停靠为右侧栏；
   // 窄屏回退为覆盖式弹层，避免把对话列压缩到无法阅读。
@@ -626,15 +682,14 @@ export function ChatScreen({
   });
   const { copilotkit } = useCopilotKit();
   const renderToolCall = useRenderToolCall();
-  const [draft, setDraft] = useState("");
   // 最近一次提交的文本：停止生成时回填到输入框，避免用户重写。
   const lastSent = useRef("");
-  const composerInput = useRef<TextInput>(null);
+  const composerRef = useRef<ComposerHandle>(null);
 
   // ⌘J（App 层派发）聚焦输入框；仅 Web 生效。
   useEffect(() => {
     if (Platform.OS !== "web") return;
-    const focusComposer = () => composerInput.current?.focus();
+    const focusComposer = () => composerRef.current?.focus();
     window.addEventListener("lingwu:focus-composer", focusComposer);
     return () => window.removeEventListener("lingwu:focus-composer", focusComposer);
   }, []);
@@ -693,6 +748,7 @@ export function ChatScreen({
   );
   const outbox = useSyncExternalStore(queue.subscribe, queue.getSnapshot, queue.getSnapshot);
   const followLatest = useRef(true);
+  const ownScroll = useRef(false);
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   const runLock = useRef(false);
   const [saveError, setSaveError] = useState("");
@@ -720,13 +776,18 @@ export function ChatScreen({
   const pendingComposerResize = useRef<{ height: number; following: boolean } | null>(null);
   const floatingComposer = hideHeader;
   const contentBottomInset = floatingComposer ? composerDockHeight + 20 : 20;
+  // 只在手机对话页给消息加边缘渐变，停在内容留白处，滚进返回按钮或输入框才变淡。
+  // 输入框背后已有一块不透明垫层，只盖住输入框自己，不和这层渐变冲突。
+  const phoneChatFade = windowWidth < breakpoints.mobile && floatingComposer;
   const [streamAnnouncement, setStreamAnnouncement] = useState("");
   const streamWasActive = useRef(false);
   const streamNeedsHistoryRefresh = useRef(false);
   const streamGaps = useRef(0);
 
   const onComposerHeightChange = useCallback((height: number) => {
-    if (height === measuredDockHeight.current) return;
+    // Keystrokes and the caret make the dock report 1px differences. Those used
+    // to resize the transcript spacer and bounce the messages above.
+    if (Math.abs(height - measuredDockHeight.current) < 8) return;
     measuredDockHeight.current = height;
     pendingComposerResize.current = {
       height,
@@ -835,6 +896,20 @@ export function ChatScreen({
       cancelAnimationFrame(reveal);
     };
   }, [loaded]);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    // Keep this off the React style object: streaming re-renders would drop an
+    // imperative overflow-anchor, and the browser would yank the tail back up
+    // under the floating agent label.
+    const id = "lingwu-chat-scroll-anchor";
+    const style = document.getElementById(id) ?? document.createElement("style");
+    style.id = id;
+    // Nested table scrollers also anchor. scroll-padding would keep pulling text
+    // under the floating label, so only opt the whole transcript out.
+    style.textContent =
+      "[data-testid='chat-message-viewport'],[data-testid='chat-message-viewport'] *{overflow-anchor:none !important}";
+    document.head.appendChild(style);
+  }, []);
   useEffect(
     () => () => {
       void agent.detachActiveRun().catch(() => {});
@@ -1035,7 +1110,7 @@ export function ChatScreen({
     // draft 意图只预填输入框，等用户确认后再走 send，避免模板一点就开跑。
     if (prompt.draft) {
       if (!claimPrompt(prompt.id)) return;
-      if (prompt.text.trim()) setDraft(prompt.text);
+      if (prompt.text.trim()) composerRef.current?.setText(prompt.text);
       // 附件同样只预选，用户可以在发送前移除。
       const ids = (prompt.attachmentIds ?? []).filter((id) =>
         w.files.some((file) => file.id === id),
@@ -1045,7 +1120,7 @@ export function ChatScreen({
       const skillIds = (prompt.skillIds ?? []).filter((id) => id.trim());
       if (skillIds.length)
         setSelectedSkillIds((current) => [...new Set([...current, ...skillIds])]);
-      composerInput.current?.focus();
+      composerRef.current?.focus();
       return;
     }
     if (!isReady || !loaded || !claimPrompt(prompt.id)) return;
@@ -1072,7 +1147,8 @@ export function ChatScreen({
       setError(t("chat.stopError", { detail: e instanceof Error ? e.message : String(e) }));
     } finally {
       // 停止后保留草稿：把刚提交的内容回填到输入框（用户可改写后重发）。
-      if (!draft.trim() && lastSent.current) setDraft(lastSent.current);
+      if (!composerRef.current?.read().trim() && lastSent.current)
+        composerRef.current?.setText(lastSent.current);
     }
   }
   async function uploadMaterial() {
@@ -1101,7 +1177,7 @@ export function ChatScreen({
     setPicking(true);
   }
   function send() {
-    const text = draft.trim();
+    const text = composerRef.current?.read().trim() ?? "";
     if (!text || !isReady || !loaded) return;
     // A new submission can continue after Stop; held follow-ups still need explicit resume.
     if (!busy && !agent.isRunning && !saveError && !queue.getSnapshot().pending.length)
@@ -1110,7 +1186,7 @@ export function ChatScreen({
     lastSent.current = text;
     const files = w.files.filter((f) => attachments.includes(f.id));
     enqueue(promptWithAttachments(text, files));
-    setDraft("");
+    composerRef.current?.clear();
     setAttachments([]);
     setPicking(false);
   }
@@ -1258,6 +1334,20 @@ export function ChatScreen({
     }
   }, [agent.isRunning, stream.state.activeRunId, stream.state.gaps, stream.state.phase]);
 
+  const nudgeScroll = (next: number) => {
+    const node = list.current?.getScrollableNode?.() as HTMLElement | undefined;
+    if (node && typeof node.scrollTop === "number") {
+      if (next - node.scrollTop <= 1) return;
+      ownScroll.current = true;
+      node.scrollTop = next;
+      scrollMetrics.current.y = next;
+      return;
+    }
+    ownScroll.current = true;
+    scrollMetrics.current.y = next;
+    list.current?.scrollTo({ y: next, animated: false });
+  };
+
   return (
     <View style={wide && filesOpen ? { flex: 1, minWidth: 0, flexDirection: "row" } : { flex: 1 }}>
       {/* 主对话列：宽屏 + 产物栏展开时与右侧停靠栏左右分栏，其余情况独占整列。 */}
@@ -1286,7 +1376,11 @@ export function ChatScreen({
         <ScrollView
           testID="chat-message-viewport"
           ref={list}
-          style={[messageColumnStyle, { opacity: historyPositioned ? 1 : 0 }]}
+          style={[
+            messageColumnStyle,
+            { opacity: historyPositioned ? 1 : 0 },
+            phoneChatFade && edgeFadeMask(contentTopInset, contentBottomInset),
+          ]}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             gap: 13,
@@ -1302,21 +1396,34 @@ export function ChatScreen({
             if (initialScroll.current || prependAnchor.current || pendingComposerResize.current)
               return;
             const gap = contentSize.height - contentOffset.y - layoutMeasurement.height;
-            const nearEnd = gap < 120;
+            const nearEnd = gap < followLatestSlack;
+            const away = renderedCount > 0 && gap > awayFromLatestSlack;
+            // Tail follow emits a scroll event. Do not treat that as the reader leaving,
+            // or the next chunk scrolls them back and the viewport oscillates.
+            if (ownScroll.current) {
+              ownScroll.current = false;
+              if (nearEnd) setAwayFromLatest(false);
+              return;
+            }
             followLatest.current = nearEnd;
-            setAwayFromLatest(renderedCount > 0 && gap > 400);
+            setAwayFromLatest(away);
             if (contentOffset.y < 160 && contentOffset.y < previousY && !olderError)
               void loadOlder();
           }}
           scrollEventThrottle={100}
           onContentSizeChange={(_width, height) => {
+            const previousHeight = scrollMetrics.current.height;
+            const previousInset = scrollMetrics.current.bottomInset;
+            const previousOffset = scrollMetrics.current.y;
             scrollMetrics.current = {
               ...scrollMetrics.current,
               height,
               bottomInset: contentBottomInset,
             };
-            const resize = pendingComposerResize.current;
-            if (resize && contentBottomInset === resize.height + 20)
+            if (
+              pendingComposerResize.current &&
+              contentBottomInset === pendingComposerResize.current.height + 20
+            )
               pendingComposerResize.current = null;
             if (!loaded) return;
             if (prependAnchor.current) {
@@ -1332,13 +1439,35 @@ export function ChatScreen({
               list.current?.scrollTo({ y, animated: false });
             } else if (initialScroll.current) {
               list.current?.scrollToEnd({ animated: false });
-            } else if (active && renderedCount > 0 && (followLatest.current || resize?.following)) {
-              followLatest.current = true;
-              setAwayFromLatest(false);
-              list.current?.scrollToEnd({ animated: false });
-            } else if (active) {
-              const gap = height - scrollMetrics.current.y - scrollViewportHeight.current;
-              setAwayFromLatest(renderedCount > 0 && gap > 400);
+            } else if (active && renderedCount > 0) {
+              const viewport = scrollViewportHeight.current;
+              const insetDelta = contentBottomInset - previousInset;
+              const contentDelta = height - previousHeight - insetDelta;
+              // Typing only changes the spacer under the transcript. Move by that
+              // exact amount when pinned, and do not move at all otherwise.
+              if (Math.abs(contentDelta) <= 2 && insetDelta !== 0) {
+                const next = composerInsetNudge({
+                  following: followLatest.current,
+                  insetDelta,
+                  offset: previousOffset,
+                  height,
+                  viewport,
+                });
+                if (next !== undefined) nudgeScroll(next);
+                return;
+              }
+              const next = pinnedTailNudge({
+                following: followLatest.current,
+                previousHeight,
+                height,
+                offset: previousOffset,
+                viewport,
+              });
+              if (next !== undefined) nudgeScroll(next);
+              else if (!followLatest.current) {
+                const gap = height - previousOffset - viewport;
+                setAwayFromLatest(renderedCount > 0 && gap > awayFromLatestSlack);
+              }
             }
           }}
           keyboardShouldPersistTaps="handled"
@@ -1616,7 +1745,7 @@ export function ChatScreen({
                       headline={t("chat.taskDispatched")}
                       body={brief.body}
                       files={w.files}
-                      onOpenFile={(file) => open({ type: "file", file })}
+                      onOpenFile={openReferencedFile}
                     />
                   ) : (
                     !!text && (
@@ -1644,7 +1773,7 @@ export function ChatScreen({
                             content={text}
                             streaming={streaming}
                             files={w.files}
-                            onOpenFile={(file) => open({ type: "file", file })}
+                            onOpenFile={openReferencedFile}
                           />
                         )}
                       </View>
@@ -1743,7 +1872,7 @@ export function ChatScreen({
                   content={draft.text}
                   streaming={!draft.done}
                   files={w.files}
-                  onOpenFile={(file) => open({ type: "file", file })}
+                  onOpenFile={openReferencedFile}
                 />
               </View>
             </View>
@@ -1893,18 +2022,12 @@ export function ChatScreen({
                 // This also confirms short-chat layouts whose total height is unchanged.
                 pendingComposerResize.current = null;
                 scrollMetrics.current.bottomInset = contentBottomInset;
-                if (prependAnchor.current) return;
-                if (loaded && active && resize.following) {
-                  followLatest.current = true;
-                  setAwayFromLatest(false);
-                  list.current?.scrollToEnd({ animated: false });
-                } else {
-                  const gap =
-                    scrollMetrics.current.height -
-                    scrollMetrics.current.y -
-                    scrollViewportHeight.current;
-                  setAwayFromLatest(renderedCount > 0 && gap > 400);
-                }
+                if (prependAnchor.current || resize.following) return;
+                const gap =
+                  scrollMetrics.current.height -
+                  scrollMetrics.current.y -
+                  scrollViewportHeight.current;
+                setAwayFromLatest(renderedCount > 0 && gap > awayFromLatestSlack);
               }}
             />
           )}
@@ -2041,10 +2164,8 @@ export function ChatScreen({
             style={conversationColumnStyle}
           >
             {floatingComposer && <ComposerMatte />}
-            <PromptComposer
-              inputRef={composerInput}
-              value={draft}
-              onChangeText={setDraft}
+            <IsolatedComposer
+              ref={composerRef}
               onSubmit={replying ? () => void stop() : send}
               placeholder={
                 !isReady
@@ -2146,7 +2267,9 @@ export function ChatScreen({
           }
           onConfirm={() => {
             setAttachments(pickerSelection);
-            setDraft((current) => (current.trim() ? current : t("chat.filePickerDefaultPrompt")));
+            composerRef.current?.setText((current) =>
+              current.trim() ? current : t("chat.filePickerDefaultPrompt"),
+            );
             setPicking(false);
           }}
           onClose={() => setPicking(false)}

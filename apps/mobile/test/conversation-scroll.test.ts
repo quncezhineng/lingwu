@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { type PrependAnchor, restorePrependOffset } from "../src/conversation-scroll.ts";
+import {
+  composerInsetNudge,
+  type PrependAnchor,
+  pinnedTailNudge,
+  restorePrependOffset,
+} from "../src/conversation-scroll.ts";
 
 const anchor: PrependAnchor = {
   height: 1200,
@@ -99,5 +104,74 @@ test("content shrink, invalid measurements and negative scroll results are safe"
       },
     ),
     0,
+  );
+});
+
+test("a pinned reader follows only the new growth and ignores a settled tail", () => {
+  assert.equal(
+    pinnedTailNudge({
+      following: true,
+      previousHeight: 2300,
+      height: 2400,
+      offset: 1700,
+      viewport: 600,
+    }),
+    1800,
+  );
+  assert.equal(
+    pinnedTailNudge({
+      following: true,
+      previousHeight: 2400,
+      height: 2400,
+      offset: 1800,
+      viewport: 600,
+    }),
+    undefined,
+  );
+});
+
+test("a reader who scrolled up is not pulled to the tail", () => {
+  assert.equal(
+    pinnedTailNudge({
+      following: false,
+      previousHeight: 2300,
+      height: 2400,
+      offset: 400,
+      viewport: 600,
+    }),
+    undefined,
+  );
+  assert.equal(
+    pinnedTailNudge({
+      following: true,
+      previousHeight: 2300,
+      height: 2400,
+      offset: 400,
+      viewport: 600,
+    }),
+    undefined,
+  );
+});
+
+test("composer growth keeps a pinned tail and leaves a reader who moved up", () => {
+  assert.equal(
+    composerInsetNudge({
+      following: true,
+      insetDelta: 24,
+      offset: 1700,
+      height: 2400,
+      viewport: 600,
+    }),
+    1724,
+  );
+  assert.equal(
+    composerInsetNudge({
+      following: false,
+      insetDelta: 24,
+      offset: 400,
+      height: 2400,
+      viewport: 600,
+    }),
+    undefined,
   );
 });

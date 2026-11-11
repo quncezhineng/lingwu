@@ -2996,12 +2996,97 @@ export function MonitorCard({
     </Card>
   );
 }
-export function NotificationsSheet() {
+export function NotificationsSheet({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const { close, open } = useWorkspace();
   const { unreadCount, error, busy, readAll, openNotification } = useNotificationActions();
   const groups = useMemo(() => (data ? buildNotificationGroups(data) : []), [data]);
+  const body = (
+    <View style={{ gap: 20 }}>
+      <ErrorNotice error={error} />
+      {groups.map((group) => (
+        <View key={group.id} style={{ gap: 9 }}>
+          <View style={[s.between, { gap: 10, alignItems: "flex-start" }]}>
+            <View style={[s.row, { flex: 1, minWidth: 0, gap: 9 }]}>
+              {group.goal ? (
+                <Target size={17} color={colors.primary} />
+              ) : (
+                <Bell size={17} color={colors.muted} />
+              )}
+              <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
+                  {group.goal?.title ?? t("agent.notificationGroupStandalone")}
+                </Text>
+                <Text style={[s.small, s.metric]}>
+                  {t("agent.notificationGroupCount", {
+                    count: String(group.notifications.length),
+                  })}
+                  {group.unread
+                    ? ` · ${t("agent.notificationGroupUnread", { count: String(group.unread) })}`
+                    : ""}
+                </Text>
+              </View>
+            </View>
+            {group.goalId ? (
+              <Button
+                small
+                onPress={() => {
+                  if (group.goalId) open({ type: "goal", goalId: group.goalId });
+                }}
+              >
+                {t("agent.goalTrackViewGoal")}
+              </Button>
+            ) : null}
+          </View>
+          <View style={{ gap: 10 }}>
+            {group.notifications.map((item) => (
+              <Card
+                key={item.id}
+                style={{
+                  gap: 6,
+                  padding: 14,
+                  // 未读通知用品牌浅蓝色底提示，已读回到白底。
+                  backgroundColor: item.read ? colors.paper : colors.sky,
+                  borderColor: item.read ? colors.line : colors.lineStrong,
+                }}
+              >
+                <View style={[s.between, { gap: 10 }]}>
+                  <Text numberOfLines={2} style={s.heading}>
+                    {item.title}
+                  </Text>
+                  {!item.read && <Chip>{t("agent.newChip")}</Chip>}
+                </View>
+                {!!item.body.trim() && (
+                  <Text numberOfLines={2} style={s.small}>
+                    {notificationExcerpt(item.body)}
+                  </Text>
+                )}
+                <View style={[s.between, { gap: 10 }]}>
+                  <Text style={[s.small, s.metric]}>{stamp(item.createdAt)}</Text>
+                  <Button small onPress={() => void openNotification(item)}>
+                    {item.taskId
+                      ? t("agent.viewTask")
+                      : item.read
+                        ? t("agent.read")
+                        : t("agent.markRead")}
+                  </Button>
+                </View>
+              </Card>
+            ))}
+          </View>
+        </View>
+      ))}
+      {!data?.notifications.length && (
+        <Empty
+          icon={Bell}
+          title={t("agent.allCaughtUp")}
+          detail={t("agent.notificationsEmptyDetail")}
+        />
+      )}
+    </View>
+  );
+  if (embedded) return body;
   return (
     <Sheet
       title={t("agent.notificationsTitle")}
@@ -3019,88 +3104,7 @@ export function NotificationsSheet() {
       }
       onClose={close}
     >
-      <View style={{ gap: 20 }}>
-        <ErrorNotice error={error} />
-        {groups.map((group) => (
-          <View key={group.id} style={{ gap: 9 }}>
-            <View style={[s.between, { gap: 10, alignItems: "flex-start" }]}>
-              <View style={[s.row, { flex: 1, minWidth: 0, gap: 9 }]}>
-                {group.goal ? (
-                  <Target size={17} color={colors.primary} />
-                ) : (
-                  <Bell size={17} color={colors.muted} />
-                )}
-                <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-                  <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
-                    {group.goal?.title ?? t("agent.notificationGroupStandalone")}
-                  </Text>
-                  <Text style={[s.small, s.metric]}>
-                    {t("agent.notificationGroupCount", {
-                      count: String(group.notifications.length),
-                    })}
-                    {group.unread
-                      ? ` · ${t("agent.notificationGroupUnread", { count: String(group.unread) })}`
-                      : ""}
-                  </Text>
-                </View>
-              </View>
-              {group.goalId ? (
-                <Button
-                  small
-                  onPress={() => {
-                    if (group.goalId) open({ type: "goal", goalId: group.goalId });
-                  }}
-                >
-                  {t("agent.goalTrackViewGoal")}
-                </Button>
-              ) : null}
-            </View>
-            <View style={{ gap: 10 }}>
-              {group.notifications.map((item) => (
-                <Card
-                  key={item.id}
-                  style={{
-                    gap: 6,
-                    padding: 14,
-                    // 未读通知用品牌浅蓝色底提示，已读回到白底。
-                    backgroundColor: item.read ? colors.paper : colors.sky,
-                    borderColor: item.read ? colors.line : colors.lineStrong,
-                  }}
-                >
-                  <View style={[s.between, { gap: 10 }]}>
-                    <Text numberOfLines={2} style={s.heading}>
-                      {item.title}
-                    </Text>
-                    {!item.read && <Chip>{t("agent.newChip")}</Chip>}
-                  </View>
-                  {!!item.body.trim() && (
-                    <Text numberOfLines={2} style={s.small}>
-                      {notificationExcerpt(item.body)}
-                    </Text>
-                  )}
-                  <View style={[s.between, { gap: 10 }]}>
-                    <Text style={[s.small, s.metric]}>{stamp(item.createdAt)}</Text>
-                    <Button small onPress={() => void openNotification(item)}>
-                      {item.taskId
-                        ? t("agent.viewTask")
-                        : item.read
-                          ? t("agent.read")
-                          : t("agent.markRead")}
-                    </Button>
-                  </View>
-                </Card>
-              ))}
-            </View>
-          </View>
-        ))}
-        {!data?.notifications.length && (
-          <Empty
-            icon={Bell}
-            title={t("agent.allCaughtUp")}
-            detail={t("agent.notificationsEmptyDetail")}
-          />
-        )}
-      </View>
+      {body}
     </Sheet>
   );
 }

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { Modal, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { useCallback, useEffect, useMemo } from "react";
+import { Platform, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import type { ActionProposal } from "../../../packages/domain/src";
 import type { AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentSpace } from "./agent-space";
@@ -9,36 +9,24 @@ import { ApprovalCard } from "./approval-card";
 import { selectBotResources } from "./bot-resources";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { X } from "./icons";
-import { queuedBriefSnapshot, subscribeQueuedBriefs } from "./queued-brief";
-import { QueuedBriefCard } from "./queued-brief-card";
+import { ModalOverlay } from "./modal-overlay";
+import { delegatedSectionTitle } from "./plan-card";
 import { colors, radius, shadow } from "./theme";
 import { TaskThreadCard } from "./thread-artifacts";
+import { s } from "./ui";
 import { useWorkspace } from "./workspace";
 
-export type WorkAnchor = { x: number; y: number; width: number; height: number };
-
-/** 头顶胶囊点开的对话框：只放这个 Agent 的委派任务，按创建时间从新到旧。 */
-export function AgentWorkDialog({ anchor, onClose }: { anchor: WorkAnchor; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { width, height } = useWindowDimensions();
+function useAgentWorkData() {
   const { current } = useAgentSpace();
-  const briefs = useSyncExternalStore(
-    subscribeQueuedBriefs,
-    queuedBriefSnapshot,
-    queuedBriefSnapshot,
-  );
   const { api, workspace, refresh, open } = useWorkspace();
   const { data, refresh: refreshAgent } = useAgentWorkspace();
-  const tasks = [...selectBotResources(current, data, workspace.files).tasks].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
+  const tasks = useMemo(
+    () =>
+      [...selectBotResources(current, data, workspace.files).tasks].sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      ),
+    [current, data, workspace.files],
   );
-  const panelWidth = Math.min(440, width - 24);
-  const left = Math.max(
-    12,
-    Math.min(anchor.x + anchor.width / 2 - panelWidth / 2, width - panelWidth - 12),
-  );
-  const top = anchor.y + anchor.height + 8;
-  const maxHeight = Math.max(220, Math.min(640, height - top - 16));
 
   useEffect(() => {
     void refresh().catch(() => {});
@@ -57,22 +45,73 @@ export function AgentWorkDialog({ anchor, onClose }: { anchor: WorkAnchor; onClo
     [api, refresh, refreshAgent],
   );
 
+  return { current, workspace, tasks, decideAction, open };
+}
+
+/** 这个 Agent 交办的任务，按创建时间从新到旧。父级负责滚动。 */
+export function AgentWorkList() {
+  const { t } = useTranslation();
+  const { current, workspace, tasks, decideAction, open } = useAgentWorkData();
+  if (tasks.length === 0) {
+    return (
+      <Text
+        style={{
+          paddingHorizontal: 4,
+          paddingVertical: 18,
+          fontSize: 13,
+          lineHeight: 20,
+          color: colors.muted,
+        }}
+      >
+        {t("agentSpace.noTasks")}
+      </Text>
+    );
+  }
   return (
-    <Modal transparent visible animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1 }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("ui.closeDetails")}
-          onPress={onClose}
-          style={{ flex: 1 }}
+    <View style={{ gap: 14 }}>
+      {tasks.map((task) => (
+        <WorkEntry
+          key={task.id}
+          task={task}
+          actions={workspace.actions.filter(
+            (action) => action.taskId === task.id || task.actionId === action.id,
+          )}
+          agentName={current.name}
+          files={workspace.files}
+          onDecide={decideAction}
+          onOpenDetails={(action) => open({ type: "review", action })}
         />
-        <View
+      ))}
+    </View>
+  );
+}
+
+/** 居中的完整委派列表。Esc、点遮罩、关闭按钮都可以收起。 */
+export function AgentWorkModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
+  const { height } = useWindowDimensions();
+  const listHeight = Math.max(280, Math.min(640, Math.round(height * 0.7)));
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+  return (
+    <ModalOverlay onRequestClose={onClose}>
+      <Pressable accessibilityRole="button" onPress={onClose} style={s.modalShade}>
+        <Pressable
+          testID="agent-work-modal"
+          accessibilityViewIsModal
+          onPress={(event) => event.stopPropagation()}
           style={{
-            position: "absolute",
-            top,
-            left,
-            width: panelWidth,
-            maxHeight,
+            width: "100%",
+            maxWidth: 440,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: radius.sheet,
@@ -92,14 +131,7 @@ export function AgentWorkDialog({ anchor, onClose }: { anchor: WorkAnchor; onClo
             }}
           >
             <View style={{ flex: 1, gap: 2 }}>
-              <Text
-                style={{ fontSize: 16, lineHeight: 24, fontWeight: "600", color: colors.heading }}
-              >
-                {t("agentSpace.delegatedWork")}
-              </Text>
-              <Text style={{ fontSize: 12, lineHeight: 18, color: colors.muted }}>
-                {current.name} · {t("agentSpace.delegatedWorkHint")}
-              </Text>
+              <Text style={delegatedSectionTitle}>{t("agentSpace.delegatedWork")}</Text>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -108,7 +140,7 @@ export function AgentWorkDialog({ anchor, onClose }: { anchor: WorkAnchor; onClo
               style={({ pressed }) => ({
                 width: 28,
                 height: 28,
-                borderRadius: radius.control,
+                borderRadius: radius.full,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: pressed ? colors.overlay1 : "transparent",
@@ -118,47 +150,19 @@ export function AgentWorkDialog({ anchor, onClose }: { anchor: WorkAnchor; onClo
             </Pressable>
           </View>
           <ScrollView
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 14, gap: 14 }}
+            style={{ maxHeight: listHeight }}
+            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 14 }}
           >
-            {tasks.length === 0 ? (
-              <Text
-                style={{
-                  paddingHorizontal: 4,
-                  paddingVertical: 18,
-                  fontSize: 13,
-                  lineHeight: 20,
-                  color: colors.muted,
-                }}
-              >
-                {t("agentSpace.noTasks")}
-              </Text>
-            ) : (
-              tasks.map((task) => (
-                <WorkEntry
-                  key={task.id}
-                  task={task}
-                  brief={briefs.get(task.id)}
-                  actions={workspace.actions.filter(
-                    (action) => action.taskId === task.id || task.actionId === action.id,
-                  )}
-                  agentName={current.name}
-                  files={workspace.files}
-                  onDecide={decideAction}
-                  onOpenDetails={(action) => open({ type: "review", action })}
-                />
-              ))
-            )}
+            <AgentWorkList />
           </ScrollView>
-        </View>
-      </View>
-    </Modal>
+        </Pressable>
+      </Pressable>
+    </ModalOverlay>
   );
 }
 
 function WorkEntry({
   task,
-  brief,
   actions,
   agentName,
   files,
@@ -166,28 +170,23 @@ function WorkEntry({
   onOpenDetails,
 }: {
   task: AgentTask;
-  brief?: { headline: string; body: string };
   actions: ActionProposal[];
   agentName: string;
   files: ReturnType<typeof useWorkspace>["workspace"]["files"];
   onDecide: (action: ActionProposal, decision: "approve" | "deny") => Promise<ActionProposal>;
   onOpenDetails: (action: ActionProposal) => void;
 }) {
-  const { t } = useTranslation();
   const when = new Date(task.createdAt).toLocaleString(activeLocaleTag(), {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
-  const headline = brief?.headline ?? `${t("chat.queuedBrief")} · ${task.title}`;
-  const body = brief?.body || task.prompt;
   return (
     <View style={{ gap: 8 }}>
       <Text style={{ paddingHorizontal: 4, fontSize: 12, lineHeight: 18, color: colors.muted }}>
         {when}
       </Text>
-      <QueuedBriefCard headline={headline} body={body} files={files} />
       {actions.map((action) => (
         <ApprovalCard
           key={action.id}
@@ -200,7 +199,7 @@ function WorkEntry({
           onOpenDetails={onOpenDetails}
         />
       ))}
-      <TaskThreadCard task={task} />
+      <TaskThreadCard task={task} quiet />
     </View>
   );
 }

@@ -5,7 +5,7 @@ import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel } from "./i18n/translate";
 import { Check, ChevronDown, ChevronUp, CircleX, Clock3 } from "./icons";
-import { colors, radius, space, statusColors, typography } from "./theme";
+import { colors, fonts, radius, space, statusColors, typography } from "./theme";
 import { s } from "./ui";
 
 /** 步骤标记：完成对勾、进行中转圈、失败叉、等待时钟、未开始空心圆点（同一套图标语言）。 */
@@ -34,6 +34,18 @@ function StepMark({ step }: { step: TaskStep }) {
   }
 }
 
+/**
+ * 「委派与任务」区域标题。侧栏、弹窗和任务卡标题共用这一套：
+ * 15 / 22、衬线、加粗，避免卡片标题比栏目标题更大。
+ */
+export const delegatedSectionTitle = {
+  fontFamily: fonts.serif,
+  fontSize: 15,
+  lineHeight: 22,
+  fontWeight: "600" as const,
+  color: colors.text,
+};
+
 /** 步骤状态的文字色：进行中用加深蓝，失败用红，其余中性。 */
 function stepTextColor(status: TaskStep["status"]) {
   if (status === "running") return colors.primaryStrong;
@@ -52,6 +64,7 @@ export function PlanCard({
   title,
   collapsible = true,
   defaultCollapsed = false,
+  quietTitle = false,
   style,
 }: {
   steps: TaskStep[];
@@ -59,6 +72,8 @@ export function PlanCard({
   title: string;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
+  /** 与「委派与任务」标题同一字号和行高，单行省略。 */
+  quietTitle?: boolean;
   style?: ViewStyle;
 }) {
   const { t } = useTranslation();
@@ -70,8 +85,23 @@ export function PlanCard({
   return (
     <View style={[card, collapsed && { backgroundColor: colors.surfaceSoft }, style]}>
       <View style={[s.between, { gap: space.xs }]}>
-        <View style={[s.row, { gap: space.xs, flexShrink: 1 }]}>
-          <Text style={s.heading}>{title}</Text>
+        <View style={[s.row, { gap: space.xs, flex: 1, minWidth: 0 }]}>
+          <Text
+            numberOfLines={quietTitle ? 1 : undefined}
+            ellipsizeMode="tail"
+            style={
+              quietTitle
+                ? {
+                    ...delegatedSectionTitle,
+                    flexGrow: 1,
+                    flexShrink: 1,
+                    minWidth: 0,
+                  }
+                : [s.heading, { flexShrink: 1 }]
+            }
+          >
+            {title}
+          </Text>
           <Text
             style={[
               s.metric,
@@ -91,6 +121,7 @@ export function PlanCard({
             style={({ pressed }) => ({
               width: 28,
               height: 28,
+              flexShrink: 0,
               alignItems: "center",
               justifyContent: "center",
               borderRadius: radius.micro,

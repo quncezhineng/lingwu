@@ -43,8 +43,16 @@ export const colors = {
   line: "#E6E6E6",
   lineSoft: "#EFEFEF",
   lineStrong: "#D6D6D6",
+  /**
+   * 图标按钮、头像圆钮、毛玻璃、胶囊和搜索条共用的 1px 描边。
+   * 落在卡片线 #E6E6E6 和过深的 #C4C4C4 中间，左右悬浮圆钮同一档。
+   */
+  controlLine: "#D5D5D5",
   /** 选中 / 悬停描边（Demo --accent-line）。 */
   accentLine: "#D9E5FA",
+  /** 悬浮按钮的毛玻璃底，让滚到下面的文字仍能读。 */
+  glass: "rgba(248,248,248,0.78)",
+  glassPressed: "rgba(244,244,244,0.92)",
   overlay1: "rgba(48,48,48,0.045)",
   overlay2: "rgba(48,48,48,0.075)",
   overlay3: "rgba(48,48,48,0.11)",
@@ -123,6 +131,8 @@ export const semantic = {
   destructiveForeground: colors.onPrimary,
   border: colors.line,
   input: colors.line,
+  /** 圆形图标按钮、头像圆钮、悬浮毛玻璃、胶囊、搜索条。 */
+  controlBorder: colors.controlLine,
   ring: colors.primary,
   sidebar: colors.sidebar,
   sidebarForeground: colors.muted,

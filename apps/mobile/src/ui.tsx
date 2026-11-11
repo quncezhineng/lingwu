@@ -1,8 +1,10 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Image,
   type ImageSourcePropType,
+  PanResponder,
   Pressable,
   type PressableProps,
   ScrollView,
@@ -15,13 +17,15 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { agentLayout } from "./agent-layout";
 import { Text, TextInput } from "./app-text";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
 import { AlertTriangle, ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
+import { shouldCompletePop, useIosSheetShift } from "./ios-transition";
 import { ModalOverlay } from "./modal-overlay";
 import { breakpoints, colors, fonts, radius, semantic, shadow, space, typography } from "./theme";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
  * 设计令牌统一由 `theme.ts` 提供，这里 re-export 以兼容既有 `from "./ui"` 引用。
@@ -147,7 +151,7 @@ export const s = StyleSheet.create({
   },
   iconButtonHover: { backgroundColor: colors.overlay1 },
   iconButtonPressed: { backgroundColor: colors.overlay2 },
-  iconButtonOutline: { backgroundColor: semantic.card, borderColor: semantic.border },
+  iconButtonOutline: { backgroundColor: semantic.card, borderColor: semantic.controlBorder },
   iconButtonSecondary: { backgroundColor: semantic.secondary },
   /** 触控目标底座：36×36（可配合 hitSlop 达到 44）。 */
   iconBox: {
@@ -532,7 +536,7 @@ export function Sheet({
   medium?: boolean;
   /** 紧凑阅读浮层：用于单张领悟卡等短内容，避免桌面端出现过宽留白。 */
   narrow?: boolean;
-  /** 小型选择浮层：桌面端收窄，移动端保留左右留白。 */
+  /** 小型选择浮层：只收窄桌面。手机上拉弹窗一律接近整屏。 */
   small?: boolean;
   /** 阅读模式：手机全屏，桌面使用大尺寸居中对话框（如研究产物详情）。 */
   fullscreen?: boolean;
@@ -548,11 +552,32 @@ export function Sheet({
   const bottomSheet = compact && !fullscreen;
   const edgeToEdge = compact && fullscreen;
   const mobileBotLayout = bottomSheet && botLayout;
+  // 状态栏/安全区之下再留一条背景。弹窗本身贴左右和底边，盖过底部安全区。
+  const sheetTop = insets.top + 12;
+  const { shift, dismiss } = useIosSheetShift(bottomSheet, height, onClose);
+  const drag = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        bottomSheet && gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderMove: (_event, gesture) => {
+        shift.setValue(Math.max(0, gesture.dy));
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        if (shouldCompletePop(gesture.dy, height, gesture.vy)) dismiss();
+        else
+          Animated.timing(shift, {
+            toValue: 0,
+            duration: 220,
+            useNativeDriver: false,
+          }).start();
+      },
+    }),
+  ).current;
   return (
-    <ModalOverlay transition={bottomSheet ? "bottom" : "fade"} onRequestClose={onClose}>
+    <ModalOverlay transition="none" onRequestClose={dismiss}>
       {/* 背板：点击深色区域关闭弹窗（dismissOnBackdrop 可关闭此行为） */}
       <Pressable
-        onPress={dismissOnBackdrop ? onClose : undefined}
+        onPress={dismissOnBackdrop ? dismiss : undefined}
         style={[
           s.modalShade,
           !compact && { padding: space.lg },
@@ -561,12 +586,13 @@ export function Sheet({
         ]}
       >
         {/* 弹窗面板：自身拦截点击，避免面板内点击冒泡到背板导致误关 */}
-        <Pressable
+        <AnimatedPressable
           testID="sheet-dialog"
           accessibilityViewIsModal
           onPress={(e) => e.stopPropagation()}
           style={[
             s.sheet,
+            bottomSheet ? { transform: [{ translateY: shift }] } : null,
             !compact && {
               maxHeight: Math.max(0, height - space.xl * 2),
               borderRadius: radius.sheet,
@@ -576,28 +602,23 @@ export function Sheet({
             medium && { maxWidth: 680 },
             narrow && { maxWidth: 560 },
             small && { maxWidth: 440 },
-            bottomSheet &&
-              small && {
-                width: Math.min(width - space.md * 2, 440),
-                maxHeight: "88%",
-                marginBottom: Math.max(insets.bottom, space.md),
-                borderBottomLeftRadius: radius.sheet,
-                borderBottomRightRadius: radius.sheet,
-              },
-            bottomSheet &&
-              !small && {
-                borderBottomLeftRadius: 0,
-                borderBottomRightRadius: 0,
-                paddingBottom: Math.max(insets.bottom, 12),
-                maxHeight: "94%",
-              },
-            mobileBotLayout && {
-              maxWidth: agentLayout.sheetMaxWidth,
-              maxHeight: "91%",
-              borderRadius: radius.sheet * 2,
+            bottomSheet && {
+              position: "absolute",
+              top: sheetTop,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: "100%",
+              maxWidth: "100%",
+              maxHeight: "100%",
+              marginBottom: 0,
+              borderWidth: 0,
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
               borderBottomLeftRadius: 0,
               borderBottomRightRadius: 0,
-              borderBottomWidth: 0,
+              paddingBottom: 0,
+              flexShrink: 0,
             },
             fullscreen &&
               !compact && {
@@ -618,15 +639,24 @@ export function Sheet({
           {bottomSheet && (
             <View
               testID="sheet-drag-handle"
+              {...drag.panHandlers}
               style={{
                 alignSelf: "center",
-                width: 28,
-                height: 3,
-                borderRadius: radius.full,
-                backgroundColor: colors.lineStrong,
-                marginTop: 8,
+                width: 36,
+                height: 16,
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
+            >
+              <View
+                style={{
+                  width: 28,
+                  height: 3,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.lineStrong,
+                }}
+              />
+            </View>
           )}
           <View
             style={[
@@ -674,23 +704,26 @@ export function Sheet({
               )}
             </View>
             {!!headerAction && <View style={{ marginRight: 8 }}>{headerAction}</View>}
-            <IconButton icon={X} label={t("ui.closeDetails")} onPress={onClose} size={32} />
+            <IconButton icon={X} label={t("ui.closeDetails")} onPress={dismiss} size={32} />
           </View>
           <ScrollView
             testID="sheet-scroll-content"
             keyboardShouldPersistTaps="handled"
-            style={[{ flexShrink: 1, minHeight: 0 }, fullscreen && { flex: 1 }]}
+            style={[{ flexShrink: 1, minHeight: 0 }, (fullscreen || bottomSheet) && { flex: 1 }]}
             contentContainerStyle={
               fullscreen
                 ? { flexGrow: 1, padding: space.md }
-                : mobileBotLayout
-                  ? { paddingHorizontal: space.lg, paddingBottom: 30 }
+                : bottomSheet
+                  ? {
+                      paddingHorizontal: mobileBotLayout ? space.lg : space.md,
+                      paddingBottom: Math.max(insets.bottom, 16) + 16,
+                    }
                   : { padding: space.md }
             }
           >
             {children}
           </ScrollView>
-        </Pressable>
+        </AnimatedPressable>
       </Pressable>
     </ModalOverlay>
   );

@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Text, TextInput } from "./app-text";
 import { ArrowUp, type IconComponent, Plus, Square } from "./icons";
-import { colors, fonts, radius, shadow } from "./ui";
+import { colors, fonts, radius, semantic, shadow } from "./ui";
 
 const noFocusRing =
   Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : undefined;
@@ -100,7 +100,7 @@ export function PromptComposer({
         alignItems: "center",
         justifyContent: "center",
         borderWidth: 1,
-        borderColor: pressed ? colors.primary : colors.lineSoft,
+        borderColor: pressed ? colors.primary : semantic.controlBorder,
         backgroundColor: pressed ? colors.sky : colors.paper,
         transform: [{ scale: pressed ? 0.96 : 1 }],
         ...shadow.card,
@@ -120,16 +120,15 @@ export function PromptComposer({
         setToolsOpen(false);
       }}
       onBlur={() => setFocused(false)}
-      onContentSizeChange={(event) =>
-        setInputHeight(
-          !value
-            ? inputMinHeight
-            : Math.max(
-                inputMinHeight,
-                Math.min(inputMaxHeight, event.nativeEvent.contentSize.height),
-              ),
-        )
-      }
+      onContentSizeChange={(event) => {
+        const measured = Math.ceil(event.nativeEvent.contentSize.height);
+        const next = !value
+          ? inputMinHeight
+          : Math.max(inputMinHeight, Math.min(inputMaxHeight, measured));
+        // A caret or one glyph should not resize the field. That resize was
+        // changing the transcript spacer and shaking the messages above.
+        setInputHeight((current) => (Math.abs(current - next) < 8 ? current : next));
+      }}
       onSubmitEditing={action}
       onKeyPress={
         Platform.OS === "web"
@@ -181,7 +180,7 @@ export function PromptComposer({
         alignItems: "center",
         justifyContent: "center",
         borderWidth: busy || canSubmit ? 0 : 1,
-        borderColor: colors.line,
+        borderColor: semantic.controlBorder,
         backgroundColor: busy || canSubmit ? colors.primaryAction : colors.surfaceRaised,
         opacity: pressed ? 0.82 : 1,
         transform: [{ scale: pressed ? 0.96 : 1 }],

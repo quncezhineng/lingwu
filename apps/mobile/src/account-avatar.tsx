@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Image, View } from "react-native";
 import { Text } from "./app-text";
-import { colors } from "./theme";
+import { colors, semantic } from "./theme";
 
 /**
  * Account avatar with the same initial fallback used by the account page.
@@ -35,7 +35,7 @@ export function AccountAvatar({
         justifyContent: "center",
         overflow: "hidden",
         borderWidth: 1,
-        borderColor: colors.line,
+        borderColor: semantic.controlBorder,
         backgroundColor: colors.paper,
       }}
     >

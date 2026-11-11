@@ -25,6 +25,32 @@ export function markdownTableRows(node: ASTNode): string[][] {
 }
 
 /**
+ * Ignore a 0-width layout pass and subpixel scrollbar flicker.
+ * Those measurements were clearing the remembered width, hiding every table
+ * hint for a frame, then putting it back and shoving the transcript.
+ */
+export function nextTableViewport(current: number, measured: number): number {
+  const next = Math.floor(measured);
+  if (!Number.isFinite(next) || next < 8) return current;
+  if (Math.abs(current - next) < 2) return current;
+  return next;
+}
+
+const rememberedTableViewports = new Map<string, number>();
+
+export function tableViewportSignature(rows: readonly (readonly string[])[]): string {
+  return rows.map((row) => row.join("\u001f")).join("\u001e");
+}
+
+export function rememberedTableViewport(signature: string): number {
+  return rememberedTableViewports.get(signature) ?? 0;
+}
+
+export function rememberTableViewport(signature: string, width: number) {
+  if (width >= 8) rememberedTableViewports.set(signature, width);
+}
+
+/**
  * Keep short values and headers readable, reserve more space for prose, and overflow
  * horizontally when those readable widths cannot fit. Never squeeze every column equally.
  */

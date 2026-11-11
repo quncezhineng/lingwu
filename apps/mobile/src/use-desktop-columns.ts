@@ -42,5 +42,12 @@ export function useDesktopColumns(available: number) {
       return next;
     });
   }, []);
-  return { widths, resize, railCollapsed, toggleRail };
+  const expandRail = useCallback(() => {
+    setRailCollapsed((current) => {
+      if (!current) return current;
+      writeStorage(RIGHT_RAIL_COLLAPSED_STORAGE_KEY, "0");
+      return false;
+    });
+  }, []);
+  return { widths, resize, railCollapsed, toggleRail, expandRail };
 }

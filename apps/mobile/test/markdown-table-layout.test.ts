@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { markdownTableWidths, markdownTextWidth } from "../src/markdown-table-layout.ts";
+import {
+  markdownTableWidths,
+  markdownTextWidth,
+  nextTableViewport,
+  rememberedTableViewport,
+  rememberTableViewport,
+  tableViewportSignature,
+} from "../src/markdown-table-layout.ts";
 
 const priceLadder = [
   ["价位", "对应 2026E 扣非PE", "需要你相信什么"],
@@ -58,4 +65,19 @@ test("compact tables preserve the same readable layout with smaller cells", () =
   const compact = markdownTableWidths(priceLadder, 0, true);
   assert.ok(compact.every((width, index) => width < regular[index]));
   assert.ok(compact[2] > compact[0]);
+});
+
+test("a zero-width layout pass does not forget the table width", () => {
+  assert.equal(nextTableViewport(326, 0), 326);
+  assert.equal(nextTableViewport(326, 4), 326);
+  assert.equal(nextTableViewport(326, 327), 326);
+  assert.equal(nextTableViewport(0, 326), 326);
+  assert.equal(nextTableViewport(326, Number.NaN), 326);
+  const signature = tableViewportSignature([
+    ["口径", "价格"],
+    ["伦敦金", "4065"],
+  ]);
+  rememberTableViewport(signature, 326);
+  assert.equal(rememberedTableViewport(signature), 326);
+  assert.equal(rememberedTableViewport("missing"), 0);
 });
