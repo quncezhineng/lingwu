@@ -13,6 +13,8 @@ import type {
   CalendarEvent,
   EmailDraft,
 } from "../../../packages/domain/src";
+import { useAgentSpace } from "./agent-space";
+import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
@@ -25,7 +27,9 @@ import {
   type FileSourceFilter,
   fileSourceBucket,
   fileSourceLabel,
+  filterArtifacts,
   filterFileLibrary,
+  groupArtifactsByAgent,
 } from "./file-library";
 import { pickAndUploadFile } from "./file-upload";
 import { activeLocaleTag, useTranslation } from "./i18n";
@@ -81,6 +85,13 @@ import {
   timeLabel,
 } from "./ui";
 import { useWorkspace } from "./workspace";
+
+/**
+ * 首页 Today 里暂不展示的邮件 / 日历版块。
+ * 只隐藏渲染入口，邮件页、日历页、统计与数据逻辑全部保留；
+ * 需要恢复时清空这个集合即可。
+ */
+const HIDDEN_TODAY_SECTIONS = new Set<string>(["mail", "calendar"]);
 
 function todayDate() {
   return localDateTime(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone)
@@ -243,132 +254,144 @@ export function TodayScreen() {
             icon: ShieldCheck,
             section: "activity" as const,
           },
-        ].map((item) => (
-          <Pressable
-            key={item.label}
-            accessibilityRole="button"
-            onPress={() => navigate(item.section)}
-            // 看板小卡片：白底 + 1px 描边分层（不靠阴影），按压态用 overlay1
-            style={({ pressed }) => [
-              s.card,
-              { flex: 1, minWidth: 190, padding: 14, height: 112 },
-              pressed && { backgroundColor: colors.overlay1 },
-            ]}
-          >
-            <View style={s.between}>
-              {/* 表头式小标签：s.label 风格（11px、加粗、letterSpacing） */}
-              <Text style={[s.label, { fontSize: 11, letterSpacing: 1 }]}>{item.label}</Text>
-              {/* 图标底座统一用 surface，品牌浅底只留给小面积状态 Chip */}
-              <View style={[s.iconBox, { width: 34, height: 34, borderRadius: 10 }]}>
-                <item.icon size={15} color={colors.primary} />
-              </View>
-            </View>
-            <Text
-              style={[
-                s.metric,
-                { fontSize: 24, color: colors.text, letterSpacing: 0.5, marginTop: 2 },
+        ]
+          .filter((item) => !HIDDEN_TODAY_SECTIONS.has(item.section))
+          .map((item) => (
+            <Pressable
+              key={item.label}
+              accessibilityRole="button"
+              onPress={() => navigate(item.section)}
+              // 看板小卡片：白底 + 1px 描边分层（不靠阴影），按压态用 overlay1
+              style={({ pressed }) => [
+                s.card,
+                { flex: 1, minWidth: 190, padding: 14, height: 112 },
+                pressed && { backgroundColor: colors.overlay1 },
               ]}
             >
-              {String(item.value).padStart(2, "0")}
-            </Text>
-            <Text style={[s.small, { marginTop: 3 }]}>{item.note}</Text>
-          </Pressable>
-        ))}
+              <View style={s.between}>
+                {/* 表头式小标签：s.label 风格（11px、加粗、letterSpacing） */}
+                <Text style={[s.label, { fontSize: 11, letterSpacing: 1 }]}>{item.label}</Text>
+                {/* 图标底座统一用 surface，品牌浅底只留给小面积状态 Chip */}
+                <View style={[s.iconBox, { width: 34, height: 34, borderRadius: 10 }]}>
+                  <item.icon size={15} color={colors.primary} />
+                </View>
+              </View>
+              <Text
+                style={[
+                  s.metric,
+                  { fontSize: 24, color: colors.text, letterSpacing: 0.5, marginTop: 2 },
+                ]}
+              >
+                {String(item.value).padStart(2, "0")}
+              </Text>
+              <Text style={[s.small, { marginTop: 3 }]}>{item.note}</Text>
+            </Pressable>
+          ))}
       </View>
       <MarketBriefingCard />
-      <View style={{ flexDirection: wide ? "row" : "column", gap: 16 }}>
-        <Card style={{ flex: 1 }}>
-          <SectionHeading
-            title={t("screens.todayCalendarHeading")}
-            action={t("screens.todayCalendarAction")}
-            onPress={() => navigate("calendar")}
-          />
-          {events.length ? (
-            events.slice(0, 3).map((e) => <AgendaRow key={e.id} event={e} />)
-          ) : (
-            <Empty
-              icon={CalendarDays}
-              title={t("screens.todayCalendarEmptyTitle")}
-              detail={t("screens.todayCalendarEmptyDetail")}
-            />
-          )}
-          <Pressable
-            onPress={() => open({ type: "event" })}
-            style={({ pressed }) => [
-              s.row,
-              {
-                gap: 8,
-                paddingTop: 12,
-                marginTop: 8,
-                borderTopWidth: 1,
-                borderTopColor: colors.line,
-                borderRadius: 10,
-              },
-              pressed && { backgroundColor: colors.overlay1 },
-            ]}
-          >
-            <Plus size={15} color={colors.muted} />
-            <Text style={s.small}>{t("screens.todayMakeTime")}</Text>
-          </Pressable>
-        </Card>
-        <Card style={{ flex: 1 }}>
-          <SectionHeading
-            title={t("screens.todayInboxHeading")}
-            action={t("screens.todayInboxAction")}
-            onPress={() => navigate("mail")}
-          />
-          {w.mail.length ? (
-            w.mail.slice(0, 3).map((m, i) => (
+      {(!HIDDEN_TODAY_SECTIONS.has("calendar") || !HIDDEN_TODAY_SECTIONS.has("mail")) && (
+        <View style={{ flexDirection: wide ? "row" : "column", gap: 16 }}>
+          {!HIDDEN_TODAY_SECTIONS.has("calendar") && (
+            <Card style={{ flex: 1 }}>
+              <SectionHeading
+                title={t("screens.todayCalendarHeading")}
+                action={t("screens.todayCalendarAction")}
+                onPress={() => navigate("calendar")}
+              />
+              {events.length ? (
+                events.slice(0, 3).map((e) => <AgendaRow key={e.id} event={e} />)
+              ) : (
+                <Empty
+                  icon={CalendarDays}
+                  title={t("screens.todayCalendarEmptyTitle")}
+                  detail={t("screens.todayCalendarEmptyDetail")}
+                />
+              )}
               <Pressable
-                key={m.id}
-                onPress={() => open({ type: "mail", mail: m })}
-                // 列表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+                onPress={() => open({ type: "event" })}
                 style={({ pressed }) => [
                   s.row,
                   {
-                    gap: 10,
-                    paddingVertical: 10,
-                    borderTopWidth: i ? 1 : 0,
+                    gap: 8,
+                    paddingTop: 12,
+                    marginTop: 8,
+                    borderTopWidth: 1,
                     borderTopColor: colors.line,
                     borderRadius: 10,
                   },
                   pressed && { backgroundColor: colors.overlay1 },
                 ]}
               >
-                <Avatar name={m.sender} index={i} />
-                <View style={{ flex: 1, gap: 3 }}>
-                  <View style={s.between}>
-                    <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>{m.sender}</Text>
-                    <Text style={[s.small, { fontSize: 10 }, s.metric]}>{timeLabel(m.date)}</Text>
-                  </View>
-                  <Text numberOfLines={1} style={[s.text, { fontSize: 12, lineHeight: 18 }]}>
-                    {m.subject}
-                  </Text>
-                  <Text numberOfLines={1} style={[s.small, { fontSize: 11 }]}>
-                    {m.body.replace(/\n/g, " ")}
-                  </Text>
-                </View>
-                {m.unread && (
-                  <View
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 4,
-                      backgroundColor: colors.primary,
-                    }}
-                  />
-                )}
+                <Plus size={15} color={colors.muted} />
+                <Text style={s.small}>{t("screens.todayMakeTime")}</Text>
               </Pressable>
-            ))
-          ) : (
-            <Empty
-              icon={Inbox}
-              title={t("screens.todayInboxEmptyTitle")}
-              detail={t("screens.todayInboxEmptyDetail")}
-            />
+            </Card>
           )}
-        </Card>
-      </View>
+          {!HIDDEN_TODAY_SECTIONS.has("mail") && (
+            <Card style={{ flex: 1 }}>
+              <SectionHeading
+                title={t("screens.todayInboxHeading")}
+                action={t("screens.todayInboxAction")}
+                onPress={() => navigate("mail")}
+              />
+              {w.mail.length ? (
+                w.mail.slice(0, 3).map((m, i) => (
+                  <Pressable
+                    key={m.id}
+                    onPress={() => open({ type: "mail", mail: m })}
+                    // 列表行：行圆角 10 + 1px 分隔线，按压态用 overlay1
+                    style={({ pressed }) => [
+                      s.row,
+                      {
+                        gap: 10,
+                        paddingVertical: 10,
+                        borderTopWidth: i ? 1 : 0,
+                        borderTopColor: colors.line,
+                        borderRadius: 10,
+                      },
+                      pressed && { backgroundColor: colors.overlay1 },
+                    ]}
+                  >
+                    <Avatar name={m.sender} index={i} />
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <View style={s.between}>
+                        <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>
+                          {m.sender}
+                        </Text>
+                        <Text style={[s.small, { fontSize: 10 }, s.metric]}>
+                          {timeLabel(m.date)}
+                        </Text>
+                      </View>
+                      <Text numberOfLines={1} style={[s.text, { fontSize: 12, lineHeight: 18 }]}>
+                        {m.subject}
+                      </Text>
+                      <Text numberOfLines={1} style={[s.small, { fontSize: 11 }]}>
+                        {m.body.replace(/\n/g, " ")}
+                      </Text>
+                    </View>
+                    {m.unread && (
+                      <View
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 4,
+                          backgroundColor: colors.primary,
+                        }}
+                      />
+                    )}
+                  </Pressable>
+                ))
+              ) : (
+                <Empty
+                  icon={Inbox}
+                  title={t("screens.todayInboxEmptyTitle")}
+                  detail={t("screens.todayInboxEmptyDetail")}
+                />
+              )}
+            </Card>
+          )}
+        </View>
+      )}
       <View style={{ flexDirection: wide ? "row" : "column", gap: 16 }}>
         <Card style={{ flex: 1 }}>
           <SectionHeading title={t("screens.todayHelpHeading")} />
@@ -1061,6 +1084,7 @@ export function FilesScreen({
 }) {
   const { workspace: w, api, refresh, open, prefillPrompt, notify } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
+  const { agents: agentList } = useAgentSpace();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [section, setSection] = useState<LibrarySection>(initialSection);
@@ -1082,13 +1106,35 @@ export function FilesScreen({
     [library.artifacts, savedInsightIds],
   );
   const fileCounts = useMemo(() => {
-    const counts = { all: library.files.length, analysis: 0, upload: 0 };
+    // 智能体分析产出的报告不是「文件」记录，但用户期望在「分析生成」里看到它们。
+    const counts = {
+      all: library.files.length + library.artifacts.length,
+      analysis: library.artifacts.length,
+      upload: 0,
+    };
     for (const file of library.files) counts[fileSourceBucket(file)] += 1;
     return counts;
-  }, [library.files]);
+  }, [library.files, library.artifacts]);
   const visibleFiles = useMemo(
     () => filterFileLibrary(library.files, { source: sourceFilter, format: formatFilter, query }),
     [library.files, sourceFilter, formatFilter, query],
+  );
+  /**
+   * 分析生成的产物按「生成它的智能体」分组展示。
+   * 「我的上传」只看上传件；格式筛选针对文件扩展名，产物没有扩展名，一并隐藏以免误读。
+   */
+  const artifactGroups = useMemo(() => {
+    if (sourceFilter === "upload" || formatFilter !== "all") return [];
+    return groupArtifactsByAgent(
+      filterArtifacts(library.artifacts, { query }),
+      agent?.tasks ?? [],
+      agentList,
+      t("screens.filesAgentUnassigned"),
+    );
+  }, [sourceFilter, formatFilter, query, library.artifacts, agent?.tasks, agentList, t]);
+  const visibleArtifactCount = artifactGroups.reduce(
+    (total, group) => total + group.artifacts.length,
+    0,
   );
   const selectedFiles = library.files.filter((file) => selectedIds.has(file.id));
   const filtersActive = sourceFilter !== "all" || formatFilter !== "all" || query.trim().length > 0;
@@ -1192,30 +1238,12 @@ export function FilesScreen({
           }}
         >
           <Text style={[s.small, { flex: 1, lineHeight: 20 }]}>{t("screens.filesSubtitle")}</Text>
-          {section === "files" && (
-            <Button primary small={compact} icon={Upload} busy={busy} onPress={() => void upload()}>
-              {t(compact ? "screens.filesImportShort" : "screens.filesImport")}
-            </Button>
-          )}
         </View>
       ) : (
         <PageHeader
           title={t("app.titleFiles")}
           description={t("screens.filesSubtitle")}
           compact={width < breakpoints.desktop}
-          actions={
-            section === "files" ? (
-              <Button
-                primary
-                small={compact}
-                icon={Upload}
-                busy={busy}
-                onPress={() => void upload()}
-              >
-                {t(compact ? "screens.filesImportShort" : "screens.filesImport")}
-              </Button>
-            ) : undefined
-          }
           style={{ marginBottom: 0 }}
         />
       )}
@@ -1324,7 +1352,9 @@ export function FilesScreen({
                 })}
               </View>
               <Text style={[s.small, { marginLeft: "auto", color: colors.faint }]}>
-                {t("screens.filesVisibleCount", { count: visibleFiles.length })}
+                {t("screens.filesVisibleCount", {
+                  count: visibleFiles.length + visibleArtifactCount,
+                })}
               </Text>
             </View>
 
@@ -1440,6 +1470,43 @@ export function FilesScreen({
             )}
           </View>
 
+          {/* 上传入口放在筛选卡之后、文件列表之前：上传是文件库的主入口，放页面底部会被长列表淹没，用户难以发现 */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("screens.filesUploadAreaTitle")}
+            disabled={busy}
+            onPress={() => void upload()}
+            style={({ pressed }) => [
+              s.row,
+              {
+                gap: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                borderWidth: 1,
+                borderStyle: "dashed",
+                borderColor: colors.lineStrong,
+                borderRadius: radius.field,
+                backgroundColor: pressed ? colors.surface : "transparent",
+                opacity: busy ? 0.7 : 1,
+              },
+            ]}
+          >
+            {busy ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Upload size={18} color={colors.muted} />
+            )}
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>
+                {t("screens.filesUploadAreaTitle")}
+              </Text>
+              <Text numberOfLines={compact ? 2 : 1} style={[s.small, { color: colors.faint }]}>
+                {t("screens.filesUploadAreaDetail")}
+              </Text>
+            </View>
+            {!compact && <Plus size={15} color={colors.faint} />}
+          </Pressable>
+
           {!!selectedFiles.length && (
             <View
               style={[
@@ -1478,7 +1545,7 @@ export function FilesScreen({
             </View>
           )}
 
-          {visibleFiles.length ? (
+          {visibleFiles.length > 0 && (
             // 文件改为一张卡内的分行列表：共用描边、行间 1px 分隔，去掉表头与逐行卡片
             <Card style={{ padding: 0, overflow: "hidden" }}>
               {visibleFiles.map((file, index) => {
@@ -1613,22 +1680,47 @@ export function FilesScreen({
                 );
               })}
             </Card>
-          ) : (
+          )}
+
+          {/* 分析产物按智能体分组：同一张卡里先给智能体名，再列它产出的报告 */}
+          {artifactGroups.map((group) => (
+            <View key={group.agentId} style={{ gap: space.xs }}>
+              <View style={[s.between, { gap: space.xs, flexWrap: "wrap" }]}>
+                <Text style={[s.label, { fontSize: 11, letterSpacing: 1 }]}>{group.agentName}</Text>
+                <Text style={[s.small, s.metric, { color: colors.faint }]}>
+                  {t("screens.libraryItemCount", { count: group.artifacts.length })}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
+                {group.artifacts.map((artifact) => (
+                  <View key={artifact.id} style={{ flexGrow: 1, flexBasis: 260, maxWidth: 520 }}>
+                    <ArtifactCard artifact={artifact} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+
+          {!visibleFiles.length && visibleArtifactCount === 0 && (
             <Card>
               <Empty
-                icon={filtersActive && library.files.length ? Folder : FileText}
+                icon={
+                  filtersActive && library.files.length + library.artifacts.length > 0
+                    ? Folder
+                    : FileText
+                }
                 title={t(
-                  filtersActive && library.files.length
+                  filtersActive && library.files.length + library.artifacts.length > 0
                     ? "screens.filesNoMatchTitle"
                     : "screens.filesEmptyTitle",
                 )}
                 detail={t(
-                  filtersActive && library.files.length
+                  filtersActive && library.files.length + library.artifacts.length > 0
                     ? "screens.filesNoMatchDetail"
                     : "screens.filesEmptyDetail",
                 )}
               >
-                {filtersActive && library.files.length > 0 && (
+                {filtersActive && library.files.length + library.artifacts.length > 0 && (
                   <Button icon={Search} onPress={clearFilters}>
                     {t("screens.filesClearFilters")}
                   </Button>
@@ -1636,51 +1728,6 @@ export function FilesScreen({
               </Empty>
             </Card>
           )}
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("screens.filesUploadAreaTitle")}
-            disabled={busy}
-            onPress={() => void upload()}
-            style={({ pressed }) => [
-              s.row,
-              {
-                gap: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                borderWidth: 1,
-                borderStyle: "dashed",
-                borderColor: colors.lineStrong,
-                borderRadius: radius.field,
-                backgroundColor: pressed ? colors.surface : "transparent",
-                opacity: busy ? 0.7 : 1,
-              },
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : (
-              <Upload size={18} color={colors.muted} />
-            )}
-            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-              <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>
-                {t("screens.filesUploadAreaTitle")}
-              </Text>
-              <Text numberOfLines={compact ? 2 : 1} style={[s.small, { color: colors.faint }]}>
-                {t("screens.filesUploadAreaDetail")}
-              </Text>
-            </View>
-            {!compact && <Plus size={15} color={colors.faint} />}
-          </Pressable>
-
-          <View style={[s.row, { gap: 6, alignItems: "flex-start", paddingHorizontal: 2 }]}>
-            <View style={{ marginTop: 3 }}>
-              <ShieldCheck size={12} color={colors.faint} />
-            </View>
-            <Text style={[s.small, { flex: 1, color: colors.faint }]}>
-              {t("screens.filesWorkspaceNote")}
-            </Text>
-          </View>
         </View>
       )}
 

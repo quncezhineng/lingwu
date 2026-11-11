@@ -45,6 +45,12 @@ export type ConnectorOption = {
 };
 
 /**
+ * 暂不对外开放的连接器：Gmail / Google Calendar / OpenBot。
+ * 只从可选列表里隐藏，连接与 OAuth 实现保留；需要恢复时清空这个集合即可。
+ */
+const HIDDEN_CONNECTOR_IDS = new Set<string>(["gmail", "calendar", "openbot"]);
+
+/**
  * 当前工作区可选的连接器。状态取自服务端快照，未连接的连接器在选择弹层里不可勾选，
  * 保证带进对话的始终是真正可用的能力。
  */
@@ -57,7 +63,7 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
   const browserConnected = workspace.connections.some(
     (connection) => connection.id === "browser" && connection.status === "connected",
   );
-  return [
+  const options: ConnectorOption[] = [
     {
       id: "gmail",
       name: "Gmail",
@@ -87,6 +93,7 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
       icon: Sparkles,
     },
   ];
+  return options.filter((option) => !HIDDEN_CONNECTOR_IDS.has(option.id));
 }
 
 /** 技能展示名：先找 Agent 自定义技能，再找技能目录，最后回退到 id。 */

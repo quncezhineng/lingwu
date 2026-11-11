@@ -636,7 +636,7 @@ const agent = {
   "agent.skillsHeading": "Skills",
   "agent.mySkills": "My skills",
   "agent.mySkillsEmpty":
-    "No skills yet. Tap “Create skill” above to write one, or add one from the skill marketplace.",
+    "No skills yet. Tap “Create skill” above to write one, or “Upload skill” to import an existing one.",
   "agent.mySkillDeletedToast": "Deleted “{title}”.",
   "agent.mySkillDeleteConfirmTitle": "Permanently delete “{title}”?",
   "agent.mySkillDeleteConfirmNoteAll":
@@ -766,7 +766,6 @@ const agent = {
   "agentSpace.createAgent": "Create Agent",
   "agentSpace.account": "Personal account",
   "agentSpace.personalCenter": "Personal center",
-  "agentSpace.accountMenuSettingsDetail": "Models, workspace and account settings",
   "agentSpace.systemAgent": "System default Agent",
   "agentSpace.more": "Global capabilities",
   "agentSpace.resizeAgentList": "Resize Agent list",
@@ -860,6 +859,13 @@ const agent = {
   "agentSpace.libraryEmpty":
     "No resources yet. Files and analysis produced by this Agent's tasks will appear here.",
   "agentSpace.createSkill": "Create skill",
+  "agentSpace.uploadSkill": "Upload skill",
+  "agentSpace.uploadSkillHint":
+    "SKILL.md files are supported: choose a file, or drop one into the area below.",
+  "agentSpace.uploadSkillDropzoneTitle": "Choose or drop a SKILL.md",
+  "agentSpace.uploadSkillDropzoneHint": "Up to 512 KB per file",
+  "agentSpace.uploadSkillDropzoneDragHint": "You can also drag a file here and drop it",
+  "agentSpace.skillUploadedToast": "Uploaded “{title}”",
   "agentSpace.addSkill": "Add skill",
   "agentSpace.addSkillHint":
     "Tap to add or remove (including your own skills); tap the icon or long-press for details, or search to filter.",

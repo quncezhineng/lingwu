@@ -29,12 +29,16 @@ import {
   Sparkles,
   Target,
   Trash2,
+  Upload,
   X,
 } from "./icons";
 import { instructionsMarkdownStyle } from "./instructions-markdown";
 import { ModalOverlay } from "./modal-overlay";
+import { SkillDropzone } from "./SkillDropzone";
 import { type SkillCatalogEntry, type SkillCategory, skillCatalog } from "./skill-catalog";
 import { SkillEditor } from "./skill-editor";
+import type { PickedSkillFile } from "./skill-file";
+import { parseSkillMarkdown, skillNameFromFile } from "./skill-markdown";
 import { deleteSkillEverywhere, skillHolderAgentIds, toggleSkillShare } from "./skill-sharing";
 import { StatusBadge, type StatusTone } from "./status-badge";
 import { breakpoints, radius } from "./theme";
@@ -1159,6 +1163,7 @@ export function CapabilityHubScreen() {
     saveSkill,
     deleteSkill,
     skillLibrary,
+    saveLibrarySkill,
     deleteLibrarySkill,
   } = useAgentSpace();
   const [category, setCategory] = useState<CategoryId>("all");
@@ -1172,6 +1177,10 @@ export function CapabilityHubScreen() {
   const [selectedMySkill, setSelectedMySkill] = useState<MySkillEntry>();
   /** 「我的技能」里正在创建新技能。 */
   const [creatingSkill, setCreatingSkill] = useState(false);
+  /** 正在读取并解析 SKILL.md：期间禁掉再次点击，避免重复入库。 */
+  const [uploadingSkill, setUploadingSkill] = useState(false);
+  /** 「上传技能」说明弹窗：先讲清格式与上传方式，再让用户选文件或拖拽。 */
+  const [uploadSkillOpen, setUploadSkillOpen] = useState(false);
   /** 「我的技能」里正在编辑库中的技能（编辑不产生 Agent 副本）。 */
   const [editingMySkill, setEditingMySkill] = useState<AgentSkill>();
   /** 技能 tab 的二级视角：「技能市场」技能目录 / 「我的技能」。 */
@@ -1286,6 +1295,30 @@ export function CapabilityHubScreen() {
         agent: agent.name,
       }),
     );
+  }
+
+  /**
+   * 把选中的 SKILL.md 解析后写进「我的技能」库。
+   * 不自动挂到某个 Agent：入库后仍走卡片里的「添加到智能体」，与手写创建保持一致。
+   * 解析失败时保留弹窗，让用户换一个文件重试。
+   */
+  async function saveUploadedSkill(picked: PickedSkillFile) {
+    if (uploadingSkill) return;
+    setUploadingSkill(true);
+    try {
+      const parsed = parseSkillMarkdown(picked.text, {
+        fallbackName: skillNameFromFile(picked.name),
+        locale,
+      });
+      saveLibrarySkill(parsed);
+      setSkillTab("mine");
+      setUploadSkillOpen(false);
+      notify(t("agentSpace.skillUploadedToast", { title: parsed.name }));
+    } catch (error) {
+      notify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUploadingSkill(false);
+    }
   }
 
   /** 点卡片删除只打开确认层，确认后才真正删除。 */
@@ -1440,7 +1473,19 @@ export function CapabilityHubScreen() {
     contentWidth >= 1000 ? 4 : contentWidth >= 680 ? 3 : 2,
   );
 
-  const scopedItems = items.filter((item) => item.type === typeFilter);
+  // 暂不对用户开放的能力入口：只在「应用与技能」目录里隐藏对应卡片，不删除底层实现。
+  // 卡片对象仍完整保留在 items 中，因此路由、连接流程等逻辑不受影响；
+  // 需要恢复时删掉下面对应 id 即可。按类型分组，避免不同 tab 下的同名 id 互相干扰。
+  const HIDDEN_CAPABILITY_IDS: Partial<Record<CapabilityType, readonly string[]>> = {
+    // 插件：邮件、日历两个工作区入口目前没有可用数据源。
+    plugins: ["mail", "calendar-workspace"],
+    // 连接器：Gmail / Google Calendar / OpenBot 暂未接入。
+    connectors: ["gmail", "calendar", "openbot"],
+  };
+  const hiddenIdsForType = HIDDEN_CAPABILITY_IDS[typeFilter] ?? [];
+  const scopedItems = items.filter(
+    (item) => item.type === typeFilter && !hiddenIdsForType.includes(item.id),
+  );
   const cardsForCategory = (item: CatalogItem, nextCategory: CategoryId) =>
     nextCategory === "all" || item.tags.includes(nextCategory as CatalogTag);
   const baseCategoryOptions = CATEGORY_OPTIONS_BY_TYPE[typeFilter];
@@ -1573,9 +1618,19 @@ export function CapabilityHubScreen() {
               active={skillTab}
               onChange={setSkillTab}
               action={
-                <Button small icon={Plus} onPress={() => setCreatingSkill(true)}>
-                  {t("agentSpace.createSkill")}
-                </Button>
+                <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                  <Button
+                    small
+                    icon={Upload}
+                    disabled={uploadingSkill}
+                    onPress={() => setUploadSkillOpen(true)}
+                  >
+                    {t("agentSpace.uploadSkill")}
+                  </Button>
+                  <Button small icon={Plus} onPress={() => setCreatingSkill(true)}>
+                    {t("agentSpace.createSkill")}
+                  </Button>
+                </View>
               }
             />
           )}
@@ -1689,6 +1744,26 @@ export function CapabilityHubScreen() {
           <View style={{ gap: 14 }}>
             <Text style={s.text}>{t("screens.connectionsOpenBotNotice")}</Text>
             <Text style={s.muted}>{t("screens.connectionsOpenBotDetail")}</Text>
+          </View>
+        </Sheet>
+      )}
+
+      {uploadSkillOpen && (
+        <Sheet
+          title={t("agentSpace.uploadSkill")}
+          subtitle={t("agentSpace.uploadSkillHint")}
+          onClose={() => setUploadSkillOpen(false)}
+          narrow
+        >
+          <View style={{ gap: 12 }}>
+            <SkillDropzone
+              title={t("agentSpace.uploadSkillDropzoneTitle")}
+              hint={t("agentSpace.uploadSkillDropzoneHint")}
+              dragHint={t("agentSpace.uploadSkillDropzoneDragHint")}
+              busy={uploadingSkill}
+              onPick={(picked) => void saveUploadedSkill(picked)}
+              onError={notify}
+            />
           </View>
         </Sheet>
       )}

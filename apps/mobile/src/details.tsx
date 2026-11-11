@@ -96,6 +96,13 @@ import {
 } from "./ui";
 import { WatchlistSymbolSheet } from "./watchlist-symbol";
 import { type Detail, useWorkspace } from "./workspace";
+
+/**
+ * 「工作区」里暂不展示的邮件 / 日历入口（设置页分组行 + 工作区浮层分区列表共用）。
+ * 只隐藏这两处 UI 入口，邮件 / 日历的页面、路由与数据逻辑全部保留；
+ * 需要恢复时清空这个集合即可。
+ */
+const HIDDEN_WORKSPACE_ENTRIES = new Set<string>(["mail", "calendar"]);
 export function Details({ detail }: { detail: Detail }) {
   const { t } = useTranslation();
   const { close, navigate } = useWorkspace();
@@ -148,17 +155,19 @@ export function Details({ detail }: { detail: Detail }) {
         { section: "files" as const, title: t("app.titleFiles"), icon: FileText },
         { section: "activity" as const, title: t("app.titleActivity"), icon: Clock3 },
         { section: "connections" as const, title: t("details.connections"), icon: ShieldCheck },
-      ].map((item) => (
-        <LinkRow
-          key={item.section}
-          title={item.title}
-          icon={item.icon}
-          onPress={() => {
-            navigate(item.section);
-            close();
-          }}
-        />
-      ))}
+      ]
+        .filter((item) => !HIDDEN_WORKSPACE_ENTRIES.has(item.section))
+        .map((item) => (
+          <LinkRow
+            key={item.section}
+            title={item.title}
+            icon={item.icon}
+            onPress={() => {
+              navigate(item.section);
+              close();
+            }}
+          />
+        ))}
     </Sheet>
   );
 }
@@ -262,22 +271,26 @@ export function SettingsScreen() {
               open({ type: "computer" });
             }}
           />
-          <LinkRow
-            icon={MailIcon}
-            title={t("app.titleMail")}
-            detail={t("app.subtitleMail")}
-            onPress={() => {
-              navigate("mail");
-            }}
-          />
-          <LinkRow
-            icon={CalendarDays}
-            title={t("app.titleCalendar")}
-            detail={t("app.subtitleCalendar")}
-            onPress={() => {
-              navigate("calendar");
-            }}
-          />
+          {!HIDDEN_WORKSPACE_ENTRIES.has("mail") && (
+            <LinkRow
+              icon={MailIcon}
+              title={t("app.titleMail")}
+              detail={t("app.subtitleMail")}
+              onPress={() => {
+                navigate("mail");
+              }}
+            />
+          )}
+          {!HIDDEN_WORKSPACE_ENTRIES.has("calendar") && (
+            <LinkRow
+              icon={CalendarDays}
+              title={t("app.titleCalendar")}
+              detail={t("app.subtitleCalendar")}
+              onPress={() => {
+                navigate("calendar");
+              }}
+            />
+          )}
         </Card>
       </View>
       <LanguagePicker visible={languageOpen} onClose={() => setLanguageOpen(false)} centered />

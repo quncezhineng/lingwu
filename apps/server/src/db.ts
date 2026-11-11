@@ -173,7 +173,7 @@ export class Store {
   /** 某 kind 下去重后的 owner 列表（用于「对每个 owner 执行一次维护」的遍历）。 */
   async owners(kind: string): Promise<string[]> {
     const result = await this.db.query(
-      "SELECT DISTINCT jsonb_build_object('owner',owner) AS data FROM records WHERE kind=$1 ORDER BY owner",
+      "SELECT DISTINCT jsonb_build_object('owner',owner) AS data FROM records WHERE kind=$1 ORDER BY data",
       [kind],
     );
     return result.rows.map((row) => (row.data as { owner: string }).owner);

@@ -92,7 +92,6 @@ const screens = {
   // Files 文件
   "screens.filesSubtitle":
     "统一管理分析生成的研究成果、上传文件、领悟卡与个人笔记，支持检索、下载和投入分析。",
-  "screens.filesImport": "上传资料",
   "screens.libraryFiles": "文件",
   "screens.libraryInsights": "领悟卡",
   "screens.libraryNotes": "我的笔记",
@@ -100,7 +99,6 @@ const screens = {
   "screens.libraryInsightsEmptyDetail": "完成的研报、对比与市场简报会自动归档到这里。",
   "screens.libraryInsightsHint": "从已完成的研究中沉淀的结论，点开可追溯依据与来源。",
   "screens.libraryItemCount": "{count} 条",
-  "screens.filesImportShort": "上传",
   "screens.filesSourceUpload": "我的上传",
   "screens.filesSourceAnalysis": "分析生成",
   "screens.filesSourceExport": "导出",
@@ -109,6 +107,7 @@ const screens = {
   "screens.filesDocumentsHeading": "文件",
   "screens.filesResearchBadge": "研究文件",
   "screens.filesGeneratedByAgent": "智能体生成",
+  "screens.filesAgentUnassigned": "未归属智能体",
   "screens.filesOpenResearchArtifact": "打开研究产物：{name}",
   "screens.filesPage": "页",
   "screens.filesPages": "页",
@@ -151,7 +150,6 @@ const screens = {
   "screens.filesUploadAreaTitle": "上传文件，随时交给灵悟分析",
   "screens.filesUploadAreaDetail":
     "支持 PDF、HTML、Markdown、图片、Word、Excel、PPT 和常见文本文件，单个文件不超过 10 MB。",
-  "screens.filesWorkspaceNote": "资料保存在当前工作区，并会随工作区数据一起同步。",
 
   // Activity 动态
   "screens.activityFilterAll": "全部动态",

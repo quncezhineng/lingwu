@@ -1,5 +1,6 @@
 import type { Artifact } from "../../../packages/domain/src";
-import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
+import type { AgentDefinition } from "./agent-space-model";
 import { type FileKind, fileKind } from "./file-kind";
 import type { TranslationKey } from "./i18n/locales/en";
 
@@ -63,10 +64,8 @@ export function filterFileLibrary(
   });
 }
 
-/** A short card preview should not expose Markdown control characters. */ export function markdownExcerpt(
-  value: string,
-  maxLength = 140,
-): string {
+/** A short card preview should not expose Markdown control characters. */
+export function markdownExcerpt(value: string, maxLength = 140): string {
   const text = value
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/!\[([^\]]*)]\([^)]*\)/g, "$1")
@@ -79,4 +78,60 @@ export function filterFileLibrary(
     .trim();
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength).trimEnd()}…`;
+}
+
+/** 一个智能体名下的分析生成产物。 */
+export interface AgentArtifactGroup {
+  agentId: string;
+  agentName: string;
+  artifacts: AgentArtifact[];
+}
+
+/** 产物没有可追溯的智能体时统一归到这个分组，避免条目凭空消失。 */
+export const UNASSIGNED_AGENT_ID = "unassigned";
+
+/**
+ * 把智能体生成的分析产物按「生成它的智能体」归类。
+ *
+ * 归属链路是 artifact.taskId → task.threadId → agent.threadId → agent：
+ * AgentArtifact 本身只记任务 id，任务只在由对话发起时才带 threadId，
+ * 因此后台定时任务（如市场简报）产出的结果会落到「未归属」分组。
+ */
+export function groupArtifactsByAgent(
+  artifacts: readonly AgentArtifact[],
+  tasks: readonly Pick<AgentTask, "id" | "threadId">[],
+  agents: readonly Pick<AgentDefinition, "id" | "name" | "threadId">[],
+  unassignedLabel: string,
+): AgentArtifactGroup[] {
+  const threadByTask = new Map(tasks.map((task) => [task.id, task.threadId]));
+  const agentByThread = new Map(agents.map((agent) => [agent.threadId, agent]));
+  const groups = new Map<string, AgentArtifactGroup>();
+  for (const artifact of newestFirst(artifacts)) {
+    const threadId = threadByTask.get(artifact.taskId);
+    const owner = threadId ? agentByThread.get(threadId) : undefined;
+    const agentId = owner?.id ?? UNASSIGNED_AGENT_ID;
+    const group = groups.get(agentId) ?? {
+      agentId,
+      agentName: owner?.name ?? unassignedLabel,
+      artifacts: [],
+    };
+    group.artifacts.push(artifact);
+    groups.set(agentId, group);
+  }
+  // 已归属的智能体排在前面，同组内仍按时间倒序（newestFirst 已保证）。
+  return [...groups.values()].sort((a, b) => {
+    if (a.agentId === UNASSIGNED_AGENT_ID) return 1;
+    if (b.agentId === UNASSIGNED_AGENT_ID) return -1;
+    return 0;
+  });
+}
+
+/** 产物标题匹配搜索词；格式筛选对产物不适用，由调用方决定是否展示。 */
+export function filterArtifacts(
+  artifacts: readonly AgentArtifact[],
+  filters: { query: string },
+): AgentArtifact[] {
+  const query = filters.query.trim().toLowerCase();
+  if (!query) return [...artifacts];
+  return artifacts.filter((artifact) => artifact.title.toLowerCase().includes(query));
 }

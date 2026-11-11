@@ -536,7 +536,7 @@ export async function createApp(
   app.route("/api/computer", computerRoutes(computer, files));
   // 对话分享：`POST /api/shares` 需登录，`GET /s/:id` 是给收件人看的公开页面。
   app.route("/api/shares", shareApiRoutes({ store: db, config }));
-  app.route("/s", sharePageRoutes({ store: db }));
+  app.route("/s", sharePageRoutes({ store: db, config }));
   app.get("/api/calendars", async (c) => c.json(await workspace.calendars(c.get("owner"))));
   app.get("/api/calendar/events", async (c) => {
     const query = z

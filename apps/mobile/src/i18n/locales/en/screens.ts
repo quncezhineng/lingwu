@@ -93,7 +93,6 @@ const screens = {
   // Files 文件
   "screens.filesSubtitle":
     "Manage research outputs, uploaded documents, insights and notes in one place, ready to search, download or add to analysis.",
-  "screens.filesImport": "Upload document",
   "screens.libraryFiles": "Files",
   "screens.libraryInsights": "Insights",
   "screens.libraryNotes": "My notes",
@@ -103,7 +102,6 @@ const screens = {
   "screens.libraryInsightsHint":
     "Conclusions kept from finished research. Open one to trace its evidence and sources.",
   "screens.libraryItemCount": "{count} items",
-  "screens.filesImportShort": "Upload",
   "screens.filesSourceUpload": "My uploads",
   "screens.filesSourceAnalysis": "From analysis",
   "screens.filesSourceExport": "Exported",
@@ -112,6 +110,7 @@ const screens = {
   "screens.filesDocumentsHeading": "Files",
   "screens.filesResearchBadge": "RESEARCH",
   "screens.filesGeneratedByAgent": "Created by agent",
+  "screens.filesAgentUnassigned": "Unassigned agent",
   "screens.filesOpenResearchArtifact": "Open research output: {name}",
   "screens.filesPage": "page",
   "screens.filesPages": "pages",
@@ -154,8 +153,6 @@ const screens = {
   "screens.filesUploadAreaTitle": "Upload a document to analyze with Lingwu",
   "screens.filesUploadAreaDetail":
     "PDF, HTML, Markdown, images, Word, Excel, PowerPoint, and common text files are supported, up to 10 MB per file.",
-  "screens.filesWorkspaceNote":
-    "Documents stay in the current workspace and sync with your workspace data.",
 
   // Activity 动态
   "screens.activityFilterAll": "All activity",

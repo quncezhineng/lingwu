@@ -568,7 +568,6 @@ function AccountMenu({
           <AccountMenuRow
             icon={Settings2}
             title={t("details.settingsTitle")}
-            detail={t("agentSpace.accountMenuSettingsDetail")}
             onPress={onSettings}
           />
           <View style={{ height: 1, marginVertical: 6, backgroundColor: colors.line }} />

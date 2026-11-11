@@ -5,6 +5,136 @@
 
 ## 变更记录
 
+### 2026-11-11 · 界面：删除技能上传弹层的 frontmatter 说明
+
+**背景**
+
+用户在「上传技能」弹层里看到一段说明「上传后会读取 frontmatter 里的名称与用途，正文作为工作提示词；没有 frontmatter 时用标题和首段兜底。」，要求删除该标题。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：删除上传弹层中 SkillDropzone 下方的说明行 `<Text>{t("agentSpace.uploadSkillNote")}</Text>`；
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：删除不再引用的 `agentSpace.uploadSkillNote` 翻译键。
+
+**验证**
+
+- `pnpm typecheck`：`capability-hub.tsx` 与翻译文件无类型错误（`bot-pages/connectors.tsx` 既有报错为历史遗留，与此无关）。
+
+### 2026-11-11 · 界面：修正「我的技能」空状态文案
+
+**背景**
+
+用户在「我的技能」页看到空状态提示「还没有技能。点右上角『创建技能』写一个，或去技能市场添加。」，要求改得更契合页面实际功能。
+
+**处理**
+
+- 核对 [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：右上角操作区实际只有「创建技能」与「上传技能」两个按钮；「技能市场」是浏览/安装到智能体的技能目录，并不能把技能加进「我的技能」，原文案「去技能市场添加」有误导；
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agent.mySkillsEmpty` 改为引导「创建技能」与「上传技能」两个真实入口。
+
+**验证**
+
+- `pnpm typecheck`：无新增类型错误（`bot-pages/connectors.tsx` 既有报错为历史遗留，与此无关）。
+
+### 2026-11-11 · 界面：删除文件库页底部的工作区说明
+
+**背景**
+
+用户在文件库页底部看到一条带盾牌图标的说明「资料保存在当前工作区，并会随工作区数据一起同步。」，要求删除该区块内容。
+
+**处理**
+
+- [screens.tsx](../apps/mobile/src/screens.tsx)：删除 `ShieldCheck` + `screens.filesWorkspaceNote` 组成的工作区说明行（文件列表之后、页面末尾）；
+- [zh-Hans/screens.ts](../apps/mobile/src/i18n/locales/zh-Hans/screens.ts) 与 [en/screens.ts](../apps/mobile/src/i18n/locales/en/screens.ts)：删除不再引用的 `screens.filesWorkspaceNote` 翻译键。
+
+**验证**
+
+- `pnpm typecheck`：`screens.tsx` 及翻译文件无类型错误（`bot-pages/connectors.tsx` 既有报错为本任务前遗留，与此无关）。
+
+### 2026-11-11 · 界面：文件库上传入口从页面底部移到列表上方
+
+**背景**
+
+用户浏览文件库页时，发现「上传文件，随时交给灵悟分析」虚线按钮位于页面底部、文件列表之后——文件多时完全看不到，入口不显眼。要求移到合适位置。
+
+**处理**
+
+- [screens.tsx](../apps/mobile/src/screens.tsx)：
+  - 将「上传文件」Pressable 从文件列表之后（页面底部）移到筛选工具卡之后、文件列表之前；
+  - 上传是文件库的主入口，放在顶部显眼区（筛选与列表之间），文件再多也不会被长列表淹没；
+  - 「工作区说明」提示行保留在页面底部不动，不作迁移。
+
+**验证**
+
+- `pnpm typecheck`：仅剩 `bot-pages/connectors.tsx` 的既有报错（与本次改动无关，历史遗留），`screens.tsx` 无类型错误。
+
+### 2026-11-11 · 界面：分享页左上角品牌行改为灵悟 Logo
+
+**背景**
+
+用户浏览 Web 端分享页（iframe 中）时，左上角「灵悟」标题旁只有一个小圆点占位图形，要求换成灵悟的品牌 Logo。
+
+**处理**
+
+- [share-routes.ts](../apps/server/src/share-routes.ts)：
+  - 内联 `BRAND_LOGO_SVG` / `BRAND_LOGO_DATA_URI`：与 [apps/mobile/assets/logo.svg](../apps/mobile/assets/logo.svg) 一致的品牌 logo，以 `data:image/svg+xml` data URI 内联进页面（分享页由 API 渲染、无静态资源路由，内联可避免外部请求与跨域图片外链）；
+  - `.brand-dot`（小圆点）样式替换为 `.brand-logo`（22px 圆角矩形）；
+  - 分享页与 404 页的品牌行均由 `<span class="brand-dot">` 改为 `<img class="brand-logo" src="${BRAND_LOGO_DATA_URI}" alt="灵悟">`，两处保持视觉一致。
+- [tests/share-page.test.ts](../tests/share-page.test.ts)：新增断言验证 `brand-logo` 图片与 `data:image/svg+xml` data URI 已渲染。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`：通过。
+- `npx tsx --import ./tests/setup.ts --test tests/share-page.test.ts`：7 例全部通过。
+
+### 2026-11-11 · 界面：分享页顶部新增「进入主页」按钮
+
+**背景**
+
+用户浏览 Web 端分享页（iframe 中）时，顶部只有「灵悟」品牌标识，缺少返回项目主页的入口。要求添加一个合适的按钮，点击即可进入项目主页。
+
+**处理**
+
+- [share-routes.ts](../apps/server/src/share-routes.ts)：
+  - 新增 `.brand-home` 胶囊按钮样式（白底、细边框、hover 变蓝描边），置于品牌行右侧（`margin-left: auto`）；
+  - `renderSharePage` 增加 `homeUrl` 参数，品牌行渲染「灵悟 + 进入主页」：`<a class="brand-home" href="${homeUrl}" target="_top">`；
+  - `sharePageRoutes` 依赖由 `{ store }` 扩展为 `{ store, config }`，`homeUrl = config.webUrl ?? config.publicUrl`（优先前端域名，未配置时回退 API 域名）；
+  - 按钮带 `target="_top"`：分享页在 Web 端以 iframe 嵌入，点击需跳出 iframe 在顶层打开主页。
+- [app.ts](../apps/server/src/app.ts)：`sharePageRoutes({ store: db, config })` 传入完整 config。
+- [tests/share-page.test.ts](../tests/share-page.test.ts)：传入 `config`，新增断言验证 `.brand-home` 按钮、`href` 指向前端域名、`target="_top"`。
+
+**验证**
+
+- `pnpm exec tsc --noEmit`：通过。
+- `npx tsx --import ./tests/setup.ts --test tests/share-page.test.ts`：7 例全部通过。
+
+### 2026-11-11 · 界面：删除文件库页头部的「上传资料」主按钮
+
+用户浏览 Web 端时选中文件库页头部（内嵌与整页两处）的「上传资料」按钮，要求删除。文件库页面下方仍保留拖放上传区域，上传能力不受影响；同步清理中英文 `screens.filesImport` / `screens.filesImportShort` 翻译条目。typecheck 通过。
+
+### 2026-11-11 · 界面：删除设置菜单行的「模型、工作区与账号设置」简介
+
+用户浏览 Web 端时选中设置行的灰色简介文字，要求删除。改动：[agent-product.tsx](../apps/mobile/src/agent-product.tsx) 的设置行移除 `detail` 属性，并同步清理中英文 `accountMenuSettingsDetail` 翻译条目。typecheck 通过。
+
+### 2026-11-11 · 修复：分享链接改用前端域名而非 API 域名
+
+**背景**
+
+用户指出「分享为链接」生成的链接域名错误：服务端拿 `PUBLIC_API_URL`（API 域名）拼链接，收件人打开的是 API 的 `/s/:id` 页面。正确的行为应该是链接指向前端（Web App）域名：收件人打开的地址与 App 同源，API 的 `/s/:id` 页面仅作为内容源被前端嵌入。
+
+**处理**
+
+- [config.ts](../apps/server/src/config.ts)：`Config` 新增可选 `webUrl` 字段；计算逻辑为 `process.env.PUBLIC_WEB_URL` 或回退 `publicUrl`（未配置前端域名时保持旧行为）。
+- [share-routes.ts](../apps/server/src/share-routes.ts)：`shareApiRoutes` 生成分享 URL 改用 `config.webUrl ?? config.publicUrl`；`GET /s/:id` 公开页仍由 API 渲染，供前端 iframe 加载。
+- 新增 [share-page-view.web.tsx](../apps/mobile/src/share-page-view.web.tsx) 与 [share-page-view.native.tsx](../apps/mobile/src/share-page-view.native.tsx)（平台分文件）：Web 端匹配 `/s/:id` 路径并用 `<iframe>` 加载 API 的分享页；原生端无路径概念，返回空。
+- [App.tsx](../apps/mobile/App.tsx)：入口检测 `window.location.pathname` 命中的 `/s/:id`，直接渲染分享视图，跳过登录与工作区。
+- [.env.example](../.env.example) / [.env](../.env)：新增 `PUBLIC_WEB_URL`（本地开发为 `http://localhost:8081`）。
+- [render.yaml](../render.yaml)：API 服务注入 `PUBLIC_WEB_URL`，取自 `lingwu-web` 的 `RENDER_EXTERNAL_URL`。
+
+**验证**
+
+- `pnpm typecheck`：`tests/*.test.ts` 与 `apps/mobile` 全部通过（仅 `bot-pages/connectors.tsx` 的 HEAD 既有报错，与本改动无关）。
+- `npx tsx --import ./tests/setup.ts --test tests/share-page.test.ts`：7 例全部通过（含新增断言：分享链接指向前端域名）。
+
 ### 2026-11-09 · 文案：消息操作栏「点赞」改为「喜欢」，点赞成功态显示「已喜欢」
 
 **背景**
@@ -3386,3 +3516,31 @@ Render Blueprint 部署时若 `TOKEN_ENCRYPTION_KEY` 使用 `generateValue: true
 **验证**
 
 - `python3 -c "import yaml..."` 解析通过，`TOKEN_ENCRYPTION_KEY` 仍在 lingwu-api 服务环境变量列表中。
+
+### 2026-11-11 · 修复后端启动崩溃与维护任务持续报错（PGlite 目录第三次损坏 + owners() SQL 违规）
+
+**现象**
+
+1. `pnpm dev` 启动即崩溃：`RuntimeError: Aborted()`，根因同 10-25 / 10-28——PGlite 数据目录 `.lingwu/postgres` 再次损坏（缺 `base/`、残留 `postmaster.pid`）。
+2. 备份重建目录后服务能启动，但每 60s 维护周期持续报 `code: 42P10`。
+
+**根因**
+
+- 数据目录：与 10-28 相同，进程被强杀导致 WASM Postgres 无法重放 WAL。
+- 42P10（`for SELECT DISTINCT, ORDER BY expressions must appear in select list`）：`db.ts` 的 `owners()` 用了 `SELECT DISTINCT jsonb_build_object('owner',owner) AS data ... ORDER BY owner`，`owner` 不在 select 列表，PostgreSQL plan 阶段即拒绝。此前旧库该路径未触发是因为记忆迁移（`memory.enabled` + Hindsight 配置）最近才启用。
+
+**修复**
+
+- 备份损坏目录：`.lingwu/postgres` → `.lingwu/postgres.corrupt-20261111`（与既有 `-20261025` / `-20261028` 归档并列）。
+- 修正 `apps/server/src/db.ts` `owners()`：`ORDER BY owner` → `ORDER BY data`（select 列表内的输出别名，合法且保持去重顺序）。已用全新 PGlite 实例 + 多 owner 数据验证去重与排序正确。
+
+**验证**
+
+- `pnpm dev`：`LingWu live API ready at http://localhost:8787`，持续观察两个完整维护周期（>120s）无 42P10。
+- `curl /api/health`：`{"ok":true,...}`。
+- 定位期间临时给 `backgroundFailure` 增加 `message` 字段输出（仅用于诊断），已还原，最终改动仅 db.ts 一行 SQL。
+
+**注意事项（复发时的处理步骤）**
+
+1. 停止后端后备份损坏目录：`mv .lingwu/postgres .lingwu/postgres.corrupt-$(date +%Y%m%d)`。
+2. 重新 `pnpm dev`，服务自动重建全新数据库，业务数据存于 Supabase，不受影响。

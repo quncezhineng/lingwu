@@ -24,9 +24,12 @@ before(async () => {
   );
   app.route(
     "/api/shares",
-    shareApiRoutes({ store: db, config: { publicUrl: "https://lingwu.test" } }),
+    shareApiRoutes({
+      store: db,
+      config: { webUrl: "https://lingwu.test", publicUrl: "https://api.lingwu.test" },
+    }),
   );
-  app.route("/s", sharePageRoutes({ store: db }));
+  app.route("/s", sharePageRoutes({ store: db, config: { webUrl: "https://lingwu.test", publicUrl: "https://api.lingwu.test" } }));
 });
 
 after(async () => {
@@ -43,7 +46,7 @@ async function createShare(question: string, answer: string) {
   return (await response.json()) as { id: string; url: string };
 }
 
-test("创建分享返回不可猜的 id 与公开链接", async () => {
+test("创建分享返回指向前端域名的公开链接", async () => {
   const share = await createShare("这只股票怎么样？", "## 结论\n\n**估值偏高**。");
   assert.match(share.id, /^[A-Za-z0-9_-]{16}$/);
   assert.equal(share.url, `https://lingwu.test/s/${share.id}`);
@@ -59,6 +62,10 @@ test("公开页面渲染提问与 Markdown 回复，且无需登录", async () =
   assert.match(html, /<h2>结论<\/h2>/);
   assert.match(html, /<strong>估值偏高<\/strong>/);
   assert.match(html, /由灵悟生成/);
+  assert.match(html, /<a class="brand-home"/);
+  assert.match(html, /href="https:\/\/lingwu\.test"/);
+  assert.match(html, /target="_top"/);
+  assert.match(html, /<img class="brand-logo" src="data:image\/svg\+xml,/);
 });
 
 test("提问里的 HTML 被转义，Markdown 里的原始 HTML 不生效", async () => {

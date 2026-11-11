@@ -73,6 +73,12 @@ services:
           name: lingwu-api
           type: web
           envVarKey: RENDER_EXTERNAL_URL
+      # 分享链接等面向收件人的地址使用前端域名（lingwu-web），而不是 API 域名。
+      - key: PUBLIC_WEB_URL
+        fromService:
+          name: lingwu-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: ALLOWED_ORIGINS
         fromService:
           name: lingwu-web

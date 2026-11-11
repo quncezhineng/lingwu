@@ -32,6 +32,8 @@ export interface Config {
   port: number;
   host: string;
   publicUrl: string;
+  /** 前端（Web App）的公开域名；分享链接等面向收件人的地址使用它，而不是 API 域名。 */
+  webUrl?: string;
   dataDir: string;
   databaseUrl?: string;
   accessKey?: string;
@@ -163,6 +165,8 @@ export function readConfig(): Config {
   }
   const port = Number(process.env.PORT ?? 8787);
   const publicUrl = process.env.PUBLIC_API_URL ?? `http://localhost:${port}`;
+  // 未单独配置前端域名时，分享链接退回 API 域名，保持与旧行为一致。
+  const webUrl = process.env.PUBLIC_WEB_URL?.trim().replace(/\/+$/, "") || publicUrl;
   const supabaseUrl = process.env.SUPABASE_URL?.trim().replace(/\/+$/, "");
   const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY?.trim();
   const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY?.trim();
@@ -175,6 +179,7 @@ export function readConfig(): Config {
     port,
     host: process.env.HOST ?? "127.0.0.1",
     publicUrl,
+    webUrl,
     dataDir: resolve(process.env.DATA_DIR ?? ".lingwu"),
     databaseUrl: process.env.DATABASE_URL,
     accessKey: process.env.LINGWU_ACCESS_KEY,
