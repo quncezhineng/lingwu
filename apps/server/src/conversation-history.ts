@@ -43,6 +43,25 @@ export const historyQuery = z.object({
   before: z.string().min(1).max(500).optional(),
 });
 
+/**
+ * 把会话流记录的消息时间挂到 `metadata.at` 上。
+ *
+ * Rich Threads 保存的消息体不带时间戳，而回复下面要显示的时间正好是流里
+ * 这条消息第一次出现的时间。挂在 `metadata` 上是 AG-UI 消息模型允许的字段，
+ * 回传给模型时会被忽略，不会影响上下文。
+ */
+export function withMessageTimes<
+  T extends { id: string; role: string; metadata?: Record<string, unknown> },
+>(messages: readonly T[], times: Readonly<Record<string, string>>): readonly T[] {
+  if (!Object.keys(times).length) return messages;
+  return messages.map((message) => {
+    const at = times[message.id];
+    // 已经有时间（例如未来某天由上游写入）就不覆盖。
+    if (!at || message.metadata?.at) return message;
+    return { ...message, metadata: { ...message.metadata, at } } as T;
+  });
+}
+
 /** Page visible messages, keeping the tool results attached to their assistant. */
 export function conversationHistoryPage<T extends { id: string; role: string }>(
   messages: readonly T[],

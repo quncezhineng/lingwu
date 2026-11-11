@@ -172,11 +172,15 @@ export class Store {
   }
   /** 某 kind 下去重后的 owner 列表（用于「对每个 owner 执行一次维护」的遍历）。 */
   async owners(kind: string): Promise<string[]> {
+    // `ORDER BY owner` sorts the plain text column that is already in the DISTINCT
+    // output, which works on both PGlite and real PostgreSQL. The previous
+    // `ORDER BY data` referenced a jsonb alias that shadowed the table's `data`
+    // column; real PostgreSQL rejects it with 42P10 (invalid_column_reference).
     const result = await this.db.query(
-      "SELECT DISTINCT jsonb_build_object('owner',owner) AS data FROM records WHERE kind=$1 ORDER BY data",
+      "SELECT DISTINCT owner FROM records WHERE kind=$1 ORDER BY owner",
       [kind],
     );
-    return result.rows.map((row) => (row.data as { owner: string }).owner);
+    return result.rows.map((row) => (row as unknown as { owner: string }).owner);
   }
   async claim<T>(owner: string, id: string, status: string, now: string): Promise<T | null> {
     const result = await this.db.query(

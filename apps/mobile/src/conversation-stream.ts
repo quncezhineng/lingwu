@@ -43,6 +43,8 @@ export interface ConversationDraft {
   runId: string;
   seq: number;
   updatedAt: number;
+  /** 这条回复第一次出现在流里的时间（服务端 ISO 时间），用于显示回复时间。 */
+  at?: string;
 }
 
 export type StreamPhase = "idle" | "connecting" | "live" | "reconnecting" | "error";
@@ -88,6 +90,8 @@ function addDraft(
     runId: envelope.runId,
     seq: envelope.seq,
     updatedAt: Date.now(),
+    // 只认第一条事件的时间：后续增量会把时间一路推到「回复结束」。
+    at: previous?.at ?? envelope.ts,
   };
   const order = previous ? state.order : [...state.order, id];
   const drafts = { ...state.drafts, [id]: next };

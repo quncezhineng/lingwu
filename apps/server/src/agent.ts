@@ -12,6 +12,7 @@ import { ConversationAgent } from "./engine/conversation.ts";
 import type { AgentService } from "./engine/service.ts";
 import type { ConversationStream } from "./engine/stream.ts";
 import { createJevAdapter, type JevAdapter } from "./jev/adapter.ts";
+import { backgroundFailure } from "./log.ts";
 
 export function agentConfigured(config: Config) {
   return (
@@ -51,7 +52,16 @@ export function makeRuntime(
           : new ConversationAgent(config, service, owner, sharedJevAdapter());
     // Mirror the exact events the runtime is about to transport into the app-owned
     // ledger. This is a tap, not a second model call: ordering and errors are preserved.
-    agent.use((input, next) => stream.observe(owner, input.threadId, input.runId, next.run(input)));
+    agent.use((input, next) => {
+      // 用户提问不走事件流（事件流只承载助手输出），时间只能在这里打点。
+      // 只认本次输入的最后一条：`input.messages` 带着整段上下文，历史提问不能重新计时。
+      const question = input.messages.at(-1);
+      if (question?.role === "user")
+        void stream
+          .noteMessage(owner, input.threadId, question.id)
+          .catch((error) => backgroundFailure("conversation.stream.note", error));
+      return stream.observe(owner, input.threadId, input.runId, next.run(input));
+    });
     return { default: agent };
   };
   const runtime = new CopilotRuntime({

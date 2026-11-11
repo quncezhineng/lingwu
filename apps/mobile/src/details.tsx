@@ -1629,7 +1629,8 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
     >
       <View style={[s.row, { flexWrap: "wrap", gap: 8, marginBottom: 16 }]}>
         <Button
-          small
+          size="sm"
+          variant="outline"
           icon={Star}
           onPress={() => {
             toggleSavedInsight(artifact.id);
@@ -1638,10 +1639,10 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
         >
           {t(saved ? "ui.unsaveInsight" : "ui.saveInsight")}
         </Button>
-        <Button small onPress={explainSimply}>
+        <Button size="sm" variant="ghost" onPress={explainSimply}>
           {t(plainOpen ? "ui.showLess" : "ui.insightSimplify")}
         </Button>
-        <Button small onPress={disagree}>
+        <Button size="sm" variant="ghost" onPress={disagree}>
           {t("ui.insightDisagree")}
         </Button>
       </View>

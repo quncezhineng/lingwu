@@ -4,7 +4,14 @@ LingWu combines a persistent browser with an optional Linux workspace for comman
 
 ## Start the Linux workspace
 
-The API host needs Docker CLI access to a running Docker engine. Build the image from this repository:
+The computer has two backends. Pick by host:
+
+- **Local / any host with a Docker engine** → Docker (below). The API host needs Docker CLI access to a running Docker engine.
+- **Managed hosts such as Render, or any server without Docker** → [E2B Desktop](#run-the-computer-on-an-e2b-desktop-optional). Managed container platforms cannot nest a Docker engine, so the local Docker backend reports `Docker operation failed. Check that the engine is running and the computer image is built locally.` and the app asks you to `Enable the E2B desktop computer on the server`. Switch to the E2B provider instead — no Docker is needed, and the code requires no changes: only the environment variables below differ.
+
+### Docker backend
+
+Build the image from this repository:
 
 ```sh
 docker build -t lingwu-computer:local apps/computer
@@ -20,6 +27,17 @@ COMPUTER_IMAGE=lingwu-computer:local
 Open **Computer → Terminal → Start computer**. Run `pwd` or `python3 --version`. Commands execute inside the Linux container with `/workspace` as their default working directory. Their output, exit code, and status appear in command history.
 
 If Docker is unavailable, the app reports the connection error. There is no fallback that executes commands on the API host.
+
+### Render (managed cloud)
+
+On Render there is no local Docker engine, so use the E2B Desktop backend instead of the Docker backend. `render.yaml` already ships with `COMPUTER_ENABLED=true` and `COMPUTER_PROVIDER=e2b-desktop`. Because `E2B_API_KEY` and `COMPUTER_DEPLOYMENT_ID` are `sync: false`, fill them manually in the **lingwu-api** service's Environment panel, then redeploy:
+
+| Variable | Value |
+| --- | --- |
+| `E2B_API_KEY` | Your E2B key |
+| `COMPUTER_DEPLOYMENT_ID` | Unique per install, e.g. `openssl rand -hex 12` |
+
+Without these two, the API refuses to start (see the validation in `config.ts`).
 
 ### Optional isolated runtime on macOS
 

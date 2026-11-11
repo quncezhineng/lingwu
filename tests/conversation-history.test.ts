@@ -8,6 +8,7 @@ import { createApp } from "../apps/server/src/app.ts";
 import {
   ConversationHistory,
   conversationHistoryPage,
+  withMessageTimes,
 } from "../apps/server/src/conversation-history.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
 
@@ -61,6 +62,30 @@ test("empty, short and tool-only transcripts terminate pagination", () => {
     assert.deepEqual(page.messages, input);
     assert.equal(page.hasMore, false);
   }
+});
+
+test("reply times ride along on message metadata without disturbing stored messages", () => {
+  const transcript = [
+    { id: "user-1", role: "user", content: "How is NVDA?" },
+    { id: "assistant-1", role: "assistant", content: "Up 2% today" },
+    { id: "tool-1", role: "tool", toolCallId: "call-1", content: "quote" },
+  ];
+  const stamped = withMessageTimes(transcript, {
+    "assistant-1": "2026-03-05T06:32:00.000Z",
+  });
+  assert.deepEqual(stamped[1], {
+    id: "assistant-1",
+    role: "assistant",
+    content: "Up 2% today",
+    metadata: { at: "2026-03-05T06:32:00.000Z" },
+  });
+  // 没有时间记录的消息保持原样，前端据此不显示时间，而不是编一个出来。
+  assert.equal(stamped[0], transcript[0]);
+  assert.equal(stamped[2], transcript[2]);
+  assert.equal((transcript[1] as { metadata?: unknown }).metadata, undefined);
+  // 上游已经带了时间就不要覆盖。
+  const existing = [{ id: "assistant-2", role: "assistant", metadata: { at: "earlier" } }];
+  assert.equal(withMessageTimes(existing, { "assistant-2": "later" })[0], existing[0]);
 });
 
 test("pages share one cloud snapshot, scoped by owner and invalidated by new events or expiry", async () => {

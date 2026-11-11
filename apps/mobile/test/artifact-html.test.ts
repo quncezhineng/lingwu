@@ -67,3 +67,55 @@ test("非 Markdown 的多行文本仍用深色代码块展示", () => {
   assert.match(html, /<pre class="code">line one/);
   assert.doesNotMatch(html, /<div class="markdown">/);
 });
+
+test("报告头不重复弹层标题，但保留读屏语义", () => {
+  const html = renderArtifactHtml(artifact({}));
+  assert.match(html, /<h1 class="sr-only">Test report<\/h1>/);
+  assert.doesNotMatch(html, /<h1>Test report<\/h1>/);
+});
+
+test("无结构的长摘要拆成可读段落，并给出要点速览", () => {
+  const summary = [
+    "截至2026-11-11，以7.02元计，总市值251.90亿元，PE(TTM)211.5倍、PB1.16倍。",
+    "收购后归母净利润计算无影响，权益比例静态增厚为0；真实增厚来自降费，年化降费1.07-1.12亿元。",
+    "跌破理论预警价区间，建议关注质押压力与复核进度。",
+    "不给目标价、不给买卖建议。",
+  ].join("");
+  const html = renderArtifactHtml(artifact({ pb: 1.16 }, summary));
+  assert.match(html, /<section class="summary markdown">/);
+  assert.match(html, /class="takeaways"/);
+  assert.ok(html.includes(tr("agent.artifactHighlights")));
+  assert.ok((html.match(/<p>/g) ?? []).length >= 2, "长摘要应拆成多个段落");
+});
+
+test("顶层标量收敛为关键指标卡，明细键值形成规范列表", () => {
+  const html = renderArtifactHtml(
+    artifact({
+      pb: 1.16,
+      itc: {
+        "1441 final": "2026-08-06 violation",
+        "Tgv mass production": "2028-2029",
+      },
+    }),
+  );
+  assert.match(html, /class="metrics"/);
+  assert.match(html, /<div class="metric-value numeric">1\.16<\/div>/);
+  assert.match(html, /class="kv"/);
+  assert.doesNotMatch(html, /<h2>Pb<\/h2>/);
+  assert.ok(html.includes(tr("agent.artifactDetailsHeading")));
+  assert.match(html, /class="disclaimer"/);
+});
+
+test("对象数组渲染为带表头、数值列右对齐的规范表格", () => {
+  const html = renderArtifactHtml(
+    artifact({
+      peers: [
+        { name: "东旭光电", pe: 12 },
+        { name: "TCL科技", pe: 15 },
+      ],
+    }),
+  );
+  assert.match(html, /class="typeset-scroll"/);
+  assert.match(html, /<th>Name<\/th>/);
+  assert.match(html, /<th class="numeric">Pe<\/th>/);
+});

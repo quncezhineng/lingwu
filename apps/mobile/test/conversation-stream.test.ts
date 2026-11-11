@@ -52,6 +52,18 @@ test("text deltas accumulate by message id and duplicate sequence numbers are ig
   assert.equal(state.lastEventId, 6);
 });
 
+test("a draft remembers when its message first appeared", () => {
+  let state = initialStreamState();
+  state = applyEnvelope(state, envelope(1, "TEXT_MESSAGE_START", { messageId: "message-1" }));
+  state = applyEnvelope(
+    state,
+    envelope(2, "TEXT_MESSAGE_CONTENT", { messageId: "message-1", delta: "Hi" }),
+  );
+  // 后续增量不能把时间往后推，否则回复时间会变成「写完的时间」。
+  assert.equal(state.drafts["message-1"].at, new Date(1).toISOString());
+  assert.equal(state.drafts["message-1"].text, "Hi");
+});
+
 test("a sequence hole requests a replay instead of applying a partial reply", () => {
   let state = initialStreamState();
   state = applyEnvelope(state, envelope(1, "RUN_STARTED"));

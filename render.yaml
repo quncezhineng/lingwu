@@ -150,8 +150,10 @@ services:
           envVarKey: WORKER_TOKEN
       # Per-user Linux computer sandbox (optional). Choose E2B Desktop so every
       # user gets their own container; a unique COMPUTER_DEPLOYMENT_ID is required.
+      # COMPUTER_ENABLED is on so the cloud (Render) sandbox works out of the box;
+      # it is backed by E2B Desktop, not the local Docker image.
       - key: COMPUTER_ENABLED
-        value: "false"
+        value: "true"
       - key: COMPUTER_PROVIDER
         value: e2b-desktop
       - key: E2B_API_KEY

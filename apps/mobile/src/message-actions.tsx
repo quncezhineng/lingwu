@@ -6,6 +6,7 @@ import { useTranslation } from "./i18n";
 import { Copy, Image, Link2, Share2, ThumbsDown, ThumbsUp } from "./icons";
 import { copyText, shareLink, shareText } from "./message-share";
 import { captureAndShare } from "./message-share-image";
+import { formatMessageTime } from "./message-time";
 import { colors, radius } from "./theme";
 
 /** 操作完成后给用户一次性提示（复用工作区的 toast）。 */
@@ -24,16 +25,20 @@ type PublishShare = (input: { question: string; answer: string }) => Promise<str
 export function MessageActions({
   markdown,
   prompt = "",
+  at = 0,
   onNotify,
   onPublishShare,
 }: {
   markdown: string;
   /** 该条回复对应的用户提问；有值时一并出现在分享的图片与网页里。 */
   prompt?: string;
+  /** 回复时间（毫秒）。0 表示这条消息没有时间记录，此时不显示时间。 */
+  at?: number;
   onNotify?: Notify;
   onPublishShare?: PublishShare;
 }) {
   const { t } = useTranslation();
+  const sentAt = formatMessageTime(at);
   // 点赞与点踩互斥：再次点击已选中的一侧取消选择。
   const [feedback, setFeedback] = useState<"like" | "dislike" | null>(null);
   const [copied, setCopied] = useState(false);
@@ -184,6 +189,8 @@ export function MessageActions({
             </View>
           )}
         </View>
+        {/* 回复时间：贴在操作栏最左，紧挨「喜欢」按钮。 */}
+        {sentAt ? <Text style={styles.time}>{sentAt}</Text> : null}
       </View>
     </>
   );
@@ -278,6 +285,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: colors.muted,
+  },
+  time: {
+    // 时间位于操作栏最左（喜欢按钮左侧），不再需要向右推。
+    paddingRight: 8,
+    fontSize: 11,
+    lineHeight: 18,
+    color: colors.faint,
   },
   shareWrap: {
     position: "relative",

@@ -28,7 +28,7 @@ import { AssistantResponse } from "./assistant-response";
 import { CardGrid } from "./card-grid";
 import { fileTypeName } from "./file-kind";
 import { activeLocaleTag, type TranslationFn, type TranslationKey, useTranslation } from "./i18n";
-import { statusLabel, tr } from "./i18n/translate";
+import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
 import {
   Activity,
   AlertTriangle,
@@ -261,11 +261,14 @@ function TaskProgress({ view }: { view: ReturnType<typeof presentTask> }) {
 export function TaskCard({
   task,
   compact = false,
+  stacked = false,
   onOpen,
   showGoal = true,
 }: {
   task: AgentTask;
   compact?: boolean;
+  /** 纵向布局（图标在上、文字在下），用于双列网格；默认横向布局用于窄列表。 */
+  stacked?: boolean;
   onOpen?: () => void;
   showGoal?: boolean;
 }) {
@@ -277,6 +280,63 @@ export function TaskCard({
     showGoal && task.goalId ? data?.goals.find((item) => item.id === task.goalId) : undefined;
   const milestone = goal?.milestones.find((item) => item.id === task.milestoneId);
   const Icon = task.kind === "monitor" ? Bell : task.kind === "research" ? Sparkles : ListChecks;
+  const title = (
+    <Text
+      numberOfLines={2}
+      style={{
+        color: colors.text,
+        fontFamily: fonts.sans,
+        fontSize: compact ? 13 : 14,
+        lineHeight: 22,
+        fontWeight: "600",
+      }}
+    >
+      {view.title}
+    </Text>
+  );
+  const status = view.attention ? (
+    <Text
+      style={{
+        fontSize: 12,
+        lineHeight: 20,
+        color: colors.primaryStrong,
+        fontWeight: "500",
+      }}
+    >
+      {t(view.attention === "review" ? "agent.reviewRequested" : "agent.inputNeeded")}
+    </Text>
+  ) : (
+    <TaskDisplayStatus view={view} />
+  );
+  const stampText = (
+    <Text style={{ color: colors.faint, fontSize: 11, lineHeight: 18 }}>
+      {stamp(view.updatedAt)}
+    </Text>
+  );
+  const goalLink =
+    goal &&
+    (milestone
+      ? t("agent.taskGoalMilestoneContext", {
+          goal: goal.title,
+          milestone: milestone.title,
+        })
+      : t("agent.taskGoalContext", { goal: goal.title }));
+  const iconBox = (
+    <View
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 11,
+        backgroundColor: colors.surfaceRaised,
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: stacked ? 0 : 1,
+      }}
+    >
+      <Icon size={17} color={colors.primary} />
+    </View>
+  );
+  const chevron = <ChevronRight size={15} color={colors.faint} />;
   return (
     <Pressable
       accessibilityRole="button"
@@ -300,51 +360,22 @@ export function TaskCard({
         backgroundColor: pressed ? colors.surfaceRaised : colors.paper,
       })}
     >
-      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 11 }}>
-        <View
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 11,
-            backgroundColor: colors.surfaceRaised,
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: 1,
-          }}
-        >
-          <Icon size={17} color={colors.primary} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 9 }}>
-          <Text
-            numberOfLines={2}
+      {stacked ? (
+        <View style={{ gap: 10 }}>
+          <View
             style={{
-              color: colors.text,
-              fontFamily: fonts.sans,
-              fontSize: compact ? 13 : 14,
-              lineHeight: 22,
-              fontWeight: "600",
+              flexDirection: "row",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
             }}
           >
-            {view.title}
-          </Text>
+            {iconBox}
+            {chevron}
+          </View>
+          {title}
           <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            {view.attention ? (
-              <Text
-                style={{
-                  fontSize: 12,
-                  lineHeight: 20,
-                  color: colors.primaryStrong,
-                  fontWeight: "500",
-                }}
-              >
-                {t(view.attention === "review" ? "agent.reviewRequested" : "agent.inputNeeded")}
-              </Text>
-            ) : (
-              <TaskDisplayStatus view={view} />
-            )}
-            <Text style={{ color: colors.faint, fontSize: 11, lineHeight: 18 }}>
-              {stamp(view.updatedAt)}
-            </Text>
+            {status}
+            {stampText}
           </View>
           {goal && (
             <Text
@@ -358,17 +389,38 @@ export function TaskCard({
               }}
               style={[s.small, { color: colors.link }]}
             >
-              {milestone
-                ? t("agent.taskGoalMilestoneContext", {
-                    goal: goal.title,
-                    milestone: milestone.title,
-                  })
-                : t("agent.taskGoalContext", { goal: goal.title })}
+              {goalLink}
             </Text>
           )}
         </View>
-        <ChevronRight size={15} color={colors.faint} />
-      </View>
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 11 }}>
+          {iconBox}
+          <View style={{ flex: 1, minWidth: 0, gap: 9 }}>
+            {title}
+            <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              {status}
+              {stampText}
+            </View>
+            {goal && (
+              <Text
+                accessibilityRole="link"
+                accessibilityLabel={t("agent.openGoalLabel", { title: goal.title })}
+                numberOfLines={1}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onOpen?.();
+                  open({ type: "goal", goalId: goal.id });
+                }}
+                style={[s.small, { color: colors.link }]}
+              >
+                {goalLink}
+              </Text>
+            )}
+          </View>
+          {chevron}
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -473,9 +525,10 @@ export function AgentActivityScreen() {
       </View>
       <CardGrid
         items={tasks}
-        minColumnWidth={340}
+        // 任务卡按双列网格展示：单栏下限放宽到 320，窄屏仍自动退化为单列。
+        minColumnWidth={320}
         getKey={(task) => task.id}
-        render={(task) => <TaskCard task={task} />}
+        render={(task) => <TaskCard task={task} stacked />}
       />
       {!tasks.length && (
         <Empty

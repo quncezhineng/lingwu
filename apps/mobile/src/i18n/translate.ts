@@ -167,6 +167,8 @@ const RUNTIME_LABEL_KEYS: Record<string, string> = {
   "Stopped by you.": "agent.run.event.stoppedByUser",
   "The agent reached the end of this run without confirming completion. Give it a follow-up instruction to continue.":
     "agent.run.event.runEndedWithoutCompletion",
+  // 模型 / 引擎抛出的固定错误消息（model.ts / service.ts）
+  "Model run timed out after five minutes": "agent.run.event.modelTimedOut",
 };
 
 /** 把服务端运行时生成的固定英文文案转换为当前语言，未登记的原文返回；空值返回空串。 */

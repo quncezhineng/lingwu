@@ -5,6 +5,57 @@
 
 ## 变更记录
 
+### 2026-11-12 · 界面：Agent 任务页改为双列网格布局
+
+**背景**
+
+用户在 Agent 详情的任务页看到任务卡片始终单列铺开（每张约 689px 宽），希望改成双列布局。
+
+**处理**
+
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)（AgentActivityScreen）：任务网格 `CardGrid` 的 `minColumnWidth` 从 340 放宽到 320，容器实测宽度下即可排成双列（窄屏仍自动退化为单列）；
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)（TaskCard）：新增 `stacked` 布局选项（图标在上、文字在下），双列窄卡下信息排列更自然；默认横向布局保持不变，`ChatWork`、目标详情、历史等其它复用处的任务卡不受影响。
+
+**验证**
+
+- `pnpm typecheck`：`agent-ui.tsx` 无类型错误（`bot-pages/connectors.tsx` 既有报错为历史遗留，与此无关）。
+
+### 2026-11-11 · 界面：通知卡片标题与简介支持中英文显示
+
+**背景**
+
+用户把界面切到中文后，通知页里仍有两条英文文案：「Task needs attention」（标题）与「Model run timed out after five minutes」（简介）。原因：服务端引擎只生成英文事件标题与错误消息，前端通知卡片渲染时没有做本地化。
+
+**处理**
+
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)（NotificationsSheet）：通知卡片标题从 `{item.title}` 改为 `runtimeLabel(item.title)`，简介从 `notificationExcerpt(item.body)` 改为 `runtimeLabel(notificationExcerpt(item.body))`，与活动流、计划卡等其它事件文案的翻译路径保持一致；
+- [translate.ts](../apps/mobile/src/i18n/translate.ts)：新增固定错误消息的映射 `"Model run timed out after five minutes" → agent.run.event.modelTimedOut`；
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：新增 `agent.run.event.modelTimedOut` 键（中文「模型运行超时（五分钟未返回）」/ 英文原文）。「任务需要关注」的中文翻译在此前已存在，无需重复添加。
+
+**说明**
+
+- `runtimeLabel` 对未登记的原文按原样返回，因此模型自由撰写的 Markdown 正文不会受影响，只有固定英文文案被翻译。
+
+**验证**
+
+- `pnpm typecheck`：`agent-ui.tsx`、`translate.ts` 及语言文件无类型错误（`bot-pages/connectors.tsx` 既有报错为历史遗留，与此无关）。
+
+### 2026-11-11 · 界面：消息操作栏的回复时间移到「喜欢」按钮左侧
+
+**背景**
+
+用户在聊天页看到助手回复的操作栏（喜欢 / 不喜欢 / 复制 / 分享 …）最右侧显示回复时间 `21:05`，希望把时间移到「喜欢」按钮左边、紧挨着图标旁边。
+
+**处理**
+
+- [message-actions.tsx](../apps/mobile/src/message-actions.tsx)：
+  - 把回复时间从操作栏最右侧移到最左侧（「喜欢」按钮之前）；
+  - 时间样式去掉 `marginLeft: "auto"`（原来是靠它把时间推到行尾），`paddingLeft` 改为 `paddingRight`，与「喜欢」按钮拉开间距。
+
+**验证**
+
+- `pnpm typecheck`：`message-actions.tsx` 无类型错误（`bot-pages/connectors.tsx` 既有报错为历史遗留，与此无关）。
+
 ### 2026-11-11 · 界面：删除技能上传弹层的 frontmatter 说明
 
 **背景**

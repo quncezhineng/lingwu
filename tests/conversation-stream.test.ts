@@ -96,6 +96,63 @@ test("a reconnect replays only the missing suffix from the event ledger", async 
   await stream.close();
 });
 
+test("message times are recovered from a ledger recorded before the time table existed", async () => {
+  const backing = new MemoryStore();
+  const at = (minute: number) => new Date(Date.UTC(2026, 2, 5, 9, minute)).toISOString();
+  // 旧版本的持久化对象只有事件、没有 `times`，时间要从事件里推回来。
+  await backing.put("owner-1", "conversation-streams", {
+    id: "thread-1",
+    seq: 3,
+    oldestSeq: 1,
+    run: null,
+    updatedAt: at(20),
+    events: [
+      { seq: 1, ts: at(0), runId: "run-1", event: textStart("message-a") },
+      { seq: 2, ts: at(10), runId: "run-1", event: textDelta("Hi", "message-a") },
+      { seq: 3, ts: at(20), runId: "run-1", event: textStart("message-b") },
+    ],
+  });
+  const stream = new ConversationStream(backing as unknown as Store);
+  assert.deepEqual(await stream.messageTimes("owner-1", "thread-1"), {
+    "message-a": at(0),
+    "message-b": at(20),
+  });
+  await stream.close();
+});
+
+test("a question that never reaches the event stream still gets a time", async () => {
+  const stream = new ConversationStream(store(), { flushMs: 0 });
+  await stream.noteMessage("owner-1", "thread-1", "question-1");
+  const recorded = await stream.messageTimes("owner-1", "thread-1");
+  assert.ok(Number.isFinite(Date.parse(recorded["question-1"])));
+  // 重试同一轮提问不会把时间往后推。
+  await stream.noteMessage("owner-1", "thread-1", "question-1");
+  assert.deepEqual(await stream.messageTimes("owner-1", "thread-1"), recorded);
+  await stream.close();
+});
+
+test("message times outlive event eviction and a reload from storage", async () => {
+  const backing = store();
+  // maxEvents 故意设成 2：第一条消息的事件会被裁掉，但它的时间必须还在。
+  const stream = new ConversationStream(backing, { flushMs: 0, maxEvents: 2 });
+  const first = await stream.publish("owner-1", "thread-1", "run-1", textStart("message-a"));
+  await stream.publish("owner-1", "thread-1", "run-1", textDelta("Hi", "message-a"));
+  await stream.publish("owner-1", "thread-1", "run-1", textStart("message-b"));
+  const times = await stream.messageTimes("owner-1", "thread-1");
+  // 同一消息的后续增量不能把时间往后推，否则长回复会显示成「结束时间」。
+  assert.equal(times["message-a"], first.ts);
+  assert.ok(times["message-b"]);
+  assert.equal((await stream.status("owner-1", "thread-1")).eventCount, 2);
+  await stream.close();
+
+  const reloaded = new ConversationStream(backing);
+  assert.deepEqual(await reloaded.messageTimes("owner-1", "thread-1"), times);
+  // 另一个线程、另一个 owner 都不能看到这张表。
+  assert.deepEqual(await reloaded.messageTimes("owner-1", "thread-2"), {});
+  assert.deepEqual(await reloaded.messageTimes("owner-2", "thread-1"), {});
+  await reloaded.close();
+});
+
 test("the retained byte budget counts UTF-8 bytes instead of UTF-16 code units", async () => {
   const stream = new ConversationStream(store(), { flushMs: 0, maxBytes: 500 });
   const delta = "中".repeat(60);

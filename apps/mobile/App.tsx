@@ -40,8 +40,8 @@ import { goBack, navigateTo, ROOT_NAVIGATION, type SectionNavigation } from "./s
 import { PageHeader } from "./src/page-header";
 import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
-import SharePageView, { isSharePath } from "./src/share-page-view";
 import { GlobalSearchSheet } from "./src/search-sheet";
+import SharePageView, { isSharePath } from "./src/share-page-view";
 import { ACCOUNT_NAV, BrandMark, ChatsColumn, MOBILE_NAV, Rail } from "./src/shell";
 import { TaskHubScreen } from "./src/task-hub";
 import { breakpoints, layout } from "./src/theme";
@@ -101,8 +101,7 @@ const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: T
 export default function App() {
   // 分享链接（/s/:id）指向前端域名，浏览器直开时命中这里：跳过登录与工作区，
   // 直接渲染分享内容；原生端无 URL，isSharePath 恒为 null，不受影响。
-  const shareId =
-    typeof window === "undefined" ? null : isSharePath(window.location.pathname);
+  const shareId = typeof window === "undefined" ? null : isSharePath(window.location.pathname);
   if (shareId) return <SharePageView id={shareId} />;
   return (
     <I18nProvider>

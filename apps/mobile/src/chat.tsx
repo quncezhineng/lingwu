@@ -106,6 +106,7 @@ import { JevInteractionContext, JevToolCard } from "./jev-tool-card";
 import { MailToolCard } from "./mail-tool-card";
 import { MemoryRecallCard } from "./memory-recall-card";
 import { MessageActions } from "./message-actions";
+import { interpolateMessageTimes, messageTimeAt } from "./message-time";
 import { edgeFadeMask } from "./mobile-chrome";
 import { ModalBackdrop } from "./modal-overlay";
 import { PromptComposer } from "./prompt-composer";
@@ -134,6 +135,7 @@ import {
   s,
   shadow,
 } from "./ui";
+import { UserMessageMeta } from "./user-message-meta";
 import { type ComposerPrompt, useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
@@ -1223,6 +1225,18 @@ export function ChatScreen({
     }
   }
   const threadTasks = (agentWorkspace?.tasks || []).filter((task) => task.threadId === threadId);
+  // 这版之前产生的消息没有真实时间记录。用对话里更早的真实记录（任务创建时间）
+  // 当上界，在真实时间之间按顺序插值，历史对话才不会整片留白。
+  const knownMessageTimes: Record<string, number> = {};
+  for (const message of messages) {
+    const at = messageTimeAt(message);
+    if (at) knownMessageTimes[message.id] = at;
+  }
+  const approximateTimes = interpolateMessageTimes(
+    messages,
+    knownMessageTimes,
+    threadTasks.map((task) => Date.parse(task.createdAt)),
+  );
   const approvalTaskSignal = threadTasks
     .filter((task) => task.actionId)
     .map((task) => `${task.id}:${task.actionId}:${task.status}`)
@@ -1673,6 +1687,12 @@ export function ChatScreen({
               const attachments = parsedUser?.attachments ?? [];
               const draft = user ? undefined : stream.state.drafts[message.id];
               const streaming = !!draft && !draft.done;
+              // 真实时间 → 本轮流式时间 → 历史插值，依次兜底。
+              const replyAt =
+                messageTimeAt(message) ||
+                (draft ? Date.parse(draft.at ?? "") : 0) ||
+                approximateTimes[message.id] ||
+                0;
               const toolCalls = readableToolCalls(message).filter(
                 (call) => call.function.name !== "delegate_task",
               );
@@ -1779,10 +1799,12 @@ export function ChatScreen({
                       </View>
                     )
                   )}
+                  {user && !!text && <UserMessageMeta text={text} at={replyAt} onNotify={notify} />}
                   {!user && !!text && (
                     <MessageActions
                       markdown={text}
                       prompt={promptByVisibleId.get(message.id) ?? ""}
+                      at={streaming ? 0 : replyAt}
                       onNotify={notify}
                       onPublishShare={(input) => publishShare(api, input)}
                     />

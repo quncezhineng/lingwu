@@ -23,7 +23,8 @@ export function CardGrid<T>({
   minColumnWidth: number;
   maxColumns?: 1 | 2 | 3;
   getKey: (item: T) => string;
-  render: (item: T) => ReactNode;
+  /** 第三个参数是本次实际排出的列数，卡片据此切换横向 / 纵向版式。 */
+  render: (item: T, index: number, layout: { columns: number }) => ReactNode;
 }) {
   const [width, setWidth] = useState(0);
   const columns =
@@ -36,14 +37,16 @@ export function CardGrid<T>({
   const cellWidth = width > 0 ? (width - GRID_GAP * (columns - 1)) / columns : 0;
   // 实测到之前按目标栏数给百分比兜底，避免首帧挤成单列再跳变。
   const fallback = maxColumns >= 3 ? "31%" : maxColumns === 2 ? "48%" : "100%";
+  // 兜底宽度本身就是按 maxColumns 折算的，这里同步报出去，首帧版式才不会先横后竖。
+  const layoutColumns = width > 0 ? columns : maxColumns;
   return (
     <View
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       style={{ flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP }}
     >
-      {items.map((item) => (
+      {items.map((item, index) => (
         <View key={getKey(item)} style={cellWidth ? { width: cellWidth } : { width: fallback }}>
-          {render(item)}
+          {render(item, index, { columns: layoutColumns })}
         </View>
       ))}
     </View>

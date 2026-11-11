@@ -44,6 +44,7 @@ const chat = {
   "chat.retryResponse": "Retry response",
   "chat.streamingReply": "LingWu is writing a reply",
   "chat.streamReplyComplete": "Reply complete",
+  "chat.timeYesterday": "Yesterday {time}",
   "chat.reconnectingLiveReply": "Reconnecting the live reply…",
   "chat.retryLiveReply": "Reconnect live reply",
   "chat.streamIntegrityWarning":
@@ -136,6 +137,8 @@ const chat = {
   "chat.copiedMarkdown": "Copied as Markdown",
   "chat.copyMarkdownFailed": "Copy failed: {detail}",
   "chat.copyFailed": "Could not copy. Please try again.",
+  "chat.copyQuestion": "Copy question",
+  "chat.copiedQuestion": "Question copied",
   "chat.share": "Share",
   "chat.shareImage": "Share as image",
   "chat.shareLink": "Share as link",

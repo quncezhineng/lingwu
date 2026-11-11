@@ -24,6 +24,7 @@ import {
   ConversationHistory,
   conversationHistoryPage,
   historyQuery,
+  withMessageTimes,
 } from "./conversation-history.ts";
 import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
@@ -99,6 +100,17 @@ export async function createApp(
     async (owner, threadId) => (await conversationStream.status(owner, threadId)).lastEventId,
   );
   const runtime = makeRuntime(config, agent, auth, intelligence, conversationStream);
+  /**
+   * 读取线程正文，并补上会话流记录的发送时间。
+   *
+   * 正文由 Rich Threads 持久化、本身不带时间戳，所以每条回复下面的时间来自
+   * 本服务转发流事件时记下的第一次出现时间（见 `ConversationStream.messageTimes`）。
+   */
+  const threadMessages = async (owner: string, threadId: string) =>
+    withMessageTimes(
+      await conversationHistory.messages(owner, threadId),
+      await conversationStream.messageTimes(owner, threadId),
+    );
   // 启动时恢复上一次在 App 里选中的模型，让选择跨重启保留。
   // 若该厂商的密钥已被移除，则回退到 .env 的 MODEL，避免指向不可用的模型。
   const savedModel = await db.get<{ model?: string }>("system", "settings", "model");
@@ -714,12 +726,13 @@ export async function createApp(
   });
   app.get("/api/conversation/threads/:threadId/messages", async (c) => {
     const query = historyQuery.parse(c.req.query());
-    const messages = await conversationHistory.messages(c.get("owner"), c.req.param("threadId"));
-    return c.json(conversationHistoryPage(messages, query));
+    return c.json(
+      conversationHistoryPage(await threadMessages(c.get("owner"), c.req.param("threadId")), query),
+    );
   });
   app.get("/api/conversation/threads/:threadId/context", async (c) =>
     c.json({
-      messages: await conversationHistory.messages(c.get("owner"), c.req.param("threadId")),
+      messages: await threadMessages(c.get("owner"), c.req.param("threadId")),
     }),
   );
   app.get("/api/conversation", async (c) => {

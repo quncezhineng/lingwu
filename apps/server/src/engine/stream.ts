@@ -51,6 +51,8 @@ interface PersistedStream {
   events: StoredStreamEvent[];
   run: StreamRun | null;
   updatedAt: string;
+  /** 每条消息第一次出现在流里的时间（messageId → ISO），见 `ThreadStream.times`。 */
+  times?: Record<string, string>;
 }
 
 interface ThreadStream {
@@ -60,6 +62,14 @@ interface ThreadStream {
   bytes: number;
   lastSeq: number;
   run: StreamRun | null;
+  /**
+   * 每条消息第一次出现的时间（messageId → ISO）。
+   *
+   * 对话正文由 CopilotKit 的 Rich Threads 持久化，消息本身不带时间戳，所以每个
+   * 回复下面要显示的时间只能由本服务在转发流事件时记下来。这张小表独立于
+   * `events` 存在：事件窗口会滚动裁剪，时间表仍能把老消息的时间保留下来。
+   */
+  times: Record<string, string>;
   subscribers: Set<(envelope: StreamEnvelope) => void>;
   loaded: boolean;
   loading?: Promise<void>;
@@ -73,9 +83,50 @@ const DEFAULT_MAX_EVENTS = 2000;
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
 const DEFAULT_FLUSH_MS = 400;
 const STALE_RUN_MS = 10 * 60 * 1000;
+/** 时间表只服务于「回复下面的时间」，保留最近的这些消息即可。 */
+const MESSAGE_TIMES_LIMIT = 500;
 
 function iso() {
   return new Date().toISOString();
+}
+
+/** 时间表来自存储，可能被旧版本或人工编辑写坏，只接受 ISO 字符串。 */
+function normalizeTimes(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const times: Record<string, string> = {};
+  for (const [id, at] of Object.entries(value as Record<string, unknown>)) {
+    if (!id || typeof at !== "string") continue;
+    if (!Number.isFinite(Date.parse(at))) continue;
+    times[id] = at;
+  }
+  return times;
+}
+
+/**
+ * 给旧数据补时间表。
+ *
+ * 时间表是后加的字段：更早的线程只存了事件。事件本来就带着 `ts` 和 `messageId`，
+ * 按顺序取每条消息的第一次出现即可——这是真实时间，前提是它的事件还没被裁剪掉。
+ */
+function deriveTimes(
+  events: readonly StoredStreamEvent[],
+  stored: Record<string, string>,
+): Record<string, string> {
+  const times = { ...stored };
+  for (const item of events) {
+    const messageId = (item.event as { messageId?: unknown }).messageId;
+    if (typeof messageId !== "string" || !messageId || times[messageId]) continue;
+    times[messageId] = item.ts;
+  }
+  return trimTimes(times);
+}
+
+/** 只保留最近的消息时间，靠对象插入顺序淘汰最旧的一条。 */
+function trimTimes(times: Record<string, string>): Record<string, string> {
+  const ids = Object.keys(times);
+  if (ids.length <= MESSAGE_TIMES_LIMIT) return times;
+  for (const stale of ids.slice(0, ids.length - MESSAGE_TIMES_LIMIT)) delete times[stale];
+  return times;
 }
 
 function eventSize(event: StoredStreamEvent) {
@@ -168,6 +219,7 @@ export class ConversationStream {
       bytes: 0,
       lastSeq: 0,
       run: null,
+      times: {},
       subscribers: new Set(),
       loaded: false,
       dirty: false,
@@ -196,6 +248,7 @@ export class ConversationStream {
             const persistedSeq = Number.isSafeInteger(saved.seq) && saved.seq > 0 ? saved.seq : 0;
             state.lastSeq = state.events.at(-1)?.seq ?? persistedSeq;
             state.run = saved.run ?? null;
+            state.times = deriveTimes(state.events, normalizeTimes(saved.times));
             state.bytes = state.events.reduce((sum, item) => sum + eventSize(item), 0);
             if (state.run?.status === "running") {
               const updated = Date.parse(state.run.updatedAt);
@@ -231,6 +284,20 @@ export class ConversationStream {
       if (!dropped) break;
       state.bytes -= eventSize(dropped);
     }
+  }
+
+  /**
+   * 记下一条消息第一次出现在流里的时间。
+   *
+   * 只记第一次：同一条消息后续的增量事件不能把时间往后推，否则长回复会显示成
+   * 「回复结束时的时间」。表只保留最近的 `MESSAGE_TIMES_LIMIT` 条，靠对象的插入
+   * 顺序淘汰最旧的一条。
+   */
+  private rememberTime(state: ThreadStream, event: BaseEvent, ts: string) {
+    const messageId = (event as { messageId?: unknown }).messageId;
+    if (typeof messageId !== "string" || !messageId || state.times[messageId]) return;
+    state.times[messageId] = ts;
+    trimTimes(state.times);
   }
 
   private snapshot(state: ThreadStream): StreamStatus {
@@ -272,6 +339,7 @@ export class ConversationStream {
       oldestSeq: state.events[0]?.seq ?? state.lastSeq + 1,
       events: state.events,
       run: state.run,
+      times: state.times,
       updatedAt: iso(),
     };
     state.writing = this.db
@@ -305,6 +373,7 @@ export class ConversationStream {
     const stored: StoredStreamEvent = { seq, ts, runId, event };
     state.events.push(stored);
     state.bytes += eventSize(stored);
+    this.rememberTime(state, event, ts);
     this.trim(state);
 
     if (event.type === EventType.RUN_STARTED) {
@@ -412,6 +481,34 @@ export class ConversationStream {
 
   async status(owner: string, threadId: string): Promise<StreamStatus> {
     return this.snapshot(await this.ensure(owner, threadId));
+  }
+
+  /**
+   * 每条消息第一次出现的时间（messageId → ISO）。
+   *
+   * 会话历史接口用它给消息补上 `metadata.at`，让回复下面能显示时间——
+   * Rich Threads 持久化的正文本身不带时间戳。没有记录的消息不会出现在返回值里，
+   * 前端据此不显示时间，而不是拿「现在」冒充。
+   */
+  async messageTimes(owner: string, threadId: string): Promise<Record<string, string>> {
+    return { ...(await this.ensure(owner, threadId)).times };
+  }
+
+  /**
+   * 记下一条不会出现在事件流里的消息的时间（用户提问）。
+   *
+   * 用户消息只在 `RunAgentInput.messages` 里出现，没有对应的 AG-UI 事件，
+   * 所以时间必须在请求入口单独打点，否则提问下面的时间只能靠插值猜。
+   * 已经有记录就不覆盖：重试同一轮提问时消息 id 不变。
+   */
+  async noteMessage(owner: string, threadId: string, messageId: string): Promise<void> {
+    if (!threadId || !messageId) return;
+    const ts = iso();
+    const state = await this.ensure(owner, threadId);
+    if (state.times[messageId]) return;
+    state.times[messageId] = ts;
+    trimTimes(state.times);
+    this.scheduleFlush(state);
   }
 
   /** Number of attached SSE clients; exposed for cleanup/concurrency tests. */

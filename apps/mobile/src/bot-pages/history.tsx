@@ -18,9 +18,14 @@ export function BotHistoryPage({ onClose, embedded }: BotPageProps) {
       {tasks.length ? (
         <CardGrid
           items={tasks}
-          minColumnWidth={340}
+          // 详情页正文列比任务中心窄（左栏 180 + 卡片内距之后约 690），
+          // 用 340 的下限会一路退化成单列，放宽到 280 才能稳定排成双列。
+          minColumnWidth={280}
           getKey={(task) => task.id}
-          render={(task) => <TaskCard task={task} compact />}
+          render={(task, _index, { columns }) => (
+            // 双列时换成纵向版式，否则图标 + 标题 + 时间会挤在同一行里。
+            <TaskCard task={task} compact stacked={columns > 1} />
+          )}
         />
       ) : (
         <BotEmpty>{t("agentSpace.noTasks")}</BotEmpty>

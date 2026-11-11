@@ -29,7 +29,13 @@ before(async () => {
       config: { webUrl: "https://lingwu.test", publicUrl: "https://api.lingwu.test" },
     }),
   );
-  app.route("/s", sharePageRoutes({ store: db, config: { webUrl: "https://lingwu.test", publicUrl: "https://api.lingwu.test" } }));
+  app.route(
+    "/s",
+    sharePageRoutes({
+      store: db,
+      config: { webUrl: "https://lingwu.test", publicUrl: "https://api.lingwu.test" },
+    }),
+  );
 });
 
 after(async () => {
