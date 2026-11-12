@@ -20,6 +20,7 @@ import { BrowserService } from "./browser.ts";
 import { ComputerService, type DockerRunner } from "./computer.ts";
 import { computerRoutes } from "./computer-routes.ts";
 import { assertApiDeploymentConfig, type Config } from "./config.ts";
+import { appConnectorRoutes } from "./connectors/routes.ts";
 import {
   ConversationHistory,
   conversationHistoryPage,
@@ -39,7 +40,6 @@ import { AgentService } from "./engine/service.ts";
 import { ConversationStream } from "./engine/stream.ts";
 import { conversationStreamRoutes } from "./engine/stream-routes.ts";
 import { symbolRoutes, watchlistRoutes } from "./engine/watchlist-routes.ts";
-import { appConnectorRoutes } from "./connectors/routes.ts";
 import { AppError } from "./errors.ts";
 import { Files } from "./files.ts";
 import { GoogleAuth } from "./google-auth.ts";
@@ -50,6 +50,7 @@ import { getPdfHealth } from "./pdf-health.ts";
 import { createRateLimitStore, rateLimit } from "./rate-limit.ts";
 import type { SearchService } from "./search.ts";
 import { shareApiRoutes, sharePageRoutes } from "./share-routes.ts";
+import { createShareStore } from "./share-store.ts";
 import { createSupabaseAuth } from "./supabase-auth.ts";
 import { createSupabaseData } from "./supabase-data.ts";
 import { WorkspaceService } from "./workspace.ts";
@@ -72,6 +73,9 @@ export async function createApp(
     accounts = createSupabaseAuth(config),
     // 操作行为日志与业务资源索引写入 Supabase（旁路，失败不影响主流程）。
     supabaseData = createSupabaseData(config);
+  // 分享是「对外承诺长期有效」的链接，单独一套持久化：本地库 + Supabase 双写，
+  // 避免数据目录重建后已发出去的链接集体失效（见 share-store.ts）。
+  const shares = createShareStore({ db, config });
   const actions = new ActionService(db, {
     execute: (owner, input, connectionId, targetVersion) =>
       workspace.execute(owner, input, connectionId, targetVersion),
@@ -555,8 +559,8 @@ export async function createApp(
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));
   app.route("/api/computer", computerRoutes(computer, files));
   // 对话分享：`POST /api/shares` 需登录，`GET /s/:id` 是给收件人看的公开页面。
-  app.route("/api/shares", shareApiRoutes({ store: db, config }));
-  app.route("/s", sharePageRoutes({ store: db, config }));
+  app.route("/api/shares", shareApiRoutes({ shares, config }));
+  app.route("/s", sharePageRoutes({ shares, config }));
   app.get("/api/calendars", async (c) => c.json(await workspace.calendars(c.get("owner"))));
   app.get("/api/calendar/events", async (c) => {
     const query = z

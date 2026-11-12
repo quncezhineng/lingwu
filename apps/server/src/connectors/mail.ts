@@ -36,9 +36,11 @@ function decodeHeader(value: string): string {
       }
     })
     .replace(/=\?([^?]+)\?Q\?([^?]+)\?=/gi, (_all, _charset: string, data: string) =>
-      data.replace(/_/g, " ").replace(/=([0-9A-F]{2})/gi, (_m, hex: string) =>
-        String.fromCharCode(Number.parseInt(hex, 16)),
-      ),
+      data
+        .replace(/_/g, " ")
+        .replace(/=([0-9A-F]{2})/gi, (_m, hex: string) =>
+          String.fromCharCode(Number.parseInt(hex, 16)),
+        ),
     )
     .replace(/\s+/g, " ")
     .trim()
@@ -77,7 +79,10 @@ class LineSocket {
       return line;
     }
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("邮箱服务器暂时连不上，请稍后再试。")), 12000);
+      const timer = setTimeout(
+        () => reject(new Error("邮箱服务器暂时连不上，请稍后再试。")),
+        12000,
+      );
       this.waiters.push((value) => {
         clearTimeout(timer);
         resolve(value);
@@ -119,7 +124,9 @@ async function imap(login: MailLogin, readIndex?: string, limit = 5): Promise<Ma
     io.send(`A1 LOGIN ${quote(login.email)} ${quote(login.code)}`);
     const auth = await io.line();
     if (!auth.startsWith("A1 OK"))
-      throw new Error("授权码被拒绝。请确认已开启 IMAP，并且粘贴的是授权码或应用专用密码，不是登录密码。");
+      throw new Error(
+        "授权码被拒绝。请确认已开启 IMAP，并且粘贴的是授权码或应用专用密码，不是登录密码。",
+      );
     io.send("A2 SELECT INBOX");
     let exists = 0;
     for (;;) {
@@ -135,7 +142,9 @@ async function imap(login: MailLogin, readIndex?: string, limit = 5): Promise<Ma
         );
     const messages: MailMessage[] = [];
     for (const index of wanted) {
-      io.send(`A3 FETCH ${index} (BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)] BODY.PEEK[TEXT]<0.1200>)`);
+      io.send(
+        `A3 FETCH ${index} (BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)] BODY.PEEK[TEXT]<0.1200>)`,
+      );
       let blob = "";
       for (;;) {
         const line = await io.line();
@@ -147,7 +156,7 @@ async function imap(login: MailLogin, readIndex?: string, limit = 5): Promise<Ma
         from: headerValue(blob, "From"),
         subject: headerValue(blob, "Subject"),
         date: headerValue(blob, "Date"),
-        ...(readIndex ? { body: blob.replace(/^[^]*?\n\n/, "").slice(0, 2000) } : {}),
+        ...(readIndex ? { body: blob.replace(/^[\s\S]*?\n\n/, "").slice(0, 2000) } : {}),
       });
     }
     io.send("A4 LOGOUT");
@@ -172,9 +181,9 @@ async function pop3(login: MailLogin, readIndex?: string, limit = 5): Promise<Ma
     const count = Number(stat.split(" ")[1] ?? 0);
     const indexes = readIndex
       ? [readIndex]
-      : Array.from({ length: Math.min(limit, count) }, (_item, index) => String(count - index)).filter(
-          (n) => Number(n) > 0,
-        );
+      : Array.from({ length: Math.min(limit, count) }, (_item, index) =>
+          String(count - index),
+        ).filter((n) => Number(n) > 0);
     const messages: MailMessage[] = [];
     for (const index of indexes) {
       io.send(`TOP ${index} 20`);
@@ -207,10 +216,13 @@ export const defaultMailTransport: MailTransport = {
     else await imap(login, undefined, 1);
   },
   async recent(login, limit) {
-    return login.protocol === "pop3" ? pop3(login, undefined, limit) : imap(login, undefined, limit);
+    return login.protocol === "pop3"
+      ? pop3(login, undefined, limit)
+      : imap(login, undefined, limit);
   },
   async read(login, index) {
-    const rows = login.protocol === "pop3" ? await pop3(login, index, 1) : await imap(login, index, 1);
+    const rows =
+      login.protocol === "pop3" ? await pop3(login, index, 1) : await imap(login, index, 1);
     const found = rows[0];
     if (!found) throw new Error("没有找到这封邮件。");
     return found;

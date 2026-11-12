@@ -182,8 +182,7 @@ const app = {
   "app.titleIdeas": "Ideas",
   "app.subtitleIdeas": "Next research steps, grounded in the markets and targets you follow.",
   "app.titleGoals": "Scheduled",
-  "app.subtitleGoals":
-    "Manage research goals and automations so LingWu can keep up with progress.",
+  "app.subtitleGoals": "Manage research goals and automations so LingWu can keep up with progress.",
   "app.titleMemories": "Memory",
   "app.subtitleMemories":
     "Keep your goals, risk preferences and focus areas as durable context for LingWu.",

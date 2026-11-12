@@ -23,6 +23,7 @@ import type { BatchQuoteItem } from "../../../../packages/integrations/src/marke
 import { agentIdForThread, agentModelForThread } from "../agent-space.ts";
 import { computerInstructions, computerTools } from "../computer-tools.ts";
 import type { Config } from "../config.ts";
+import { connectionGuidance, invokeConnection } from "../connectors/service.ts";
 import { createJevAdapter, type JevAdapter } from "../jev/adapter.ts";
 import { JevService } from "../jev/service.ts";
 import { presentChoicesTool } from "../jev/tools.ts";
@@ -31,7 +32,6 @@ import type { ResolvedModel } from "../model-settings.ts";
 import { searchDescription, searchInputSchema, searchInstructions } from "../search.ts";
 import { agentIdentityGuidance } from "./agent-persona.ts";
 import { readInstalledSkill, skillGuidanceForThread } from "./bot-skills.ts";
-import { connectionGuidance, invokeConnection } from "../connectors/service.ts";
 import { recallMemories } from "./memory-recall.ts";
 import { reminderList } from "./reminder-list.ts";
 import type { AgentService } from "./service.ts";

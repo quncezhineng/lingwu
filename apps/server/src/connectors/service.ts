@@ -3,8 +3,15 @@ import type { Config } from "../config.ts";
 import type { Store } from "../db.ts";
 import { AppError } from "../errors.ts";
 import { APP_CONNECTORS, type CatalogEntry, connectorBySlug } from "./catalog.ts";
-import { mailTransport, type MailLogin } from "./mail.ts";
-import { assertDingUrl, McpError, mcpSession, type McpAuth, type McpFetch, type McpTool } from "./mcp.ts";
+import { type MailLogin, mailTransport } from "./mail.ts";
+import {
+  assertDingUrl,
+  type McpAuth,
+  McpError,
+  type McpFetch,
+  type McpTool,
+  mcpSession,
+} from "./mcp.ts";
 
 const KIND = "app-connectors";
 const TOKEN_RE = /^[A-Za-z0-9]{16,128}$/;
@@ -89,7 +96,9 @@ export function missingConfig(entry: CatalogEntry, config: Config): string[] {
       `官方 MCP 登录需要回调 ${callback} 被 Google 接受。现有的 Google 登录只覆盖邮件和日历，不包含 Drive / Sheets MCP。`,
     ];
   if (entry.slug === "gmail-mcp")
-    return ["Gmail 官方 MCP 登录还不可用。请用「Gmail 邮箱」的应用专用密码，或已有的 Google 邮件连接。"];
+    return [
+      "Gmail 官方 MCP 登录还不可用。请用「Gmail 邮箱」的应用专用密码，或已有的 Google 邮件连接。",
+    ];
   return [`登录授权需要回调 ${callback}，当前还没有接上。`];
 }
 
@@ -100,7 +109,8 @@ function authMode(entry: CatalogEntry): McpAuth {
   return "query";
 }
 
-const OVERLAP = /^(daily|pro_bar|stk_mins|rt_k|rt_min|rt_min_daily|realtime_quote|quotes|daily_basic|fund_basic|fund_nav|fund_daily)$/i;
+const OVERLAP =
+  /^(daily|pro_bar|stk_mins|rt_k|rt_min|rt_min_daily|realtime_quote|quotes|daily_basic|fund_basic|fund_nav|fund_daily)$/i;
 
 function overlapsBuiltin(slug: string, name: string): boolean {
   if (slug !== "tushare" && slug !== "yingmi" && slug !== "pandadata") return false;
@@ -131,11 +141,20 @@ function localTools(entry: CatalogEntry): McpTool[] {
       { name: "read_message", description: "按序号读取一封邮件。参数 index。不会发信。" },
     ];
   if (entry.transport === "docling")
-    return [{ name: "parse_file", description: "把已上传的文件交给 Docling 解析。参数 filename。" }];
+    return [
+      { name: "parse_file", description: "把已上传的文件交给 Docling 解析。参数 filename。" },
+    ];
   return [];
 }
 
-async function remember(deps: Deps, owner: string, entry: CatalogEntry, secret: SecretBody, tools: McpTool[], label?: string) {
+async function remember(
+  deps: Deps,
+  owner: string,
+  entry: CatalogEntry,
+  secret: SecretBody,
+  tools: McpTool[],
+  label?: string,
+) {
   const row: Saved = {
     id: entry.slug,
     secret: seal(deps.config, secret),
@@ -186,12 +205,16 @@ function asAppError(error: unknown): never {
   throw error;
 }
 
-export async function connectConnector(deps: Deps, owner: string, slug: string, input: ConnectInput) {
+export async function connectConnector(
+  deps: Deps,
+  owner: string,
+  slug: string,
+  input: ConnectInput,
+) {
   const entry = connectorBySlug(slug);
   if (!entry) throw new AppError("没有这个连接", 404);
   const missing = missingConfig(entry, deps.config);
-  if (entry.transport === "oauth")
-    throw new AppError(missing.join(" "), 503, "missing_config");
+  if (entry.transport === "oauth") throw new AppError(missing.join(" "), 503, "missing_config");
   if (entry.transport === "docling" && missing.length)
     throw new AppError(missing.join(" "), 503, "missing_config");
   try {
@@ -202,13 +225,21 @@ export async function connectConnector(deps: Deps, owner: string, slug: string, 
 }
 
 async function connectReady(deps: Deps, owner: string, entry: CatalogEntry, input: ConnectInput) {
-  if (entry.transport === "mcp-query" || entry.transport === "mcp-bearer" || entry.transport === "mcp-header") {
+  if (
+    entry.transport === "mcp-query" ||
+    entry.transport === "mcp-bearer" ||
+    entry.transport === "mcp-header"
+  ) {
     const token = (input.token ?? "").trim();
     requireToken(entry, token);
     const session = await mcpSession(entry.endpoint ?? "", token, authMode(entry), deps.fetcher);
     const tools = (await session.tools()).filter((tool) => !overlapsBuiltin(entry.slug, tool.name));
     if (entry.slug === "tushare" && tools.some((tool) => tool.name === "trade_cal"))
-      await session.call("trade_cal", { exchange: "SSE", start_date: "20260105", end_date: "20260105" });
+      await session.call("trade_cal", {
+        exchange: "SSE",
+        start_date: "20260105",
+        end_date: "20260105",
+      });
     if (entry.slug === "yingmi" && tools.some((tool) => tool.name === "GetCurrentTime"))
       await session.call("GetCurrentTime", {});
     if (!tools.length) throw new AppError("没有发现可用工具。");
@@ -236,7 +267,8 @@ async function connectReady(deps: Deps, owner: string, entry: CatalogEntry, inpu
     const domain = email.split("@")[1] ?? "";
     if (!EMAIL_RE.test(email) || !entry.mailDomains?.includes(domain))
       throw new AppError("邮箱地址和这张卡片的服务商不一致。");
-    if (!CODE_RE.test(code)) throw new AppError("授权码格式不正确。请粘贴授权码或应用专用密码，不是登录密码。");
+    if (!CODE_RE.test(code))
+      throw new AppError("授权码格式不正确。请粘贴授权码或应用专用密码，不是登录密码。");
     const login: MailLogin = {
       host: entry.mailHost ?? "",
       port: entry.mailProtocol === "pop3" ? 995 : 993,
@@ -247,7 +279,10 @@ async function connectReady(deps: Deps, owner: string, entry: CatalogEntry, inpu
     try {
       await mailTransport().check(login);
     } catch (error) {
-      throw new AppError(error instanceof Error ? error.message : "邮箱服务器暂时连不上，请稍后再试。", 502);
+      throw new AppError(
+        error instanceof Error ? error.message : "邮箱服务器暂时连不上，请稍后再试。",
+        502,
+      );
     }
     await remember(deps, owner, entry, { email, code }, localTools(entry), email);
     return { connected: true, toolCount: localTools(entry).length };
@@ -268,7 +303,10 @@ export async function connectionGuidance(db: Store, owner: string): Promise<stri
     return " No extra account connections are connected. Call use_connection only after one is connected; do not invent outside data.";
   const lines = saved.map((row) => {
     const entry = connectorBySlug(row.id);
-    const tools = row.tools.map((tool) => tool.name).slice(0, 8).join(", ");
+    const tools = row.tools
+      .map((tool) => tool.name)
+      .slice(0, 8)
+      .join(", ");
     return `${entry?.name ?? row.id} (slug ${row.id}${tools ? `: ${tools}` : ""})`;
   });
   return (
@@ -310,8 +348,18 @@ export async function invokeConnection(
 }
 
 function stripSecrets(args: Record<string, unknown>): Record<string, unknown> {
-  const blocked = new Set(["token", "api_key", "apikey", "authorization", "password", "code", "auth_code"]);
-  return Object.fromEntries(Object.entries(args).filter(([name]) => !blocked.has(name.toLowerCase())));
+  const blocked = new Set([
+    "token",
+    "api_key",
+    "apikey",
+    "authorization",
+    "password",
+    "code",
+    "auth_code",
+  ]);
+  return Object.fromEntries(
+    Object.entries(args).filter(([name]) => !blocked.has(name.toLowerCase())),
+  );
 }
 
 function redactMessage(message: string, secret: SecretBody): string {
@@ -328,8 +376,17 @@ async function dispatch(
   tool: string,
   args: Record<string, unknown>,
 ): Promise<string> {
-  if (entry.transport === "mcp-query" || entry.transport === "mcp-bearer" || entry.transport === "mcp-header") {
-    const session = await mcpSession(entry.endpoint ?? "", secret.token ?? "", authMode(entry), deps.fetcher);
+  if (
+    entry.transport === "mcp-query" ||
+    entry.transport === "mcp-bearer" ||
+    entry.transport === "mcp-header"
+  ) {
+    const session = await mcpSession(
+      entry.endpoint ?? "",
+      secret.token ?? "",
+      authMode(entry),
+      deps.fetcher,
+    );
     return session.call(tool, args);
   }
   if (entry.transport === "mcp-url") {
@@ -382,7 +439,12 @@ async function fmpCall(deps: Deps, token: string, tool: string, args: Record<str
   return JSON.stringify(parsed).slice(0, 4000);
 }
 
-async function mailCall(entry: CatalogEntry, secret: SecretBody, tool: string, args: Record<string, unknown>) {
+async function mailCall(
+  entry: CatalogEntry,
+  secret: SecretBody,
+  tool: string,
+  args: Record<string, unknown>,
+) {
   const login: MailLogin = {
     host: entry.mailHost ?? "",
     port: entry.mailProtocol === "pop3" ? 995 : 993,
@@ -409,7 +471,8 @@ async function ownedFiles(deps: Deps, textOnly: boolean) {
   const rows = await files.list(depsOwner(deps));
   if (!textOnly) return rows;
   return rows.filter(
-    (file) => /text|json|csv|markdown/.test(file.mimeType) || /\.(txt|md|csv|json)$/i.test(file.name),
+    (file) =>
+      /text|json|csv|markdown/.test(file.mimeType) || /\.(txt|md|csv|json)$/i.test(file.name),
   );
 }
 
@@ -419,13 +482,16 @@ function depsOwner(deps: Deps & { owner?: string }): string {
 
 async function fileCall(deps: Deps, tool: string, args: Record<string, unknown>) {
   const files = await ownedFiles(deps, true);
-  if (tool === "list_files") return JSON.stringify(files.map((file) => ({ name: file.name, mimeType: file.mimeType })));
+  if (tool === "list_files")
+    return JSON.stringify(files.map((file) => ({ name: file.name, mimeType: file.mimeType })));
   if (tool === "read_file") return readNamedFile(deps, files, String(args.filename ?? ""));
   throw new AppError("没有这个工具");
 }
 
 async function ledgerCall(deps: Deps, tool: string, args: Record<string, unknown>) {
-  const files = (await ownedFiles(deps, true)).filter((file) => file.name.toLowerCase().endsWith(".csv"));
+  const files = (await ownedFiles(deps, true)).filter((file) =>
+    file.name.toLowerCase().endsWith(".csv"),
+  );
   if (tool === "list_ledgers") return JSON.stringify(files.map((file) => file.name));
   if (tool !== "summarize_ledger") throw new AppError("没有这个工具");
   const text = await readNamedFile(deps, files, String(args.filename ?? ""));
@@ -436,7 +502,8 @@ async function ledgerCall(deps: Deps, tool: string, args: Record<string, unknown
     const cells = line.split(",");
     headers.forEach((header, index) => {
       const value = Number(cells[index]);
-      if (Number.isFinite(value)) totals[header.trim() || `列${index + 1}`] = (totals[header.trim()] ?? 0) + value;
+      if (Number.isFinite(value))
+        totals[header.trim() || `列${index + 1}`] = (totals[header.trim()] ?? 0) + value;
     });
   }
   return JSON.stringify({ rows: Math.max(lines.length - 1, 0), totals });

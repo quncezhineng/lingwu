@@ -7,10 +7,10 @@ import type { AgentIdentity, AgentTask } from "../../../../packages/domain/src/a
 import { emailDraftSchema, eventDraftSchema } from "../../../../packages/domain/src/index.ts";
 import { agentModelForThread } from "../agent-space.ts";
 import { computerInstructions, computerTools } from "../computer-tools.ts";
+import { connectionGuidance, invokeConnection } from "../connectors/service.ts";
 import { searchDescription, searchInputSchema, searchInstructions } from "../search.ts";
 import { agentIdentityGuidance } from "./agent-persona.ts";
 import { readInstalledSkill, skillGuidanceForThread } from "./bot-skills.ts";
-import { connectionGuidance, invokeConnection } from "../connectors/service.ts";
 import type { AgentService } from "./service.ts";
 import { tanstackAgent } from "./tanstack-agent.ts";
 import type { TaskContext } from "./worker.ts";

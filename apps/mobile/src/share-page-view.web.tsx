@@ -30,7 +30,7 @@ type ShareState =
   | { status: "missing" }
   | { status: "error" };
 
-export default function SharePageView({ id }: { id: string }) {
+export default function SharePageView({ id, broken = false }: { id: string; broken?: boolean }) {
   const [state, setState] = useState<ShareState>({ status: "loading" });
   // 重试计数：变化即重新取数，失败态不必刷新整页。
   const [attempt, setAttempt] = useState(0);
@@ -38,6 +38,8 @@ export default function SharePageView({ id }: { id: string }) {
   const compact = width <= 520;
 
   useEffect(() => {
+    // 链接本身就不完整时无可取：直接停在提示上，别发一次注定 404 的请求。
+    if (broken) return;
     const controller = new AbortController();
     let active = true;
     setState({ status: "loading" });
@@ -53,7 +55,7 @@ export default function SharePageView({ id }: { id: string }) {
       active = false;
       controller.abort();
     };
-  }, [id, attempt]);
+  }, [id, attempt, broken]);
 
   // 分享页是独立页面：标签页标题跟随提问，转发到聊天软件时也更容易辨认。
   useEffect(() => {
@@ -89,7 +91,13 @@ export default function SharePageView({ id }: { id: string }) {
             </Pressable>
           </View>
 
-          {state.status === "loading" ? (
+          {broken ? (
+            <View style={styles.card}>
+              <Text style={styles.hint}>这个分享链接不完整，请让发送方重新复制一次。</Text>
+            </View>
+          ) : null}
+
+          {!broken && state.status === "loading" ? (
             <View style={[styles.card, styles.centerCard]}>
               <ActivityIndicator color={colors.primary} />
               <Text style={styles.hint}>正在加载分享…</Text>

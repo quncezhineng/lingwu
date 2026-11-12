@@ -558,7 +558,8 @@ const agent = {
   "agent.hubCategoryDocuments": "文档解析",
   "agent.hubCategoryFiles": "文件",
   "agent.hubCategoryDevelopment": "研发协作",
-  "agent.hubConnectionsAccount": "已连接 {count} 个。连接属于当前账号，所有智能体都能调用这些工具。",
+  "agent.hubConnectionsAccount":
+    "已连接 {count} 个。连接属于当前账号，所有智能体都能调用这些工具。",
   "agent.hubConnectorEmail": "邮箱地址",
   "agent.hubConnectorCode": "授权码",
   "agent.hubConnectorUrl": "个人 MCP 地址",
@@ -594,7 +595,8 @@ const agent = {
   "agent.hubOpenBotDetail": "连接 OpenBot 执行后端，承接智能体任务。",
   "agent.appsHeroEyebrow": "技能与连接",
   "agent.appsHeroTitle": "让灵悟按你的研究方式工作。",
-  "agent.appsHeroDetail": "技能是做事方法，连接把外部账号和运行环境接进工作区。接通之后，对话里可以使用对应的工具。",
+  "agent.appsHeroDetail":
+    "技能是做事方法，连接把外部账号和运行环境接进工作区。接通之后，对话里可以使用对应的工具。",
   "agent.appsFilterAll": "全部",
   "agent.appsFilterPlugins": "连接",
   "agent.appsFilterSkills": "技能",

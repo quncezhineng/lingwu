@@ -36,9 +36,9 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
 import { ChatScreen, WorkspaceTools } from "./chat";
-import { type ThreadHistoryPage, threadHistoryPagePath } from "./conversation-history";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ComputerScreen } from "./computer";
+import { type ThreadHistoryPage, threadHistoryPagePath } from "./conversation-history";
 import { columnMaxWidth, desktopColumns } from "./desktop-columns";
 import { Details, SettingsScreen } from "./details";
 import { useTranslation } from "./i18n";
@@ -62,8 +62,8 @@ import {
   X,
 } from "./icons";
 import { IosStack } from "./ios-stack";
+import { type BotPreview, botHasUnread, latestBotPreview } from "./mobile-bots";
 import { MobileBotsHome } from "./mobile-bots-home";
-import { botHasUnread, type BotPreview, latestBotPreview } from "./mobile-bots";
 import { ModalOverlay } from "./modal-overlay";
 import { unreadCount } from "./notification-actions";
 import { delegatedSectionTitle } from "./plan-card";

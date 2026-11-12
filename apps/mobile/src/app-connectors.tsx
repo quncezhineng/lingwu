@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
-import { Text } from "./app-text";
 import type { LingWuApi } from "./api";
+import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { Button, colors, Field, Sheet, s } from "./ui";
 
@@ -53,7 +53,9 @@ export function AppConnectorSheet({
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const blocked = item.auth === "oauth" || (item.auth === "platform" && item.missing.length > 0 && !item.connected);
+  const blocked =
+    item.auth === "oauth" ||
+    (item.auth === "platform" && item.missing.length > 0 && !item.connected);
   const submit = async () => {
     if (busy) return;
     setBusy(true);
@@ -110,7 +112,12 @@ export function AppConnectorSheet({
         ) : null}
         {item.auth === "authcode" ? (
           <>
-            <Field label={t("agent.hubConnectorEmail")} value={email} onChangeText={setEmail} autoCapitalize="none" />
+            <Field
+              label={t("agent.hubConnectorEmail")}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+            />
             <Field
               label={t("agent.hubConnectorCode")}
               value={code}
@@ -129,10 +136,17 @@ export function AppConnectorSheet({
             autoCorrect={false}
           />
         ) : null}
-        {!!message && <Text style={{ color: colors.danger, fontSize: 13, lineHeight: 20 }}>{message}</Text>}
+        {!!message && (
+          <Text style={{ color: colors.danger, fontSize: 13, lineHeight: 20 }}>{message}</Text>
+        )}
         <View style={{ flexDirection: "row", gap: 10 }}>
           {item.connected ? (
-            <Button variant="outline" style={{ flex: 1 }} disabled={busy} onPress={() => void disconnect()}>
+            <Button
+              variant="outline"
+              style={{ flex: 1 }}
+              disabled={busy}
+              onPress={() => void disconnect()}
+            >
               {t("agent.hubConnectorDisconnect")}
             </Button>
           ) : null}

@@ -605,7 +605,8 @@ const agent = {
   "agent.searchConnectors": "Search connectors",
   "agent.searchCapabilities": "Search skills or connections",
   "agent.hubPluginsDetail": "Bring a runtime into the workspace",
-  "agent.hubSkillsDetail": "Research methods. Install one on an agent and it can follow it in chat.",
+  "agent.hubSkillsDetail":
+    "Research methods. Install one on an agent and it can follow it in chat.",
   "agent.hubConnectorsShortDetail": "External tools and services",
   "agent.hubSearchPlugins": "Search plugins",
   "agent.hubSearchSkills": "Search skills",
@@ -809,7 +810,8 @@ const agent = {
   "agentSpace.createAgent": "Create Agent",
   "agentSpace.account": "Personal account",
   "agentSpace.connectors": "Connections",
-  "agentSpace.connectorsHint": "Connections belong to this account. This list is only the ones assigned to this agent.",
+  "agentSpace.connectorsHint":
+    "Connections belong to this account. This list is only the ones assigned to this agent.",
   "agentSpace.connectorsEmpty": "No connections are assigned to this agent yet.",
   "agentSpace.personalCenter": "Personal center",
   "agentSpace.systemAgent": "System default Agent",

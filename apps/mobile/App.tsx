@@ -41,7 +41,7 @@ import { PageHeader } from "./src/page-header";
 import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
 import { GlobalSearchSheet } from "./src/search-sheet";
-import { isSharePath } from "./src/share-page-path";
+import { parseSharePath } from "./src/share-page-path";
 import SharePageView from "./src/share-page-view";
 import { ACCOUNT_NAV, BrandMark, ChatsColumn, MOBILE_NAV, Rail } from "./src/shell";
 import { TaskHubScreen } from "./src/task-hub";
@@ -101,13 +101,23 @@ const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: T
 /** 应用入口：先挂载语言上下文，保证包含登录页在内的所有界面都可被翻译。 */
 export default function App() {
   // 分享链接（/s/:id）指向前端域名，浏览器直开时命中这里：跳过登录与工作区，
-  // 直接渲染分享内容；原生端无 URL，isSharePath 恒为 null，不受影响。
-  const shareId = typeof window === "undefined" ? null : isSharePath(window.location.pathname);
+  // 直接渲染分享内容；原生端无 URL，识别结果恒为 none，不受影响。
+  const sharePath =
+    typeof window === "undefined"
+      ? ({ kind: "none" } as const)
+      : parseSharePath(window.location.pathname);
   // 分享页同样挂语言上下文：正文里的表格、图片占位等组件按当前语言取文案。
-  if (shareId)
+  if (sharePath.kind === "share")
     return (
       <I18nProvider>
-        <SharePageView id={shareId} />
+        <SharePageView id={sharePath.id} />
+      </I18nProvider>
+    );
+  // 链接被复制坏了：给一句明确提示，而不是退回工作区/登录页让人以为「链接点不开」。
+  if (sharePath.kind === "broken")
+    return (
+      <I18nProvider>
+        <SharePageView id="" broken />
       </I18nProvider>
     );
   return (

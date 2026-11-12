@@ -1,9 +1,9 @@
 /**
  * 对话回复的公开分享页。
  *
- * 用户在对话里点「分享为链接」时，客户端把「提问 + 回复」写入 `shares` 集合，
- * 服务端返回一个不可猜的短 id；`GET /s/:id` 用这个 id 渲染一张无需登录即可
- * 阅读的静态页面，方便直接发给别人。链接域名用 `PUBLIC_WEB_URL`（前端域名），
+ * 用户在对话里点「分享为链接」时，客户端把「提问 + 回复」交给 `share-store` 落库
+ *（本地库 + Supabase 双写，见 `share-store.ts`），服务端返回一个不可猜的短 id；
+ * `GET /s/:id` 用这个 id 渲染一张无需登录即可阅读的静态页面，方便直接发给别人。链接域名用 `PUBLIC_WEB_URL`（前端域名），
  * 收件人打开的是前端地址；Web 端由 SPA 接管 `/s/:id`，用 `GET /s/:id/data`
  * 拿正文后用自己的 Markdown 渲染器出图，服务端页面则留作无 JS 场景的兜底。
  *
@@ -16,22 +16,16 @@ import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
 import MarkdownIt from "markdown-it";
 import { z } from "zod";
-import type { Store } from "./db.ts";
+import type { ShareRecord, ShareStore } from "./share-store.ts";
 
 type Env = { Variables: { owner: string } };
 
-/** 分享记录。`id` 同时是数据库主键与 URL 路径段。 */
-export interface ShareRecord {
-  id: string;
-  /** 用户提问；可能为空（例如会话首条就是助手消息）。 */
-  question: string;
-  /** 助手回复的原始 Markdown。 */
-  answer: string;
-  createdAt: string;
-}
+/** 分享记录由 `share-store` 统一持久化，这里只负责渲染与校验。 */
+export type { ShareRecord };
 
-const SHARES_KIND = "shares";
+/** 分享 id 的形状：与 `share-store` 生成的 `randomBytes(12)` base64url 一致。 */
 const SHARE_ID_PATTERN = /^[A-Za-z0-9_-]{8,32}$/;
+
 /** 单条分享的体积上限：正文 6 万字，足够覆盖长研报，又避免把库撑爆。 */
 const shareInputSchema = z.object({
   question: z.string().trim().max(4000).default(""),
@@ -297,7 +291,7 @@ function renderNotFound(): string {
  * 收件人拿到链接直接就能打开。
  */
 export function sharePageRoutes(deps: {
-  store: Store;
+  shares: ShareStore;
   // 「进入主页」按钮的目标地址：优先前端域名（PUBLIC_WEB_URL），未配置时回退 API 域名。
   config: { webUrl?: string; publicUrl: string };
 }): Hono {
@@ -314,28 +308,28 @@ export function sharePageRoutes(deps: {
   app.get("/:id/data", async (c) => {
     const id = c.req.param("id");
     if (!SHARE_ID_PATTERN.test(id)) return c.json({ error: "Share not found" }, 404);
-    const row = await deps.store.getByKindAndId<ShareRecord>(SHARES_KIND, id);
-    if (!row) return c.json({ error: "Share not found" }, 404);
+    const share = await deps.shares.get(id);
+    if (!share) return c.json({ error: "Share not found" }, 404);
     return c.json({
       id,
-      question: typeof row.value.question === "string" ? row.value.question : "",
-      answer: typeof row.value.answer === "string" ? row.value.answer : "",
-      createdAt: typeof row.value.createdAt === "string" ? row.value.createdAt : "",
+      question: share.question,
+      answer: share.answer,
+      createdAt: share.createdAt,
     });
   });
   app.get("/:id", async (c) => {
     const id = c.req.param("id");
     if (!SHARE_ID_PATTERN.test(id)) return c.html(renderNotFound(), 404);
-    const row = await deps.store.getByKindAndId<ShareRecord>(SHARES_KIND, id);
-    if (!row) return c.html(renderNotFound(), 404);
-    return c.html(renderSharePage(row.value, homeUrl));
+    const share = await deps.shares.get(id);
+    if (!share) return c.html(renderNotFound(), 404);
+    return c.html(renderSharePage(share, homeUrl));
   });
   return app;
 }
 
 /** 创建分享，挂载在 `/api/shares` 下（`POST /`）。需登录。 */
 export function shareApiRoutes(deps: {
-  store: Store;
+  shares: ShareStore;
   // 优先用前端域名（PUBLIC_WEB_URL）；未配置时回退 API 域名，保持向后兼容。
   config: { webUrl?: string; publicUrl: string };
 }): Hono<Env> {
@@ -348,7 +342,7 @@ export function shareApiRoutes(deps: {
       answer: input.answer,
       createdAt: new Date().toISOString(),
     };
-    await deps.store.put(c.get("owner"), SHARES_KIND, record);
+    await deps.shares.put(c.get("owner"), record);
     // 指向前端域名：收件人打开的地址与 App 同源；Web 端 SPA 会兜住 /s/:id 并展示内容。
     const baseUrl = deps.config.webUrl ?? deps.config.publicUrl;
     return c.json({ id: record.id, url: `${baseUrl}/s/${record.id}` }, 201);

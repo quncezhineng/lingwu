@@ -173,7 +173,8 @@ export const APP_CONNECTORS: readonly CatalogEntry[] = [
   {
     slug: "google-drive",
     name: "Google Drive",
-    summary: "官方 Drive MCP。用你的 Google 账号登录后查找文件并读正文。不需要平台申请另一套 OAuth 应用。",
+    summary:
+      "官方 Drive MCP。用你的 Google 账号登录后查找文件并读正文。不需要平台申请另一套 OAuth 应用。",
     category: "office",
     featured: false,
     auth: "oauth",
@@ -299,7 +300,8 @@ export const APP_CONNECTORS: readonly CatalogEntry[] = [
   {
     slug: "gmail-mcp",
     name: "Gmail 官方 MCP",
-    summary: "官方登录授权这一路还没有接上。个人邮箱请用「Gmail 邮箱」，或继续用已有的 Google 登录连接。不会发信。",
+    summary:
+      "官方登录授权这一路还没有接上。个人邮箱请用「Gmail 邮箱」，或继续用已有的 Google 登录连接。不会发信。",
     category: "office",
     featured: false,
     auth: "oauth",

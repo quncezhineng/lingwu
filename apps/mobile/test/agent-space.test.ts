@@ -431,10 +431,7 @@ test("removing a skill from an Agent only detaches that Agent's copy", () => {
 
   // 内容相同的旧副本在 normalize 时收成技能库引用，摘除时按库 id 去掉这一处引用。
   const next = detachSkillFromAgent(state, "agent-a", librarySkill.id);
-  assert.deepEqual(
-    next.agents.find((agent) => agent.id === "agent-a")?.skillRefs,
-    [],
-  );
+  assert.deepEqual(next.agents.find((agent) => agent.id === "agent-a")?.skillRefs, []);
   assert.deepEqual(next.agents.find((agent) => agent.id === "agent-a")?.customSkills, []);
   // 「我的技能」原件和另一个 Agent 的引用都还在。
   assert.deepEqual(

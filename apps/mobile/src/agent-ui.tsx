@@ -3199,13 +3199,13 @@ export function NotificationsSheet({ embedded = false }: { embedded?: boolean } 
               >
                 <View style={[s.between, { gap: 10 }]}>
                   <Text numberOfLines={2} style={s.heading}>
-                    {item.title}
+                    {runtimeLabel(item.title)}
                   </Text>
                   {!item.read && <Chip>{t("agent.newChip")}</Chip>}
                 </View>
                 {!!item.body.trim() && (
                   <Text numberOfLines={2} style={s.small}>
-                    {notificationExcerpt(item.body)}
+                    {runtimeLabel(notificationExcerpt(item.body))}
                   </Text>
                 )}
                 <View style={[s.between, { gap: 10 }]}>

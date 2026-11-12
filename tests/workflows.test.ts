@@ -440,7 +440,10 @@ test("milestone edits stay manual while goals are hidden, so a legacy task does 
   await reconcile();
   const milestones = (await db.get<Goal>(owner, "goals", goal.id))?.milestones;
   assert.equal(milestones?.length, 1);
-  assert.equal(milestones?.some((milestone) => milestone.id === legacy.id), false);
+  assert.equal(
+    milestones?.some((milestone) => milestone.id === legacy.id),
+    false,
+  );
 });
 
 test("failed, cancelled and review-blocked tasks do not complete milestones", async () => {

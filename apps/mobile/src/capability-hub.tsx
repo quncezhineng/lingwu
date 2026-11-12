@@ -4,7 +4,7 @@ import Markdown from "react-native-markdown-renderer";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition, AgentSkill } from "./agent-space-model";
-import { type AppConnectorView, AppConnectorSheet, useAppConnectors } from "./app-connectors";
+import { AppConnectorSheet, type AppConnectorView, useAppConnectors } from "./app-connectors";
 import { Text, TextInput } from "./app-text";
 import { assistantMarkdown } from "./assistant-markdown";
 import { useTranslation } from "./i18n";

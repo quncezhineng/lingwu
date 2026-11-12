@@ -5,8 +5,8 @@ import type { Store } from "../db.ts";
 import {
   connectConnector,
   disconnectConnector,
-  listConnectors,
   type FileReader,
+  listConnectors,
 } from "./service.ts";
 
 const bodySchema = z.object({

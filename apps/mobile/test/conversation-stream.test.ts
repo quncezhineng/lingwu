@@ -21,7 +21,10 @@ interface CapturedReply {
 
 const captured = JSON.parse(
   readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), "../../../tests/fixtures/xiaowu-7388e0ff-deltas.json"),
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../tests/fixtures/xiaowu-7388e0ff-deltas.json",
+    ),
     "utf8",
   ),
 ) as CapturedReply;

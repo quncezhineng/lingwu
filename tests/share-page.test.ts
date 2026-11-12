@@ -2,14 +2,22 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { Hono } from "hono";
 import { z } from "zod";
+import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
 import { shareApiRoutes, sharePageRoutes } from "../apps/server/src/share-routes.ts";
+import { createShareStore, type ShareStore } from "../apps/server/src/share-store.ts";
+
+/** 分享链接的域名配置：前端域名与 API 域名分开，验证链接指向的是前者。 */
+const SHARE_CONFIG = { webUrl: "https://lingwu.test", publicUrl: "https://api.lingwu.test" };
 
 let db: Store;
+let shares: ShareStore;
 let app: Hono<{ Variables: { owner: string } }>;
 
 before(async () => {
   db = await createStore();
+  // 测试不配 Supabase：分享只落内存库，不发网络请求。
+  shares = createShareStore({ db, config: {} as Config });
   app = new Hono<{ Variables: { owner: string } }>();
   // 测试里用固定 owner 代替鉴权中间件。
   app.use("/api/*", async (c, next) => {
@@ -22,20 +30,8 @@ before(async () => {
       ? c.json({ error: error.issues.map((issue) => issue.message).join("; ") }, 422)
       : c.json({ error: "Request failed." }, 500),
   );
-  app.route(
-    "/api/shares",
-    shareApiRoutes({
-      store: db,
-      config: { webUrl: "https://lingwu.test", publicUrl: "https://api.lingwu.test" },
-    }),
-  );
-  app.route(
-    "/s",
-    sharePageRoutes({
-      store: db,
-      config: { webUrl: "https://lingwu.test", publicUrl: "https://api.lingwu.test" },
-    }),
-  );
+  app.route("/api/shares", shareApiRoutes({ shares, config: SHARE_CONFIG }));
+  app.route("/s", sharePageRoutes({ shares, config: SHARE_CONFIG }));
 });
 
 after(async () => {

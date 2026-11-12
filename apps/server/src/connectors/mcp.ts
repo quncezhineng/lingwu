@@ -48,7 +48,11 @@ function parseBody(raw: string, contentType: string): Record<string, unknown> | 
   const text = raw.trim();
   if (!text) return null;
   let blob = text;
-  if (contentType.includes("text/event-stream") || text.startsWith("data:") || text.startsWith("event:")) {
+  if (
+    contentType.includes("text/event-stream") ||
+    text.startsWith("data:") ||
+    text.startsWith("event:")
+  ) {
     blob = text
       .split("\n")
       .filter((line) => line.startsWith("data:"))
@@ -70,7 +74,11 @@ export function assertDingUrl(raw: string): string {
   } catch {
     throw new McpError("请粘贴完整的 https MCP 地址");
   }
-  if (url.protocol !== "https:" || !url.pathname.startsWith("/server/") || !url.searchParams.get("key"))
+  if (
+    url.protocol !== "https:" ||
+    !url.pathname.startsWith("/server/") ||
+    !url.searchParams.get("key")
+  )
     throw new McpError("请从钉钉 MCP 市场复制完整的个人地址，路径以 /server/ 开头，并包含 ?key=");
   return url.toString();
 }
@@ -130,7 +138,10 @@ export async function mcpSession(
           : parsed?.error && typeof parsed.error === "object"
             ? String((parsed.error as { message?: string }).message ?? "凭证被拒绝")
             : raw || "凭证被拒绝";
-      throw new McpError(redact(message, secrets), response.status === 401 ? "invalid_token" : "upstream");
+      throw new McpError(
+        redact(message, secrets),
+        response.status === 401 ? "invalid_token" : "upstream",
+      );
     }
     return parsed;
   };
@@ -161,7 +172,10 @@ export async function mcpSession(
       const result = await rpc("tools/list", {});
       const batch = Array.isArray(result.tools) ? result.tools : [];
       return batch
-        .filter((item): item is { name?: string; description?: string } => !!item && typeof item === "object")
+        .filter(
+          (item): item is { name?: string; description?: string } =>
+            !!item && typeof item === "object",
+        )
         .map((item) => ({
           name: String(item.name ?? "").slice(0, 80),
           description: String(item.description ?? "").slice(0, 240),
