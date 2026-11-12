@@ -5,6 +5,36 @@
 
 ## 变更记录
 
+### 2026-11-13 · 界面：「技能与连接」已连接徽章改为品牌蓝
+
+**背景**
+
+「技能与连接」页连接器卡片右下角的「已连接」徽章是中性的灰底灰字，用户希望已连接时显示蓝色文字 + 蓝色背景，让成功状态更醒目。
+
+**处理**
+
+- [status-badge.tsx](../apps/mobile/src/status-badge.tsx)：`StatusBadge` 新增可选 `textColor` prop 覆盖文字颜色，默认为空的语义色，不影响任务状态等既有调用；
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`CapabilityCard` 中已连接徽章改为浅蓝底（`colors.sky`）+ 深蓝字（`colors.primaryStrong`），未连接保持中性灰不变。
+
+**验证**
+
+- `pnpm typecheck` 通过；`pnpm format`（biome check）575 个文件无告警。
+
+### 2026-11-13 · 界面：「技能与连接」页内置连接器默认显示已连接
+
+**背景**
+
+用户希望「技能与连接」页的「日历」和「智能体电脑」两个内置连接器默认显示「已连接」，而不是「未连接」。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：卡片状态由 `item.state === "connected"` 决定「已连接/未连接」badge。将「日历」工作区卡片的 `state: "open"` 改为 `"connected"`；「智能体电脑」卡片的 `state: browserConnected ? "connected" : "available"` 改为固定 `"connected"`（内置能力默认可用，不再依赖连接探测）；
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：移除随之不再使用的 `browserConnected` 探测变量，避免未使用告警。
+
+**验证**
+
+- `pnpm typecheck` 通过；`pnpm format`（biome check）575 个文件无告警。
+
 ### 2026-11-12 · 修复：分享链接打开后进的是灵悟首页，改为前端原生渲染
 
 **背景**

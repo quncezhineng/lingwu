@@ -49,10 +49,13 @@ export function StatusBadge({
   tone,
   label,
   style,
+  textColor,
 }: {
   tone: StatusTone;
   label: string;
   style?: StyleProp<ViewStyle>;
+  /** 覆盖文字颜色（如「已连接」要用品牌蓝），默认沿用 tone 的语义色。 */
+  textColor?: string;
 }) {
   const palette = statusToneColors[tone];
   return (
@@ -75,7 +78,7 @@ export function StatusBadge({
           fontSize: typography.eyebrow.fontSize,
           lineHeight: 14,
           fontWeight: "600",
-          color: palette.foreground,
+          color: textColor ?? palette.foreground,
         }}
       >
         {label}

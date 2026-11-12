@@ -333,11 +333,22 @@ function ShortcutCard({
 function CapabilityCard({ item }: { item: CatalogItem }) {
   const { t } = useTranslation();
   /** 连接器卡片右下角展示真实连接状态，未接通时不暗示「可用」。 */
+  // 已连接用品牌蓝（浅蓝底 + 深蓝字），未连接沿用中性灰。
   const connectorStatus =
     item.type === "connectors"
       ? item.state === "connected"
-        ? { tone: "done" as StatusTone, label: t("agent.hubConnectorStateConnected") }
-        : { tone: "paused" as StatusTone, label: t("agent.hubConnectorStateDisconnected") }
+        ? {
+            tone: "done" as StatusTone,
+            label: t("agent.hubConnectorStateConnected"),
+            background: colors.sky,
+            foreground: colors.primaryStrong,
+          }
+        : {
+            tone: "paused" as StatusTone,
+            label: t("agent.hubConnectorStateDisconnected"),
+            background: undefined,
+            foreground: undefined,
+          }
       : undefined;
 
   return (
@@ -436,11 +447,13 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
             <StatusBadge
               tone={connectorStatus.tone}
               label={connectorStatus.label}
+              textColor={connectorStatus.foreground}
               style={{
                 alignSelf: "center",
                 borderRadius: 6,
                 paddingHorizontal: 7,
                 paddingVertical: 3,
+                backgroundColor: connectorStatus.background,
               }}
             />
           )}
@@ -1263,9 +1276,6 @@ export function CapabilityHubScreen() {
       connection.id === "google" &&
       (connection.status === "connected" || connection.status === "sample"),
   );
-  const browserConnected = workspace.connections.some(
-    (connection) => connection.id === "browser" && connection.status === "connected",
-  );
   const builtInSource = t("agent.hubSourceLingwu");
   const workspaceSource = t("agent.hubSourceWorkspace");
   const skillSource = t("agent.hubSourceLingwu");
@@ -1438,7 +1448,7 @@ export function CapabilityHubScreen() {
       iconColor: serviceBrands.googleCalendar.fg,
       iconSurface: serviceBrands.googleCalendar.surface,
       source: workspaceSource,
-      state: "open",
+      state: "connected",
       onPress: () => navigate("calendar"),
     },
     {
@@ -1451,7 +1461,7 @@ export function CapabilityHubScreen() {
       iconColor: serviceBrands.browser.fg,
       iconSurface: serviceBrands.browser.surface,
       source: builtInSource,
-      state: browserConnected ? "connected" : "available",
+      state: "connected",
       onPress: () => open({ type: "computer" }),
     },
     {

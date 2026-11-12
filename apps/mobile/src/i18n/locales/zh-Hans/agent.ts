@@ -581,7 +581,7 @@ const agent = {
   "agent.hubStateConnected": "已连接",
   "agent.hubStateAvailable": "可连接",
   "agent.hubStateOpen": "打开",
-  "agent.hubConnectorStateConnected": "已连接成功",
+  "agent.hubConnectorStateConnected": "已连接",
   "agent.hubConnectorStateDisconnected": "未连接",
   "agent.hubPluginNoMatchTitle": "没有找到匹配的插件",
   "agent.hubSkillNoMatchTitle": "没有找到匹配的技能",
