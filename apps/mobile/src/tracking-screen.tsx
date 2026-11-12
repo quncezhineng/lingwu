@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, useWindowDimensions, View } from "react-native";
 import type { Monitor } from "../../../packages/domain/src/agent";
+import { goalsEnabled } from "../../../packages/domain/src/features";
 import {
   AgentStatus,
   GOAL_CATEGORIES,
@@ -21,14 +22,14 @@ import { statusLabel } from "./i18n/translate";
 import { Bell, CalendarDays, ChevronRight, type IconComponent, Plus, Target } from "./icons";
 import { monitorScheduleText } from "./monitor-text";
 import { PageHeader } from "./page-header";
-import { breakpoints, colors, fonts, radius } from "./theme";
+import { breakpoints, colors, fonts, radius, space } from "./theme";
 import {
   type AttentionAction,
   type AttentionReason,
   buildTrackingView,
   type GoalTrack,
 } from "./tracking-view";
-import { Button, Card, Chip, Empty, SectionHeading, Sheet, s } from "./ui";
+import { Button, Card, Chip, Empty, HoverPressable, SectionHeading, Sheet, s } from "./ui";
 import { type PriceReminderIntent, useWorkspace } from "./workspace";
 
 type TrackingFilter = "all" | "goal" | "reminder";
@@ -69,6 +70,43 @@ const ACTION_KEYS: Record<AttentionAction, TranslationKey> = {
   plan_next: "agent.planNextSteps",
   view_goal: "agent.goalTrackViewGoal",
 };
+
+function NewAutomationCard({ onPress }: { onPress: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <HoverPressable
+      accessibilityRole="button"
+      accessibilityLabel={t("agent.newAutomationCard")}
+      onPress={onPress}
+      style={({ pressed, hovered }) => ({
+        flex: 1,
+        minHeight: 96,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: space.xs,
+        padding: space.sm,
+        borderWidth: 1,
+        borderStyle: "dashed",
+        borderColor: hovered || pressed ? colors.primary : colors.lineStrong,
+        borderRadius: radius.card,
+        backgroundColor: pressed ? colors.overlay1 : hovered ? colors.sky : colors.paper,
+      })}
+    >
+      <Plus size={16} color={colors.primaryStrong} />
+      <Text
+        style={{
+          fontSize: 14,
+          lineHeight: 20,
+          color: colors.primaryStrong,
+          fontFamily: fonts.serif,
+        }}
+      >
+        {t("agent.newAutomationCard")}
+      </Text>
+    </HoverPressable>
+  );
+}
 
 const goalTrackKey = (track: GoalTrack) => track.goal.id;
 const reminderKey = (monitor: Monitor) => monitor.id;
@@ -451,6 +489,9 @@ export function TrackingScreen({
     setComposer({ kind: "reminderForm", priceReminder: reminderIntent });
     onReminderIntentHandled?.();
   }, [onReminderIntentHandled, reminderIntent]);
+  useEffect(() => {
+    if (!goalsEnabled && filter === "goal") setFilter("all");
+  }, [filter]);
 
   if (!data || !view) {
     return (
@@ -473,17 +514,27 @@ export function TrackingScreen({
   const tracksWithReminders = orderedGoalTracks.filter(
     (track) => track.goal.status !== "completed" && track.reminders.length,
   );
-  const filters = [
-    { id: "all", label: t("agent.trackingFilterAll"), count: view.counts.tracking },
+  const showGoals = goalsEnabled;
+  const filters: Array<{ id: TrackingFilter; label: string; count: number }> = [
     {
-      id: "goal",
-      label: t("agent.goalsTab"),
-      count: orderedGoalTracks.filter((track) => track.goal.status !== "completed").length,
+      id: "all",
+      label: t("agent.trackingFilterAll"),
+      count: showGoals ? view.counts.tracking : orderedReminders.length,
     },
+    ...(showGoals
+      ? [
+          {
+            id: "goal" as const,
+            label: t("agent.goalsTab"),
+            count: orderedGoalTracks.filter((track) => track.goal.status !== "completed").length,
+          },
+        ]
+      : []),
     { id: "reminder", label: t("agent.remindersTab"), count: orderedReminders.length },
-  ] as const;
-  const hasAny =
-    filter === "goal"
+  ];
+  const hasAny = !showGoals
+    ? orderedReminders.length > 0
+    : filter === "goal"
       ? orderedGoalTracks.length > 0
       : filter === "reminder"
         ? orderedReminders.length > 0
@@ -492,6 +543,7 @@ export function TrackingScreen({
             completedReminderTracks.length +
             orderedStandalone.length >
           0;
+  const startNew = () => setComposer(showGoals ? { kind: "picker" } : { kind: "reminderOptions" });
   const backTo: ComposerStep | undefined = !composer
     ? undefined
     : composer.kind === "goalCategories" || composer.kind === "reminderOptions"
@@ -627,45 +679,65 @@ export function TrackingScreen({
     <View style={{ gap: 20 }}>
       {!embedded && (
         <PageHeader
-          title={t("agent.monitorsHeroTitle")}
-          description={t("agent.monitorsHeroDescription")}
+          title={showGoals ? t("agent.monitorsHeroTitle") : t("agent.automationsHeroTitle")}
+          description={
+            showGoals ? t("agent.monitorsHeroDescription") : t("agent.automationsHeroDescription")
+          }
           compact={width < breakpoints.desktop}
           actions={
-            <Button small primary icon={Plus} onPress={() => setComposer({ kind: "picker" })}>
-              {t("agent.newTracking")}
-            </Button>
+            showGoals ? (
+              <Button small primary icon={Plus} onPress={startNew}>
+                {t("agent.newTracking")}
+              </Button>
+            ) : undefined
           }
           style={{ marginBottom: 0 }}
         />
       )}
       <AgentStatus />
 
-      <View style={[s.between, { gap: 10, flexWrap: "wrap" }]}>
-        <View accessibilityRole="tablist" style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-          {filters.map((item) => (
-            <FilterPill
-              key={item.id}
-              active={filter === item.id}
-              label={item.label}
-              count={item.count}
-              onPress={() => setFilter(item.id)}
-            />
-          ))}
+      {showGoals && (
+        <View style={[s.between, { gap: 10, flexWrap: "wrap" }]}>
+          <View accessibilityRole="tablist" style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+            {filters.map((item) => (
+              <FilterPill
+                key={item.id}
+                active={filter === item.id}
+                label={item.label}
+                count={item.count}
+                onPress={() => setFilter(item.id)}
+              />
+            ))}
+          </View>
+          {embedded && (
+            <Button small primary icon={Plus} onPress={startNew}>
+              {t("agent.newTracking")}
+            </Button>
+          )}
         </View>
-        {embedded && (
-          <Button small primary icon={Plus} onPress={() => setComposer({ kind: "picker" })}>
-            {t("agent.newTracking")}
-          </Button>
-        )}
-      </View>
+      )}
 
-      {!hasAny ? (
+      {!showGoals ? (
+        <CardGrid
+          items={orderedReminders}
+          minColumnWidth={340}
+          getKey={(item) => item.id}
+          trailing={<NewAutomationCard onPress={startNew} />}
+          render={(item) => (
+            <TrackingRow
+              monitor={item}
+              onOpen={() => setSelectedMonitor(item.id)}
+              onEdit={() => setEditingMonitor(item.id)}
+            />
+          )}
+        />
+      ) : !hasAny ? (
         <Empty
           icon={Target}
-          title={t("agent.trackingEmptyTitle")}
-          detail={t("agent.trackingEmptyDetail")}
+          title={showGoals ? t("agent.trackingEmptyTitle") : t("agent.automationsEmptyTitle")}
+          detail={showGoals ? t("agent.trackingEmptyDetail") : t("agent.automationsEmptyDetail")}
         >
-          <Button small primary icon={Plus} onPress={() => setComposer({ kind: "picker" })}>
+          <Button small primary icon={Plus} onPress={startNew}>
             {t("agent.newTracking")}
           </Button>
         </Empty>
@@ -757,9 +829,9 @@ export function TrackingScreen({
           )}
         </View>
       )}
-      {completedReminders}
+      {showGoals && completedReminders}
 
-      {goal && (
+      {showGoals && goal && (
         <Sheet title={goal.title} onClose={() => setSelectedGoal(undefined)}>
           <GoalCard
             goal={goal}
@@ -795,12 +867,14 @@ export function TrackingScreen({
         >
           {composer.kind === "picker" && (
             <View style={{ gap: 10 }}>
-              <OptionCard
-                icon={Target}
-                title={t("agent.newGoalOption")}
-                detail={t("agent.newGoalOptionDetail")}
-                onPress={() => setComposer({ kind: "goalCategories" })}
-              />
+              {showGoals && (
+                <OptionCard
+                  icon={Target}
+                  title={t("agent.newGoalOption")}
+                  detail={t("agent.newGoalOptionDetail")}
+                  onPress={() => setComposer({ kind: "goalCategories" })}
+                />
+              )}
               <OptionCard
                 icon={Bell}
                 title={t("agent.newReminderOption")}
@@ -809,7 +883,7 @@ export function TrackingScreen({
               />
             </View>
           )}
-          {composer.kind === "goalCategories" && (
+          {showGoals && composer.kind === "goalCategories" && (
             <View style={{ gap: 16 }}>
               <View style={{ gap: 10 }}>
                 <SectionHeading title={t("agent.taskTemplates")} />
@@ -850,7 +924,7 @@ export function TrackingScreen({
               </View>
             </View>
           )}
-          {composer.kind === "goalForm" && (
+          {showGoals && composer.kind === "goalForm" && (
             <GoalForm
               category={composer.category}
               onDone={() => {

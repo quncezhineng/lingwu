@@ -195,17 +195,21 @@ export function desktopCommand(
   limit = computerOutputLimit,
   ceiling = diskCeiling,
 ) {
+  // 512-byte blocks. The kernel stops a runaway writer here even if the poll below
+  // cannot get CPU; SIGXFSZ (153) is reported as the same stop as the poll.
+  const blocks = Math.ceil(ceiling / 512);
   const script = [
     // fd 3 is the real stderr; bash's own job notices go to /dev/null.
     "exec 3>&2 2>/dev/null",
     "o=$(mktemp -d) || exit 125",
-    `/usr/bin/timeout --signal=TERM --kill-after=2s 30s /bin/bash --noprofile --norc -c "$1" >"$o/out" 2>"$o/err" </dev/null 3>&- &`,
+    `( ulimit -f ${blocks}; /usr/bin/timeout --signal=TERM --kill-after=2s 30s /bin/bash --noprofile --norc -c "$1" >"$o/out" 2>"$o/err" </dev/null 3>&- ) &`,
     "p=$!",
     `{ while kill -0 $p 2>/dev/null; do [ $(( $(wc -c <"$o/out") + $(wc -c <"$o/err") )) -gt ${ceiling} ] && { : >"$o/big"; kill $p; break; }; sleep 0.1; done; } </dev/null >/dev/null 2>&1 3>&- &`,
     "w=$!",
     "wait $p",
     "s=$?",
     "kill $w 2>/dev/null",
+    `[ "$s" -eq 153 ] && { : >"$o/big"; s=143; }`,
     // Sent first: the server's output cap is shared, and stdout alone can fill it.
     `[ -e "$o/big" ] && printf 'Output exceeded the limit; the command was stopped.\\n' >&3`,
     `head -c ${limit + 1} "$o/out"`,

@@ -17,6 +17,7 @@ export function CardGrid<T>({
   maxColumns = 2,
   getKey,
   render,
+  trailing,
 }: {
   items: readonly T[];
   /** 单栏最小宽度：不足则减少列数。目标卡 / 任务卡约 340，紧凑卡片约 200。 */
@@ -25,6 +26,8 @@ export function CardGrid<T>({
   getKey: (item: T) => string;
   /** 第三个参数是本次实际排出的列数，卡片据此切换横向 / 纵向版式。 */
   render: (item: T, index: number, layout: { columns: number }) => ReactNode;
+  /** 跟在最后一格，和卡片同一栏宽。 */
+  trailing?: ReactNode;
 }) {
   const [width, setWidth] = useState(0);
   const columns =
@@ -49,6 +52,9 @@ export function CardGrid<T>({
           {render(item, index, { columns: layoutColumns })}
         </View>
       ))}
+      {trailing ? (
+        <View style={cellWidth ? { width: cellWidth } : { width: fallback }}>{trailing}</View>
+      ) : null}
     </View>
   );
 }

@@ -81,6 +81,8 @@ type AgentSpaceContextValue = {
   deleteSkill: (agentId: string, skillId: string) => void;
   /** 从技能目录安装 / 卸载某个技能到指定 Agent；已安装时不重复写入。 */
   setSkillInstalled: (agentId: string, skillId: string, installed: boolean) => void;
+  /** 把账户级技能库里的一份技能挂到 Agent 上，或摘掉。挂的是 id，不是副本。 */
+  setSkillRef: (agentId: string, skillId: string, linked: boolean) => void;
 };
 
 const AgentSpaceContext = createContext<AgentSpaceContextValue | null>(null);
@@ -365,6 +367,50 @@ export function AgentSpaceProvider({
     setState((value) => detachSkillFromAgent(value, agentId, skillId));
   }, []);
 
+  const setSkillRef = useCallback<AgentSpaceContextValue["setSkillRef"]>(
+    (agentId, skillId, linked) => {
+      const id = skillId.trim();
+      if (!id) return;
+      setState((value) => {
+        const target = value.agents.find((agent) => agent.id === agentId);
+        if (!target) return value;
+        const librarySkill = value.skillLibrary.find((skill) => skill.id === id);
+        const refs = new Set(target.skillRefs);
+        if (linked) refs.add(id);
+        else refs.delete(id);
+        const customSkills = librarySkill
+          ? target.customSkills.filter(
+              (skill) =>
+                skill.id !== id &&
+                [skill.name, skill.purpose, skill.instructions, skill.outputFormat].join(
+                  "\u0000",
+                ) !==
+                  [
+                    librarySkill.name,
+                    librarySkill.purpose,
+                    librarySkill.instructions,
+                    librarySkill.outputFormat,
+                  ].join("\u0000"),
+            )
+          : target.customSkills.filter((skill) => skill.id !== id);
+        if (
+          refs.size === target.skillRefs.length &&
+          [...refs].every((item) => target.skillRefs.includes(item)) &&
+          customSkills.length === target.customSkills.length
+        ) {
+          return value;
+        }
+        return {
+          ...value,
+          agents: value.agents.map((agent) =>
+            agent.id === agentId ? { ...agent, skillRefs: [...refs], customSkills } : agent,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
   const setSkillInstalled = useCallback<AgentSpaceContextValue["setSkillInstalled"]>(
     (agentId, skillId, installed) => {
       const id = skillId.trim();
@@ -423,6 +469,7 @@ export function AgentSpaceProvider({
       toggleSkill,
       deleteSkill,
       setSkillInstalled,
+      setSkillRef,
     }),
     [
       state,
@@ -447,6 +494,7 @@ export function AgentSpaceProvider({
       toggleSkill,
       deleteSkill,
       setSkillInstalled,
+      setSkillRef,
     ],
   );
 

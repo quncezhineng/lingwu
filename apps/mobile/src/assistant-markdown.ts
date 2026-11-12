@@ -128,6 +128,52 @@ function restoreInlineCode(text: string, codes: string[]): string {
   return text.replace(/\uE000(\d+)\uE000/g, (_, index: string) => codes[Number(index)] ?? "");
 }
 
+/**
+ * A dropped delta can leave `****` (two markers with the word between them
+ * gone) or a trailing `**`. Balanced pairs stay. Anything that cannot be a
+ * pair is removed so it is not drawn as literal asterisks.
+ */
+function hideUnbalancedMarkers(line: string): string {
+  // `****` is two markers whose text was dropped. Pair markers that can open
+  // and close emphasis, and delete only the ones that cannot. A closer is
+  // often followed by a space (`**在跌** |`), so whitespace after `**` does
+  // not by itself make the marker junk.
+  const collapsed = line.replace(/\*{4,}/g, "");
+  const marks: number[] = [];
+  for (let index = 0; index < collapsed.length - 1; index += 1) {
+    if (collapsed[index] !== "*" || collapsed[index + 1] !== "*") continue;
+    marks.push(index);
+    index += 1;
+  }
+  const isOpener = (index: number) => {
+    const after = collapsed[index + 2];
+    return after !== undefined && !/\s/.test(after);
+  };
+  const isCloser = (index: number) => {
+    const before = collapsed[index - 1];
+    return before !== undefined && !/\s/.test(before);
+  };
+  const stack: number[] = [];
+  const paired = new Set<number>();
+  for (const index of marks) {
+    if (isCloser(index) && stack.length > 0) {
+      paired.add(stack.pop() ?? index);
+      paired.add(index);
+      continue;
+    }
+    if (isOpener(index)) stack.push(index);
+  }
+  if (paired.size === marks.length) return collapsed;
+  let out = "";
+  let cursor = 0;
+  for (const index of marks) {
+    if (paired.has(index)) continue;
+    out += collapsed.slice(cursor, index);
+    cursor = index + 2;
+  }
+  return out + collapsed.slice(cursor);
+}
+
 function repairEmphasisLine(line: string): string {
   // Keep a real pair (`的**抛压**`). Only a lone marker jammed between two
   // letters is noise (`定价**不是`). Deleting every such marker also ate the
@@ -135,14 +181,15 @@ function repairEmphasisLine(line: string): string {
   let next = line.replace(/^(\s*[-*+])\*\*/, "$1 **");
   next = next.replace(/^(\s*\d+[.)])\*\*/, "$1 **");
   const lostOpening = /^(\s*(?:[-*+]|\d+[.)])\s+)((?:(?!\*\*)[\s\S])*)\*\*\s*$/.exec(next);
-  if (lostOpening) return `${lostOpening[1]}**${lostOpening[2].trimEnd()}**`;
+  if (lostOpening) return hideUnbalancedMarkers(`${lostOpening[1]}**${lostOpening[2].trimEnd()}**`);
   const unclosed = /^(\s*(?:[-*+]|\d+[.)])\s+)\*\*((?:(?!\*\*)[\s\S])*)$/.exec(next);
-  if (unclosed && !next.trimEnd().endsWith("**")) return `${next.trimEnd()}**`;
+  if (unclosed && !next.trimEnd().endsWith("**"))
+    return hideUnbalancedMarkers(`${next.trimEnd()}**`);
   if ((next.match(/\*\*/g)?.length ?? 0) === 1)
     next = next.replace(/([\p{L}\p{N}])\*\*([\p{L}\p{N}])/u, "$1$2");
   if ((next.match(/\*\*/g)?.length ?? 0) % 2 === 1 && /(?:^|\s)\*\*\S/.test(next))
-    return `${next.trimEnd()}**`;
-  return next;
+    return hideUnbalancedMarkers(`${next.trimEnd()}**`);
+  return hideUnbalancedMarkers(next);
 }
 
 function closeDanglingEmphasis(prose: string): string {

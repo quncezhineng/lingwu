@@ -481,6 +481,7 @@ function OptionCard({
  */
 export function SkillPickerSheet({
   customSkills,
+  installedCatalogIds,
   selectedIds,
   onToggle,
   onConfirm,
@@ -488,6 +489,8 @@ export function SkillPickerSheet({
   onInspectSkill,
 }: {
   customSkills: readonly AgentSkill[];
+  /** 这个 Agent 已装的内置技能。传入后列表只含已装技能。 */
+  installedCatalogIds?: readonly string[];
   selectedIds: readonly string[];
   onToggle: (id: string) => void;
   onConfirm: () => void;
@@ -502,9 +505,12 @@ export function SkillPickerSheet({
   const matches = (...values: string[]) =>
     !keyword || values.some((value) => value.toLowerCase().includes(keyword));
 
+  const installed = installedCatalogIds ? new Set(installedCatalogIds) : undefined;
   const custom = customSkills.filter((skill) => matches(skill.name, skill.purpose));
-  const filtered = skillCatalog.filter((skill) =>
-    matches(skill.titleZh, skill.titleEn, skill.descriptionZh, skill.descriptionEn, skill.id),
+  const filtered = skillCatalog.filter(
+    (skill) =>
+      (installed ? installed.has(skill.id) : true) &&
+      matches(skill.titleZh, skill.titleEn, skill.descriptionZh, skill.descriptionEn, skill.id),
   );
   const visible = filtered.slice(0, SKILL_PAGE_SIZE);
   const hidden = filtered.length - visible.length;

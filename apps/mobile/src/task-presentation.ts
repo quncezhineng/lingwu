@@ -30,6 +30,11 @@ export function serverToolOutcome(
   return { state: "saved" as const, id, taskId };
 }
 
+/** 监控任务由「自动化」页代表，任务列表不再重复展示。 */
+export function listedWorkTasks<T extends { kind: string }>(tasks: readonly T[]): T[] {
+  return tasks.filter((task) => task.kind !== "monitor");
+}
+
 export function taskRequiresSetup(
   task: AgentTask,
   monitors?: readonly Pick<Monitor, "id" | "taskId">[],

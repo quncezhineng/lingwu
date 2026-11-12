@@ -15,6 +15,7 @@ import {
   type ProposalInput,
 } from "../../../packages/domain/src";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import { goalsEnabled } from "../../../packages/domain/src/features";
 import { ArchivedThreadsScreen } from "./account";
 import { DelegateSheet, GoalCard, NotificationsSheet, TaskDetail } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
@@ -109,7 +110,8 @@ export function Details({ detail }: { detail: Detail }) {
   const { close, navigate } = useWorkspace();
   if (detail.type === "computer") return <ComputerSheet />;
   if (detail.type === "task") return <TaskDetail taskId={detail.taskId} />;
-  if (detail.type === "goal") return <GoalDetailSheet goalId={detail.goalId} />;
+  if (detail.type === "goal")
+    return goalsEnabled ? <GoalDetailSheet goalId={detail.goalId} /> : null;
   if (detail.type === "delegate")
     return (
       <DelegateSheet

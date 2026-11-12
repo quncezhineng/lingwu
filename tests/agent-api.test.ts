@@ -366,7 +366,7 @@ test("memories can be edited and forgotten while identity changes persist", asyn
   assert.ok(await db.get("other-user", "memories", "private-memory"));
 });
 
-test("idea dismissal survives refresh and concurrent acceptance creates one goal and task", async () => {
+test("idea dismissal survives refresh and concurrent acceptance creates one task while goals stay hidden", async () => {
   const ideas = await read<Idea[]>("/ideas/refresh", {});
   assert.ok(ideas.length >= 2);
   assert.ok(ideas.every((idea) => idea.evidence.length > 0));
@@ -388,7 +388,7 @@ test("idea dismissal survives refresh and concurrent acceptance creates one goal
   assert.equal(results[0].status, "accepted");
   assert.equal(results[0].taskId, results[1].taskId);
   const after = await read<AgentWorkspace>("");
-  assert.equal(after.goals.length, before.goals.length + 1);
+  assert.equal(after.goals.length, before.goals.length);
   assert.equal(after.tasks.length, before.tasks.length + 1);
   assert.ok(results[0].taskId);
   await read(`/tasks/${results[0].taskId}/control`, { action: "cancel" });

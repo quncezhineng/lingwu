@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import { useAgentSpace } from "../agent-space";
-import type { AgentDefinition, AgentSkill } from "../agent-space-model";
+import { type AgentDefinition, type AgentSkill, heldCustomSkills } from "../agent-space-model";
 import { Text, TextInput } from "../app-text";
 import { MySkillDetailSheet, SkillDetailSheet } from "../capability-hub";
 import { CardGrid } from "../card-grid";
@@ -191,7 +191,7 @@ function SkillLibraryPanel({
   onViewCustomDetail: (skill: AgentSkill) => void;
 }) {
   const { t, locale } = useTranslation();
-  const { current, deleteSkill, saveSkill, setSkillInstalled, skillLibrary } = useAgentSpace();
+  const { current, deleteSkill, setSkillRef, setSkillInstalled, skillLibrary } = useAgentSpace();
   const { notify } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
   // 三栏布局下列宽远小于窗口宽，用 onLayout 的真实列宽决定单双列。
@@ -210,7 +210,7 @@ function SkillLibraryPanel({
       key: `custom:${skill.id}`,
       title: skill.name,
       description: skill.purpose || skill.instructions,
-      installed: Boolean(findSkillCopy(current, skill)),
+      installed: current.skillRefs.includes(skill.id) || Boolean(findSkillCopy(current, skill)),
       custom: skill,
     }));
   const catalogEntries: LibraryEntry[] = skillCatalog
@@ -276,7 +276,11 @@ function SkillLibraryPanel({
                   return;
                 }
                 if (!entry.custom) return;
-                const action = toggleSkillShare({ saveSkill, deleteSkill }, current, entry.custom);
+                const action = toggleSkillShare(
+                  { setSkillRef, deleteSkill },
+                  current,
+                  entry.custom,
+                );
                 if (action === "blocked") return;
                 notify(
                   t(
@@ -308,7 +312,14 @@ function SkillLibraryPanel({
 
 export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
   const { t, locale } = useTranslation();
-  const { agents: agentList, current, deleteSkill, saveSkill, setSkillInstalled } = useAgentSpace();
+  const {
+    agents: agentList,
+    current,
+    deleteSkill,
+    setSkillRef,
+    setSkillInstalled,
+    skillLibrary,
+  } = useAgentSpace();
   const { notify } = useWorkspace();
   /** 只用于编辑已有自建技能；创建入口统一收在「应用与能力 → 技能」。 */
   const [editingSkill, setEditingSkill] = useState<AgentSkill>();
@@ -332,7 +343,7 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
    */
   const toggleSkillInAgent = (agent: AgentDefinition) => {
     if (!viewingCustom) return;
-    const action = toggleSkillShare({ saveSkill, deleteSkill }, agent, viewingCustom);
+    const action = toggleSkillShare({ setSkillRef, deleteSkill }, agent, viewingCustom);
     notify(
       t(action === "added" ? "agent.skillInstalledToast" : "agent.skillUninstalledToast", {
         title: viewingCustom.name,
@@ -366,9 +377,12 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
    */
   const removeCustomSkill = (skill: AgentSkill) => {
     setViewingCustom(undefined);
-    deleteSkill(current.id, skill.id);
+    setSkillRef(current.id, skill.id, false);
+    if (current.customSkills.some((item) => item.id === skill.id))
+      deleteSkill(current.id, skill.id);
     notify(t("agent.skillDetachedToast", { title: skill.name, agent: current.name }));
   };
+  const customSkills = heldCustomSkills(current, skillLibrary);
 
   /**
    * 卡片上的「移除」：目录技能只取消当前 Agent 的安装状态，技能本身仍留在技能库，
@@ -394,7 +408,11 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
         {embedded && (
           <BotInlineBack label={t("common.back")} onPress={() => setEditingSkill(undefined)} />
         )}
-        <SkillEditor skill={editingSkill} onClose={() => setEditingSkill(undefined)} />
+        <SkillEditor
+          library={skillLibrary.some((skill) => skill.id === editingSkill.id)}
+          skill={editingSkill}
+          onClose={() => setEditingSkill(undefined)}
+        />
       </BotPage>
     );
   if (adding)
@@ -434,7 +452,7 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
     );
   // 自建技能与从技能库安装的技能同列展示，合并成一个列表交给两列网格。
   const skillCards: { key: string; node: ReactNode }[] = [
-    ...current.customSkills.map((skill) => ({
+    ...customSkills.map((skill) => ({
       key: `custom:${skill.id}`,
       node: (
         <Pressable
@@ -502,7 +520,7 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
             {t("agentSpace.addSkill")}
           </Button>
         </View>
-        {current.customSkills.length || installedEntries.length ? (
+        {customSkills.length || installedEntries.length ? (
           <CardGrid
             items={skillCards}
             minColumnWidth={300}

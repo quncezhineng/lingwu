@@ -98,6 +98,33 @@ test("bold that starts after a bullet is not left as a trailing **", () => {
   assert.doesNotMatch(lostHtml, /\*\*/);
 });
 
+test("bold inside a table cell stays bold", () => {
+  const html = assistantMarkdown.render(
+    presentAssistantMarkdown("| **通信ETF（515880）** | 0.458 | **-0.22%** | **在跌** |"),
+  );
+  assert.match(html, /<strong>通信ETF（515880）<\/strong>/);
+  assert.match(html, /<strong>-0\.22%<\/strong>/);
+  assert.match(html, /<strong>在跌<\/strong>/);
+  assert.doesNotMatch(html, /\*\*/);
+});
+
+test("markers left unpaired by a dropped delta are not drawn", () => {
+  // Fragments from the 11:54 screenshot. The words between the markers were
+  // already gone; these tests only cover the asterisks that remained.
+  const holed = assistantMarkdown.render(
+    presentAssistantMarkdown("海外： 0，盈利 91.%，RO.0****\n提往下：**\n加20把** 撤**"),
+  );
+  assert.doesNotMatch(holed, /\*\*/);
+  assert.match(holed, /RO\.0/);
+  assert.match(holed, /提往下：/);
+  const intact = assistantMarkdown.render(
+    presentAssistantMarkdown("海外AI算力：营收 **+53.0%**，盈利 **+91.6%**，ROE **32.0%**"),
+  );
+  assert.match(intact, /<strong>\+53\.0%<\/strong>/);
+  assert.match(intact, /<strong>32\.0%<\/strong>/);
+  assert.doesNotMatch(intact, /\*\*/);
+});
+
 test("a settled message does not leave a literal ** between words", () => {
   const html = assistantMarkdown.render(presentAssistantMarkdown("定价**不是降息"));
   assert.doesNotMatch(html, /\*\*/);

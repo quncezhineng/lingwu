@@ -3,10 +3,23 @@ import test from "node:test";
 import type { AgentTask } from "../../../packages/domain/src/agent.ts";
 import {
   hasInternalTaskText,
+  listedWorkTasks,
   presentTask,
   serverToolOutcome,
   taskRequiresSetup,
 } from "../src/task-presentation.ts";
+
+test("monitor tasks stay out of the task list", () => {
+  const tasks = [
+    { kind: "agent", id: "job" },
+    { kind: "monitor", id: "watch" },
+    { kind: "research", id: "report" },
+  ];
+  assert.deepEqual(
+    listedWorkTasks(tasks).map((task) => task.id),
+    ["job", "report"],
+  );
+});
 
 test("a rejected tool call does not advertise a created task or expose its diagnostics", () => {
   const failure = {

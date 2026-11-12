@@ -39,6 +39,7 @@ import { AgentService } from "./engine/service.ts";
 import { ConversationStream } from "./engine/stream.ts";
 import { conversationStreamRoutes } from "./engine/stream-routes.ts";
 import { symbolRoutes, watchlistRoutes } from "./engine/watchlist-routes.ts";
+import { appConnectorRoutes } from "./connectors/routes.ts";
 import { AppError } from "./errors.ts";
 import { Files } from "./files.ts";
 import { GoogleAuth } from "./google-auth.ts";
@@ -316,6 +317,12 @@ export async function createApp(
       "<h1>Google is connected</h1><p>Return to LingWu and refresh your workspace.</p>",
     );
   });
+  app.get("/api/app-connectors/oauth/callback", (c) =>
+    c.html(
+      "<h1>登录还没有完成</h1><p>这个连接的登录回调还没有登记。回到灵悟，按卡片上的说明使用密钥或个人地址。</p>",
+      501,
+    ),
+  );
   app.use("/api/*", async (c, next) => {
     const signedRoute =
       /^\/api\/files\/[^/]+\/content$|^\/api\/browsers\/[^/]+\/(?:preview|console)$/.test(
@@ -328,6 +335,7 @@ export async function createApp(
     c.set("owner", owner);
     await next();
   });
+  appConnectorRoutes(app, { db, config, files });
   /**
    * 当前登录用户；账号模式下 owner 就是 Supabase 用户 uuid。
    * 供 App 的「我的」页面展示昵称、邮箱等个人信息。

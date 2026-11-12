@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Text, TextInput } from "./app-text";
 import { ArrowUp, type IconComponent, Plus, Square } from "./icons";
-import { colors, fonts, radius, semantic, shadow } from "./ui";
+import { colors, composerMetrics, fonts, radius, semantic, shadow } from "./ui";
 
 const noFocusRing =
   Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : undefined;
@@ -82,6 +82,9 @@ export function PromptComposer({
   const action = () => {
     if (busy || canSubmit) onSubmit();
   };
+  const controlSize = inline ? composerMetrics.control : dense ? 34 : 36;
+  const multiline = inputHeight > inputMinHeight + composerMetrics.growSlack;
+  const composerRadius = multiline ? composerMetrics.pillRadius : radius.full;
   const cornerButton = cornerAction ? (
     <Pressable
       accessibilityRole="button"
@@ -143,6 +146,7 @@ export function PromptComposer({
             }
           : undefined
       }
+      key={placeholder}
       placeholder={placeholder}
       placeholderTextColor={colors.faint}
       accessibilityLabel={accessibilityLabel}
@@ -174,8 +178,8 @@ export function PromptComposer({
       hitSlop={4}
       onPress={action}
       style={({ pressed }) => ({
-        width: dense ? 34 : 36,
-        height: dense ? 34 : 36,
+        width: controlSize,
+        height: controlSize,
         borderRadius: radius.full,
         alignItems: "center",
         justifyContent: "center",
@@ -204,11 +208,11 @@ export function PromptComposer({
           {
             position: "relative",
             backgroundColor: colors.paper,
-            borderRadius: radius.composer,
+            borderRadius: composerRadius,
             borderWidth: 1,
             borderColor: focused ? colors.primary : colors.line,
-            padding: 6,
-            minHeight: 54,
+            padding: composerMetrics.padding,
+            minHeight: composerMetrics.minHeight,
             ...shadow.composer,
           },
           style,
@@ -216,7 +220,13 @@ export function PromptComposer({
       >
         {cornerButton}
         {attachments}
-        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: multiline ? "flex-end" : "center",
+            gap: 4,
+          }}
+        >
           <View style={{ position: "relative", zIndex: 10 }}>
             <Pressable
               accessibilityRole="button"
@@ -224,8 +234,8 @@ export function PromptComposer({
               accessibilityState={{ expanded: toolsOpen }}
               onPress={() => setToolsOpen(!toolsOpen)}
               style={({ pressed }) => ({
-                width: 36,
-                height: 36,
+                width: controlSize,
+                height: controlSize,
                 borderRadius: radius.control,
                 alignItems: "center",
                 justifyContent: "center",
@@ -288,10 +298,10 @@ export function PromptComposer({
         {
           position: "relative",
           backgroundColor: colors.paper,
-          borderRadius: radius.composer,
+          borderRadius: composerMetrics.pillRadius,
           borderWidth: 1,
           borderColor: focused ? colors.primary : colors.line,
-          padding: dense ? 6 : 8,
+          padding: dense ? composerMetrics.padding : 8,
           ...shadow.composer,
         },
         style,

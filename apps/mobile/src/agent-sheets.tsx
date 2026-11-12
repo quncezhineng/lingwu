@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import { goalsEnabled } from "../../../packages/domain/src/features";
 import { AccountScreen } from "./account";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
@@ -9,6 +10,7 @@ import {
   AGENT_TEMPLATES,
   type AgentAvatarId,
   type AgentTemplateId,
+  heldCustomSkills,
   parsePreferenceFocus,
 } from "./agent-space-model";
 import { useAgentWorkspace } from "./agent-workspace";
@@ -21,7 +23,6 @@ import { useTranslation } from "./i18n";
 import {
   Brain,
   ChevronRight,
-  Clock3,
   FileText,
   FolderOpen,
   Globe2,
@@ -31,7 +32,6 @@ import {
   Plus,
   RotateCcw,
   Search,
-  Shapes,
   ShieldAlert,
   Sparkles,
   Star,
@@ -146,7 +146,6 @@ function SheetSection({ children }: { children: React.ReactNode }) {
 
 export function AgentMoreContent({
   onPanel,
-  onOpenApps,
   onOpenAgentSkills,
   onInspectSkill,
   compact = true,
@@ -161,19 +160,14 @@ export function AgentMoreContent({
   compact?: boolean;
 }) {
   const { t, locale } = useTranslation();
-  const { current } = useAgentSpace();
-  const { data } = useAgentWorkspace();
-  const tasks = data?.tasks ?? [];
-  const activeTasks = tasks.filter(
-    (task) => !["succeeded", "failed", "cancelled"].includes(task.status),
-  );
+  const { current, skillLibrary } = useAgentSpace();
+  const heldSkills = heldCustomSkills(current, skillLibrary);
   // 「{name} 的能力」只展示这个 Agent 真正配置的技能：自建技能 + 从技能库安装的技能。
   // 不再回退到模板自带的 current.skills —— 没配置技能时这一栏就应该完全为空，
   // 与 Agent 详情 → 技能页的空态一致；底部按钮引导去技能页添加。
-  const capabilities = [
-    ...current.customSkills.map((skill) => skill.id),
-    ...current.installedSkills,
-  ].slice(0, 4);
+  const capabilities = [...heldSkills.map((skill) => skill.id), ...current.installedSkills]
+    .filter((id) => goalsEnabled || id !== "goals")
+    .slice(0, 4);
   return (
     <View style={{ gap: 6 }}>
       <SheetSection>
@@ -183,14 +177,6 @@ export function AgentMoreContent({
           title={t("agentSpace.marketBrief")}
           detail={t("agentSpace.marketBriefDetail")}
           onPress={() => onPanel("brief")}
-        />
-        <PanelButton
-          compact={compact}
-          icon={Clock3}
-          title={t("agentSpace.tasks")}
-          detail={t("agentSpace.tasksDetail")}
-          badge={activeTasks.length}
-          onPress={() => onPanel("tasks")}
         />
         <PanelButton
           compact={compact}
@@ -212,13 +198,6 @@ export function AgentMoreContent({
           title={t("app.navPreferences")}
           detail={t("details.settingsPreferencesDetail")}
           onPress={() => onPanel("memory")}
-        />
-        <PanelButton
-          compact={compact}
-          icon={Shapes}
-          title={t("app.navApps")}
-          detail={t("app.destAppsDetail")}
-          onPress={onOpenApps}
         />
       </SheetSection>
 
@@ -242,10 +221,10 @@ export function AgentMoreContent({
             // 展示名优先查固定标签表（兼容历史系统能力 id），否则按技能目录 / 自建技能取名。
             const displayName =
               AGENT_CAPABILITY_LABELS[capability]?.[locale === "zh-Hans" ? "zh" : "en"] ||
-              skillDisplayName(capability, current.customSkills);
+              skillDisplayName(capability, heldSkills);
             // 配置过的技能都能点开只读详情；兜底仍可打开「技能中心」面板。
             const inspectable =
-              current.customSkills.some((skill) => skill.id === capability) ||
+              heldSkills.some((skill) => skill.id === capability) ||
               skillCatalog.some((skill) => skill.id === capability);
             return (
               <Pressable
@@ -695,8 +674,8 @@ export function AgentSkillInspectSheet({
   skillId: string;
   onClose: () => void;
 }) {
-  const { current } = useAgentSpace();
-  const custom = current.customSkills.find((skill) => skill.id === skillId);
+  const { current, skillLibrary } = useAgentSpace();
+  const custom = heldCustomSkills(current, skillLibrary).find((skill) => skill.id === skillId);
   if (custom) {
     return <MySkillDetailSheet title={custom.name} skill={custom} onClose={onClose} />;
   }

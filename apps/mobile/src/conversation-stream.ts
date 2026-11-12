@@ -301,6 +301,57 @@ export function verifyDrafts(
   return report;
 }
 
+export interface AssistantTextChoice {
+  text: string;
+  /**
+   * The finished ledger draft lost text that the saved message still has, so
+   * the bubble shows the saved copy. This is the only case for the integrity
+   * warning. A saved copy that is a damaged subsequence of the ledger (the
+   * browser fan-out dropped spans) is not shown and does not warn.
+   */
+  savedFallback: boolean;
+}
+
+/** Every character of `needle` appears in `haystack` in the same order. */
+function containsInOrder(needle: string, haystack: string) {
+  if (needle.length === 0) return true;
+  let index = 0;
+  for (const char of haystack) {
+    if (char !== needle[index]) continue;
+    index += 1;
+    if (index === needle.length) return true;
+  }
+  return false;
+}
+
+/**
+ * Pick the assistant bubble text.
+ *
+ * The ledger draft is the concatenation of model deltas. The saved message is
+ * the CopilotKit runtime copy, which is also what the bubble used to prefer
+ * whenever the two disagreed. On the 11:54 小悟 reply that runtime copy had
+ * lost spans (raw `**`, missing characters) while the ledger and the thread
+ * history were the same intact markdown. Prefer the intact copy: the longer
+ * text when one is a subsequence of the other. Fall back to the saved message
+ * only when the finished ledger is the one with a hole.
+ */
+export function chooseAssistantText(
+  content: string,
+  live: { text: string; done: boolean } | undefined,
+): AssistantTextChoice {
+  if (!live) return { text: content, savedFallback: false };
+  if (live.text.trim() === content.trim()) return { text: content, savedFallback: false };
+  if (!live.done)
+    return { text: live.text.length > content.length ? live.text : content, savedFallback: false };
+  const ledgerHoldsSaved =
+    containsInOrder(content, live.text) && live.text.length >= content.length;
+  if (ledgerHoldsSaved) return { text: live.text, savedFallback: false };
+  const savedHoldsLedger = containsInOrder(live.text, content) && content.length > live.text.length;
+  if (savedHoldsLedger) return { text: content, savedFallback: true };
+  if (live.text.length >= content.length) return { text: live.text, savedFallback: false };
+  return { text: content, savedFallback: true };
+}
+
 class StreamRequestError extends Error {
   constructor(
     message: string,

@@ -4,6 +4,7 @@ import Markdown from "react-native-markdown-renderer";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition, AgentSkill } from "./agent-space-model";
+import { type AppConnectorView, AppConnectorSheet, useAppConnectors } from "./app-connectors";
 import { Text, TextInput } from "./app-text";
 import { assistantMarkdown } from "./assistant-markdown";
 import { useTranslation } from "./i18n";
@@ -17,17 +18,19 @@ import {
   ChevronRight,
   CircleDollarSign,
   Download,
+  FileText,
+  FolderOpen,
   Globe2,
   Hand,
   type IconComponent,
   Link2,
   Mail,
   Plus,
-  Puzzle,
   Search,
   ShieldCheck,
   Sparkles,
   Target,
+  Terminal,
   Trash2,
   Upload,
   X,
@@ -55,7 +58,14 @@ type CapabilityCategoryId =
   | "writing"
   | "monitoring"
   | "connections"
-  | "workspace";
+  | "workspace"
+  | "featured"
+  | "research-data"
+  | "search"
+  | "office"
+  | "documents"
+  | "files"
+  | "development";
 type CategoryId = "all" | CapabilityCategoryId | SkillCategory;
 type CatalogTag = Exclude<CategoryId, "all">;
 type CapabilityState = "ready" | "connected" | "available" | "open";
@@ -68,6 +78,7 @@ type CatalogItem = {
   title: string;
   detail: string;
   icon: IconComponent;
+  testID?: string;
   iconColor: string;
   iconSurface: string;
   source: string;
@@ -107,10 +118,24 @@ const SKILL_CATEGORY_OPTIONS: CategoryOption[] = [
   { id: "research-tools", labelKey: "agent.hubSkillCategoryResearchTools" },
 ];
 
+const CONNECTOR_CATEGORY_OPTIONS: CategoryOption[] = [
+  { id: "all", labelKey: "agent.hubCategoryAll" },
+  { id: "featured", labelKey: "agent.hubCategoryFeatured" },
+  { id: "research-data", labelKey: "agent.hubCategoryResearchData" },
+  { id: "search", labelKey: "agent.hubCategorySearch" },
+  { id: "office", labelKey: "agent.hubCategoryOffice" },
+  { id: "documents", labelKey: "agent.hubCategoryDocuments" },
+  { id: "files", labelKey: "agent.hubCategoryFiles" },
+  { id: "development", labelKey: "agent.hubCategoryDevelopment" },
+  { id: "research", labelKey: "agent.hubCategoryResearch" },
+  { id: "connections", labelKey: "agent.hubCategoryConnections" },
+  { id: "workspace", labelKey: "agent.hubCategoryWorkspace" },
+];
+
 const CATEGORY_OPTIONS_BY_TYPE: Record<CapabilityType, CategoryOption[]> = {
   plugins: CAPABILITY_CATEGORY_OPTIONS,
   skills: SKILL_CATEGORY_OPTIONS,
-  connectors: CAPABILITY_CATEGORY_OPTIONS,
+  connectors: CONNECTOR_CATEGORY_OPTIONS,
 };
 
 const FILLER_KEYS = ["a", "b", "c", "d", "e", "f"] as const;
@@ -329,6 +354,7 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
       }}
     >
       <Pressable
+        testID={item.testID}
         accessibilityRole="button"
         accessibilityLabel={`${item.title} · ${item.detail}`}
         onPress={item.onPress}
@@ -1153,21 +1179,56 @@ export function SkillDeleteConfirm({
   );
 }
 
+function appConnectorCard(
+  item: AppConnectorView,
+  onPress: () => void,
+  labels: { connected: string; idle: string },
+): CatalogItem {
+  const icon =
+    item.category === "search"
+      ? Search
+      : item.category === "documents"
+        ? FileText
+        : item.category === "files"
+          ? FolderOpen
+          : item.category === "development"
+            ? Terminal
+            : item.category === "office"
+              ? Mail
+              : Link2;
+  return {
+    id: `app:${item.slug}`,
+    testID: `app-connector-${item.slug}`,
+    type: "connectors",
+    tags: [item.category, "connections", ...(item.featured ? (["featured"] as const) : [])],
+    title: item.name,
+    detail: item.summary,
+    icon,
+    iconColor: colors.primary,
+    iconSurface: colors.sky,
+    source: item.connected ? labels.connected : labels.idle,
+    state: item.connected ? "connected" : "available",
+    onPress,
+  };
+}
+
 export function CapabilityHubScreen() {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
   const { navigate, workspace, api, refresh, notify, open, prefillPrompt } = useWorkspace();
+  const appConnectors = useAppConnectors(api);
+  const [appSlug, setAppSlug] = useState<string | null>(null);
   const {
     agents: agentList,
     setSkillInstalled,
-    saveSkill,
+    setSkillRef,
     deleteSkill,
     skillLibrary,
     saveLibrarySkill,
     deleteLibrarySkill,
   } = useAgentSpace();
   const [category, setCategory] = useState<CategoryId>("all");
-  const [typeFilter, setTypeFilter] = useState<CapabilityType>("plugins");
+  const [typeFilter, setTypeFilter] = useState<CapabilityType>("skills");
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [configSheet, setConfigSheet] = useState<ConfigSheet>();
@@ -1288,7 +1349,7 @@ export function CapabilityHubScreen() {
    */
   function toggleMySkillInAgent(agent: AgentDefinition) {
     if (!selectedMySkill) return;
-    const action = toggleSkillShare({ saveSkill, deleteSkill }, agent, selectedMySkill.skill);
+    const action = toggleSkillShare({ setSkillRef, deleteSkill }, agent, selectedMySkill.skill);
     notify(
       t(action === "added" ? "agent.skillInstalledToast" : "agent.skillUninstalledToast", {
         title: selectedMySkill.skill.name,
@@ -1332,7 +1393,7 @@ export function CapabilityHubScreen() {
    * 否则删完库里的条目后，Agent 上的副本仍会以「已添加」状态留在各自的技能页里。
    */
   function deleteMySkill(entry: MySkillEntry) {
-    deleteSkillEverywhere({ deleteSkill }, agentList, entry.skill);
+    deleteSkillEverywhere({ setSkillRef, deleteSkill }, agentList, entry.skill);
     deleteLibrarySkill(entry.skill.id);
     setDeletingMySkill(undefined);
     setSelectedMySkill(undefined);
@@ -1369,7 +1430,7 @@ export function CapabilityHubScreen() {
     },
     {
       id: "calendar-workspace",
-      type: "plugins",
+      type: "connectors",
       tags: ["workspace", "connections"],
       title: t("app.titleCalendar"),
       detail: t("agent.shortcutCalendarDetail"),
@@ -1382,7 +1443,7 @@ export function CapabilityHubScreen() {
     },
     {
       id: "browser",
-      type: "plugins",
+      type: "connectors",
       tags: ["connections", "research"],
       title: t("threads.agentComputer"),
       detail: t("agent.hubBrowserDetail"),
@@ -1432,6 +1493,12 @@ export function CapabilityHubScreen() {
       state: workspace.runtime.openbotConfigured ? "connected" : "available",
       onPress: () => setConfigSheet("openbot"),
     },
+    ...appConnectors.items.map((item) =>
+      appConnectorCard(item, () => setAppSlug(item.slug), {
+        connected: t("agent.hubConnectorStateConnected"),
+        idle: t("agent.hubCategoryConnections"),
+      }),
+    ),
   ];
 
   const selectType = (next: CapabilityType) => {
@@ -1441,13 +1508,6 @@ export function CapabilityHubScreen() {
   };
 
   const shortcuts: Shortcut[] = [
-    {
-      id: "plugins",
-      title: t("agent.pluginsHeading"),
-      detail: t("agent.hubPluginsDetail"),
-      icon: Puzzle,
-      onPress: () => selectType("plugins"),
-    },
     {
       id: "skills",
       title: t("agent.skillsHeading"),
@@ -1473,14 +1533,10 @@ export function CapabilityHubScreen() {
     contentWidth >= 1000 ? 4 : contentWidth >= 680 ? 3 : 2,
   );
 
-  // 暂不对用户开放的能力入口：只在「应用与技能」目录里隐藏对应卡片，不删除底层实现。
-  // 卡片对象仍完整保留在 items 中，因此路由、连接流程等逻辑不受影响；
-  // 需要恢复时删掉下面对应 id 即可。按类型分组，避免不同 tab 下的同名 id 互相干扰。
+  // 连接页展示 Gmail、Google Calendar、OpenBot 和智能体电脑。
+  // 日历工作区入口已恢复；邮件快捷卡仍隐藏。
   const HIDDEN_CAPABILITY_IDS: Partial<Record<CapabilityType, readonly string[]>> = {
-    // 插件：日历工作区入口已恢复，目前只隐藏邮件。
     plugins: ["mail"],
-    // 连接器：Gmail / Google Calendar / OpenBot 暂未接入。
-    connectors: ["gmail", "calendar", "openbot"],
   };
   const hiddenIdsForType = HIDDEN_CAPABILITY_IDS[typeFilter] ?? [];
   const scopedItems = items.filter(
@@ -1609,6 +1665,11 @@ export function CapabilityHubScreen() {
       <View>
         <View style={{ gap: 14 }}>
           {/* 技能 tab 的二级标签页：技能市场 / 我的技能，切换时整块内容替换。 */}
+          {typeFilter === "connectors" ? (
+            <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 20 }}>
+              {t("agent.hubConnectionsAccount", { count: appConnectors.connectedCount })}
+            </Text>
+          ) : null}
           {typeFilter === "skills" && (
             <HubTabBar
               tabs={[
@@ -1735,6 +1796,14 @@ export function CapabilityHubScreen() {
         </View>
       </View>
 
+      {appConnectors.items.find((item) => item.slug === appSlug) ? (
+        <AppConnectorSheet
+          item={appConnectors.items.find((item) => item.slug === appSlug) as AppConnectorView}
+          api={api}
+          onClose={() => setAppSlug(null)}
+          onChanged={() => void appConnectors.refresh()}
+        />
+      ) : null}
       {configSheet && (
         <Sheet
           title="OpenBot"

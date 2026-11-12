@@ -48,7 +48,7 @@ const threads = {
   "threads.agentComputer": "Agent computer",
   "threads.calendar": "Calendar",
   "threads.files": "Materials",
-  "threads.appsAndSettings": "Apps & capabilities",
+  "threads.appsAndSettings": "Skills & connections",
 } satisfies Dictionary;
 
 export default threads;

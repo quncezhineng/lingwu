@@ -1,13 +1,30 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   applyControlMessage,
   applyEnvelope,
   type ConversationDraft,
+  chooseAssistantText,
   initialStreamState,
   type StreamEnvelope,
   verifyDrafts,
 } from "../src/conversation-stream.ts";
+
+interface CapturedReply {
+  messageId: string;
+  deltas: string[];
+  text: string;
+}
+
+const captured = JSON.parse(
+  readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../../../tests/fixtures/xiaowu-7388e0ff-deltas.json"),
+    "utf8",
+  ),
+) as CapturedReply;
 
 function envelope(
   seq: number,
@@ -307,4 +324,40 @@ test("text fallback picks the latest unclaimed saved message", () => {
     { id: "newer", role: "assistant", content: "Same answer" },
   ]);
   assert.deepEqual(report.matchedByText, [{ id: "live", messageId: "newer" }]);
+});
+
+test("captured 小悟 deltas rebuild the intact reply and win over a holed runtime copy", () => {
+  let state = initialStreamState();
+  state = applyEnvelope(state, envelope(1, "RUN_STARTED"));
+  captured.deltas.forEach((delta, index) => {
+    state = applyEnvelope(
+      state,
+      envelope(index + 2, "TEXT_MESSAGE_CHUNK", { messageId: captured.messageId, delta }),
+    );
+  });
+  state = applyEnvelope(state, envelope(captured.deltas.length + 2, "RUN_FINISHED"));
+  const live = state.drafts[captured.messageId];
+  assert.equal(live?.text, captured.text);
+  assert.equal(live?.done, true);
+  // The browser copy lost the same spans as the 11:54 screenshot: individual
+  // captured deltas ("202", "三", "通", "证券", …) never arrived.
+  const holed = captured.deltas.filter((_, index) => index % 4 !== 0).join("");
+  assert.notEqual(holed, captured.text);
+  assert.match(captured.text, /2026 三季报（财通证券）/);
+  assert.doesNotMatch(holed, /2026 三季报（财通证券）/);
+  const choice = chooseAssistantText(holed, { text: live?.text ?? "", done: true });
+  assert.equal(choice.text, captured.text);
+  assert.equal(choice.savedFallback, false);
+});
+
+test("a finished ledger that is only a prefix falls back to the longer saved reply", () => {
+  const choice = chooseAssistantText("完整的已保存回复。", {
+    text: "完整的",
+    done: true,
+  });
+  assert.equal(choice.text, "完整的已保存回复。");
+  assert.equal(choice.savedFallback, true);
+  const streaming = chooseAssistantText("已", { text: "已经更长的实时文本", done: false });
+  assert.equal(streaming.text, "已经更长的实时文本");
+  assert.equal(streaming.savedFallback, false);
 });

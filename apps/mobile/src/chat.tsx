@@ -37,7 +37,12 @@ import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { AgentSkillInspectSheet } from "./agent-sheets";
 import { useAgentSpace } from "./agent-space";
-import type { AgentAvatarId, AgentCommunication, AgentTone } from "./agent-space-model";
+import {
+  type AgentAvatarId,
+  type AgentCommunication,
+  type AgentTone,
+  heldCustomSkills,
+} from "./agent-space-model";
 import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text, type TextInput } from "./app-text";
@@ -81,7 +86,12 @@ import {
   pinnedTailNudge,
   restorePrependOffset,
 } from "./conversation-scroll";
-import { type ConversationDraft, useConversationStream, verifyDrafts } from "./conversation-stream";
+import {
+  type ConversationDraft,
+  chooseAssistantText,
+  useConversationStream,
+  verifyDrafts,
+} from "./conversation-stream";
 import { DesktopToolCard } from "./desktop-tool-card";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
@@ -312,6 +322,16 @@ export function WorkspaceTools() {
     ),
   });
   useRenderTool({
+    name: "use_skill",
+    description: "Read an installed skill",
+    parameters: displayParameters,
+    render: ({ args, result, status }) => (
+      <ToolStep tool="use_skill" args={args} result={result} status={status}>
+        <UseSkillCard result={result} loading={status !== "complete"} />
+      </ToolStep>
+    ),
+  });
+  useRenderTool({
     name: "create_goal",
     description: "Display a saved goal",
     parameters: displayParameters,
@@ -482,6 +502,11 @@ function reportDeliveries(
   }
   flush();
   return byMessage;
+}
+
+function UseSkillCard({ result, loading }: { result: unknown; loading: boolean }) {
+  const { t } = useTranslation();
+  return <ServerToolCard name={t("tools.toolStepUseSkill")} result={result} loading={loading} />;
 }
 
 function ServerToolCard({
@@ -713,11 +738,12 @@ export function ChatScreen({
   const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [selectedConnectorIds, setSelectedConnectorIds] = useState<string[]>([]);
-  const { current: currentAgent } = useAgentSpace();
+  const { current: currentAgent, skillLibrary } = useAgentSpace();
+  const heldSkills = heldCustomSkills(currentAgent, skillLibrary);
   const connectorChoices = connectorOptions(w);
   const selectedSkills: ComposerSelection[] = selectedSkillIds.map((id) => ({
     id,
-    name: skillDisplayName(id, currentAgent.customSkills),
+    name: skillDisplayName(id, heldSkills),
   }));
   const selectedConnectors = connectorChoices.filter((option) =>
     selectedConnectorIds.includes(option.id),
@@ -732,9 +758,9 @@ export function ChatScreen({
   }, [threadId]);
   useAgentContext({
     description:
-      "Skills and connectors the user attached to this conversation from the composer. Use the skills when the request matches them; a connector marked connected can be used directly. This context does not grant access to any resource the user has not connected.",
+      "Skills and connectors the user attached to this conversation. Call use_skill with each selected skill id and follow the returned method. A connector marked connected can be used directly. This context does not grant access to any resource the user has not connected.",
     value: {
-      skills: selectedSkills.map((skill) => skill.name),
+      skills: selectedSkills.map((skill) => ({ id: skill.id, name: skill.name })),
       connectors: selectedConnectors.map((option) => ({
         name: option.name,
         status: option.connected ? "connected" : "not connected",
@@ -772,6 +798,7 @@ export function ChatScreen({
   const prependAnchor = useRef<PrependAnchor | null>(null);
   // Set while a queued message is being sent, so a lock refusal holds it instead of failing.
   const queuedTurn = useRef(false);
+  const stopping = useRef(false);
   const [keyboardPadding, setKeyboardPadding] = useState(0);
   const [composerDockHeight, setComposerDockHeight] = useState(70);
   const measuredDockHeight = useRef(70);
@@ -1133,18 +1160,27 @@ export function ChatScreen({
     const subscription = copilotkit.subscribe({
       onError: (event) => {
         if (event.context?.agentId && event.context.agentId !== agentId) return;
+        const failure = event.error instanceof Error ? event.error : new Error(String(event.error));
+        // Stop aborts the run request on purpose. That is not a failed reply.
+        if (stopping.current && (failure.name === "AbortError" || /aborted/i.test(failure.message)))
+          return;
         const during = { replaying: false, queuedTurn: queuedTurn.current };
         if (!showsRunError(event, during)) return;
-        const failure = event.error instanceof Error ? event.error : new Error(String(event.error));
         setError(failure.message);
       },
     });
     return () => subscription.unsubscribe();
   }, [copilotkit, agentId, queue]);
   async function stop() {
+    stopping.current = true;
     queue.pause();
     try {
       await copilotkit.stopAgent({ agent });
+      // The runtime proxy posts /stop but does not abort its own run request,
+      // so the composer stays on "stop" while tokens keep arriving.
+      const running = agent as { abortController?: AbortController };
+      if (running.abortController && !running.abortController.signal.aborted)
+        running.abortController.abort();
     } catch (e) {
       setError(t("chat.stopError", { detail: e instanceof Error ? e.message : String(e) }));
     } finally {
@@ -1181,6 +1217,7 @@ export function ChatScreen({
   function send() {
     const text = composerRef.current?.read().trim() ?? "";
     if (!text || !isReady || !loaded) return;
+    stopping.current = false;
     // A new submission can continue after Stop; held follow-ups still need explicit resume.
     if (!busy && !agent.isRunning && !saveError && !queue.getSnapshot().pending.length)
       queue.resume();
@@ -1249,7 +1286,6 @@ export function ChatScreen({
     if (approvalTaskSignal) void refresh().catch(() => {});
   }, [approvalTaskSignal, refresh]);
   const integrity = verifyDrafts(stream.state.drafts, messages);
-  const mismatchedDraftIds = new Set(integrity.mismatched.map((item) => item.id));
   const matchedByTextDraftIds = new Set(integrity.matchedByText.map((item) => item.id));
   const persistedMessageIds = new Set(messages.map((message) => message.id));
   const streamDrafts: ConversationDraft[] = stream.state.order
@@ -1265,12 +1301,14 @@ export function ChatScreen({
     const content = typeof message.content === "string" ? message.content : "";
     if (message.role !== "assistant") return content;
     const live = stream.state.drafts[message.id];
-    // On an integrity failure the saved message wins. Otherwise use whichever
-    // copy is further ahead, so a lagging or dropped runtime stream cannot rewind
-    // text that the replayable SSE channel already delivered.
-    if (!live || mismatchedDraftIds.has(live.id)) return content;
-    return live.text.length > content.length ? live.text : content;
+    return chooseAssistantText(content, live && { text: live.text, done: live.done }).text;
   };
+  const savedFallback = messages.some((message) => {
+    if (message.role !== "assistant" || typeof message.content !== "string") return false;
+    const live = stream.state.drafts[message.id];
+    return chooseAssistantText(message.content, live && { text: live.text, done: live.done })
+      .savedFallback;
+  });
   const deliveries = reportDeliveries(messages, messageText, agentWorkspace?.artifacts ?? []);
   const latestDesktop = messages
     .flatMap((m) => readableToolCalls(m))
@@ -1286,7 +1324,7 @@ export function ChatScreen({
     (replying && latestVisible?.role === "assistant" && latestVisibleText.length > 0);
   const liveError = stream.state.phase === "error" ? stream.state.error || "" : "";
   const primaryError = error || liveError;
-  const integrityWarning = integrity.mismatched.length ? t("chat.streamIntegrityWarning") : "";
+  const integrityWarning = savedFallback ? t("chat.streamIntegrityWarning") : "";
   const streamActive =
     streamDrafts.some((draft) => !draft.done && draft.text.length > 0) ||
     (replying && stream.state.phase !== "error");
@@ -2306,7 +2344,8 @@ export function ChatScreen({
       {skillPickerOpen && (
         <>
           <SkillPickerSheet
-            customSkills={currentAgent.customSkills}
+            customSkills={heldSkills}
+            installedCatalogIds={currentAgent.installedSkills}
             selectedIds={selectedSkillIds}
             onToggle={(id) =>
               setSelectedSkillIds((ids) =>

@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AccountScreen } from "./account";
 import { AccountAvatar } from "./account-avatar";
 import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-header";
@@ -31,11 +31,12 @@ import {
   onboardingSummary,
 } from "./agent-space-model";
 import { IdeasScreen } from "./agent-ui";
-import { AgentWorkList, AgentWorkModal } from "./agent-work-dialog";
+import { AgentWorkList } from "./agent-work-dialog";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
 import { ChatScreen, WorkspaceTools } from "./chat";
+import { type ThreadHistoryPage, threadHistoryPagePath } from "./conversation-history";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ComputerScreen } from "./computer";
 import { columnMaxWidth, desktopColumns } from "./desktop-columns";
@@ -62,6 +63,7 @@ import {
 } from "./icons";
 import { IosStack } from "./ios-stack";
 import { MobileBotsHome } from "./mobile-bots-home";
+import { botHasUnread, type BotPreview, latestBotPreview } from "./mobile-bots";
 import { ModalOverlay } from "./modal-overlay";
 import { unreadCount } from "./notification-actions";
 import { delegatedSectionTitle } from "./plan-card";
@@ -231,11 +233,18 @@ function AgentMenu({
 function AgentListItem({
   agent,
   active,
+  preview,
+  unread = false,
+  detailed = false,
   onPress,
   onOpenMenu,
 }: {
   agent: AgentDefinition;
   active: boolean;
+  preview?: string;
+  unread?: boolean;
+  /** 电脑侧栏用手机首页的两行样式。抽屉里的紧凑列表保持单行。 */
+  detailed?: boolean;
   onPress: () => void;
   onOpenMenu: (anchor: AgentMenuAnchor) => void;
 }) {
@@ -247,6 +256,89 @@ function AgentListItem({
       onOpenMenu({ agent, x, y, width, height });
     });
   };
+  const label = agent.role ? `${agent.name} · ${agent.role}` : agent.name;
+  if (detailed) {
+    return (
+      <View
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        style={{
+          borderRadius: radius.sheet,
+          backgroundColor: active ? colors.sky : hovered ? colors.overlay1 : "transparent",
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityState={{ selected: active }}
+          onPress={onPress}
+          style={{
+            minHeight: 68,
+            paddingVertical: 10,
+            paddingLeft: space.xs,
+            paddingRight: space.xl,
+            borderRadius: radius.sheet,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <AgentOrb avatar={agent.avatar} size={44} />
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text numberOfLines={1} style={{ ...typography.agentName, color: colors.text }}>
+              {label}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text
+                numberOfLines={1}
+                style={{ flex: 1, fontSize: 13, lineHeight: 20, color: colors.muted }}
+              >
+                {preview || t("agentSpace.noBotMessages")}
+              </Text>
+              {unread && !hovered && (
+                <View
+                  accessibilityLabel={t("agentSpace.newNotifications")}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: radius.full,
+                    backgroundColor: colors.primary,
+                  }}
+                />
+              )}
+            </View>
+          </View>
+        </Pressable>
+        <Pressable
+          ref={moreRef}
+          accessibilityRole="button"
+          accessibilityLabel={t("ui.moreActions")}
+          accessibilityHint={agent.name}
+          hitSlop={4}
+          pointerEvents={hovered ? "auto" : "none"}
+          onPress={openMenu}
+          style={({ pressed }) => ({
+            position: "absolute",
+            top: 10,
+            right: space.md,
+            width: 26,
+            height: 26,
+            borderRadius: radius.badge,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: hovered ? 1 : 0,
+            backgroundColor: pressed ? colors.overlay2 : "transparent",
+          })}
+        >
+          <MoreHorizontal
+            size={16}
+            strokeWidth={1.8}
+            color={active || hovered ? colors.muted : colors.faint}
+          />
+        </Pressable>
+      </View>
+    );
+  }
   return (
     <View
       // 整行悬停底色：让「切换对话」与右侧「更多」读起来是同一行。
@@ -494,6 +586,7 @@ function AccountMenu({
   email,
   avatarUrl,
   compact,
+  anchor,
   onClose,
   onProfile,
   onSettings,
@@ -503,6 +596,8 @@ function AccountMenu({
   email: string;
   avatarUrl?: string;
   compact: boolean;
+  /** 手机首页把头像菜单贴在左上角圆钮下方。不传时仍贴在底栏头像上方。 */
+  anchor?: { top: number; left: number };
   onClose: () => void;
   onProfile: () => void;
   onSettings: () => void;
@@ -527,11 +622,13 @@ function AccountMenu({
           }}
         />
         <View
+          testID="account-menu"
           accessibilityViewIsModal
           style={{
             position: "absolute",
-            left: compact ? 16 : 18,
-            bottom: 82,
+            ...(anchor
+              ? { top: anchor.top, left: anchor.left }
+              : { left: compact ? 16 : 14, bottom: compact ? 72 : 58 }),
             width: menuWidth,
             padding: 6,
             borderWidth: 1,
@@ -640,7 +737,31 @@ function AgentRail({
     }
     return { pinnedAgents: pinned, restAgents: rest };
   }, [orderedAgents]);
-  const { navigate, open, workspace } = useWorkspace();
+  const { navigate, open, workspace, api } = useWorkspace();
+  const [previews, setPreviews] = useState<Record<string, BotPreview | null>>({});
+  const agentKey = agents.map((agent) => agent.id).join("|");
+  useEffect(() => {
+    if (compact) return;
+    let alive = true;
+    for (const agent of agents) {
+      void api
+        .request<ThreadHistoryPage>(threadHistoryPagePath(agent.threadId))
+        .then((page) => {
+          if (!alive) return;
+          setPreviews((current) => ({
+            ...current,
+            [agent.id]: latestBotPreview(page.messages),
+          }));
+        })
+        .catch(() => {
+          if (!alive) return;
+          setPreviews((current) => ({ ...current, [agent.id]: null }));
+        });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [api, agentKey, compact]);
   const { data: agentData } = useAgentWorkspace();
   const unreadNotifications = unreadCount(agentData?.notifications);
   const accountNickname = workspace.profile.name.trim() || t("agentSpace.account");
@@ -662,7 +783,7 @@ function AgentRail({
         height: "100%",
         paddingHorizontal: compact ? 20 : 14,
         paddingTop: compact ? 44 : 18,
-        paddingBottom: 14,
+        paddingBottom: compact ? 14 : 18,
         borderRightWidth: compact ? 0 : 1,
         borderRightColor: colors.line,
         backgroundColor: colors.surfaceRaised,
@@ -760,9 +881,13 @@ function AgentRail({
           <View
             style={{
               gap: 2,
-              padding: 4,
-              borderRadius: radius.control,
-              backgroundColor: colors.overlay1,
+              ...(compact
+                ? {
+                    padding: 4,
+                    borderRadius: radius.control,
+                    backgroundColor: colors.overlay1,
+                  }
+                : null),
             }}
           >
             {pinnedAgents.map((agent) => (
@@ -770,6 +895,14 @@ function AgentRail({
                 key={agent.id}
                 agent={agent}
                 active={agent.id === current.id}
+                detailed={!compact}
+                preview={previews[agent.id]?.text}
+                unread={botHasUnread(
+                  agent.threadId,
+                  agent.system,
+                  agentData?.tasks ?? [],
+                  agentData?.notifications ?? [],
+                )}
                 onPress={() => choose(agent)}
                 onOpenMenu={setMenuAnchor}
               />
@@ -781,6 +914,14 @@ function AgentRail({
             key={agent.id}
             agent={agent}
             active={agent.id === current.id}
+            detailed={!compact}
+            preview={previews[agent.id]?.text}
+            unread={botHasUnread(
+              agent.threadId,
+              agent.system,
+              agentData?.tasks ?? [],
+              agentData?.notifications ?? [],
+            )}
             onPress={() => choose(agent)}
             onOpenMenu={setMenuAnchor}
           />
@@ -790,7 +931,8 @@ function AgentRail({
           onPress={() => onOpen("create")}
           style={({ pressed }) => ({
             minHeight: 40,
-            paddingHorizontal: 9,
+            paddingLeft: compact ? 9 : space.xs,
+            paddingRight: compact ? 9 : space.sm,
             borderRadius: radius.control,
             backgroundColor: pressed ? colors.overlay1 : "transparent",
             flexDirection: "row",
@@ -805,64 +947,126 @@ function AgentRail({
           </Text>
         </Pressable>
       </ScrollView>
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: colors.line,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
-        }}
-      >
-        <HoverPressable
-          accessibilityRole="button"
-          accessibilityLabel={t("agentSpace.personalCenter")}
-          onPress={() => setAccountMenuOpen(true)}
-          style={({ pressed, hovered }) => ({
-            flex: 1,
-            minWidth: 0,
-            paddingVertical: 8,
-            paddingLeft: 6,
-            paddingRight: 4,
-            borderRadius: radius.control,
-            backgroundColor: pressed ? colors.overlay3 : hovered ? colors.overlay2 : "transparent",
+      {compact ? (
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: colors.line,
             flexDirection: "row",
             alignItems: "center",
-            gap: 9,
-          })}
-        >
-          <AccountAvatar
-            avatarUrl={workspace.profile.avatarUrl}
-            name={accountNickname}
-            size={30}
-            borderRadius={8}
-          />
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>{accountNickname}</Text>
-            <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
-              {t("agentSpace.account")}
-            </Text>
-          </View>
-        </HoverPressable>
-        <HoverPressable
-          accessibilityRole="button"
-          accessibilityLabel={t("app.settingsLabel")}
-          onPress={() => {
-            onClose?.();
-            navigate("settings");
+            gap: 4,
           }}
-          style={({ pressed, hovered }) => ({
-            width: 36,
-            height: 36,
-            borderRadius: radius.control,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: pressed ? colors.overlay3 : hovered ? colors.overlay2 : "transparent",
-          })}
         >
-          <Settings2 size={17} strokeWidth={1.7} color={colors.muted} />
-        </HoverPressable>
-      </View>
+          <HoverPressable
+            accessibilityRole="button"
+            accessibilityLabel={t("agentSpace.personalCenter")}
+            onPress={() => setAccountMenuOpen(true)}
+            style={({ pressed, hovered }) => ({
+              flex: 1,
+              minWidth: 0,
+              paddingVertical: 8,
+              paddingLeft: 6,
+              paddingRight: 4,
+              borderRadius: radius.control,
+              backgroundColor: pressed
+                ? colors.overlay3
+                : hovered
+                  ? colors.overlay2
+                  : "transparent",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 9,
+            })}
+          >
+            <AccountAvatar
+              avatarUrl={workspace.profile.avatarUrl}
+              name={accountNickname}
+              size={30}
+              borderRadius={8}
+            />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[s.text, { fontSize: 12, fontWeight: "500" }]}>{accountNickname}</Text>
+              <Text style={[s.small, { fontSize: 9, color: colors.faint }]}>
+                {t("agentSpace.account")}
+              </Text>
+            </View>
+          </HoverPressable>
+          <HoverPressable
+            accessibilityRole="button"
+            accessibilityLabel={t("app.settingsLabel")}
+            onPress={() => {
+              onClose?.();
+              navigate("settings");
+            }}
+            style={({ pressed, hovered }) => ({
+              width: 36,
+              height: 36,
+              borderRadius: radius.control,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: pressed
+                ? colors.overlay3
+                : hovered
+                  ? colors.overlay2
+                  : "transparent",
+            })}
+          >
+            <Settings2 size={17} strokeWidth={1.7} color={colors.muted} />
+          </HoverPressable>
+        </View>
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <HoverPressable
+            testID="account-avatar-button"
+            accessibilityRole="button"
+            accessibilityLabel={t("agentSpace.personalCenter")}
+            onPress={() => setAccountMenuOpen(true)}
+            style={({ pressed, hovered }) => ({
+              width: 32,
+              height: 32,
+              borderRadius: radius.full,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: pressed
+                ? colors.overlay2
+                : hovered
+                  ? colors.overlay1
+                  : "transparent",
+            })}
+          >
+            <AccountAvatar
+              avatarUrl={workspace.profile.avatarUrl}
+              name={accountNickname}
+              size={32}
+              borderRadius={radius.full}
+            />
+          </HoverPressable>
+          <HoverPressable
+            testID="skills-connections-entry"
+            accessibilityRole="button"
+            accessibilityLabel={t("app.navApps")}
+            onPress={() => {
+              onClose?.();
+              navigate("apps");
+            }}
+            style={({ pressed, hovered }) => ({
+              flex: 1,
+              minHeight: 32,
+              paddingHorizontal: space.sm,
+              borderRadius: radius.full,
+              borderWidth: 1,
+              borderColor: colors.line,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: pressed ? colors.overlay2 : hovered ? colors.overlay1 : colors.paper,
+            })}
+          >
+            <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>
+              {t("app.navApps")}
+            </Text>
+          </HoverPressable>
+        </View>
+      )}
       {accountMenuOpen && (
         <AccountMenu
           name={accountNickname}
@@ -1024,12 +1228,9 @@ function RailIdentity({ onEdit }: { onEdit: () => void }) {
       </View>
       <Text
         style={{
+          ...typography.agentName,
           textAlign: "center",
           paddingHorizontal: 28,
-          fontFamily: fonts.serif,
-          fontSize: 16,
-          lineHeight: 24,
-          fontWeight: "600",
           color: colors.text,
         }}
       >
@@ -1057,7 +1258,6 @@ function CapabilityRail({
   const { t } = useTranslation();
   const { navigate } = useWorkspace();
   const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
-  const [workOpen, setWorkOpen] = useState(false);
   const leave = () => onNavigateAway?.();
   const editAgent = () => {
     leave();
@@ -1105,7 +1305,7 @@ function CapabilityRail({
             <Button
               variant="outline"
               style={{ alignSelf: "stretch" }}
-              onPress={() => setWorkOpen(true)}
+              onPress={() => onOpen("tasks")}
             >
               {t("agentSpace.moreDelegated")}
             </Button>
@@ -1141,7 +1341,6 @@ function CapabilityRail({
       {inspectSkillId && (
         <AgentSkillInspectSheet skillId={inspectSkillId} onClose={() => setInspectSkillId(null)} />
       )}
-      {workOpen && <AgentWorkModal onClose={() => setWorkOpen(false)} />}
     </>
   );
 }
@@ -1459,7 +1658,9 @@ export function AgentProductShell({
     expandRail,
   } = useDesktopColumns(availableWidth);
   const { t } = useTranslation();
-  const { section, close, back, reminderIntent, navigate, open } = useWorkspace();
+  const { section, close, back, reminderIntent, navigate, open, workspace } = useWorkspace();
+  const insets = useSafeAreaInsets();
+  const [mobileAccountMenu, setMobileAccountMenu] = useState(false);
   const {
     agents,
     current,
@@ -1796,7 +1997,7 @@ export function AgentProductShell({
                           setBotOpen(true);
                         }}
                         onCreate={() => openPanel("create")}
-                        onAccount={() => openPanel("account")}
+                        onAccount={() => setMobileAccountMenu(true)}
                         onNotifications={() => open({ type: "notifications" })}
                         onConnections={() => setAppsSheet(true)}
                       />
@@ -1957,6 +2158,28 @@ export function AgentProductShell({
               />
             </SafeAreaView>
           </View>
+        )}
+        {phone && mobileAccountMenu && (
+          <AccountMenu
+            name={workspace.profile.name.trim() || t("agentSpace.account")}
+            email={workspace.profile.email}
+            avatarUrl={workspace.profile.avatarUrl}
+            compact
+            anchor={{ top: insets.top + 16 + 44 + 10, left: 16 }}
+            onClose={() => setMobileAccountMenu(false)}
+            onProfile={() => {
+              setMobileAccountMenu(false);
+              openPanel("account");
+            }}
+            onSettings={() => {
+              setMobileAccountMenu(false);
+              navigate("settings");
+            }}
+            onSignOut={() => {
+              setMobileAccountMenu(false);
+              onSignOut();
+            }}
+          />
         )}
         <AgentSheets
           key={`${current.id}:${panel}`}

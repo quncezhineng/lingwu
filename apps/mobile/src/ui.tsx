@@ -36,6 +36,7 @@ export {
   chartNeutral,
   chartSeries,
   colors,
+  composerMetrics,
   fonts,
   iconStroke,
   radius,

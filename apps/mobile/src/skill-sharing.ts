@@ -15,7 +15,7 @@ type SkillContent = Pick<AgentSkill, "name" | "purpose" | "instructions" | "outp
 
 /** 需要的最小存储能力，便于两个页面直接传入自己的 agent-space 方法。 */
 type SkillStore = {
-  saveSkill: (agentId: string, input: SkillContent, skillId?: string) => void;
+  setSkillRef: (agentId: string, skillId: string, linked: boolean) => void;
   deleteSkill: (agentId: string, skillId: string) => void;
 };
 
@@ -37,8 +37,12 @@ export function findSkillCopy(
  * 已持有该技能的 Agent id（按内容指纹判定，含创建该技能的来源 Agent）。
  * 「添加到智能体」面板据此标记「已添加」与底部计数，面板本身展示全部 Agent。
  */
-export function skillHolderAgentIds(agents: AgentDefinition[], skill: SkillContent): string[] {
-  return agents.filter((agent) => findSkillCopy(agent, skill)).map((agent) => agent.id);
+function holdsSkill(agent: AgentDefinition, skill: AgentSkill) {
+  return (agent.skillRefs ?? []).includes(skill.id) || Boolean(findSkillCopy(agent, skill));
+}
+
+export function skillHolderAgentIds(agents: AgentDefinition[], skill: AgentSkill): string[] {
+  return agents.filter((agent) => holdsSkill(agent, skill)).map((agent) => agent.id);
 }
 
 /**
@@ -54,7 +58,7 @@ export function skillHolderAgentIds(agents: AgentDefinition[], skill: SkillConte
  */
 export function skillLockedAgentIds(
   agents: AgentDefinition[],
-  skill: SkillContent,
+  skill: AgentSkill,
   sourceAgentId?: string,
 ): string[] {
   const holders = skillHolderAgentIds(agents, skill);
@@ -102,26 +106,22 @@ export function collectSharedSkills(agents: AgentDefinition[]): SharedSkillEntry
 export function toggleSkillShare(
   store: SkillStore,
   target: AgentDefinition,
-  skill: SkillContent,
+  skill: AgentSkill,
   guard?: { agents: AgentDefinition[]; sourceAgentId?: string },
 ): "added" | "removed" | "blocked" {
   const existing = findSkillCopy(target, skill);
-  if (existing) {
+  if (holdsSkill(target, skill)) {
     if (
       guard &&
       skillLockedAgentIds(guard.agents, skill, guard.sourceAgentId).includes(target.id)
     ) {
       return "blocked";
     }
-    store.deleteSkill(target.id, existing.id);
+    store.setSkillRef(target.id, skill.id, false);
+    if (existing) store.deleteSkill(target.id, existing.id);
     return "removed";
   }
-  store.saveSkill(target.id, {
-    name: skill.name,
-    purpose: skill.purpose,
-    instructions: skill.instructions,
-    outputFormat: skill.outputFormat,
-  });
+  store.setSkillRef(target.id, skill.id, true);
   return "added";
 }
 
@@ -133,18 +133,19 @@ export function toggleSkillShare(
  * 返回实际删除的副本数量。
  */
 export function deleteSkillEverywhere(
-  store: Pick<SkillStore, "deleteSkill">,
+  store: SkillStore,
   agents: AgentDefinition[],
-  skill: SkillContent,
+  skill: AgentSkill,
 ): number {
   const fingerprint = skillFingerprint(skill);
   let removed = 0;
   for (const agent of agents) {
-    for (const copy of agent.customSkills) {
-      if (skillFingerprint(copy) !== fingerprint) continue;
-      store.deleteSkill(agent.id, copy.id);
-      removed += 1;
-    }
+    const copies = agent.customSkills.filter((copy) => skillFingerprint(copy) === fingerprint);
+    const linked = (agent.skillRefs ?? []).includes(skill.id);
+    if (!linked && copies.length === 0) continue;
+    if (linked) store.setSkillRef(agent.id, skill.id, false);
+    for (const copy of copies) store.deleteSkill(agent.id, copy.id);
+    removed += 1;
   }
   return removed;
 }

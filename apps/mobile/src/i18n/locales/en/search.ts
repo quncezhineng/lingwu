@@ -16,7 +16,7 @@ const search = {
   "search.kindMail": "Mail",
   "search.kindEvent": "Calendar",
   "search.kindMemory": "Memory",
-  "search.kindMonitor": "Alerts",
+  "search.kindMonitor": "Automation",
 } satisfies Dictionary;
 
 export default search;

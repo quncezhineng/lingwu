@@ -16,7 +16,7 @@ const search = {
   "search.kindMail": "邮件",
   "search.kindEvent": "日历",
   "search.kindMemory": "记忆",
-  "search.kindMonitor": "盯盘提醒",
+  "search.kindMonitor": "自动化",
 } satisfies Dictionary;
 
 export default search;

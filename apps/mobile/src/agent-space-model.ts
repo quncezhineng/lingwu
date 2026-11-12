@@ -67,6 +67,10 @@ export interface AgentDefinition {
   skills: string[];
   /** 从技能目录安装到该 Agent 的技能 id；详情页据此区分「已安装」。 */
   installedSkills: string[];
+  /** 账户级技能库里的自建技能 id。编辑原件后，引用它的 Agent 立即看到新内容。 */
+  skillRefs: string[];
+  /** 分配给这个智能体的连接 id。连接本身仍是账户级的。 */
+  installedConnectors?: string[];
   customSkills: AgentSkill[];
 }
 
@@ -230,7 +234,7 @@ export const AGENT_CAPABILITY_LABELS: Record<string, { zh: string; en: string }>
   portfolio: { zh: "组合观察", en: "Portfolio" },
   risk: { zh: "风险与对照", en: "Risk & comparison" },
   notes: { zh: "笔记与领悟卡", en: "Notes & insights" },
-  reminder: { zh: "盯盘与提醒", en: "Alerts" },
+  reminder: { zh: "自动化", en: "Automation" },
   goals: { zh: "目标与跟进", en: "Goals" },
   ideas: { zh: "主动建议", en: "Ideas" },
   files: { zh: "资料与成果", en: "Files & results" },
@@ -276,6 +280,7 @@ export function createSystemAgent(
     createdAt: now,
     skills: [...SYSTEM_AGENT_CAPABILITIES],
     installedSkills: [],
+    skillRefs: [],
     customSkills: [],
   };
 }
@@ -368,6 +373,7 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
     createdAt: stringValue(value.createdAt, defaults.createdAt),
     skills: skills.length ? skills : defaults.skills,
     installedSkills: [...new Set(stringArray(value.installedSkills))].slice(0, 60),
+    skillRefs: [...new Set(stringArray(value.skillRefs))].slice(0, 60),
     customSkills: Array.isArray(value.customSkills)
       ? value.customSkills
           .map(normalizeSkill)
@@ -418,6 +424,37 @@ function normalizeSkillLibrary(value: unknown, agents: AgentDefinition[]): Agent
   return [...byContent.values()];
 }
 
+/** 把和技能库内容相同的旧副本收成引用，之后改库里的原件就会作用到这个 Agent。 */
+export function linkCopiedSkills(
+  agent: AgentDefinition,
+  library: readonly AgentSkill[],
+): AgentDefinition {
+  const refs = new Set(agent.skillRefs);
+  const copies: AgentSkill[] = [];
+  for (const copy of agent.customSkills) {
+    const match = library.find((skill) => skillContentKey(skill) === skillContentKey(copy));
+    if (match) refs.add(match.id);
+    else if (!refs.has(copy.id)) copies.push(copy);
+  }
+  return { ...agent, skillRefs: [...refs].slice(0, 60), customSkills: copies };
+}
+
+/** 这个 Agent 实际持有的自建技能：技能库引用优先，对不上指纹的旧副本仍保留。 */
+export function heldCustomSkills(
+  agent: AgentDefinition,
+  library: readonly AgentSkill[],
+): AgentSkill[] {
+  const byId = new Map(library.map((skill) => [skill.id, skill]));
+  const referenced = agent.skillRefs
+    .map((id) => byId.get(id))
+    .filter((skill): skill is AgentSkill => Boolean(skill));
+  const referencedKeys = new Set(referenced.map(skillContentKey));
+  const leftovers = agent.customSkills.filter(
+    (skill) => !agent.skillRefs.includes(skill.id) && !referencedKeys.has(skillContentKey(skill)),
+  );
+  return [...referenced, ...leftovers];
+}
+
 /** Parses persisted state and always guarantees exactly one system Agent. */
 export function normalizeAgentSpace(value: unknown, mainThreadId: string): AgentSpaceState {
   const record = isRecord(value) ? value : {};
@@ -434,6 +471,10 @@ export function normalizeAgentSpace(value: unknown, mainThreadId: string): Agent
     threadIds.add(agent.threadId);
     agents.push(agent);
   }
+  const skillLibrary = normalizeSkillLibrary(record.skillLibrary, agents);
+  for (let index = 0; index < agents.length; index += 1) {
+    agents[index] = linkCopiedSkills(agents[index], skillLibrary);
+  }
   const systemIndex = agents.findIndex((agent) => agent.id === SYSTEM_AGENT_ID);
   if (systemIndex === -1) agents.unshift(createSystemAgent(mainThreadId));
   else agents[systemIndex] = { ...agents[systemIndex], system: true, threadId: mainThreadId };
@@ -445,7 +486,7 @@ export function normalizeAgentSpace(value: unknown, mainThreadId: string): Agent
     version: 1,
     currentAgentId,
     agents,
-    skillLibrary: normalizeSkillLibrary(record.skillLibrary, agents),
+    skillLibrary,
     preferences: normalizePreferences(record.preferences),
     onboardingDone: record.onboardingDone === true,
     onboardingStep: Math.max(0, Math.min(4, Math.trunc(Number(record.onboardingStep) || 0))),
@@ -523,6 +564,7 @@ export function createAgentFromTemplate(
     createdAt: now,
     skills: [...preset.skills],
     installedSkills: [],
+    skillRefs: [],
     customSkills: [],
   };
 }
@@ -558,12 +600,18 @@ export function detachSkillFromAgent(
   skillId: string,
 ): AgentSpaceState {
   const target = state.agents.find((agent) => agent.id === agentId);
-  if (!target?.customSkills.some((skill) => skill.id === skillId)) return state;
+  const hasCopy = target?.customSkills.some((skill) => skill.id === skillId) ?? false;
+  const hasRef = target?.skillRefs.includes(skillId) ?? false;
+  if (!target || (!hasCopy && !hasRef)) return state;
   return {
     ...state,
     agents: state.agents.map((agent) =>
       agent.id === agentId
-        ? { ...agent, customSkills: agent.customSkills.filter((skill) => skill.id !== skillId) }
+        ? {
+            ...agent,
+            customSkills: agent.customSkills.filter((skill) => skill.id !== skillId),
+            skillRefs: agent.skillRefs.filter((id) => id !== skillId),
+          }
         : agent,
     ),
   };

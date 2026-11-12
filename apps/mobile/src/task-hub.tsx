@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import { goalsEnabled } from "../../../packages/domain/src/features";
 import { AgentActivityScreen } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { HubTabs } from "./hub-tabs";
 import { useTranslation } from "./i18n";
+import { listedWorkTasks } from "./task-presentation";
 import { colors, fonts } from "./theme";
 import { TrackingScreen } from "./tracking-screen";
 import { buildTrackingView } from "./tracking-view";
@@ -34,7 +36,7 @@ export function TaskHubScreen({ initialTab }: { initialTab?: TaskHubTab } = {}) 
     if (reminderIntent) setTab("tracking");
   }, [reminderIntent]);
 
-  const totalTasks = data?.tasks.length ?? 0;
+  const totalTasks = listedWorkTasks(data?.tasks ?? []).length;
   const tracking = data ? buildTrackingView(data) : undefined;
 
   return (
@@ -53,7 +55,9 @@ export function TaskHubScreen({ initialTab }: { initialTab?: TaskHubTab } = {}) 
           {
             id: "tracking",
             label: t("app.taskHubReminders"),
-            count: tracking?.counts.tracking ?? 0,
+            count: goalsEnabled
+              ? (tracking?.counts.tracking ?? 0)
+              : (tracking?.reminders.length ?? 0),
           },
         ]}
       />

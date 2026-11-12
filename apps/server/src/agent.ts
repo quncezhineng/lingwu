@@ -8,6 +8,7 @@ import {
 } from "@copilotkit/runtime/v2";
 import type { Auth } from "./auth.ts";
 import type { Config } from "./config.ts";
+import { coalesceTextChunks } from "./engine/coalesce-text.ts";
 import { ConversationAgent } from "./engine/conversation.ts";
 import type { AgentService } from "./engine/service.ts";
 import type { ConversationStream } from "./engine/stream.ts";
@@ -60,7 +61,12 @@ export function makeRuntime(
         void stream
           .noteMessage(owner, input.threadId, question.id)
           .catch((error) => backgroundFailure("conversation.stream.note", error));
-      return stream.observe(owner, input.threadId, input.runId, next.run(input));
+      // The ledger keeps every raw delta. The gateway and the browser receive
+      // the merged bursts, so a dropped websocket frame cannot punch a hole
+      // through the middle of a word or leave a `**` without its partner.
+      return coalesceTextChunks(
+        stream.observe(owner, input.threadId, input.runId, next.run(input)),
+      );
     });
     return { default: agent };
   };

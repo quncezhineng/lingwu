@@ -240,8 +240,19 @@ test("accepting a goal idea keeps the task attached to the original goal", async
     category: "Health",
   });
   const ideas = await server.agent.refreshIdeas(ideaOwner);
-  const idea = ideas.find((candidate) => candidate.input.goalId === goal.id);
-  assert.ok(idea);
+  assert.ok(!ideas.some((candidate) => candidate.input.goalId === goal.id));
+  const idea: Idea = {
+    id: "existing-goal-plan",
+    title: "Plan the walking routine",
+    reason: goal.description,
+    prompt: "Plan the walking routine",
+    kind: "plan",
+    input: { goalId: goal.id },
+    evidence: [],
+    status: "new",
+    createdAt: new Date().toISOString(),
+  };
+  await db.put(ideaOwner, "ideas", idea);
 
   const accepted = await server.agent.decideIdea(ideaOwner, idea.id, "accept");
   assert.ok(accepted?.taskId);
@@ -258,7 +269,7 @@ test("accepting a goal idea keeps the task attached to the original goal", async
   assert.equal((await server.agent.getTask(ideaOwner, task.id)).status, "paused");
 });
 
-test("accepting an idea without a goal still creates one goal and task", async () => {
+test("accepting an idea without a goal creates a task and leaves goals untouched", async () => {
   const ideaOwner = "standalone-ideas";
   const idea: Idea = {
     id: "standalone-plan",
@@ -277,13 +288,11 @@ test("accepting an idea without a goal still creates one goal and task", async (
   await server.agent.decideIdea(ideaOwner, idea.id, "accept");
 
   const goals = await db.list<Goal>(ideaOwner, "goals");
-  assert.equal(goals.length, 1);
-  assert.equal(goals[0].title, idea.title);
-  assert.equal(goals[0].description, idea.reason);
+  assert.equal(goals.length, 0);
   const tasks = await db.list<AgentTask>(ideaOwner, "tasks");
   assert.equal(tasks.length, 1);
   assert.equal(tasks[0].id, accepted.taskId);
-  assert.equal(tasks[0].goalId, goals[0].id);
+  assert.equal(tasks[0].goalId, undefined);
 });
 
 test("cancelling a task denies its pending action", async () => {
@@ -380,7 +389,7 @@ test("dismissal racing acceptance never creates work for a dismissed idea", asyn
   }
 });
 
-test("milestone-linked outcomes preserve manual progress and legacy goal tasks still append once", async () => {
+test("milestone edits stay manual while goals are hidden, so a legacy task does not append one", async () => {
   const goal = await server.agent.createGoal(owner, {
     title: "Budget",
     milestones: ["Review spending", "Save"],
@@ -430,8 +439,8 @@ test("milestone-linked outcomes preserve manual progress and legacy goal tasks s
   await reconcile();
   await reconcile();
   const milestones = (await db.get<Goal>(owner, "goals", goal.id))?.milestones;
-  assert.equal(milestones?.length, 2);
-  assert.equal(milestones?.filter((m) => m.id === legacy.id && m.done).length, 1);
+  assert.equal(milestones?.length, 1);
+  assert.equal(milestones?.some((milestone) => milestone.id === legacy.id), false);
 });
 
 test("failed, cancelled and review-blocked tasks do not complete milestones", async () => {

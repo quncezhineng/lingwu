@@ -175,6 +175,12 @@ function toolTitle(tool: string, args: ToolArguments, result: unknown, t: Transl
     case "recall_memory":
     case "recall":
       return t("tools.toolStepRecallMemory");
+    case "use_skill": {
+      const title = textArgument(args, "skillId");
+      return title
+        ? t("tools.toolStepUseSkillTitle", { title: clip(title) })
+        : t("tools.toolStepUseSkill");
+    }
     case "create_goal": {
       const title = textArgument(args, "title");
       return title ? t("tools.toolStepGoalTitle", { title: clip(title) }) : t("tools.toolStepGoal");

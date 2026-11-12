@@ -59,6 +59,8 @@ const agentSchema = z
     skills: z.array(identifier).max(30),
     // 从技能目录安装到该 Agent 的技能 id；旧客户端不带该字段，保持可选以兼容。
     installedSkills: z.array(identifier).max(60).optional(),
+    // 自建技能按技能库 id 引用，不再复制。旧客户端不带该字段。
+    skillRefs: z.array(identifier).max(60).optional(),
     customSkills: z.array(skillSchema).max(30),
   })
   .strict();

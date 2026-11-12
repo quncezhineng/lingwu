@@ -45,7 +45,7 @@ const threads = {
   "threads.agentComputer": "智能体电脑",
   "threads.calendar": "日历",
   "threads.files": "资料",
-  "threads.appsAndSettings": "应用与技能",
+  "threads.appsAndSettings": "技能与连接",
 } satisfies Dictionary;
 
 export default threads;

@@ -218,6 +218,21 @@ export const radius = {
 } as const;
 
 /**
+ * 底部对话输入。单行时用 radius.full，浏览器会收成高度的一半，两端是完整半圆。
+ * 多行不再跟着变高去取一半，否则两端会鼓成过大的半圆；这时用 pillRadius，
+ * 它等于单行最小高度的一半。
+ */
+const composerMinHeight = 52;
+export const composerMetrics = {
+  minHeight: composerMinHeight,
+  padding: 6,
+  control: 36,
+  pillRadius: composerMinHeight / 2,
+  /** 高度超过单行这么多，就从胶囊收成大圆角。 */
+  growSlack: 8,
+} as const;
+
+/**
  * 字阶九档（+ 两个数据档与洞察标题特例）。
  *
  * 行高按 Demo 的阅读感取松（正文 1.6，长文 1.78），字距一律非负：
@@ -272,6 +287,14 @@ export const typography = {
     fontWeight: "600",
     letterSpacing: 0,
     fontFamily: fonts.sans,
+  },
+  /** 15/22：侧栏列表和右侧身份上的「名称 · 角色」。比 16 略小，长名称少截断。 */
+  agentName: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "600",
+    letterSpacing: 0,
+    fontFamily: fonts.serif,
   },
   /** 22/32：页面 H1 与浮层标题，统一字体 / w500 / ls 0.3。 */
   h1: {

@@ -164,7 +164,7 @@ const app = {
   "app.navGoals": "Scheduled",
   "app.navGoalsShort": "Scheduled",
   "app.navPreferences": "Memory",
-  "app.navApps": "Apps & skills",
+  "app.navApps": "Skills & connections",
   "app.navAccount": "Account",
   "app.titleToday": "Workbench",
   "app.subtitleToday":
@@ -178,28 +178,28 @@ const app = {
     "Manage watchlists, holdings and portfolios in one workspace shared by every Agent.",
   "app.titleActivity": "Tasks",
   "app.subtitleActivity":
-    "Manage tasks, progress and reminders across every Agent, and handle anything that needs your review.",
+    "Manage tasks, progress and automations across every Agent, and handle anything that needs your review.",
   "app.titleIdeas": "Ideas",
   "app.subtitleIdeas": "Next research steps, grounded in the markets and targets you follow.",
   "app.titleGoals": "Scheduled",
   "app.subtitleGoals":
-    "Manage research goals and conditional reminders so LingWu can keep tracking progress.",
+    "Manage research goals and automations so LingWu can keep up with progress.",
   "app.titleMemories": "Memory",
   "app.subtitleMemories":
     "Keep your goals, risk preferences and focus areas as durable context for LingWu.",
-  "app.titleApps": "Apps & skills",
+  "app.titleApps": "Skills & connections",
   "app.subtitleApps":
     "Extend how you work with plugins, complete specialist tasks with skills, and bring in external context through connectors.",
   "app.moreHeading": "More",
   "app.destFilesDetail": "Documents, insights and notes",
   "app.destPreferencesDetail": "Goals, risk preferences and focus areas",
-  "app.destAppsDetail": "Extend research workflows, specialist skills and external connections",
-  "app.destGoalsDetail": "Research goals and conditional reminders",
+  "app.destAppsDetail": "Manage skills and account-level connections",
+  "app.destGoalsDetail": "Research goals and automations",
   "app.titleAccount": "Account",
   "app.subtitleAccount": "Review your profile, sign-in status and workspace details.",
   "app.taskHubEyebrow": "Ongoing work",
   "app.taskHubTasks": "Tasks",
-  "app.taskHubReminders": "Tracking",
+  "app.taskHubReminders": "Automation",
   "app.personalContextHeading": "Personal context",
   "app.memoryShortcutDetail": "{count} memories · goals, risks and focus areas",
   "app.titleConnections": "Apps & skills",
@@ -255,8 +255,8 @@ const app = {
     "Follow a stock or fund to keep its moves and research context together.",
   "workbench.noPendingTitle": "Nothing needs your decision",
   "workbench.noPendingDetail":
-    "LingWu will bring an alert here when the conditions you set are met.",
-  "workbench.setupAlert": "Set up an alert",
+    "LingWu will bring the context here when an automation condition is met.",
+  "workbench.setupAlert": "Set up an automation",
   "workbench.waitingEyebrow": "Something to review",
   "workbench.waitingDetail":
     "LingWu has prepared the next step and is waiting for your confirmation.",
@@ -320,7 +320,7 @@ const app = {
   "workbench.allActivity": "All tasks",
   "workbench.noActivityTitle": "No tasks yet",
   "workbench.noActivityDetail":
-    "Start an analysis or delegate a task, and the latest progress will appear here.",
+    "Start an analysis or a task, and the latest progress will appear here.",
   "workbench.synced": "Synced",
   "preferences.type": "Memory",
   "preferences.editMemory": "Edit memory",

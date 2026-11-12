@@ -92,11 +92,11 @@ test("跨 Agent 汇总同内容技能只保留最近更新的一条", () => {
   );
 });
 
-test("toggleSkillShare 无副本时复制，有副本时删除", () => {
+test("toggleSkillShare 未引用时记下技能库 id，已持有时摘掉引用和旧副本", () => {
   const calls: string[] = [];
   const store = {
-    saveSkill: (agentId: string, input: { name: string }) => {
-      calls.push(`save:${agentId}:${input.name}`);
+    setSkillRef: (agentId: string, skillId: string, linked: boolean) => {
+      calls.push(`ref:${agentId}:${skillId}:${linked ? "on" : "off"}`);
     },
     deleteSkill: (agentId: string, skillId: string) => {
       calls.push(`delete:${agentId}:${skillId}`);
@@ -104,19 +104,19 @@ test("toggleSkillShare 无副本时复制，有副本时删除", () => {
   };
 
   assert.equal(toggleSkillShare(store, agent("other"), skill()), "added");
-  assert.deepEqual(calls, ["save:other:现金流质量检查"]);
+  assert.deepEqual(calls, ["ref:other:skill-a:on"]);
 
   calls.length = 0;
   const holder = agent("other", [skill({ id: "skill-copy" })]);
   assert.equal(toggleSkillShare(store, holder, skill()), "removed");
-  assert.deepEqual(calls, ["delete:other:skill-copy"]);
+  assert.deepEqual(calls, ["ref:other:skill-a:off", "delete:other:skill-copy"]);
 });
 
 test("带 guard 时只读副本拒绝移除，其它副本不受影响", () => {
   const calls: string[] = [];
   const store = {
-    saveSkill: (agentId: string, input: { name: string }) => {
-      calls.push(`save:${agentId}:${input.name}`);
+    setSkillRef: (agentId: string, skillId: string, linked: boolean) => {
+      calls.push(`ref:${agentId}:${skillId}:${linked ? "on" : "off"}`);
     },
     deleteSkill: (agentId: string, skillId: string) => {
       calls.push(`delete:${agentId}:${skillId}`);
@@ -130,17 +130,20 @@ test("带 guard 时只读副本拒绝移除，其它副本不受影响", () => {
   assert.deepEqual(calls, []);
 
   assert.equal(toggleSkillShare(store, copy, skill(), guard), "removed");
-  assert.deepEqual(calls, ["delete:copy:skill-copy"]);
+  assert.deepEqual(calls, ["ref:copy:skill-a:off", "delete:copy:skill-copy"]);
 
   // 只剩一份副本时，即使没有来源参数也拒绝移除。
   const only = agent("only", [skill()]);
   assert.equal(toggleSkillShare(store, only, skill(), { agents: [only] }), "blocked");
-  assert.deepEqual(calls, ["delete:copy:skill-copy"]);
+  assert.deepEqual(calls, ["ref:copy:skill-a:off", "delete:copy:skill-copy"]);
 });
 
 test("删除我的技能时清掉所有 Agent 上的同内容副本", () => {
   const calls: string[] = [];
   const store = {
+    setSkillRef: (agentId: string, skillId: string, linked: boolean) => {
+      calls.push(`ref:${agentId}:${skillId}:${linked ? "on" : "off"}`);
+    },
     deleteSkill: (agentId: string, skillId: string) => {
       calls.push(`delete:${agentId}:${skillId}`);
     },
@@ -156,6 +159,9 @@ test("删除我的技能时清掉所有 Agent 上的同内容副本", () => {
 test("删除我的技能不会误删内容不同的技能", () => {
   const calls: string[] = [];
   const store = {
+    setSkillRef: () => {
+      calls.push("ref");
+    },
     deleteSkill: (agentId: string, skillId: string) => {
       calls.push(`delete:${agentId}:${skillId}`);
     },

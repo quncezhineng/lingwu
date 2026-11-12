@@ -22,6 +22,7 @@ import {
   monitorInputSchema,
   type RunEvent,
 } from "../../../../packages/domain/src/agent.ts";
+import { goalsEnabled } from "../../../../packages/domain/src/features.ts";
 import type {
   ActionProposal,
   Artifact,
@@ -500,6 +501,21 @@ export class AgentService {
       detail: "Changed by you",
     });
     return updated;
+  }
+  /** Stop work the user just cancelled from the chat stop button. */
+  async cancelOpenThreadTasks(owner: string, threadId: string) {
+    if (!threadId) return;
+    const open = new Set<AgentTask["status"]>(["queued", "running", "scheduled"]);
+    const tasks = await this.db.list<AgentTask>(owner, "tasks");
+    for (const task of tasks) {
+      if (task.threadId !== threadId || !open.has(task.status)) continue;
+      try {
+        await this.control(owner, task.id, "cancel");
+      } catch (error) {
+        if (error instanceof AppError && error.status === 409) continue;
+        throw error;
+      }
+    }
   }
   async answer(
     owner: string,
@@ -1080,21 +1096,22 @@ export class AgentService {
         createdAt: date(),
       } satisfies Idea);
     }
-    for (const goal of await this.db.listByStatus<Goal>(owner, "goals", "active"))
-      if (!goal.milestones.length) {
-        const id = hash(`goal:${goal.id}:${goal.description}`);
-        await this.db.insertIfAbsent(owner, "ideas", {
-          id,
-          title: `Let's make a plan for ${goal.title}`,
-          reason: "This goal has no milestones yet. A concrete plan will give it a next step.",
-          evidence: [{ id: goal.id, kind: "user", title: goal.title, excerpt: goal.description }],
-          prompt: `Create an actionable plan for ${goal.title}. ${goal.description}`,
-          kind: "plan",
-          input: { goalId: goal.id },
-          status: "new",
-          createdAt: date(),
-        } satisfies Idea);
-      }
+    if (goalsEnabled)
+      for (const goal of await this.db.listByStatus<Goal>(owner, "goals", "active"))
+        if (!goal.milestones.length) {
+          const id = hash(`goal:${goal.id}:${goal.description}`);
+          await this.db.insertIfAbsent(owner, "ideas", {
+            id,
+            title: `Let's make a plan for ${goal.title}`,
+            reason: "This goal has no milestones yet. A concrete plan will give it a next step.",
+            evidence: [{ id: goal.id, kind: "user", title: goal.title, excerpt: goal.description }],
+            prompt: `Create an actionable plan for ${goal.title}. ${goal.description}`,
+            kind: "plan",
+            input: { goalId: goal.id },
+            status: "new",
+            createdAt: date(),
+          } satisfies Idea);
+        }
     await this.ensure(owner);
     await this.db.compareAndSwap(owner, "agent-settings", "identity", {}, { lastIdeasAt: date() });
     return this.db.list<Idea>(owner, "ideas");
@@ -1150,16 +1167,18 @@ export class AgentService {
       if (idea?.status !== "accepted") return idea;
     }
     if (idea.taskId && (await this.db.get(owner, "tasks", idea.taskId))) return idea;
+    const linkedGoalId = typeof idea.input.goalId === "string" ? idea.input.goalId : undefined;
     const goalId =
-      typeof idea.input.goalId === "string"
-        ? idea.input.goalId
-        : (
+      linkedGoalId ??
+      (goalsEnabled
+        ? (
             await this.createGoal(
               owner,
               { title: idea.title, description: idea.reason },
               hash(`idea-goal:${id}`),
             )
-          ).id;
+          ).id
+        : undefined);
     const task = await this.createTask(
       owner,
       {
@@ -1167,7 +1186,7 @@ export class AgentService {
         prompt: idea.prompt,
         kind: idea.kind,
         input: idea.input,
-        goalId,
+        ...(goalId ? { goalId } : {}),
       },
       `idea:${id}`,
     );
@@ -1488,7 +1507,7 @@ export class AgentService {
           });
         }
       }
-      if (task.goalId && !task.milestoneId) {
+      if (goalsEnabled && task.goalId && !task.milestoneId) {
         for (let attempt = 0; attempt < 8; attempt++) {
           const goal = await this.db.get<Goal>(owner, "goals", task.goalId);
           if (!goal || goal.milestones.some((m) => m.id === task.id)) break;
