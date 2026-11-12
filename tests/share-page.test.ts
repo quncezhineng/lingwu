@@ -91,6 +91,37 @@ test("不存在的 id 返回 404 页面", async () => {
   assert.match(await response.text(), /这个分享不存在/);
 });
 
+test("JSON 形态返回提问与原始 Markdown，供前端原生渲染", async () => {
+  const share = await createShare("这只股票怎么样？", "## 结论\n\n**估值偏高**。");
+  const response = await app.request(`/s/${share.id}/data`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+  const payload = (await response.json()) as Record<string, unknown>;
+  assert.equal(payload.id, share.id);
+  assert.equal(payload.question, "这只股票怎么样？");
+  // 正文保持原始 Markdown：渲染由前端完成，服务端不再二次加工。
+  assert.equal(payload.answer, "## 结论\n\n**估值偏高**。");
+  assert.equal(typeof payload.createdAt, "string");
+});
+
+test("JSON 形态对不存在的分享与非法 id 都返回 404", async () => {
+  for (const id of ["doesnotexist1234", "%20%20"]) {
+    const response = await app.request(`/s/${id}/data`);
+    assert.equal(response.status, 404);
+    assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+  }
+});
+
+test("JSON 形态在没有提问时返回空串而不是缺字段", async () => {
+  const share = await createShare("", "只有回答。");
+  const payload = (await (await app.request(`/s/${share.id}/data`)).json()) as Record<
+    string,
+    unknown
+  >;
+  assert.equal(payload.question, "");
+  assert.equal(payload.answer, "只有回答。");
+});
+
 test("非法 id 形状直接 404", async () => {
   const response = await app.request("/s/%20%20");
   assert.equal(response.status, 404);

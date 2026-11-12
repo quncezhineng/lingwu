@@ -5,6 +5,27 @@
 
 ## 变更记录
 
+### 2026-11-12 · 修复：分享链接打开后进的是灵悟首页，改为前端原生渲染
+
+**背景**
+
+用户在对话回复底部点「分享为链接」，分享本身成功，但把拿到的 `PUBLIC_WEB_URL/s/:id` 链接打开后看到的是灵悟首页/登录页，看不到分享的对话内容。原实现把服务端渲染的分享页用 `<iframe>` 套在 SPA 里，整条链路依赖「静态站兜住 `/s/:id` + 跨服务内嵌 iframe」两个环节，任一环节失效都表现为打不开内容，排查成本高。
+
+**处理**
+
+- [share-routes.ts](../apps/server/src/share-routes.ts)：新增 `GET /s/:id/data`，无需登录返回 `{ id, question, answer, createdAt }`（正文保持原始 Markdown）；挂在 `/s` 下不经过 `/api/*` 鉴权。原 `GET /s/:id` 服务端页面保留，作为无 JS / 前端异常时的兜底入口。
+- [share-page-view.web.tsx](../apps/mobile/src/share-page-view.web.tsx)：去掉 iframe，改为拉取 `/s/:id/data` 后用应用内的 `AssistantResponse`（Markdown、表格、代码块）原生绘制分享页，含加载中 / 不存在 / 加载失败（可重试，并提供「打开原文页面」兜底）三态；窄屏自动收窄内边距，阅读列上限 720。
+- [share-page-path.ts](../apps/mobile/src/share-page-path.ts)（新增）：`isSharePath` 从平台文件抽出为纯函数，并放宽为允许前缀路径（兼容部署在子路径下的场景）。
+- [share-page-data.ts](../apps/mobile/src/share-page-data.ts) / [share-page-model.ts](../apps/mobile/src/share-page-model.ts)（新增）：取数与防御式解析分离，接口字段缺失不会被渲染成空白页。
+- [App.tsx](../apps/mobile/App.tsx)：分享分支补挂 `I18nProvider`（正文里的表格、图片占位组件依赖语言上下文），并从 `share-page-path` 引入 `isSharePath`。
+- [share-page-view.native.tsx](../apps/mobile/src/share-page-view.native.tsx)：移除重复的 `isSharePath` 导出，只保留空视图（原生端分享链接走系统浏览器）。
+
+**验证**
+
+- `tsx --import ./tests/setup.ts --test tests/share-page.test.ts apps/mobile/test/share-page.test.ts`：17 例全部通过（新增 JSON 形态、路径识别、解析与日期格式化的用例）。
+- 无头 Chrome 实测：`/s/:id` 直接命中分享页，标签页标题随提问、表格/代码块/列表渲染正常，1280×900 与 390×844 两种视口均无溢出；失效 id 显示「这个分享不存在，或者已经失效了」。
+- `biome check` 对改动文件无告警；`tsc --noEmit` 服务端与移动端在改动文件上无类型错误（`bot-pages/connectors.tsx` 既有报错为历史遗留）。
+
 ### 2026-11-12 · 界面：Agent 任务页改为双列网格布局
 
 **背景**

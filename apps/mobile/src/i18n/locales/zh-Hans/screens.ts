@@ -136,6 +136,13 @@ const screens = {
   "screens.filesAnalyzePrompt":
     "请结合我选择的资料，整理核心观点、关键数据和需要进一步核验的问题。",
   "screens.filesDownload": "下载 {name}",
+  "screens.filesShare": "分享 {name}",
+  "screens.filesExport": "保存 {name}",
+  "screens.filesShared": "已打开系统分享面板。",
+  "screens.filesShareSaved": "当前环境不支持直接分享，文件已保存。",
+  "screens.filesShareFailed": "分享失败，请重试。",
+  "screens.filesExported": "已保存 {name}。",
+  "screens.filesExportFailed": "保存失败，请重试。",
   "screens.filesSelectLabel": "选择 {name}",
   "screens.filesOpenLabel": "打开 {name}",
   "screens.filesColumnName": "名称",

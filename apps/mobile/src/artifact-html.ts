@@ -631,3 +631,170 @@ export function renderArtifactHtml(artifact: AgentArtifact): string {
 </body>
 </html>`;
 }
+
+/** 纯文本字段名：与 HTML 报告的 `label()` 同一口径，但不做转义。 */
+function plainLabel(key: string): string {
+  const spaced = key.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/**
+ * Markdown 单元格：压成单行文本。
+ *
+ * GFM 表格的行以换行分隔，单元格里出现换行会把表格截断，因此这里把换行、
+ * 竖线统一折叠；对象/数组用「键：值」串起来，保持一行可读。
+ */
+function markdownCell(value: unknown): string {
+  if (Array.isArray(value)) return value.map(markdownCell).join("、") || "—";
+  if (isRecord(value)) {
+    const pairs = Object.entries(value).map(
+      ([key, item]) => `${plainLabel(key)}：${markdownCell(item)}`,
+    );
+    return pairs.join("；") || "—";
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value)
+      ? value.toLocaleString(activeLocaleTag(), { maximumFractionDigits: 2 })
+      : "—";
+  }
+  if (typeof value === "boolean") return value ? "✓" : "✗";
+  if (value === null || value === undefined) return "—";
+  const text = String(value)
+    .replace(/\s*\n+\s*/g, " ")
+    .replace(/\|/g, "\\|")
+    .trim();
+  return text || "—";
+}
+
+/** 记录数组 -> GFM 表格。 */
+function markdownTable(rows: Record<string, unknown>[]): string {
+  const keys = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+  if (!keys.length) return "—";
+  const header = `| ${keys.map(plainLabel).join(" | ")} |`;
+  const divider = `| ${keys.map(() => "---").join(" | ")} |`;
+  const body = rows.map((row) => `| ${keys.map((key) => markdownCell(row[key])).join(" | ")} |`);
+  return [header, divider, ...body].join("\n");
+}
+
+/**
+ * 与 `isHtmlDocument` 同一判定，但返回普通布尔值。
+ *
+ * `isHtmlDocument` 是类型守卫，在 `typeof value === "string"` 之后调用会把
+ * 假分支里的字符串收窄成 `never`；这里包一层，保住后续字符串操作的类型。
+ */
+function isHtmlSource(value: string): boolean {
+  return isHtmlDocument(value);
+}
+
+/**
+ * 任意数据值 -> Markdown 块。
+ *
+ * 长文本如果是 Markdown 源码就原样保留（模型写的研报不该被拍平），
+ * 否则包进代码块；完整 HTML 页面只留一行指引，避免把整页源码塞进导出文件。
+ */
+function markdownValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    if (!value.length) return "—";
+    const samples = value.slice(0, 100);
+    if (samples.every(isRecord)) return markdownTable(samples);
+    return samples.map((item) => `- ${markdownCell(item)}`).join("\n");
+  }
+  if (isRecord(value)) {
+    return Object.entries(value)
+      .map(([key, item]) => `- **${plainLabel(key)}**: ${markdownCell(item)}`)
+      .join("\n");
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return "—";
+    if (isHtmlSource(trimmed)) return `> ${tr("agent.artifactHtmlAttachment")}`;
+    if (trimmed.includes("\n") || trimmed.length > 120) {
+      return looksLikeMarkdown(trimmed) ? trimmed : `\`\`\`\n${trimmed}\n\`\`\``;
+    }
+    return trimmed;
+  }
+  return markdownCell(value);
+}
+
+/** 报告头部的日期文本：与 HTML 报告保持一致。 */
+function reportDateText(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(activeLocaleTag(), {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * 生成研究产物的 Markdown 文档（导出 / 公开分享页共用）。
+ *
+ * 信息顺序与 HTML 报告一致：标题与元信息 → 摘要 → 关键指标 → 明细数据。
+ * 表格与列表都走标准 GFM，粘到飞书、Notion、GitHub 都能直接排版。
+ */
+export function renderArtifactMarkdown(artifact: AgentArtifact): string {
+  const parts: string[] = [`# ${artifact.title}`, ""];
+  const dateText = reportDateText(artifact.createdAt);
+  const meta = [statusLabel(artifact.kind), dateText].filter(Boolean).join(" · ");
+  if (meta) parts.push(`> ${meta}`, "");
+
+  const summary = readableSummary(artifact.summary).trim();
+  if (summary) parts.push(summary, "");
+
+  if (artifact.kind === "finance") {
+    const data = artifact.data;
+    parts.push(
+      `## ${tr("agent.artifactKeyMetrics")}`,
+      "",
+      [
+        `- **${tr("agent.financeIncome")}**: ${markdownCell(data.income)}`,
+        `- **${tr("agent.financeSpending")}**: ${markdownCell(data.spending)}`,
+        `- **${tr("agent.financeRemaining")}**: ${markdownCell(data.saved)}`,
+      ].join("\n"),
+      "",
+    );
+    const categories = Array.isArray(data.categories) ? data.categories : [];
+    if (categories.length) {
+      parts.push(`## ${tr("agent.whereMoneyWent")}`, "", markdownValue(categories), "");
+    }
+    const transactions = Array.isArray(data.transactions) ? data.transactions : [];
+    if (transactions.length) {
+      parts.push(`## ${tr("agent.viewTransactions")}`, "", markdownValue(transactions), "");
+    }
+  } else {
+    const metrics: Array<[string, unknown]> = [];
+    const details: string[] = [];
+    for (const [key, value] of Object.entries(artifact.data)) {
+      if (INSIGHT_SECTION_KEYS.has(key)) continue;
+      if (isMetric(value)) {
+        metrics.push([key, value]);
+        continue;
+      }
+      details.push(`### ${plainLabel(key)}`, "", markdownValue(value), "");
+    }
+    if (metrics.length) {
+      parts.push(
+        `## ${tr("agent.artifactKeyMetrics")}`,
+        "",
+        metrics
+          .map(([key, value]) => `- **${plainLabel(key)}**: ${markdownCell(value)}`)
+          .join("\n"),
+        "",
+      );
+    }
+    if (details.length) {
+      parts.push(`## ${tr("agent.artifactDetailsHeading")}`, "", ...details);
+    }
+  }
+
+  if (DISCLAIMER_KINDS.has(artifact.kind)) {
+    parts.push("---", "", `_${tr("ui.disclaimer")}_`, "");
+  }
+  return `${parts
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()}\n`;
+}

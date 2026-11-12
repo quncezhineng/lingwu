@@ -6,79 +6,126 @@ import { ArtifactCard, TaskCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { BrowserThreadCard } from "./computer";
+import { saveRemoteFile, shareRemoteFile } from "./file-export";
 import { fileKind, fileTypeName } from "./file-kind";
 import { useTranslation } from "./i18n";
-import { ChevronRight, FileText } from "./icons";
+import { ArrowDownToLine, ChevronRight, FileText, Share2 } from "./icons";
 import { PlanCard } from "./plan-card";
 import { QuestionCard, taskHasQuestion } from "./question-card";
 import { Button, colors, ErrorNotice, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
 export function FileThreadCard({ file }: { file: Artifact }) {
-  const { open } = useWorkspace();
+  const { open, api, notify } = useWorkspace();
   const { t } = useTranslation();
   const kind = fileKind(file);
+  // 对话里直接生成的文件：分享 / 导出与报告卡保持同一套动作，不必先点进详情。
+  const [busy, setBusy] = useState<"share" | "save" | null>(null);
+
+  const share = async () => {
+    if (busy) return;
+    setBusy("share");
+    try {
+      const result = await shareRemoteFile(api, file);
+      notify(t(result === "saved" ? "screens.filesShareSaved" : "screens.filesShared"));
+    } catch {
+      notify(t("screens.filesShareFailed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const save = async () => {
+    if (busy) return;
+    setBusy("save");
+    try {
+      await saveRemoteFile(api, file);
+      notify(t("screens.filesExported", { name: file.name }));
+    } catch {
+      notify(t("screens.filesExportFailed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t(
-        kind === "html" ? "tools.openHtml" : kind === "pdf" ? "tools.openPdf" : "tools.openFile",
-        { name: file.name },
-      )}
-      onPress={() => open({ type: "file", file })}
-      // 产物条目：白底 + 1px 描边的紧凑卡片，按压态用 overlay1
-      style={({ pressed }) => [
-        s.card,
-        { padding: 12, gap: 8, width: "100%", maxWidth: 440 },
-        pressed && { backgroundColor: colors.overlay1 },
-      ]}
-    >
-      <View style={{ borderRadius: 10, padding: 12, backgroundColor: colors.surface, gap: 8 }}>
-        <Text style={s.heading}>{file.name.replace(/\.(pdf|html?)$/i, "")}</Text>
-        {file.fields?.length ? (
-          file.fields.slice(0, 4).map((field) => (
-            <View
-              key={field.name}
-              style={{
-                gap: 4,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.line,
-                paddingBottom: 8,
-              }}
-            >
-              <Text style={[s.small, { fontSize: 10 }]}>
-                {field.name.replace(/_/g, " ").toUpperCase()}
-              </Text>
-              <Text style={[s.text, { fontSize: 13, fontVariant: ["tabular-nums"] as const }]}>
-                {field.value || "—"}
-              </Text>
-            </View>
-          ))
-        ) : (
-          <Text style={s.muted}>
-            {kind === "html"
-              ? t("tools.fileHtmlTap")
-              : kind === "pdf"
-                ? file.pageCount === 1
-                  ? t("tools.fileTapSingle")
-                  : t("tools.fileTapPlural", { pageCount: file.pageCount })
-                : t("tools.fileOpenTap")}
-          </Text>
+    <View style={[s.card, { padding: 12, gap: 8, width: "100%", maxWidth: 440 }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t(
+          kind === "html" ? "tools.openHtml" : kind === "pdf" ? "tools.openPdf" : "tools.openFile",
+          { name: file.name },
         )}
-      </View>
-      <View style={[s.row, { gap: 12 }]}>
-        <View style={[s.iconBox, { width: 40, height: 40 }]}>
-          <FileText size={20} color={colors.primary} />
+        onPress={() => open({ type: "file", file })}
+        style={({ pressed }) => [{ gap: 8 }, pressed && { opacity: 0.72 }]}
+      >
+        <View style={{ borderRadius: 10, padding: 12, backgroundColor: colors.surface, gap: 8 }}>
+          <Text style={s.heading}>{file.name.replace(/\.(pdf|html?)$/i, "")}</Text>
+          {file.fields?.length ? (
+            file.fields.slice(0, 4).map((field) => (
+              <View
+                key={field.name}
+                style={{
+                  gap: 4,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.line,
+                  paddingBottom: 8,
+                }}
+              >
+                <Text style={[s.small, { fontSize: 10 }]}>
+                  {field.name.replace(/_/g, " ").toUpperCase()}
+                </Text>
+                <Text style={[s.text, { fontSize: 13, fontVariant: ["tabular-nums"] as const }]}>
+                  {field.value || "—"}
+                </Text>
+              </View>
+            ))
+          ) : (
+            <Text style={s.muted}>
+              {kind === "html"
+                ? t("tools.fileHtmlTap")
+                : kind === "pdf"
+                  ? file.pageCount === 1
+                    ? t("tools.fileTapSingle")
+                    : t("tools.fileTapPlural", { pageCount: file.pageCount })
+                  : t("tools.fileOpenTap")}
+            </Text>
+          )}
         </View>
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text numberOfLines={2} style={s.heading}>
-            {file.name}
-          </Text>
-          <Text style={s.muted}>{fileTypeName(file)}</Text>
+        <View style={[s.row, { gap: 12 }]}>
+          <View style={[s.iconBox, { width: 40, height: 40 }]}>
+            <FileText size={20} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text numberOfLines={2} style={s.heading}>
+              {file.name}
+            </Text>
+            <Text style={s.muted}>{fileTypeName(file)}</Text>
+          </View>
+          <ChevronRight size={18} color={colors.muted} />
         </View>
-        <ChevronRight size={18} color={colors.muted} />
+      </Pressable>
+      <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 6 }}>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={Share2}
+          busy={busy === "share"}
+          onPress={() => void share()}
+        >
+          {t("agent.artifactShare")}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={ArrowDownToLine}
+          busy={busy === "save"}
+          onPress={() => void save()}
+        >
+          {t("agent.artifactExport")}
+        </Button>
       </View>
-    </Pressable>
+    </View>
   );
 }
 /** Hydrates task-linked artifacts by ID on replay; signed URLs are never stored in messages. */

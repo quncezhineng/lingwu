@@ -1477,8 +1477,8 @@ export function CapabilityHubScreen() {
   // 卡片对象仍完整保留在 items 中，因此路由、连接流程等逻辑不受影响；
   // 需要恢复时删掉下面对应 id 即可。按类型分组，避免不同 tab 下的同名 id 互相干扰。
   const HIDDEN_CAPABILITY_IDS: Partial<Record<CapabilityType, readonly string[]>> = {
-    // 插件：邮件、日历两个工作区入口目前没有可用数据源。
-    plugins: ["mail", "calendar-workspace"],
+    // 插件：日历工作区入口已恢复，目前只隐藏邮件。
+    plugins: ["mail"],
     // 连接器：Gmail / Google Calendar / OpenBot 暂未接入。
     connectors: ["gmail", "calendar", "openbot"],
   };

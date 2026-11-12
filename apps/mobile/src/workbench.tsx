@@ -669,6 +669,7 @@ export function WorkbenchScreen() {
                   : t("workbench.insightEmptyDetail")
               }
               saved={!!insight && savedInsightIds.includes(insight.id)}
+              artifact={insight}
               savePlacement="header"
               onToggleSave={
                 insight

@@ -20,6 +20,7 @@ import { Text, TextInput } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
+import { saveRemoteFile, shareRemoteFile } from "./file-export";
 import { fileBadge, fileExtension, fileKind } from "./file-kind";
 import {
   buildFileLibrary,
@@ -54,6 +55,7 @@ import {
   Mail,
   Plus,
   Search,
+  Share2,
   ShieldCheck,
   Sparkles,
   Upload,
@@ -87,11 +89,11 @@ import {
 import { useWorkspace } from "./workspace";
 
 /**
- * 首页 Today 里暂不展示的邮件 / 日历版块。
- * 只隐藏渲染入口，邮件页、日历页、统计与数据逻辑全部保留；
+ * 首页 Today 里暂不展示的版块。
+ * 日历版块已恢复，目前只隐藏邮件；只隐藏渲染入口，页面、统计与数据逻辑全部保留；
  * 需要恢复时清空这个集合即可。
  */
-const HIDDEN_TODAY_SECTIONS = new Set<string>(["mail", "calendar"]);
+const HIDDEN_TODAY_SECTIONS = new Set<string>(["mail"]);
 
 function todayDate() {
   return localDateTime(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone)
@@ -1202,11 +1204,33 @@ export function FilesScreen({
     onOpenChat?.();
   }
 
-  function download(file: Artifact) {
+  /**
+   * 保存到本地：带鉴权取回文件内容再落盘（原生端交给系统分享面板保存）。
+   * 以前直接 `openURL` 在 Web 上只会新开一个标签页，真正想留档还得另存一次。
+   */
+  async function download(file: Artifact) {
     setError("");
-    void Linking.openURL(api.url(file.url || `/api/files/${file.id}/content`)).catch((e) => {
-      setError(e instanceof Error ? e.message : String(e));
-    });
+    try {
+      await saveRemoteFile(api, file);
+      notify(t("screens.filesExported", { name: file.name }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setError(message);
+      notify(t("screens.filesExportFailed"));
+    }
+  }
+
+  /** 分享文件本身：浏览器支持 Web Share 时直接发文件，否则降级为保存。 */
+  async function share(file: Artifact) {
+    setError("");
+    try {
+      const result = await shareRemoteFile(api, file);
+      notify(t(result === "saved" ? "screens.filesShareSaved" : "screens.filesShared"));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setError(message);
+      notify(t("screens.filesShareFailed"));
+    }
   }
 
   async function upload() {
@@ -1662,10 +1686,16 @@ export function FilesScreen({
                       }}
                     >
                       <IconButton
+                        icon={Share2}
+                        label={t("screens.filesShare", { name: file.name })}
+                        size={compact ? 40 : 34}
+                        onPress={() => void share(file)}
+                      />
+                      <IconButton
                         icon={ArrowDownToLine}
                         label={t("screens.filesDownload", { name: file.name })}
                         size={compact ? 40 : 34}
-                        onPress={() => download(file)}
+                        onPress={() => void download(file)}
                       />
                       <Button
                         small
@@ -1764,6 +1794,7 @@ export function FilesScreen({
                       showSections={false}
                       meta={symbol ? `${symbol} · ${date}` : date}
                       saved={true}
+                      artifact={artifact}
                       savePlacement="header"
                       onToggleSave={() => {
                         toggleSavedInsight(artifact.id);

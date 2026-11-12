@@ -23,6 +23,7 @@ import type {
 import { resolveMonitorCurrency } from "../../../packages/domain/src/monitor-currency";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
+import { ArtifactActions } from "./artifact-actions";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { CardGrid } from "./card-grid";
@@ -961,39 +962,56 @@ export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
   const { open } = useWorkspace();
   const Icon = artifact.kind === "finance" ? CircleDollarSign : FileText;
   // 产物卡：独立的「文件产物」视觉，与洞察卡（衬线标题）、计划卡（步骤）、审批卡区分开。
+  // 分享 / 导出必须与正文按钮并列而不是嵌套，避免 react-native-web 上嵌套按钮冒泡误触。
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={artifact.title}
-      onPress={() => open({ type: "artifact", artifact })}
-      style={({ pressed }) => [
-        {
-          width: "100%",
-          maxWidth: 520,
-          padding: 12,
-          gap: 6,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: colors.line,
-          backgroundColor: pressed ? colors.overlay1 : colors.paper,
-        },
-      ]}
+    <View
+      style={{
+        width: "100%",
+        maxWidth: 520,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.line,
+        backgroundColor: colors.paper,
+        overflow: "hidden",
+      }}
     >
-      <View style={[s.row, { gap: 10 }]}>
-        <View style={[s.glyph, { width: 34, height: 34, backgroundColor: colors.surface }]}>
-          <Icon size={16} color={colors.primary} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={artifact.title}
+        onPress={() => open({ type: "artifact", artifact })}
+        style={({ pressed }) => [
+          { padding: 12, gap: 6 },
+          pressed && { backgroundColor: colors.overlay1 },
+        ]}
+      >
+        <View style={[s.row, { gap: 10 }]}>
+          <View style={[s.glyph, { width: 34, height: 34, backgroundColor: colors.surface }]}>
+            <Icon size={16} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text style={{ fontSize: 10, lineHeight: 14, color: colors.faint }}>
+              {`${statusLabel(artifact.kind)} · ${t("agent.artifactOpenDetail")}`}
+            </Text>
+            <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
+              {artifact.title}
+            </Text>
+          </View>
+          <ArrowUpRight size={15} color={colors.faint} />
         </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text style={{ fontSize: 10, lineHeight: 14, color: colors.faint }}>
-            {`${statusLabel(artifact.kind)} · ${t("agent.artifactOpenDetail")}`}
-          </Text>
-          <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
-            {artifact.title}
-          </Text>
-        </View>
-        <ArrowUpRight size={15} color={colors.faint} />
+      </Pressable>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 10,
+          paddingBottom: 10,
+        }}
+      >
+        <ArtifactActions artifact={artifact} />
       </View>
-    </Pressable>
+    </View>
   );
 }
 export function DelegateSheet({

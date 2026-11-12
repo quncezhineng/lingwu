@@ -36,6 +36,7 @@ import {
   FolderOpen,
   MessageCircle,
   RefreshCw,
+  Share2,
   Sparkles,
 } from "./icons";
 import { InsightCard } from "./insight-card";
@@ -50,7 +51,9 @@ import {
   todayISO,
   useBriefingState,
 } from "./market";
+import { shareLink } from "./message-share";
 import { markdownPreviewDocument } from "./open-html-document";
+import { publishShare } from "./share-page";
 import { Button, Card, colors, DisclaimerNote, dateLabel, ErrorNotice, s, typography } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -443,6 +446,23 @@ export function MarketBriefingCard({
     }
   };
 
+  /** 分享简报：与报告产物一致，发布成公开网页再把链接交给系统分享面板。 */
+  const share = async () => {
+    if (!briefing) return;
+    try {
+      const url = await publishShare(api, {
+        question: `${briefing.date} · ${title}`,
+        answer: briefingMarkdown(briefing, t, lead || t("markets.briefingFallbackLead")),
+      });
+      const result = await shareLink(url, title);
+      notify(
+        t(result === "copied" ? "markets.briefingShareCopied" : "markets.briefingShareShared"),
+      );
+    } catch {
+      notify(t("markets.briefingShareFailed"));
+    }
+  };
+
   let body: ReactNode;
   if (state.status === "loading" || state.status === "generating") {
     body = (
@@ -773,6 +793,9 @@ export function MarketBriefingCard({
             style={{ flexGrow: compact ? 1 : 0 }}
           >
             {t("markets.briefingDownload")}
+          </Button>
+          <Button icon={Share2} onPress={() => void share()} style={{ flexGrow: compact ? 1 : 0 }}>
+            {t("markets.briefingShare")}
           </Button>
           <Button icon={FolderOpen} onPress={openFiles} style={{ flexGrow: compact ? 1 : 0 }}>
             {t("markets.briefingViewFiles")}

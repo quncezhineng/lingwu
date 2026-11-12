@@ -4,7 +4,8 @@
  * 用户在对话里点「分享为链接」时，客户端把「提问 + 回复」写入 `shares` 集合，
  * 服务端返回一个不可猜的短 id；`GET /s/:id` 用这个 id 渲染一张无需登录即可
  * 阅读的静态页面，方便直接发给别人。链接域名用 `PUBLIC_WEB_URL`（前端域名），
- * 收件人打开的是前端地址；Web 端由 SPA 以 iframe 加载本页面内容。
+ * 收件人打开的是前端地址；Web 端由 SPA 接管 `/s/:id`，用 `GET /s/:id/data`
+ * 拿正文后用自己的 Markdown 渲染器出图，服务端页面则留作无 JS 场景的兜底。
  *
  * 安全约定：
  * - 分享 id 由服务端用 12 字节随机数生成（base64url，16 字符），无法枚举；
@@ -15,7 +16,6 @@ import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
 import MarkdownIt from "markdown-it";
 import { z } from "zod";
-import type { Config } from "./config.ts";
 import type { Store } from "./db.ts";
 
 type Env = { Variables: { owner: string } };
@@ -303,6 +303,26 @@ export function sharePageRoutes(deps: {
 }): Hono {
   const homeUrl = deps.config.webUrl ?? deps.config.publicUrl;
   const app = new Hono();
+  /**
+   * 分享内容的 JSON 形态。
+   *
+   * Web 端在前端域名下打开 `/s/:id` 时，不再用 iframe 套一层服务端页面，
+   * 而是用应用内的 Markdown 渲染器直接画：这里把正文交给前端，避免跨服务
+   * 嵌页带来的高度坍塌、被浏览器拦截、iframe 内无法滚动等一串问题。
+   * 与上面那条 HTML 路由一样挂在 `/s` 下，不经过 `/api/*` 的鉴权。
+   */
+  app.get("/:id/data", async (c) => {
+    const id = c.req.param("id");
+    if (!SHARE_ID_PATTERN.test(id)) return c.json({ error: "Share not found" }, 404);
+    const row = await deps.store.getByKindAndId<ShareRecord>(SHARES_KIND, id);
+    if (!row) return c.json({ error: "Share not found" }, 404);
+    return c.json({
+      id,
+      question: typeof row.value.question === "string" ? row.value.question : "",
+      answer: typeof row.value.answer === "string" ? row.value.answer : "",
+      createdAt: typeof row.value.createdAt === "string" ? row.value.createdAt : "",
+    });
+  });
   app.get("/:id", async (c) => {
     const id = c.req.param("id");
     if (!SHARE_ID_PATTERN.test(id)) return c.html(renderNotFound(), 404);

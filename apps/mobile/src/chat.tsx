@@ -1957,6 +1957,7 @@ export function ChatScreen({
                           eyebrow={`${t("workbench.insightCard")} · ${statusLabel(artifact.kind)}`}
                           title={artifact.summary || artifact.title}
                           meta={artifact.title}
+                          artifact={artifact}
                           onPress={() => open({ type: "artifact", artifact })}
                         />
                       ) : (

@@ -1,5 +1,7 @@
 import { Pressable, type StyleProp, useWindowDimensions, View, type ViewStyle } from "react-native";
+import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { Text } from "./app-text";
+import { ArtifactActions } from "./artifact-actions";
 import { useTranslation } from "./i18n";
 import { ArrowUpRight, type IconComponent, Sparkles, Star } from "./icons";
 import { breakpoints, colors, radius, space, statusColors, typography } from "./theme";
@@ -36,6 +38,7 @@ export function InsightCard({
   savePlacement = "inline",
   collapsed = false,
   showSections = true,
+  artifact,
   accessibilityLabel,
   style,
 }: {
@@ -66,6 +69,11 @@ export function InsightCard({
   collapsed?: boolean;
   /** 是否在卡面展开三段；工作台首屏传 false，把三段留给详情浮层。 */
   showSections?: boolean;
+  /**
+   * 对应的研究产物。传入后卡片页脚会出现「分享 / 导出」，
+   * 让对话里的报告卡不必先点进详情才能转发或落盘。
+   */
+  artifact?: AgentArtifact;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
@@ -187,6 +195,7 @@ export function InsightCard({
           {meta}
         </Text>
         <View style={[s.row, { gap: space.sm }]}>
+          {artifact ? <ArtifactActions artifact={artifact} variant="links" /> : null}
           {!!onSimplify && (
             <Pressable accessibilityRole="button" hitSlop={6} onPress={onSimplify}>
               <Text style={[typography.caption, { color: colors.link }]}>
@@ -239,7 +248,7 @@ export function InsightCard({
   }
 
   // 有内嵌动作时必须拆分布局，避免 Pressable 嵌套在 Web 上冒泡误触。
-  if (onToggleSave || onSimplify || onDisagree) {
+  if (onToggleSave || onSimplify || onDisagree || artifact) {
     return (
       <View style={[cardStyle, style]}>
         <Pressable

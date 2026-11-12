@@ -668,6 +668,7 @@ function InsightsSheet({ onClose }: { onClose: () => void }) {
               eyebrow={artifact.kind === "report" ? "Report" : "Research"}
               title={artifact.summary || artifact.title}
               meta={artifact.title}
+              artifact={artifact}
               actionLabel={t("agent.artifactOpenDetail")}
               onPress={() => open({ type: "artifact", artifact })}
             />

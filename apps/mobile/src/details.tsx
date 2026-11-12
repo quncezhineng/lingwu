@@ -19,6 +19,7 @@ import { ArchivedThreadsScreen } from "./account";
 import { DelegateSheet, GoalCard, NotificationsSheet, TaskDetail } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
+import { ArtifactActions } from "./artifact-actions";
 import { artifactHasHtmlPreview, renderArtifactHtml } from "./artifact-html";
 import BrowserConsole from "./BrowserConsole";
 import { browserAddress, browserSite } from "./browser-address";
@@ -98,11 +99,11 @@ import { WatchlistSymbolSheet } from "./watchlist-symbol";
 import { type Detail, useWorkspace } from "./workspace";
 
 /**
- * 「工作区」里暂不展示的邮件 / 日历入口（设置页分组行 + 工作区浮层分区列表共用）。
- * 只隐藏这两处 UI 入口，邮件 / 日历的页面、路由与数据逻辑全部保留；
+ * 「工作区」里暂不展示的入口（设置页分组行 + 工作区浮层分区列表共用）。
+ * 日历入口已恢复，目前只隐藏邮件；只隐藏 UI 入口，页面、路由与数据逻辑全部保留；
  * 需要恢复时清空这个集合即可。
  */
-const HIDDEN_WORKSPACE_ENTRIES = new Set<string>(["mail", "calendar"]);
+const HIDDEN_WORKSPACE_ENTRIES = new Set<string>(["mail"]);
 export function Details({ detail }: { detail: Detail }) {
   const { t } = useTranslation();
   const { close, navigate } = useWorkspace();
@@ -1645,6 +1646,11 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
         <Button size="sm" variant="ghost" onPress={disagree}>
           {t("ui.insightDisagree")}
         </Button>
+      </View>
+      {/* 报告的动作另起一行：分享（公开链接）与导出（HTML / Markdown）不与阅读动作混排。 */}
+      <View style={{ gap: 6, marginBottom: 16 }}>
+        <ArtifactActions artifact={artifact} variant="full" />
+        <Text style={[s.small, { color: colors.faint }]}>{t("agent.artifactSharePublicNote")}</Text>
       </View>
       {plainOpen && view.plain && (
         <View

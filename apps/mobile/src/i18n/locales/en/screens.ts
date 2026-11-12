@@ -139,6 +139,13 @@ const screens = {
   "screens.filesAnalyzePrompt":
     "Using the documents I selected, organize the key points, data, and questions that still need verification.",
   "screens.filesDownload": "Download {name}",
+  "screens.filesShare": "Share {name}",
+  "screens.filesExport": "Save {name}",
+  "screens.filesShared": "Share sheet opened.",
+  "screens.filesShareSaved": "Sharing isn’t available here, so the file was saved instead.",
+  "screens.filesShareFailed": "Couldn’t share this file. Try again.",
+  "screens.filesExported": "Saved {name}.",
+  "screens.filesExportFailed": "Couldn’t save this file. Try again.",
   "screens.filesSelectLabel": "Select {name}",
   "screens.filesOpenLabel": "Open {name}",
   "screens.filesColumnName": "Name",
