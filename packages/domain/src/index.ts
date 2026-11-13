@@ -17,6 +17,7 @@ export type Section =
   | "watchlist"
   | "portfolio"
   | "notes"
+  | "deliverables"
   | "apps"
   | "settings"
   | "agent"

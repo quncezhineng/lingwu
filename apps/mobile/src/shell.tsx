@@ -392,7 +392,10 @@ export function Rail() {
                 icon={item.icon}
                 label={t(item.labelKey)}
                 collapsed={collapsed}
-                active={section === item.id || (item.id === "files" && section === "notes")}
+                active={
+                  section === item.id ||
+                  (item.id === "files" && (section === "notes" || section === "deliverables"))
+                }
                 badge={item.id === "activity" && activeCount ? activeCount : undefined}
                 onPress={() => navigate(item.id)}
               />

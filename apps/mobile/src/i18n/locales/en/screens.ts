@@ -110,6 +110,14 @@ const screens = {
   "screens.libraryFiles": "Files",
   "screens.libraryInsights": "Insights",
   "screens.libraryNotes": "My notes",
+  "screens.libraryDeliverables": "Deliverables",
+  "screens.todayDeliverablesHeading": "Waiting for your review",
+  "screens.todayDeliverablesAction": "Open deliverables",
+  "screens.todayDeliverablesEmpty":
+    "No deliverables waiting. New drafts and scheduled briefings appear here.",
+  "screens.todayDeliverableDraft": "Draft · not submitted yet",
+  "screens.todayDeliverableUnsourced": "In review · {count} unsourced numbers",
+  "screens.todayDeliverableReady": "In review · numbers traced, ready to approve",
   "screens.libraryInsightsEmptyTitle": "No saved insights yet",
   "screens.libraryInsightsEmptyDetail":
     "Finished reports, comparisons and briefings are filed here automatically.",

@@ -29,6 +29,8 @@ import {
 } from "./conversation-history.ts";
 import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
+import { deliverablePublicRoutes } from "./engine/deliverable-public-routes.ts";
+import { deliverableRoutes } from "./engine/deliverables-routes.ts";
 import { financialRoutes } from "./engine/financial-routes.ts";
 import { marketRoutes } from "./engine/market-routes.ts";
 import { monitorRoutes } from "./engine/monitor-routes.ts";
@@ -97,6 +99,21 @@ export async function createApp(
     computer,
     options.market,
     options.search,
+    // 交付物审计日志复用 lingwu_audit_logs 旁路写入；远端失败不影响本地留痕。
+    (owner, entry) => {
+      if (!supabaseData) return;
+      return supabaseData.writeAuditLog({
+        user_id: owner,
+        action: `deliverable.${entry.action}`,
+        resource_type: "deliverable",
+        resource_id: entry.deliverable_id,
+        metadata: {
+          actor: entry.actor,
+          version: entry.version,
+          detail: entry.detail,
+        },
+      });
+    },
   );
   const intelligence = new CopilotKitIntelligence({ apiKey: config.intelligenceApiKey });
   const conversationStream = new ConversationStream(db);
@@ -556,6 +573,7 @@ export async function createApp(
   app.route("/api/portfolios", portfolioRoutes(agent));
   app.route("/api/notes", noteRoutes(agent));
   app.route("/api/monitor", monitorRoutes(agent));
+  app.route("/api/deliverables", deliverableRoutes(agent, config));
   app.route("/api/financials", financialRoutes(agent));
   app.route("/api/market", marketRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));
@@ -563,6 +581,7 @@ export async function createApp(
   // 对话分享：`POST /api/shares` 需登录，`GET /s/:id` 是给收件人看的公开页面。
   app.route("/api/shares", shareApiRoutes({ shares, config }));
   app.route("/s", sharePageRoutes({ shares, config }));
+  app.route("/d", deliverablePublicRoutes(agent.deliverables));
   app.get("/api/calendars", async (c) => c.json(await workspace.calendars(c.get("owner"))));
   app.get("/api/calendar/events", async (c) => {
     const query = z
