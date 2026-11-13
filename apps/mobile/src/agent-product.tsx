@@ -2127,6 +2127,7 @@ export function AgentProductShell({
                         onConnections={() => setAppsSheet(true)}
                         onOpenToday={() => navigate("today")}
                         onOpenDeliverables={() => navigate("deliverables")}
+                        onOpenTemplates={() => navigate("templates")}
                       />
                     ),
                   },

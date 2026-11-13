@@ -55,7 +55,11 @@ export const createDeliverableSchema = z
     template_id: z.string().trim().min(1).max(100).optional(),
     template_version: z.string().trim().min(1).max(60).optional(),
   })
-  .strict();
+  .strict()
+  .refine((value) => !(value.template_version && !value.template_id), {
+    message: "template_version requires template_id",
+    path: ["template_version"],
+  });
 
 export const updateDeliverableSchema = z
   .object({
@@ -78,7 +82,11 @@ export const updateDeliverableSchema = z
       value.template_id !== undefined ||
       value.template_version !== undefined,
     { message: "Provide title, content, sources or citations to update" },
-  );
+  )
+  .refine((value) => !(value.template_version && !value.template_id), {
+    message: "template_version requires template_id",
+    path: ["template_version"],
+  });
 
 export const transitionDeliverableSchema = z
   .object({

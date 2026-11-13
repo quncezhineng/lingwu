@@ -26,7 +26,7 @@ import type {
 } from "../../../../packages/domain/src/deliverable.ts";
 import type { Store } from "../db.ts";
 import { AppError } from "../errors.ts";
-import { diffDeliverableContent } from "./deliverables.ts";
+import { diffDeliverableContent, redactPii } from "./deliverables.ts";
 
 export const TEMPLATES_KIND = "user-templates";
 const MAX_STRUCTURE = 40;
@@ -355,6 +355,48 @@ export function templateSkeleton(template: Pick<UserTemplate, "structure" | "fie
   return sections.join("\n").trim();
 }
 
+/**
+ * 共享模板的安全视图。
+ * 跨 owner 只暴露章节骨架与必填字段名，原始正文、反例、版本快照与
+ * 复用明细一律不出边界；描述、标题等自由文本再过一遍 PII 脱敏。
+ */
+export function sharedTemplateView(template: UserTemplate): UserTemplate {
+  const redact = (text: string) => redactPii(text);
+  const structure = template.structure.map((section) => ({
+    ...section,
+    title: redact(section.title),
+  }));
+  const fields = template.fields
+    .filter((field) => field.required)
+    .map((field) => ({ ...field, label: redact(field.label) }));
+  return {
+    id: template.id,
+    user_id: template.user_id,
+    name: redact(template.name),
+    description: redact(template.description),
+    kind: template.kind,
+    version: template.version,
+    structure,
+    fields,
+    voice: {
+      tone: template.voice.tone,
+      language: template.voice.language,
+      units: template.voice.units.map(redact),
+      conventions: [],
+    },
+    counterexamples: [],
+    sample_content: templateSkeleton({ structure, fields }),
+    versions: [],
+    usage: [],
+    metrics: template.metrics,
+    shared: true,
+    ...(template.shared_at ? { shared_at: template.shared_at } : {}),
+    built_in: false,
+    created_at: template.created_at,
+    updated_at: template.updated_at,
+  };
+}
+
 function tokenize(text: string): string[] {
   const stop = new Set(
     "的了和与在是我你他这那有不就都也很到对及为上中下一这个那个我们你们他们".split(""),
@@ -449,12 +491,7 @@ export class TemplatesService {
     const all = await this.db.scan<UserTemplate>(TEMPLATES_KIND);
     return all
       .filter((entry) => entry.owner !== owner && entry.value.shared)
-      .map((entry) => ({
-        ...entry.value,
-        // 共享模板不带原始正文与复用记录：只保留结构与口径。
-        sample_content: templateSkeleton(entry.value),
-        usage: [],
-      }))
+      .map((entry) => sharedTemplateView(entry.value))
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   }
 

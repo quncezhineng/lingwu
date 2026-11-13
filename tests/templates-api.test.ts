@@ -262,24 +262,62 @@ test("shared templates are visible to other owners only after opt-in", async () 
   assert.equal(after.templates[0]?.name, "团队共享口径");
 });
 
-test("shared templates expose structure and conventions without sample content", async () => {
+test("shared templates expose only a redacted skeleton across owners", async () => {
   const source = await server.agent.deliverables.create("privacy-owner", {
     kind: "REPORT",
     title: "客户研报",
-    content: "# 结论\n客户：张三，手机 13800138000。\n\n## 风险提示\n仅供参考。",
+    content:
+      "# 结论\n客户：张三，手机 13800138000。\n数据来源：客户张三 13800138000。\n\n## 风险提示\n仅供参考。",
     sources: [],
     citations: [],
   });
-  const template = await server.agent.templates.createFromDeliverable("privacy-owner", source, {
-    name: "客户敏感口径",
+  // 第二版删掉敏感行，让反例与版本快照里都带上原始 PII。
+  await server.agent.deliverables.update("privacy-owner", source.id, {
+    content: "# 结论\n收入同比增长 30%。\n\n## 风险提示\n仅供参考。",
+    change_summary: "移除客户信息",
+    editor: "user",
   });
+  const updatedSource = await server.agent.deliverables.get("privacy-owner", source.id);
+  const template = await server.agent.templates.createFromDeliverable(
+    "privacy-owner",
+    updatedSource,
+    { name: "客户敏感口径" },
+  );
+  assert.ok(template.counterexamples.some((item) => item.text.includes("13800138000")));
+  assert.ok(updatedSource.versions.length === 2);
   await server.agent.templates.setShared("privacy-owner", template.id, true);
   const shared = await call<{ templates: UserTemplate[] }>("/shared");
   const entry = shared.templates.find((item) => item.id === template.id);
   assert.ok(entry);
-  assert.doesNotMatch(entry.sample_content, /张三|13800138000/);
+  const serialized = JSON.stringify(entry);
+  assert.doesNotMatch(serialized, /张三|13800138000/);
+  assert.doesNotMatch(entry.sample_content, /收入同比增长|仅供参考/);
   assert.match(entry.sample_content, /## 结论/);
+  assert.deepEqual(entry.counterexamples, []);
+  assert.deepEqual(entry.versions, []);
+  assert.deepEqual(entry.voice.conventions, []);
   assert.equal(entry.usage.length, 0);
+});
+
+test("template_version without template_id is rejected", async () => {
+  const response = await server.app.request("/api/deliverables", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      kind: "REPORT",
+      title: "伪造版本",
+      content: "无数字结论。",
+      template_version: "tpl-x@v99",
+    }),
+  });
+  assert.equal(response.status, 422);
+  const created = await createDeliverable("无数字结论。");
+  const update = await server.app.request(`/api/deliverables/${created.id}`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify({ template_version: "tpl-x@v99" }),
+  });
+  assert.equal(update.status, 422);
 });
 
 test("a shared template can be reused and records usage on its owner", async () => {

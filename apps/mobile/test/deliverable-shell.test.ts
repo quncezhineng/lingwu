@@ -112,4 +112,8 @@ test("SecondarySection 实际渲染 TemplateScreen 并有侧栏入口", () => {
   assert.ok(caseClause, 'SecondarySection 必须包含 case "templates"');
   assert.equal(hasJsxTag(caseClause, "TemplateScreen"), true);
   assert.equal(hasStringLiteral(namedFunction(file, "AgentRail"), "agent-rail-templates"), true);
+  const home = parse("mobile-bots-home.tsx");
+  const bots = namedFunction(home, "MobileBotsHome");
+  assert.equal(hasStringLiteral(bots, "mobile-bots-templates"), true);
+  assert.equal(hasIdentifier(bots, "onOpenTemplates"), true);
 });
