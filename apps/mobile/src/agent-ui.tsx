@@ -24,7 +24,6 @@ import { goalsEnabled } from "../../../packages/domain/src/features";
 import { resolveMonitorCurrency } from "../../../packages/domain/src/monitor-currency";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
-import { ArtifactActions } from "./artifact-actions";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { CardGrid } from "./card-grid";
@@ -971,7 +970,7 @@ export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
   const { open } = useWorkspace();
   const Icon = artifact.kind === "finance" ? CircleDollarSign : FileText;
   // 产物卡：独立的「文件产物」视觉，与洞察卡（衬线标题）、计划卡（步骤）、审批卡区分开。
-  // 分享 / 导出必须与正文按钮并列而不是嵌套，避免 react-native-web 上嵌套按钮冒泡误触。
+  // 分享 / 导出收纳在详情页工具栏里，卡片本身不重复放置动作按钮。
   return (
     <View
       style={{
@@ -1008,18 +1007,6 @@ export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
           <ArrowUpRight size={15} color={colors.faint} />
         </View>
       </Pressable>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          gap: 6,
-          paddingHorizontal: 10,
-          paddingBottom: 10,
-        }}
-      >
-        <ArtifactActions artifact={artifact} />
-      </View>
     </View>
   );
 }

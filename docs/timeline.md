@@ -5,6 +5,88 @@
 
 ## 变更记录
 
+### 2026-11-13 · 功能：对话回复操作栏新增「导出为 Markdown」
+
+**背景**
+
+用户希望在智能体对话流的回复操作栏里，把「提问 + 回复」整体导出为 Markdown 文件，按钮位置在「不喜欢」与「复制为 Markdown」之间。
+
+**处理**
+
+- [message-actions.tsx](../apps/mobile/src/message-actions.tsx)：
+  - 「不喜欢」与「复制为 Markdown」之间新增「导出为 Markdown」（`ArrowDownToLine`）操作按钮；
+  - `onExport` 把「提问 + 回复」组合成 Markdown 正文（提问在前、`---` 分隔），调用既有 `saveTextFile` 落盘——Web 触发浏览器下载，原生端写入缓存并走系统分享面板保存；文件名形如「灵悟对话 2026-11-13-21-05-07.md」；
+  - 完成后用 toast 反馈成功 / 失败。
+- [zh-Hans/chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts)、[en/chat.ts](../apps/mobile/src/i18n/locales/en/chat.ts)：新增 `chat.exportMarkdown` / `chat.exportMarkdownName` / `chat.exportMarkdownDone` / `chat.exportMarkdownFailed` 四个键。
+- 复用 [csv-file](../apps/mobile/src/csv-file.web.ts) 的 `saveTextFile`，无需新写导出逻辑。
+
+**验证**
+
+- `pnpm typecheck`、`pnpm format`（biome check）均通过。
+
+### 2026-11-13 · 界面：文件卡片移除分享按钮（分享本质是下载，右侧已有下载）
+
+**背景**
+
+「我的资料」文件卡片上的「分享」按钮实际行为与下载等价（分享文件其实就是取回内容再交给系统），且它右侧已有专门的下载按钮，用户要求删除分享按钮。
+
+**处理**
+
+- [screens.tsx](../apps/mobile/src/screens.tsx)：文件列表卡片删除 `Share2` 分享 IconButton，保留下载（`ArrowDownToLine`）与分析按钮；同时移除随之不再使用的 `share` 函数、`shareRemoteFile` 与 `Share2` imports（下载走既有的 `download` → `saveRemoteFile`）。
+
+**说明**
+
+- 「技能库」页（[library.tsx](../apps/mobile/src/bot-pages/library.tsx)）同样有一对分享/下载按钮，本次未改动；分享相关 i18n 键仍被该页与消息附件使用，予以保留。
+
+**验证**
+
+- `pnpm typecheck`、`pnpm format`（biome check）均通过。
+
+### 2026-11-13 · 界面：市场简报底部移除「我的资料」按钮
+
+**处理**
+
+- [briefing-card.tsx](../apps/mobile/src/briefing-card.tsx)：简报底部的操作行删除「我的资料」（`markets.briefingViewFiles`）按钮，仅保留下载、分享、继续分析；洞察为空状态下的「前往我的资料」引导按钮不受影响。
+
+**验证**
+
+- `pnpm typecheck`、`pnpm format`（biome check）均通过。
+
+### 2026-11-13 · 界面：市场简报下载按钮「下载资料」改为「下载简报」
+
+**处理**
+
+- [zh-Hans/markets.ts](../apps/mobile/src/i18n/locales/zh-Hans/markets.ts)：`markets.briefingDownload` 译文由「下载资料」改为「下载简报」；英文译文（Download briefing）保持不变。
+
+**验证**
+
+- `pnpm format`（biome check）575 个文件无告警。
+
+### 2026-11-13 · 界面：区域标题「自动化与任务」改为「任务与自动化」
+
+**处理**
+
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agentSpace.delegatedWork` 译文由「自动化与任务」改为「任务与自动化」（用于 [agent-product.tsx](../apps/mobile/src/agent-product.tsx) 的区域标题）；英文译文不变。
+
+**验证**
+
+- `pnpm format`（biome check）575 个文件无告警。
+
+### 2026-11-13 · 界面：资料卡片不再显示「分享 / 导出」按钮，收进详情页
+
+**背景**
+
+对话 / 资料列表里的产物卡底部有「分享」「导出」两个小按钮，用户希望卡片本身不放置动作按钮，这两个动作只在打开详情后提供。
+
+**处理**
+
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：`ArtifactCard`（产物卡）删除底部 `ArtifactActions`（buttons 变体）按钮容器，点卡片只会打开详情；移除不再使用的 `ArtifactActions` import，并更新组件注释；
+- 详情弹层早已通过 [details.tsx](../apps/mobile/src/details.tsx) 的 `ArtifactActions variant="full"` 提供分享链接 / 导出 HTML / 导出 Markdown / 复制为 Markdown，无需改动。
+
+**验证**
+
+- `pnpm typecheck` 通过；`pnpm format`（biome check）575 个文件无告警。
+
 ### 2026-11-13 · 界面：「技能与连接」已连接徽章改为品牌蓝
 
 **背景**

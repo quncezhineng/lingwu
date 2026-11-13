@@ -797,9 +797,6 @@ export function MarketBriefingCard({
           <Button icon={Share2} onPress={() => void share()} style={{ flexGrow: compact ? 1 : 0 }}>
             {t("markets.briefingShare")}
           </Button>
-          <Button icon={FolderOpen} onPress={openFiles} style={{ flexGrow: compact ? 1 : 0 }}>
-            {t("markets.briefingViewFiles")}
-          </Button>
           <Button
             primary
             icon={MessageCircle}

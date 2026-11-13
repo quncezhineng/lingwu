@@ -2,8 +2,9 @@ import { type ReactNode, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
+import { saveTextFile } from "./csv-file";
 import { useTranslation } from "./i18n";
-import { Copy, Image, Link2, Share2, ThumbsDown, ThumbsUp } from "./icons";
+import { ArrowDownToLine, Copy, Image, Link2, Share2, ThumbsDown, ThumbsUp } from "./icons";
 import { copyText, shareLink, shareText } from "./message-share";
 import { captureAndShare } from "./message-share-image";
 import { formatMessageTime } from "./message-time";
@@ -59,6 +60,24 @@ export function MessageActions({
       onNotify?.(t("chat.copiedMarkdown"));
     } catch {
       onNotify?.(t("chat.copyFailed"));
+    }
+  };
+
+  /** 导出「提问 + 回复」为 Markdown 文件（Web 触发浏览器下载，原生走系统保存）。 */
+  const onExport = async () => {
+    try {
+      const body = question ? `${question}\n\n---\n\n${markdown}` : markdown;
+      const stamp = new Date()
+        .toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" })
+        .replace(/[: ]/g, "-");
+      await saveTextFile(
+        `${t("chat.exportMarkdownName")} ${stamp}.md`,
+        body,
+        "text/markdown;charset=utf-8",
+      );
+      onNotify?.(t("chat.exportMarkdownDone"));
+    } catch {
+      onNotify?.(t("chat.exportMarkdownFailed"));
     }
   };
 
@@ -157,6 +176,9 @@ export function MessageActions({
             color={feedback === "dislike" ? colors.primary : colors.muted}
             fill={feedback === "dislike" ? colors.primary : undefined}
           />
+        </ActionButton>
+        <ActionButton label={t("chat.exportMarkdown")} onPress={onExport}>
+          <ArrowDownToLine size={15} color={colors.muted} />
         </ActionButton>
         <ActionButton
           label={t(copied ? "chat.copiedMarkdown" : "chat.copyMarkdown")}

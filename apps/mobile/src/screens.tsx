@@ -20,7 +20,7 @@ import { Text, TextInput } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
-import { saveRemoteFile, shareRemoteFile } from "./file-export";
+import { saveRemoteFile } from "./file-export";
 import { fileBadge, fileExtension, fileKind } from "./file-kind";
 import {
   buildFileLibrary,
@@ -55,7 +55,6 @@ import {
   Mail,
   Plus,
   Search,
-  Share2,
   ShieldCheck,
   Sparkles,
   Upload,
@@ -1220,19 +1219,6 @@ export function FilesScreen({
     }
   }
 
-  /** 分享文件本身：浏览器支持 Web Share 时直接发文件，否则降级为保存。 */
-  async function share(file: Artifact) {
-    setError("");
-    try {
-      const result = await shareRemoteFile(api, file);
-      notify(t(result === "saved" ? "screens.filesShareSaved" : "screens.filesShared"));
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      setError(message);
-      notify(t("screens.filesShareFailed"));
-    }
-  }
-
   async function upload() {
     setError("");
     setBusy(true);
@@ -1685,12 +1671,6 @@ export function FilesScreen({
                         marginLeft: compact ? 32 : 0,
                       }}
                     >
-                      <IconButton
-                        icon={Share2}
-                        label={t("screens.filesShare", { name: file.name })}
-                        size={compact ? 40 : 34}
-                        onPress={() => void share(file)}
-                      />
                       <IconButton
                         icon={ArrowDownToLine}
                         label={t("screens.filesDownload", { name: file.name })}

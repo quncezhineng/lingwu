@@ -135,7 +135,7 @@ const markets = {
   "markets.briefingRelationSummary": "本次简报记录了 {count} 个关注标的，其中 {moved} 个出现异动。",
   "markets.briefingRelationEmpty": "本次简报没有关注标的更新，暂无足够信息判断与自选的关系。",
   "markets.briefingNext": "下一步关注什么",
-  "markets.briefingDownload": "下载资料",
+  "markets.briefingDownload": "下载简报",
   "markets.briefingDownloadName": "今日市场简报",
   "markets.briefingDownloaded": "简报已下载。",
   "markets.briefingDownloadError": "简报下载失败，请重试。",
