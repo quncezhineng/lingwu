@@ -29,6 +29,8 @@ import {
 } from "./conversation-history.ts";
 import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
+import { deliverablePublicRoutes } from "./engine/deliverable-public-routes.ts";
+import { deliverableRoutes } from "./engine/deliverable-routes.ts";
 import { financialRoutes } from "./engine/financial-routes.ts";
 import { marketRoutes } from "./engine/market-routes.ts";
 import { monitorRoutes, todayRoutes } from "./engine/monitor-routes.ts";
@@ -40,6 +42,7 @@ import { agentRoutes } from "./engine/routes.ts";
 import { AgentService } from "./engine/service.ts";
 import { ConversationStream } from "./engine/stream.ts";
 import { conversationStreamRoutes } from "./engine/stream-routes.ts";
+import { templateRoutes } from "./engine/templates-routes.ts";
 import { symbolRoutes, watchlistRoutes } from "./engine/watchlist-routes.ts";
 import { AppError } from "./errors.ts";
 import { Files } from "./files.ts";
@@ -557,6 +560,9 @@ export async function createApp(
   app.route("/api/today", todayRoutes(agent));
   app.route("/api/portfolios", portfolioRoutes(agent));
   app.route("/api/notes", noteRoutes(agent));
+  app.route("/api/deliverables", deliverableRoutes(agent));
+  app.route("/api/templates", templateRoutes(agent));
+  app.route("/d", deliverablePublicRoutes(agent.deliverables));
   app.route("/api/financials", financialRoutes(agent));
   app.route("/api/market", marketRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));

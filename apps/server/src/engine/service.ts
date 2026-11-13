@@ -46,6 +46,7 @@ import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
 import { createBriefingScheduler } from "./briefing-scheduler.ts";
 import { detectDealSignals } from "./deal-signal.ts";
+import { DeliverablesService } from "./deliverables.ts";
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
 import { HindsightClient } from "./hindsight.ts";
@@ -65,6 +66,7 @@ import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
 import { summarizeReport } from "./report-brief.ts";
 import { generateResearchReport, researchSymbolSchema } from "./research.ts";
+import { TemplatesService } from "./templates.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
 
@@ -121,6 +123,8 @@ export class AgentService {
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
   readonly monitors: MonitorService;
+  readonly deliverables: DeliverablesService;
+  readonly templates: TemplatesService;
   /** 多 Agent 记忆引擎（Hindsight），未配置时降级为本地关键词召回。 */
   readonly memory: HindsightClient;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
@@ -151,6 +155,8 @@ export class AgentService {
       holdings: (owner, portfolioId) => this.portfolios.holdings(owner, portfolioId),
       notify: (owner, title, body, key) => this.notify(owner, title, body, undefined, key),
     });
+    this.deliverables = new DeliverablesService(db);
+    this.templates = new TemplatesService(db);
     this.memory = new HindsightClient({
       baseUrl: config.hindsightBaseUrl,
       apiKey: config.hindsightApiKey,
@@ -1499,6 +1505,22 @@ export class AgentService {
         task.id,
         `task-done:${task.id}`,
       );
+      // 定时任务 / 研究产出的正文自动落到交付物中心（同一任务幂等）。
+      if (
+        task.result &&
+        ["market_briefing", "research", "document", "finance"].includes(task.kind)
+      ) {
+        try {
+          await this.deliverables.captureFromTask(owner, {
+            id: task.id,
+            title: task.title,
+            kind: task.kind,
+            result: task.result,
+          });
+        } catch (error) {
+          console.error("deliverable capture failed", { taskId: task.id, error });
+        }
+      }
       // 投融资决策规则兜底：模型未主动 write_memory 时，从任务结果捕捉决策信号落一条 decision 记忆。
       if (task.result) {
         const signals = detectDealSignals(task.result);
