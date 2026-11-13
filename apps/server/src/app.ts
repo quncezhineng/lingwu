@@ -31,6 +31,7 @@ import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
 import { financialRoutes } from "./engine/financial-routes.ts";
 import { marketRoutes } from "./engine/market-routes.ts";
+import { monitorRoutes } from "./engine/monitor-routes.ts";
 import { noteRoutes } from "./engine/notes-routes.ts";
 import { portfolioRoutes } from "./engine/portfolio-routes.ts";
 import { priceAlertRoutes } from "./engine/price-alert-routes.ts";
@@ -554,6 +555,7 @@ export async function createApp(
   app.route("/api/price-alerts", priceAlertRoutes(agent));
   app.route("/api/portfolios", portfolioRoutes(agent));
   app.route("/api/notes", noteRoutes(agent));
+  app.route("/api/monitor", monitorRoutes(agent));
   app.route("/api/financials", financialRoutes(agent));
   app.route("/api/market", marketRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));

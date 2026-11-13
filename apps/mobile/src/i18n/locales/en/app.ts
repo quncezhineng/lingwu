@@ -199,6 +199,7 @@ const app = {
   "app.taskHubEyebrow": "Ongoing work",
   "app.taskHubTasks": "Tasks",
   "app.taskHubReminders": "Automation",
+  "app.taskHubMonitor": "Watching",
   "app.personalContextHeading": "Personal context",
   "app.memoryShortcutDetail": "{count} memories · goals, risks and focus areas",
   "app.titleConnections": "Apps & skills",

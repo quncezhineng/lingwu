@@ -7,6 +7,7 @@ import computer from "./computer";
 import details from "./details";
 import financials from "./financials";
 import markets from "./markets";
+import monitor from "./monitor";
 import notes from "./notes";
 import portfolio from "./portfolio";
 import quotes from "./quotes";
@@ -33,6 +34,7 @@ export const zhHans = {
   ...status,
   ...details,
   ...markets,
+  ...monitor,
   ...research,
   ...search,
   ...portfolio,

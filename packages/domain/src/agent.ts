@@ -457,3 +457,119 @@ export const investmentNoteSchema = z.object({
   updated_at: z.string().datetime(),
 });
 export type InvestmentNote = z.infer<typeof investmentNoteSchema>;
+
+/* ------------------------------------------------------------------ *
+ * OPT-01 事件监控：规则、事件、投递与打扰预算
+ * ------------------------------------------------------------------ */
+
+export type MonitorMarket = "CN" | "HK" | "US";
+export type MonitorTargetType = "symbol" | "portfolio" | "thesis" | "page";
+export type MonitorEventKind =
+  | "PRICE_MOVE"
+  | "EARNINGS"
+  | "ANNOUNCEMENT"
+  | "DIVIDEND"
+  | "HALT"
+  | "RATING_CHANGE"
+  | "NEWS"
+  | "THESIS_SIGNAL"
+  | "PAGE_CHANGE";
+/** 打扰级别：必须知道 / 可以稍后 / 只归档。预算只消耗 MUST_KNOW。 */
+export type MonitorLevel = "MUST_KNOW" | "LATER" | "ARCHIVE";
+export type MonitorDeliveryChannel = "in_app" | "webhook";
+
+export interface MonitorPriceCondition {
+  threshold_type: "PRICE_ABOVE" | "PRICE_BELOW" | "CHANGE_PCT";
+  threshold_value: number;
+}
+
+export interface MonitorQuietHours {
+  /** 用户本地时间 HH:mm，默认 22:00–07:00。 */
+  start: string;
+  end: string;
+  time_zone: string;
+}
+
+/** 一条「盯」规则。target_type=thesis 时即 OPT-02 证伪条件对应的 L4 规则。 */
+export interface MonitorRule {
+  id: string;
+  user_id: string;
+  name?: string;
+  target_type: MonitorTargetType;
+  target_id: string;
+  market: MonitorMarket;
+  event_kinds: MonitorEventKind[];
+  level: MonitorLevel;
+  cooldown_minutes: number;
+  /** L1 行情轮询间隔（分钟）。事件源推送不受此字段影响。 */
+  interval_minutes: number;
+  enabled: boolean;
+  channels: MonitorDeliveryChannel[];
+  webhook_url?: string;
+  quiet_hours?: MonitorQuietHours;
+  price?: MonitorPriceCondition;
+  created_at: string;
+  updated_at: string;
+  last_checked_at?: string;
+  last_error?: string;
+  /** 规则连续被标记「不必要」后自动降频/停用时的说明。 */
+  disabled_reason?: string;
+}
+
+export type MonitorEventState = "new" | "delivered" | "archived" | "dismissed" | "downgraded";
+
+export interface MonitorEvent {
+  id: string;
+  user_id: string;
+  rule_id: string;
+  rule_name?: string;
+  kind: MonitorEventKind;
+  /** 规则配置的原始级别。 */
+  original_level: MonitorLevel;
+  /** 经过预算/静默期后的实际级别。 */
+  level: MonitorLevel;
+  title: string;
+  body: string;
+  payload: Record<string, unknown>;
+  dedupe_key: string;
+  detected_at: string;
+  market_date: string;
+  state: MonitorEventState;
+  reason?: string;
+  notification_id?: string;
+  delivered_at?: string;
+  /** 超出预算被降级时，汇总投递时间（本地 19:00）。 */
+  digest_at?: string;
+  updated_at: string;
+}
+
+export interface MonitorDeliveryLog {
+  id: string;
+  user_id: string;
+  event_id: string;
+  channel: MonitorDeliveryChannel;
+  sent_at: string;
+  provider_id?: string;
+  result: "sent" | "failed" | "skipped";
+  detail?: string;
+}
+
+export interface AttentionBudget {
+  id: string;
+  user_id: string;
+  /** 用户本地日期 YYYY-MM-DD。 */
+  date: string;
+  limit: number;
+  used: number;
+  downgraded_count: number;
+  updated_at: string;
+}
+
+export interface MonitorToday {
+  date: string;
+  budget: AttentionBudget;
+  must_know: MonitorEvent[];
+  later: MonitorEvent[];
+  archive: MonitorEvent[];
+  rules: MonitorRule[];
+}
