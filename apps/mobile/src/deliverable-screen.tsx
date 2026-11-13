@@ -422,7 +422,7 @@ function DeliverableDetail({
               {t("deliverables.sendWithGate")}
             </Button>
           )}
-          {(item.status === "approved" || item.status === "sent") && (
+          {item.status === "sent" && (
             <Button
               busy={busy}
               onPress={() =>
@@ -436,7 +436,7 @@ function DeliverableDetail({
               {t("deliverables.share")}
             </Button>
           )}
-          {item.status === "in_review" && (
+          {(item.status === "in_review" || item.status === "approved") && (
             <Button
               busy={busy}
               onPress={() =>
@@ -491,7 +491,7 @@ function DeliverableDetail({
         <Card style={{ gap: 8 }}>
           <View style={[s.between, { gap: 8 }]}>
             <SectionHeading title={t("deliverables.contentTitle")} style={{ marginBottom: 0 }} />
-            {item.status !== "sent" && item.status !== "archived" && (
+            {(item.status === "draft" || item.status === "in_review") && (
               <Button small onPress={() => setEditing((value) => !value)}>
                 {editing ? t("deliverables.cancelEdit") : t("deliverables.edit")}
               </Button>

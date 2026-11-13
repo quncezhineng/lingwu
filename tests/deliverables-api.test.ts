@@ -209,6 +209,7 @@ test("share links are read-only, disclaimer-bearing and revocable", async () => 
   ]);
   await post(`/${deliverable.id}/submit`, {});
   await post(`/${deliverable.id}/approve`, {});
+  await post(`/${deliverable.id}/send`, {});
   const share = await post<{ id: string; url: string }>(`/${deliverable.id}/share`, {}, 201);
   assert.match(share.url, /\/d\//);
   const page = await server.app.request(`/d/${share.id}`);
@@ -224,6 +225,109 @@ test("share links are read-only, disclaimer-bearing and revocable", async () => 
   });
   assert.equal(revoke.status, 204);
   assert.equal((await server.app.request(`/d/${share.id}`)).status, 404);
+});
+
+test("B1: sharing requires send(), and the public page reads the pinned sent snapshot", async () => {
+  const deliverable = await createDeliverable("营收 10%。", [
+    {
+      number_text: "10%",
+      source_url: "https://example.com/report",
+      excerpt: "Revenue 10%.",
+    },
+  ]);
+  await post(`/${deliverable.id}/submit`, {});
+  await post(`/${deliverable.id}/approve`, {});
+  const blocked = await server.app.request(`/api/deliverables/${deliverable.id}/share`, {
+    method: "POST",
+    headers: headers(),
+    body: "{}",
+  });
+  assert.equal(blocked.status, 409);
+
+  const sent = await post<Deliverable>(`/${deliverable.id}/send`, {});
+  assert.ok(sent.sent_version);
+  const share = await post<{ id: string }>(`/${deliverable.id}/share`, {}, 201);
+
+  // 即使当前记录被改写，公开页也只读发送时锁定的版本快照。
+  const stored = await db.get<Deliverable>(sent.user_id, "deliverables", sent.id);
+  assert.ok(stored);
+  await db.put(sent.user_id, "deliverables", {
+    ...stored,
+    content: "被篡改的当前正文",
+  });
+  const html = await (await server.app.request(`/d/${share.id}`)).text();
+  assert.match(html, /营收 10%/);
+  assert.doesNotMatch(html, /被篡改/);
+});
+
+test("B2: editing an approved deliverable forces it back to draft", async () => {
+  const deliverable = await createDeliverable("营收 10%。", [
+    {
+      number_text: "10%",
+      source_url: "https://example.com/report",
+      excerpt: "Revenue 10%.",
+    },
+  ]);
+  await post(`/${deliverable.id}/submit`, {});
+  const approved = await post<Deliverable>(`/${deliverable.id}/approve`, {});
+  assert.equal(approved.status, "approved");
+  assert.ok(approved.approved_at);
+  assert.equal(approved.approved_by, "user");
+
+  const edited = await call<Deliverable>(`/${deliverable.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ content: "营收 10%，新增一段风险提示。" }),
+  });
+  assert.equal(edited.status, "draft");
+  assert.equal(edited.approved_at, undefined);
+  assert.equal(edited.approved_by, undefined);
+  assert.ok(edited.audit.some((entry) => entry.detail?.includes("退回草稿")));
+});
+
+test("B3: citations match normalized numbers exactly, never as substrings", async () => {
+  const deliverable = await createDeliverable("营收 10%，利润 1.2 亿。", [
+    {
+      number_text: "0%",
+      source_url: "https://example.com/report",
+      excerpt: "Zero percent.",
+    },
+    {
+      number_text: "2 亿",
+      source_url: "https://example.com/report",
+      excerpt: "Two hundred million.",
+    },
+  ]);
+  assert.equal(
+    deliverable.numbers.every((item) => item.status === "unsourced"),
+    true,
+  );
+  await post(`/${deliverable.id}/submit`, {});
+  const response = await server.app.request(`/api/deliverables/${deliverable.id}/approve`, {
+    method: "POST",
+    headers: headers(),
+    body: "{}",
+  });
+  assert.equal(response.status, 409);
+
+  const exact = await createDeliverable("营收 10%，利润 1.2 亿。", [
+    {
+      number_text: "10%",
+      source_url: "https://example.com/report",
+      excerpt: "Revenue 10%.",
+    },
+    {
+      number_text: "1.2 亿",
+      source_url: "https://example.com/report",
+      excerpt: "Profit 120 million.",
+    },
+  ]);
+  assert.equal(
+    exact.numbers.every((item) => item.status === "sourced"),
+    true,
+  );
+  await post(`/${exact.id}/submit`, {});
+  const approved = await post<Deliverable>(`/${exact.id}/approve`, {});
+  assert.equal(approved.status, "approved");
 });
 
 test("task capture is idempotent and links back to its source task", async () => {

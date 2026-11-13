@@ -59,7 +59,7 @@ export const deliverableCitationInputSchema = z.object({
 export type DeliverableCitationInput = z.infer<typeof deliverableCitationInputSchema>;
 
 const sourceLinkSchema = z.object({
-  type: z.enum(["task", "briefing", "symbol", "thesis", "note", "artifact", "url"]),
+  type: z.enum(["task", "briefing", "symbol", "thesis", "note", "artifact", "deliverable", "url"]),
   id: z.string().trim().min(1).max(200),
   label: z.string().trim().max(200).optional(),
   url: httpUrlSchema.optional(),
@@ -72,6 +72,7 @@ export const createDeliverableSchema = z.object({
   citations: z.array(deliverableCitationInputSchema).max(200).optional(),
   source_links: z.array(sourceLinkSchema).max(30).optional(),
   created_from: sourceLinkSchema.optional(),
+  template_id: z.string().trim().max(100).optional(),
   template_version: z.string().trim().max(60).optional(),
   disclaimer: z.string().trim().max(1000).optional(),
   recipient: z.string().trim().max(200).optional(),
@@ -84,6 +85,7 @@ export const updateDeliverableSchema = z
     content: z.string().trim().min(1).max(MAX_CONTENT).optional(),
     citations: z.array(deliverableCitationInputSchema).max(200).optional(),
     source_links: z.array(sourceLinkSchema).max(30).optional(),
+    template_id: z.string().trim().max(100).optional(),
     template_version: z.string().trim().max(60).optional(),
     disclaimer: z.string().trim().max(1000).optional(),
     recipient: z.string().trim().max(200).optional(),
@@ -95,6 +97,7 @@ export const updateDeliverableSchema = z
       value.content !== undefined ||
       value.citations !== undefined ||
       value.source_links !== undefined ||
+      value.template_id !== undefined ||
       value.template_version !== undefined ||
       value.disclaimer !== undefined ||
       value.recipient !== undefined,
@@ -139,6 +142,10 @@ export interface DeliverableShare {
   deliverable_id: string;
   created_at: string;
   revoked: boolean;
+  /** 分享锁定在发送时的版本；公开页只读这个快照，不读当前正文。 */
+  sent_version: number;
+  /** 分享时的免责声明快照，后续配置变更不影响已发出的链接。 */
+  disclaimer: string;
 }
 
 /* ------------------------------------------------------------------ *
@@ -210,11 +217,8 @@ function buildNumbers(
   return extractNumbers(content).map((item, index) => {
     const key = normalizeNumber(item.text);
     const prior = priorByText.get(key)?.shift();
-    const citation = citations.find(
-      (entry) =>
-        normalizeNumber(entry.number_text) === key ||
-        normalizeNumber(entry.number_text).includes(key),
-    );
+    // 数字出处必须是规范化后的精确匹配：`10%` 不能命中 `0%`，`1.2 亿` 不能命中 `2 亿`。
+    const citation = citations.find((entry) => normalizeNumber(entry.number_text) === key);
     const status =
       prior?.status === "estimate" && !citation ? "estimate" : citation ? "sourced" : "unsourced";
     return {
@@ -527,6 +531,7 @@ export class DeliverablesService {
         ),
       ],
       source_links: input.source_links ?? [],
+      template_id: input.template_id,
       template_version: input.template_version,
       disclaimer: input.disclaimer ?? DEFAULT_DISCLAIMER,
       recipient: input.recipient,
@@ -591,6 +596,7 @@ export class DeliverablesService {
       content: input.content ?? deliverable.content,
       citations,
       source_links: input.source_links ?? deliverable.source_links,
+      template_id: input.template_id ?? deliverable.template_id,
       template_version: input.template_version ?? deliverable.template_version,
       disclaimer: input.disclaimer ?? deliverable.disclaimer,
       recipient: input.recipient ?? deliverable.recipient,
@@ -612,22 +618,44 @@ export class DeliverablesService {
         ),
       ].slice(-MAX_VERSIONS);
     }
+    // 批准后任何正文 / 出处变更都必须重新走审批：退回 draft、清空批准信息并撤销分享。
+    const material =
+      contentChanged ||
+      titleChanged ||
+      input.citations !== undefined ||
+      input.source_links !== undefined;
+    if (material && deliverable.status === "approved")
+      Object.assign(next, await this.demoteApproved(owner, next));
     await this.db.put(owner, DELIVERABLES_KIND, next);
     return this.record(owner, next, {
       actor,
       action: "updated",
       detail:
-        input.change_summary ??
-        ([
-          titleChanged ? "标题" : "",
-          contentChanged ? "正文" : "",
-          input.citations !== undefined ? "出处" : "",
-        ]
-          .filter(Boolean)
-          .join("、") ||
-          "更新元数据"),
+        (input.change_summary ??
+          ([
+            titleChanged ? "标题" : "",
+            contentChanged ? "正文" : "",
+            input.citations !== undefined ? "出处" : "",
+          ]
+            .filter(Boolean)
+            .join("、") ||
+            "更新元数据")) +
+        (material && deliverable.status === "approved" ? "（已退回草稿，需重新审批）" : ""),
       version: next.version,
     });
+  }
+
+  /** 已批准的交付物发生实质变更时退回草稿，并让旧分享链接立即失效。 */
+  private async demoteApproved(
+    owner: string,
+    deliverable: Deliverable,
+  ): Promise<Partial<Deliverable>> {
+    const shares = await this.db.list<DeliverableShare>(owner, DELIVERABLE_SHARES_KIND);
+    for (const share of shares) {
+      if (share.deliverable_id === deliverable.id && !share.revoked)
+        await this.db.put(owner, DELIVERABLE_SHARES_KIND, { ...share, revoked: true });
+    }
+    return { status: "draft", approved_at: undefined, approved_by: undefined };
   }
 
   private async transition(
@@ -726,6 +754,8 @@ export class DeliverablesService {
             : item,
         ),
       };
+      if (deliverable.status === "approved")
+        Object.assign(next, await this.demoteApproved(owner, next));
       await this.db.put(owner, DELIVERABLES_KIND, next);
       return this.record(owner, next, {
         actor: "user",
@@ -743,6 +773,8 @@ export class DeliverablesService {
             : item,
         ),
       };
+      if (deliverable.status === "approved")
+        Object.assign(next, await this.demoteApproved(owner, next));
       await this.db.put(owner, DELIVERABLES_KIND, next);
       return this.record(owner, next, {
         actor: "user",
@@ -775,6 +807,8 @@ export class DeliverablesService {
         ),
       ].slice(-MAX_VERSIONS),
     };
+    if (deliverable.status === "approved")
+      Object.assign(next, await this.demoteApproved(owner, next));
     await this.db.put(owner, DELIVERABLES_KIND, next);
     return this.record(owner, next, {
       actor: "user",
@@ -924,13 +958,16 @@ export class DeliverablesService {
 
   async share(owner: string, id: string): Promise<DeliverableShare> {
     const deliverable = await this.require(owner, id);
-    if (deliverable.status !== "approved" && deliverable.status !== "sent")
-      throw new AppError("Only approved or sent deliverables can be shared", 409);
+    // 分享必须和 send() 走同一道合规门：只有已经合规发送的版本才能生成公开链接。
+    if (deliverable.status !== "sent" || !deliverable.sent_version)
+      throw new AppError("Only sent deliverables can be shared", 409, "not_sent");
     const share: DeliverableShare = {
       id: randomBytes(12).toString("base64url"),
       deliverable_id: deliverable.id,
       created_at: new Date().toISOString(),
       revoked: false,
+      sent_version: deliverable.sent_version,
+      disclaimer: deliverable.disclaimer,
     };
     await this.db.put(owner, DELIVERABLE_SHARES_KIND, share);
     await this.record(owner, deliverable, {
@@ -948,7 +985,7 @@ export class DeliverablesService {
     await this.db.put(owner, DELIVERABLE_SHARES_KIND, { ...share, revoked: true });
   }
 
-  /** 公开只读视图：只给已分享、未撤销的交付物，且永远带免责声明。 */
+  /** 公开只读视图：只给已分享、未撤销的交付物，且只读发送时锁定的版本快照。 */
   async publicView(shareId: string): Promise<{
     id: string;
     title: string;
@@ -967,15 +1004,18 @@ export class DeliverablesService {
     );
     if (!ownerRecord) return null;
     const deliverable = ownerRecord.value;
-    if (deliverable.status !== "approved" && deliverable.status !== "sent") return null;
+    if (deliverable.status !== "sent") return null;
+    if (deliverable.sent_version !== found.sent_version) return null;
+    const snapshot = deliverable.versions.find((item) => item.version === found.sent_version);
+    if (!snapshot) return null;
     return {
       id: deliverable.id,
-      title: deliverable.title,
-      content: deliverable.content,
+      title: snapshot.title,
+      content: snapshot.content,
       kind: deliverable.kind,
-      disclaimer: deliverable.disclaimer,
-      created_at: deliverable.updated_at,
-      version: deliverable.version,
+      disclaimer: found.disclaimer,
+      created_at: snapshot.created_at,
+      version: snapshot.version,
     };
   }
 
