@@ -40,9 +40,10 @@ function approvalSummary(action: ActionProposal) {
 /** Today 聚合：监控事件 + 预算 + 论点回检 + 待审批，一次读回首页所需内容。 */
 export async function buildToday(service: AgentService, owner: string, now = new Date()) {
   const base = await service.monitors.today(owner, now);
-  const [notes, actions] = await Promise.all([
+  const [notes, actions, pendingDeliverables] = await Promise.all([
     service.notes.list(owner, { type: "THESIS", limit: 200 }),
     service.db.list<ActionProposal>(owner, "actions"),
+    service.deliverables.list(owner, { status: "in_review", limit: 20 }),
   ]);
   const active = notes.filter((note) => note.status === "ACTIVE");
   const review = active
@@ -64,6 +65,10 @@ export async function buildToday(service: AgentService, owner: string, now = new
     ...base,
     theses: { active, review },
     approvals: actions.filter((action) => action.status === "awaiting_review").map(approvalSummary),
+    deliverables: {
+      pending_review: pendingDeliverables,
+      pending_review_count: pendingDeliverables.length,
+    },
   };
 }
 

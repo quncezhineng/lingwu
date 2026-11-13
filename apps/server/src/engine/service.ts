@@ -46,6 +46,7 @@ import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
 import { createBriefingScheduler } from "./briefing-scheduler.ts";
 import { detectDealSignals } from "./deal-signal.ts";
+import { DeliverablesService } from "./deliverables.ts";
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
 import { HindsightClient } from "./hindsight.ts";
@@ -121,6 +122,7 @@ export class AgentService {
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
   readonly monitors: MonitorService;
+  readonly deliverables: DeliverablesService;
   /** 多 Agent 记忆引擎（Hindsight），未配置时降级为本地关键词召回。 */
   readonly memory: HindsightClient;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
@@ -151,6 +153,7 @@ export class AgentService {
       holdings: (owner, portfolioId) => this.portfolios.holdings(owner, portfolioId),
       notify: (owner, title, body, key) => this.notify(owner, title, body, undefined, key),
     });
+    this.deliverables = new DeliverablesService(db);
     this.memory = new HindsightClient({
       baseUrl: config.hindsightBaseUrl,
       apiKey: config.hindsightApiKey,

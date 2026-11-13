@@ -155,6 +155,7 @@ const app = {
   "app.openingWorkspace": "Opening your workspace…",
   "app.navToday": "Workbench",
   "app.navMonitors": "Monitor rules",
+  "app.navDeliverables": "Deliverables",
   "app.goHome": "Back to home",
   "app.navChat": "Chat",
   "app.navWatchlist": "Watchlist & portfolios",

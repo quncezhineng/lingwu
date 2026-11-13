@@ -20,6 +20,7 @@ import { Text, TextInput } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
+import { DeliverableTodayCard } from "./deliverable-today";
 import { saveRemoteFile, shareRemoteFile } from "./file-export";
 import { fileBadge, fileExtension, fileKind } from "./file-kind";
 import {
@@ -308,6 +309,7 @@ export function TodayScreen() {
           ))}
       </View>
       <MonitorTodayCard />
+      <DeliverableTodayCard />
       <MarketBriefingCard />
       <ThesisReviewCard
         items={reviewQueue}

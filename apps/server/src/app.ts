@@ -29,6 +29,7 @@ import {
 } from "./conversation-history.ts";
 import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
+import { deliverableRoutes } from "./engine/deliverable-routes.ts";
 import { financialRoutes } from "./engine/financial-routes.ts";
 import { marketRoutes } from "./engine/market-routes.ts";
 import { monitorRoutes, todayRoutes } from "./engine/monitor-routes.ts";
@@ -557,6 +558,7 @@ export async function createApp(
   app.route("/api/today", todayRoutes(agent));
   app.route("/api/portfolios", portfolioRoutes(agent));
   app.route("/api/notes", noteRoutes(agent));
+  app.route("/api/deliverables", deliverableRoutes(agent));
   app.route("/api/financials", financialRoutes(agent));
   app.route("/api/market", marketRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));

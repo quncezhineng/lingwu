@@ -8,7 +8,7 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
 import { type ThreadHistoryPage, threadHistoryPagePath } from "./conversation-history";
 import { useTranslation } from "./i18n";
-import { Bell, Link2, PanelsTopLeft, Plus, Search } from "./icons";
+import { Bell, FileText, Link2, PanelsTopLeft, Plus, Search } from "./icons";
 import {
   type BotPreview,
   botHasUnread,
@@ -38,6 +38,7 @@ export function MobileBotsHome({
   onNotifications,
   onConnections,
   onOpenToday,
+  onOpenDeliverables,
 }: {
   onOpenBot: (agent: AgentDefinition) => void;
   onCreate: () => void;
@@ -45,6 +46,7 @@ export function MobileBotsHome({
   onNotifications: () => void;
   onConnections: () => void;
   onOpenToday: () => void;
+  onOpenDeliverables: () => void;
 }) {
   const { t } = useTranslation();
   const { api, workspace } = useWorkspace();
@@ -253,6 +255,19 @@ export function MobileBotsHome({
           ]}
         >
           <PanelsTopLeft size={20} color={colors.text} />
+        </Pressable>
+        <Pressable
+          testID="mobile-bots-deliverables"
+          accessibilityRole="button"
+          accessibilityLabel={t("app.navDeliverables")}
+          onPress={onOpenDeliverables}
+          style={({ pressed }) => [
+            mobileGlassStyle(pressed),
+            floatingControl,
+            { borderRadius: radius.full },
+          ]}
+        >
+          <FileText size={20} color={colors.text} />
         </Pressable>
         <Pressable
           testID="mobile-bots-create"

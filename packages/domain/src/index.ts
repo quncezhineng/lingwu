@@ -4,6 +4,7 @@ export type WorkspaceMode = "sample" | "live";
 export type Section =
   | "today"
   | "monitors"
+  | "deliverables"
   | "chat"
   | "mail"
   | "calendar"
@@ -227,3 +228,4 @@ export interface ExecutionBackend {
 }
 
 export type { ComputerCommand, ComputerDirectory, ComputerSnapshot } from "./computer.ts";
+export * from "./deliverable.ts";
