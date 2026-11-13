@@ -6,7 +6,7 @@ import { after, before, beforeEach, test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
-import { humanEditRatio } from "../apps/server/src/engine/templates.ts";
+import { humanEditRatio, sharedTemplateView } from "../apps/server/src/engine/templates.ts";
 import type {
   Deliverable,
   TemplateMatch,
@@ -259,7 +259,7 @@ test("shared templates are visible to other owners only after opt-in", async () 
   assert.equal(before.templates.length, 0);
   await server.agent.templates.setShared("other-owner", other.id, true);
   const after = await call<{ templates: UserTemplate[] }>("/shared");
-  assert.equal(after.templates[0]?.name, "团队共享口径");
+  assert.equal(after.templates[0]?.name, "共享模板");
 });
 
 test("shared templates expose only a redacted skeleton across owners", async () => {
@@ -318,6 +318,120 @@ test("template_version without template_id is rejected", async () => {
     body: JSON.stringify({ template_version: "tpl-x@v99" }),
   });
   assert.equal(update.status, 422);
+});
+
+test("shared view is an explicit whitelist with no PII in any serialized field", () => {
+  const constructed = {
+    id: "tpl-constructed",
+    user_id: "owner-a",
+    name: "张三的季报",
+    description: "李四 13900139000 的客户模板",
+    kind: "REPORT",
+    version: 3,
+    structure: [
+      {
+        id: "s-1",
+        title: "结论",
+        order: 0,
+        required: true,
+        instructions: "张三 13800138000 口径",
+      },
+    ],
+    fields: [
+      {
+        id: "f-1",
+        label: "营收增速",
+        required: true,
+        unit: "13800138000 元",
+        description: "张三的手机",
+      },
+    ],
+    voice: {
+      tone: "formal",
+      language: "zh",
+      units: ["13800138000亿元"],
+      conventions: ["客户：王五 13700137000"],
+    },
+    counterexamples: [{ id: "c-1", text: "张三 13800138000" }],
+    sample_content: "客户：张三，手机 13800138000。",
+    created_from: { type: "deliverable", id: "d-1", label: "张三的季报" },
+    versions: [
+      {
+        id: "v-1",
+        version: 1,
+        name: "张三版本",
+        description: "李四 13900139000",
+        structure: [{ id: "s-1", title: "结论", order: 0, required: true }],
+        fields: [{ id: "f-1", label: "营收增速", required: true, unit: "13800138000 元" }],
+        voice: { tone: "formal", language: "zh", units: [], conventions: ["王五 13700137000"] },
+        counterexamples: [{ id: "c-1", text: "张三 13800138000" }],
+        summary: "张三",
+        created_at: "2026-11-13T00:00:00.000Z",
+      },
+    ],
+    usage: [
+      {
+        deliverable_id: "d-1",
+        version: 1,
+        edit_ratio: 0,
+        edited_chars: 0,
+        total_chars: 0,
+        at: "2026-11-13T00:00:00.000Z",
+      },
+    ],
+    metrics: {
+      reuse_count: 1,
+      first_edit_ratio: 0,
+      latest_edit_ratio: 0,
+      needs_clarification: false,
+      match_total: 1,
+      accepted: 1,
+      rejections: 0,
+      match_accuracy: 1,
+    },
+    shared: true,
+    shared_at: "2026-11-13T00:00:00.000Z",
+    built_in: false,
+    created_at: "2026-11-13T00:00:00.000Z",
+    updated_at: "2026-11-13T00:00:00.000Z",
+  } as unknown as UserTemplate;
+
+  const view = sharedTemplateView(constructed);
+  const serialized = JSON.stringify(view);
+  assert.doesNotMatch(serialized, /张三|李四|王五|13800138000|13900139000|13700137000/);
+  assert.equal("instructions" in view.structure[0], false);
+  assert.equal("unit" in view.fields[0], false);
+  assert.equal("description" in view.fields[0], false);
+  assert.equal(view.fields[0]?.label, "营收增速");
+  assert.doesNotMatch(view.sample_content, /13800138000|元/);
+  assert.match(view.sample_content, /## 结论/);
+  assert.deepEqual(view.versions, []);
+  assert.deepEqual(view.counterexamples, []);
+});
+
+test("owner still reads the full unredacted template", async () => {
+  const source = await createDeliverable("# 结论\n客户：张三，手机 13800138000。");
+  const template = await post<UserTemplate>(
+    "/from-deliverable",
+    { deliverable_id: source.id, name: "张三的季报" },
+    201,
+  );
+  const updated = await call<UserTemplate>(`/${template.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      description: "李四 13900139000 的客户模板",
+      structure: [
+        { id: "s-1", title: "结论", order: 0, required: true, instructions: "张三 13800138000" },
+      ],
+      fields: [{ id: "f-1", label: "营收增速", required: true, unit: "13800138000 元" }],
+    }),
+  });
+  assert.equal(updated.name, "张三的季报");
+  assert.equal(updated.description, "李四 13900139000 的客户模板");
+  assert.equal(updated.structure[0]?.instructions, "张三 13800138000");
+  assert.equal(updated.fields[0]?.unit, "13800138000 元");
+  const own = await call<UserTemplate>(`/${template.id}`);
+  assert.equal(own.fields[0]?.unit, "13800138000 元");
 });
 
 test("a shared template can be reused and records usage on its owner", async () => {

@@ -362,18 +362,26 @@ export function templateSkeleton(template: Pick<UserTemplate, "structure" | "fie
  */
 export function sharedTemplateView(template: UserTemplate): UserTemplate {
   const redact = (text: string) => redactPii(text);
-  const structure = template.structure.map((section) => ({
-    ...section,
+  // 显式白名单：逐字段重建，禁止展开原对象，避免后续新增字段被自动带出。
+  const structure: TemplateSection[] = template.structure.map((section) => ({
+    id: section.id,
     title: redact(section.title),
+    order: section.order,
+    required: section.required,
   }));
   const fields = template.fields
     .filter((field) => field.required)
-    .map((field) => ({ ...field, label: redact(field.label) }));
+    .map((field) => ({
+      id: field.id,
+      label: redact(field.label),
+      required: field.required,
+    }));
   return {
     id: template.id,
     user_id: template.user_id,
-    name: redact(template.name),
-    description: redact(template.description),
+    // 名称与描述可能藏着规则库识别不了的裸姓名，跨 owner 一律不从原模板带出。
+    name: "共享模板",
+    description: "",
     kind: template.kind,
     version: template.version,
     structure,
@@ -381,7 +389,7 @@ export function sharedTemplateView(template: UserTemplate): UserTemplate {
     voice: {
       tone: template.voice.tone,
       language: template.voice.language,
-      units: template.voice.units.map(redact),
+      units: [],
       conventions: [],
     },
     counterexamples: [],
