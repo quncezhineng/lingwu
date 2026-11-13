@@ -225,6 +225,25 @@ test("share links are read-only, disclaimer-bearing and revocable", async () => 
   });
   assert.equal(revoke.status, 204);
   assert.equal((await server.app.request(`/d/${share.id}`)).status, 404);
+  const revoked = await call<Deliverable>(`/${deliverable.id}`);
+  assert.ok(revoked.audit.some((entry) => entry.action === "share_revoked"));
+});
+
+test("injected disclaimers render once in the public page", async () => {
+  const deliverable = await createDeliverable("营收 10%。", [
+    {
+      number_text: "10%",
+      source_url: "https://example.com/report",
+      excerpt: "Revenue 10%.",
+    },
+  ]);
+  await post(`/${deliverable.id}/submit`, {});
+  await post(`/${deliverable.id}/approve`, {});
+  const sent = await post<Deliverable>(`/${deliverable.id}/send`, {});
+  assert.ok(sent.content.includes(sent.disclaimer));
+  const share = await post<{ id: string }>(`/${deliverable.id}/share`, {}, 201);
+  const html = await (await server.app.request(`/d/${share.id}`)).text();
+  assert.equal(html.split(sent.disclaimer).length - 1, 1);
 });
 
 test("B1: sharing requires send(), and the public page reads the pinned sent snapshot", async () => {

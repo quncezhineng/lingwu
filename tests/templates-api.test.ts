@@ -256,6 +256,24 @@ test("shared templates are visible to other owners only after opt-in", async () 
   assert.equal(after.templates[0]?.name, "团队共享口径");
 });
 
+test("shared templates expose structure and conventions without sample content", async () => {
+  const source = await server.agent.deliverables.create("privacy-owner", {
+    kind: "REPORT",
+    title: "客户研报",
+    content: "# 结论\n客户：张三，手机 13800138000。\n\n## 风险提示\n仅供参考。",
+  });
+  const template = await server.agent.templates.createFromDeliverable("privacy-owner", source, {
+    name: "客户敏感口径",
+  });
+  await server.agent.templates.setShared("privacy-owner", template.id, true);
+  const shared = await call<{ templates: UserTemplate[] }>("/shared");
+  const entry = shared.templates.find((item) => item.id === template.id);
+  assert.ok(entry);
+  assert.doesNotMatch(entry.sample_content, /张三|13800138000/);
+  assert.match(entry.sample_content, /## 结论/);
+  assert.equal(entry.usage.length, 0);
+});
+
 test("a shared template can be reused and records usage on its owner", async () => {
   const otherDeliverable = await server.agent.deliverables.create("other-owner", {
     kind: "REPORT",

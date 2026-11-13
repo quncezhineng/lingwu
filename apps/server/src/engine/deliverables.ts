@@ -195,6 +195,16 @@ export function normalizeNumber(text: string): string {
   return text.replace(/[,\s]/g, "").replace(/％/g, "%").replace(/−/g, "-").toLowerCase();
 }
 
+/**
+ * 发送时免责声明会被注入正文，而展示层又会单独渲染一次。
+ * 渲染正文前去掉尾部注入块，避免详情页与公开页出现两遍免责声明。
+ */
+export function stripInjectedDisclaimer(content: string, disclaimer: string): string {
+  if (!disclaimer) return content;
+  const suffix = `\n\n---\n\n${disclaimer}`;
+  return content.endsWith(suffix) ? content.slice(0, -suffix.length) : content;
+}
+
 function numberId(text: string, index: number): string {
   return `num-${createHash("sha1")
     .update(`${index}:${normalizeNumber(text)}`)
@@ -983,6 +993,18 @@ export class DeliverablesService {
     const share = await this.db.get<DeliverableShare>(owner, DELIVERABLE_SHARES_KIND, shareId);
     if (!share) throw new AppError("Share not found", 404);
     await this.db.put(owner, DELIVERABLE_SHARES_KIND, { ...share, revoked: true });
+    const deliverable = await this.db.get<Deliverable>(
+      owner,
+      DELIVERABLES_KIND,
+      share.deliverable_id,
+    );
+    if (deliverable)
+      await this.record(owner, deliverable, {
+        actor: "user",
+        action: "share_revoked",
+        detail: `撤销分享链接 ${shareId}`,
+        version: deliverable.version,
+      });
   }
 
   /** 公开只读视图：只给已分享、未撤销的交付物，且只读发送时锁定的版本快照。 */

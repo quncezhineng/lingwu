@@ -10,8 +10,22 @@ import {
   parseDeliverable,
   parseDeliverables,
   parseDiff,
+  stripInjectedDisclaimer,
   unresolvedNumbers,
 } from "../src/deliverables.ts";
+
+test("stripInjectedDisclaimer removes only the trailing injected block", () => {
+  const disclaimer = "本内容由灵悟 AI 辅助生成，仅供投资参考。";
+  assert.equal(
+    stripInjectedDisclaimer(`营收 10%。\n\n---\n\n${disclaimer}`, disclaimer),
+    "营收 10%。",
+  );
+  assert.equal(stripInjectedDisclaimer("营收 10%。", disclaimer), "营收 10%。");
+  assert.equal(
+    stripInjectedDisclaimer("正文提到本内容由灵悟 AI 辅助生成。", disclaimer),
+    "正文提到本内容由灵悟 AI 辅助生成。",
+  );
+});
 
 const PAYLOAD = {
   id: "d-1",

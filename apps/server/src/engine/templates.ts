@@ -335,6 +335,23 @@ function normalizeCounterexamples(
   }));
 }
 
+/**
+ * 团队共享只暴露结构 / 口径：用章节骨架替代原始正文，
+ * 避免把来源交付物里的客户信息带出所有者边界。
+ */
+export function templateSkeleton(template: Pick<UserTemplate, "structure" | "fields">): string {
+  const sections = [...template.structure]
+    .sort((a, b) => a.order - b.order)
+    .map((section) =>
+      section.required ? `## ${section.title}\n\n` : `<!-- 可选章节：${section.title} -->\n`,
+    );
+  const required = template.fields
+    .filter((field) => field.required)
+    .map((field) => `${field.label}${field.unit ? `（${field.unit}）` : ""}`);
+  if (required.length) sections.push(`> 必填字段：${required.join("、")}\n`);
+  return sections.join("\n").trim();
+}
+
 function tokenize(text: string): string[] {
   const stop = new Set(
     "的了和与在是我你他这那有不就都也很到对及为上中下一这个那个我们你们他们".split(""),
@@ -429,7 +446,12 @@ export class TemplatesService {
     const all = await this.db.scan<UserTemplate>(TEMPLATES_KIND);
     return all
       .filter((entry) => entry.owner !== owner && entry.value.shared)
-      .map((entry) => entry.value)
+      .map((entry) => ({
+        ...entry.value,
+        // 共享模板不带原始正文与复用记录：只保留结构与口径。
+        sample_content: templateSkeleton(entry.value),
+        usage: [],
+      }))
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   }
 
@@ -604,9 +626,13 @@ export class TemplatesService {
     deliverableId: string,
     version: number,
     content: string,
+    actorOwner?: string,
   ): Promise<UserTemplate> {
     const template = await this.require(owner, templateId);
-    const result = humanEditRatio(template.sample_content, content);
+    // 共享模板对使用者只暴露骨架，改动率也以骨架为基准，避免用隐藏原文误判。
+    const base =
+      actorOwner && actorOwner !== owner ? templateSkeleton(template) : template.sample_content;
+    const result = humanEditRatio(base, content);
     const at = new Date().toISOString();
     const record: TemplateUsageRecord = {
       deliverable_id: deliverableId,

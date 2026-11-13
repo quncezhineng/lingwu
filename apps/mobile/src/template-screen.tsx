@@ -103,13 +103,11 @@ function MetricsPanel({ metrics }: { metrics: TemplateMetrics }) {
 
 function TemplateCard({
   template,
-  readonly,
   onOpen,
   onShare,
   onUse,
 }: {
   template: UserTemplate;
-  readonly?: boolean;
   onOpen: () => void;
   onShare?: () => void;
   onUse: () => void;
@@ -159,11 +157,9 @@ function TemplateCard({
         <Button small style={{ minHeight: 40 }} onPress={onOpen}>
           {t("templates.open")}
         </Button>
-        {!readonly && (
-          <Button small primary style={{ minHeight: 40 }} onPress={onUse}>
-            {t("templates.use")}
-          </Button>
-        )}
+        <Button small primary style={{ minHeight: 40 }} onPress={onUse}>
+          {t("templates.use")}
+        </Button>
         {onShare && (
           <Button small style={{ minHeight: 40 }} onPress={onShare}>
             {template.shared ? t("templates.unshare") : t("templates.share")}
@@ -237,11 +233,13 @@ function UseTemplateSheet({
 
 function TemplateDetail({
   template,
+  readonly,
   onClose,
   onChanged,
   onUse,
 }: {
   template: UserTemplate;
+  readonly?: boolean;
   onClose: () => void;
   onChanged: (next: UserTemplate) => void;
   onUse: () => void;
@@ -316,20 +314,24 @@ function TemplateDetail({
           <Button primary onPress={onUse}>
             {t("templates.use")}
           </Button>
-          <Button onPress={() => setEditing((value) => !value)}>
-            {editing ? t("templates.cancelEdit") : t("templates.edit")}
-          </Button>
-          <Button
-            busy={busy}
-            onPress={() =>
-              void setTemplateShared(api, template.id, !template.shared).then((next) => {
-                notify(next.shared ? t("templates.sharedNow") : t("templates.unsharedNow"));
-                onChanged(next);
-              })
-            }
-          >
-            {template.shared ? t("templates.unshare") : t("templates.share")}
-          </Button>
+          {!readonly && (
+            <Button onPress={() => setEditing((value) => !value)}>
+              {editing ? t("templates.cancelEdit") : t("templates.edit")}
+            </Button>
+          )}
+          {!readonly && (
+            <Button
+              busy={busy}
+              onPress={() =>
+                void setTemplateShared(api, template.id, !template.shared).then((next) => {
+                  notify(next.shared ? t("templates.sharedNow") : t("templates.unsharedNow"));
+                  onChanged(next);
+                })
+              }
+            >
+              {template.shared ? t("templates.unshare") : t("templates.share")}
+            </Button>
+          )}
         </View>
 
         {editing ? (
@@ -731,6 +733,7 @@ export function TemplateScreen() {
   const [tab, setTab] = useState<TemplateTab>("mine");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<UserTemplate>();
+  const [selectedReadonly, setSelectedReadonly] = useState(false);
   const [useTarget, setUseTarget] = useState<{
     id: string;
     name: string;
@@ -827,7 +830,10 @@ export function TemplateScreen() {
                 <View key={template.id} style={{ width: cardWidth }}>
                   <TemplateCard
                     template={template}
-                    onOpen={() => setSelected(template)}
+                    onOpen={() => {
+                      setSelectedReadonly(false);
+                      setSelected(template);
+                    }}
                     onShare={() => void setTemplateShared(api, template.id, !template.shared)}
                     onUse={() => use(template)}
                   />
@@ -852,8 +858,10 @@ export function TemplateScreen() {
               <View key={template.id} style={{ width: cardWidth }}>
                 <TemplateCard
                   template={template}
-                  readonly
-                  onOpen={() => setSelected(template)}
+                  onOpen={() => {
+                    setSelectedReadonly(true);
+                    setSelected(template);
+                  }}
                   onUse={() => use(template)}
                 />
               </View>
@@ -873,6 +881,7 @@ export function TemplateScreen() {
       {selected && (
         <TemplateDetail
           template={state.templates.find((item) => item.id === selected.id) ?? selected}
+          readonly={selectedReadonly}
           onClose={() => setSelected(undefined)}
           onChanged={(next) => setSelected(next)}
           onUse={() => use(selected)}

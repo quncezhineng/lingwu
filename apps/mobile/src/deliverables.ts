@@ -402,6 +402,13 @@ export function numberSummary(deliverable: Deliverable): {
   return count;
 }
 
+/** 发送时免责声明已注入正文；展示时去掉尾部注入块，避免渲染两遍。 */
+export function stripInjectedDisclaimer(content: string, disclaimer: string): string {
+  if (!disclaimer) return content;
+  const suffix = `\n\n---\n\n${disclaimer}`;
+  return content.endsWith(suffix) ? content.slice(0, -suffix.length) : content;
+}
+
 export function canApprove(deliverable: Deliverable): boolean {
   return deliverable.status === "in_review" && unresolvedNumbers(deliverable).length === 0;
 }

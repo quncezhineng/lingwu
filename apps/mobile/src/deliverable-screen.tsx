@@ -29,6 +29,7 @@ import {
   resolveDeliverableNumber,
   sendDeliverable,
   shareDeliverable,
+  stripInjectedDisclaimer,
   submitDeliverable,
   unresolvedNumbers,
   updateDeliverable,
@@ -550,7 +551,7 @@ function DeliverableDetail({
             </View>
           ) : (
             <Text style={[s.text, { fontSize: 14, lineHeight: 23 }]} selectable>
-              {item.content}
+              {stripInjectedDisclaimer(item.content, item.disclaimer)}
             </Text>
           )}
           {!!item.disclaimer && (

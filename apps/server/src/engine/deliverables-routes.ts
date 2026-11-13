@@ -63,6 +63,7 @@ export function deliverableRoutes(service: AgentService, config: Config): Hono<E
         deliverable.id,
         deliverable.version,
         deliverable.content,
+        owner,
       );
     }
     return c.json(deliverable, 201);
@@ -89,6 +90,7 @@ export function deliverableRoutes(service: AgentService, config: Config): Hono<E
         deliverable.id,
         deliverable.version,
         deliverable.content,
+        owner,
       );
     }
     return c.json(deliverable);
