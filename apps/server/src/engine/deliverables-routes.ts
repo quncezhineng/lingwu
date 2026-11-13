@@ -45,15 +45,53 @@ export function deliverableRoutes(service: AgentService, config: Config): Hono<E
     return c.json({ deliverables: await service.deliverables.list(c.get("owner"), query) });
   });
   app.post("/", async (c) => {
+    const owner = c.get("owner");
     const input = createDeliverableSchema.parse(await c.req.json());
-    return c.json(await service.deliverables.create(c.get("owner"), input), 201);
+    if (input.template_id && !input.template_version) {
+      const { template } = await service.templates.resolveUsable(owner, input.template_id);
+      input.template_version = `${template.id}@v${template.version}`;
+    }
+    const deliverable = await service.deliverables.create(owner, input);
+    if (deliverable.template_id) {
+      const { owner: templateOwner } = await service.templates.resolveUsable(
+        owner,
+        deliverable.template_id,
+      );
+      await service.templates.recordUsage(
+        templateOwner,
+        deliverable.template_id,
+        deliverable.id,
+        deliverable.version,
+        deliverable.content,
+      );
+    }
+    return c.json(deliverable, 201);
   });
   app.get("/:id", async (c) =>
     c.json(await service.deliverables.require(c.get("owner"), c.req.param("id"))),
   );
   app.put("/:id", async (c) => {
+    const owner = c.get("owner");
     const input = updateDeliverableSchema.parse(await c.req.json());
-    return c.json(await service.deliverables.update(c.get("owner"), c.req.param("id"), input));
+    if (input.template_id && !input.template_version) {
+      const { template } = await service.templates.resolveUsable(owner, input.template_id);
+      input.template_version = `${template.id}@v${template.version}`;
+    }
+    const deliverable = await service.deliverables.update(owner, c.req.param("id"), input);
+    if (deliverable.template_id) {
+      const { owner: templateOwner } = await service.templates.resolveUsable(
+        owner,
+        deliverable.template_id,
+      );
+      await service.templates.recordUsage(
+        templateOwner,
+        deliverable.template_id,
+        deliverable.id,
+        deliverable.version,
+        deliverable.content,
+      );
+    }
+    return c.json(deliverable);
   });
   app.post("/:id/submit", async (c) =>
     c.json(await service.deliverables.submit(c.get("owner"), c.req.param("id"))),

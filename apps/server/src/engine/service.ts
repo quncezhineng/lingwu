@@ -66,6 +66,7 @@ import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
 import { summarizeReport } from "./report-brief.ts";
 import { generateResearchReport, researchSymbolSchema } from "./research.ts";
+import { TemplatesService } from "./templates.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
 
@@ -120,6 +121,7 @@ export class AgentService {
   readonly portfolios: PortfoliosService;
   readonly notes: NotesService;
   readonly deliverables: DeliverablesService;
+  readonly templates: TemplatesService;
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
   readonly monitor: MonitorEngine;
@@ -147,6 +149,7 @@ export class AgentService {
     this.portfolios = new PortfoliosService(db, market);
     this.notes = new NotesService(db);
     this.deliverables = new DeliverablesService(db, auditSink);
+    this.templates = new TemplatesService(db);
     this.financials = new FinancialsService(db);
     this.priceAlerts = new PriceAlertsService(db, market);
     this.monitor = new MonitorEngine(db, market, {

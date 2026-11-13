@@ -85,6 +85,7 @@ const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: T
     portfolio: { titleKey: "app.titlePortfolio", subtitleKey: "app.subtitlePortfolio" },
     notes: { titleKey: "app.titleNotes", subtitleKey: "app.subtitleNotes" },
     deliverables: { titleKey: "deliverables.title", subtitleKey: "deliverables.subtitle" },
+    templates: { titleKey: "templates.title", subtitleKey: "templates.subtitle" },
     activity: { titleKey: "app.titleActivity", subtitleKey: "app.subtitleActivity" },
     ideas: { titleKey: "app.titleIdeas", subtitleKey: "app.subtitleIdeas" },
     goals: { titleKey: "app.titleGoals", subtitleKey: "app.subtitleGoals" },
@@ -738,7 +739,7 @@ function WorkspaceShell({
   const Screen =
     section === "today"
       ? WorkbenchScreen
-      : section === "deliverables"
+      : section === "deliverables" || section === "templates"
         ? FilesScreen
         : section === "watchlist" || section === "portfolio"
           ? WatchlistHubScreen
@@ -953,6 +954,7 @@ function WorkspaceShell({
                       section !== "files" &&
                       section !== "notes" &&
                       section !== "deliverables" &&
+                      section !== "templates" &&
                       section !== "goals" && (
                         <PageHeader
                           title={title ? t(title.titleKey) : ""}
@@ -963,14 +965,19 @@ function WorkspaceShell({
                     <ErrorNotice error={error} />
                     {section === "account" ? (
                       <AccountScreen onSignOut={onSignOut} />
-                    ) : section === "files" || section === "notes" || section === "deliverables" ? (
+                    ) : section === "files" ||
+                      section === "notes" ||
+                      section === "deliverables" ||
+                      section === "templates" ? (
                       <FilesScreen
                         initialSection={
                           section === "notes"
                             ? "notes"
                             : section === "deliverables"
                               ? "deliverables"
-                              : "files"
+                              : section === "templates"
+                                ? "templates"
+                                : "files"
                         }
                       />
                     ) : (
@@ -1040,7 +1047,9 @@ function WorkspaceShell({
                         (item.id === "activity" && section === "goals") ||
                         (item.id === "today" && ["watchlist", "portfolio"].includes(section)) ||
                         (item.id === "files" &&
-                          (section === "notes" || section === "deliverables")) ||
+                          (section === "notes" ||
+                            section === "deliverables" ||
+                            section === "templates")) ||
                         (item.id === "account" &&
                           ["memories", "apps", "connections"].includes(section));
                       return (

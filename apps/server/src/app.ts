@@ -42,6 +42,7 @@ import { agentRoutes } from "./engine/routes.ts";
 import { AgentService } from "./engine/service.ts";
 import { ConversationStream } from "./engine/stream.ts";
 import { conversationStreamRoutes } from "./engine/stream-routes.ts";
+import { templateRoutes } from "./engine/templates-routes.ts";
 import { symbolRoutes, watchlistRoutes } from "./engine/watchlist-routes.ts";
 import { AppError } from "./errors.ts";
 import { Files } from "./files.ts";
@@ -574,6 +575,7 @@ export async function createApp(
   app.route("/api/notes", noteRoutes(agent));
   app.route("/api/monitor", monitorRoutes(agent));
   app.route("/api/deliverables", deliverableRoutes(agent, config));
+  app.route("/api/templates", templateRoutes(agent));
   app.route("/api/financials", financialRoutes(agent));
   app.route("/api/market", marketRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));

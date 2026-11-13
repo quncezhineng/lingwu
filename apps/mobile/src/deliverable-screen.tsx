@@ -37,6 +37,7 @@ import {
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { AlertTriangle, ArrowUpRight, Clock3, FileText, Link2, Plus, ShieldCheck } from "./icons";
+import { createTemplateFromDeliverable } from "./templates";
 import { breakpoints, radius, space } from "./theme";
 import {
   Button,
@@ -386,6 +387,9 @@ function DeliverableDetail({
     >
       <View style={{ gap: space.md }}>
         <ErrorNotice error={error || state.error} />
+        {item.templateVersion && (
+          <Chip>{t("deliverables.usedTemplate", { version: item.templateVersion })}</Chip>
+        )}
 
         <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
           {item.status === "draft" && (
@@ -461,6 +465,17 @@ function DeliverableDetail({
               {t("deliverables.archive")}
             </Button>
           )}
+          <Button
+            busy={busy}
+            onPress={() =>
+              void run(
+                () => createTemplateFromDeliverable(api, item.id),
+                t("deliverables.savedAsTemplate"),
+              )
+            }
+          >
+            {t("deliverables.saveAsTemplate")}
+          </Button>
           {item.status === "archived" && (
             <Button
               busy={busy}

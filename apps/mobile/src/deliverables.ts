@@ -44,7 +44,7 @@ export interface DeliverableNumberRef {
 }
 
 export interface DeliverableSourceLink {
-  type: "task" | "briefing" | "symbol" | "thesis" | "note" | "artifact" | "url";
+  type: "task" | "briefing" | "symbol" | "thesis" | "note" | "artifact" | "deliverable" | "url";
   id: string;
   label?: string;
   url?: string;
@@ -198,7 +198,9 @@ function parseSourceLink(value: unknown): DeliverableSourceLink | undefined {
   if (
     !id ||
     !type ||
-    !["task", "briefing", "symbol", "thesis", "note", "artifact", "url"].includes(type)
+    !["task", "briefing", "symbol", "thesis", "note", "artifact", "deliverable", "url"].includes(
+      type,
+    )
   )
     return undefined;
   return {
@@ -496,6 +498,8 @@ export interface CreateDeliverableInput {
     fetched_at?: string;
   }[];
   source_links?: DeliverableSourceLink[];
+  template_id?: string;
+  template_version?: string;
   disclaimer?: string;
   recipient?: string;
 }
