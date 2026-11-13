@@ -526,7 +526,8 @@ test("ordered list markers and heading ordinals are not treated as unsourced num
     {
       kind: "REPORT",
       title: "编号研报",
-      content: "## 1. 摘要\n1. 营收增长\n2. 毛利提升\n- 3) 风险可控\n结论：维持买入。",
+      content:
+        "## 1. 摘要\n1. 营收增长\n2. 毛利提升\n1、渠道改善\n2、库存健康\n（1）风险可控\n（2）估值合理\n- 3) 结论：维持买入。",
     },
     201,
   );
@@ -583,6 +584,41 @@ test("model PII findings are actually redacted, and unredactable findings block 
   assert.ok(blockedAudit.some((entry) => entry.detail === "pii_unredacted"));
   assert.equal(
     blockedAudit.some((entry) => entry.action === "pii_redacted"),
+    false,
+  );
+});
+
+test("model PII findings that overlap rule hits are treated as already handled", async () => {
+  const hooked = new DeliverablesService(db, {
+    piiReview: async () => [
+      {
+        code: "phone",
+        label: "手机号",
+        excerpt: "13800138000",
+        redacted: "138****8000",
+      },
+    ],
+  });
+  const note = await hooked.create(
+    "model-owner-overlap",
+    createDeliverableSchema.parse({
+      title: "规则重叠",
+      content: "客户电话 13800138000。",
+    }),
+  );
+  await hooked.submit("model-owner-overlap", note.id);
+  await hooked.approve("model-owner-overlap", note.id);
+  const sent = await hooked.send("model-owner-overlap", note.id, {
+    recipients: ["reader@example.com"],
+    channel: "manual",
+    actor: "user",
+  });
+  assert.equal(sent.status, "sent");
+  assert.doesNotMatch(sent.content, /13800138000/);
+  const audit = await hooked.audits("model-owner-overlap", note.id);
+  assert.ok(audit.some((entry) => entry.action === "pii_redacted"));
+  assert.equal(
+    audit.some((entry) => entry.detail === "pii_unredacted"),
     false,
   );
 });

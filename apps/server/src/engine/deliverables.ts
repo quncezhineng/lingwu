@@ -224,7 +224,11 @@ export function extractNumericTokens(content: string): NumericToken[] {
     const lineStart = masked.lastIndexOf("\n", start - 1) + 1;
     const prefix = masked.slice(lineStart, start);
     const suffix = masked.slice(start + text.length);
-    if (/^\s*(?:(?:#{1,6}|[-*+])\s*)?$/.test(prefix) && /^[.)、](?:\s|$)/.test(suffix)) continue;
+    // 中文顿号编号（`1、渠道`）后面通常直接接正文，不要求空格。
+    if (/^\s*(?:(?:#{1,6}|[-*+])\s*)?$/.test(prefix) && /^(?:[.)](?:\s|$)|、)/.test(suffix))
+      continue;
+    // 中文括号编号：`（1）` / `(1)`，括号内只有数字时按序号处理。
+    if (/[（(]\s*$/.test(prefix) && /^[）)]/.test(suffix) && /^\d+$/.test(text)) continue;
     const digits = text.replace(/\D/g, "");
     if (/^1[3-9]\d{9}$/.test(digits) || digits.length >= 15) continue;
     const key = normalizeNumericToken(text);
@@ -320,7 +324,8 @@ export function redactPii(text: string): string {
 
 /**
  * 应用模型复核给出的 `redacted` 文本。
- * 命中片段找不到、或 `redacted` 仍等于原文时视为无法脱敏，由调用方阻断发送，
+ * 命中片段已不存在（例如规则库先行脱敏）时视为已处理；
+ * `redacted` 为空或仍等于原文时视为无法脱敏，由调用方阻断发送，
  * 避免出现「正文未脱敏但审计写 pii_redacted」。
  */
 export function applyModelPiiFindings(
@@ -334,10 +339,8 @@ export function applyModelPiiFindings(
       missing.push(finding.excerpt || finding.label);
       continue;
     }
-    if (!next.includes(finding.excerpt)) {
-      missing.push(finding.excerpt);
-      continue;
-    }
+    // 规则库已经先行脱敏过的重叠命中，此处视为已处理。
+    if (!next.includes(finding.excerpt)) continue;
     next = next.split(finding.excerpt).join(finding.redacted);
   }
   return { content: next, missing };

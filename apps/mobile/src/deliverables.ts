@@ -500,7 +500,11 @@ export function deliverableNumberTokens(content: string): DeliverableNumberToken
     const lineStart = masked.lastIndexOf("\n", start - 1) + 1;
     const prefix = masked.slice(lineStart, start);
     const suffix = masked.slice(start + text.length);
-    if (/^\s*(?:(?:#{1,6}|[-*+])\s*)?$/.test(prefix) && /^[.)、](?:\s|$)/.test(suffix)) continue;
+    // 中文顿号编号（`1、渠道`）后面通常直接接正文，不要求空格。
+    if (/^\s*(?:(?:#{1,6}|[-*+])\s*)?$/.test(prefix) && /^(?:[.)](?:\s|$)|、)/.test(suffix))
+      continue;
+    // 中文括号编号：`（1）` / `(1)`，括号内只有数字时按序号处理。
+    if (/[（(]\s*$/.test(prefix) && /^[）)]/.test(suffix) && /^\d+$/.test(text)) continue;
     const digits = text.replace(/\D/g, "");
     if (/^1[3-9]\d{9}$/.test(digits) || digits.length >= 15) continue;
     const key = normalizeDeliverableNumber(text);

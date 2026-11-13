@@ -300,7 +300,9 @@ test("数字 token 保留正负号与单位，未溯源数字按 token 精确定
   assert.deepEqual(pending, [{ text: "+5%", occurrence: 1 }]);
 
   assert.deepEqual(
-    deliverableNumberTokens("## 1. 摘要\n1. 营收增长\n2. 毛利提升\n- 3) 风险可控\n增长 23%。"),
+    deliverableNumberTokens(
+      "## 1. 摘要\n1. 营收增长\n2. 毛利提升\n1、渠道改善\n2、库存健康\n（1）风险可控\n（2）估值合理\n- 3) 风险可控\n增长 23%。",
+    ),
     [{ text: "23%", occurrence: 1 }],
   );
 });
