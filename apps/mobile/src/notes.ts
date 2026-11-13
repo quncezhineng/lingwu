@@ -33,6 +33,8 @@ export interface ThesisEvidence {
 }
 
 export interface ThesisEvidenceInput {
+  /** 已有证据的 id；编辑链接时用它保留证据身份与抓取时间。 */
+  id?: string;
   url: string;
   publishedAt?: string;
   quoteNumber?: string;
@@ -714,9 +716,10 @@ export async function updateNote(
     content?: string;
     status?: ThesisStatus;
     evidence?: ThesisEvidenceInput[];
-    falsifyCondition?: ThesisFalsifyCondition;
-    horizon?: ThesisHorizon;
-    confidence?: number;
+    /** null 表示显式清空该字段。 */
+    falsifyCondition?: ThesisFalsifyCondition | null;
+    horizon?: ThesisHorizon | null;
+    confidence?: number | null;
   },
 ): Promise<InvestmentNote> {
   if (state.source === "api") {
@@ -730,12 +733,14 @@ export async function updateNote(
         ...(evidence === undefined ? {} : { evidence }),
         ...(patch.falsifyCondition === undefined
           ? {}
-          : {
-              falsify_condition: {
-                kind: patch.falsifyCondition.kind,
-                expression: patch.falsifyCondition.expression,
-              },
-            }),
+          : patch.falsifyCondition === null
+            ? { falsify_condition: null }
+            : {
+                falsify_condition: {
+                  kind: patch.falsifyCondition.kind,
+                  expression: patch.falsifyCondition.expression,
+                },
+              }),
         ...(patch.horizon === undefined ? {} : { horizon: patch.horizon }),
         ...(patch.confidence === undefined ? {} : { confidence: patch.confidence }),
       },
@@ -756,18 +761,13 @@ export async function updateNote(
     ...(patch.evidence === undefined
       ? {}
       : {
-          evidence: patch.evidence.map((item, index) => ({
-            id: existing.evidence?.[index]?.id ?? `local-evidence-${index}`,
-            url: item.url,
-            publishedAt: item.publishedAt,
-            quoteNumber: item.quoteNumber,
-            fetchedAt: existing.evidence?.[index]?.fetchedAt ?? new Date().toISOString(),
-            healthy: true,
-          })),
+          evidence: mergeEvidence(existing.evidence, patch.evidence),
         }),
-    ...(patch.falsifyCondition === undefined ? {} : { falsifyCondition: patch.falsifyCondition }),
-    ...(patch.horizon === undefined ? {} : { horizon: patch.horizon }),
-    ...(patch.confidence === undefined ? {} : { confidence: patch.confidence }),
+    ...(patch.falsifyCondition === undefined
+      ? {}
+      : { falsifyCondition: patch.falsifyCondition ?? undefined }),
+    ...(patch.horizon === undefined ? {} : { horizon: patch.horizon ?? undefined }),
+    ...(patch.confidence === undefined ? {} : { confidence: patch.confidence ?? undefined }),
     updatedAt: new Date().toISOString(),
   };
   setState({ notes: state.notes.map((item) => (item.id === id ? updated : item)) });
@@ -777,10 +777,33 @@ export async function updateNote(
 function apiEvidence(evidence?: ThesisEvidenceInput[]) {
   if (!evidence?.length) return evidence;
   return evidence.map((item) => ({
+    ...(item.id ? { id: item.id } : {}),
     url: item.url,
     ...(item.publishedAt ? { published_at: item.publishedAt } : {}),
     ...(item.quoteNumber ? { quote_number: item.quoteNumber } : {}),
   }));
+}
+
+/** 本地 mock 与接口保持同一合并规则：优先按 id，其次按 URL 复用原证据。 */
+export function mergeEvidence(
+  existing: ThesisEvidence[] | undefined,
+  input: ThesisEvidenceInput[],
+): ThesisEvidence[] {
+  const at = new Date().toISOString();
+  return input.map((item, index) => {
+    const previous =
+      (item.id ? existing?.find((entry) => entry.id === item.id) : undefined) ??
+      existing?.find((entry) => entry.url === item.url) ??
+      existing?.[index];
+    return {
+      id: previous?.id ?? item.id ?? `local-evidence-${index}`,
+      url: item.url,
+      publishedAt: item.publishedAt,
+      quoteNumber: item.quoteNumber,
+      fetchedAt: previous?.fetchedAt ?? at,
+      healthy: previous?.healthy ?? true,
+    };
+  });
 }
 
 export async function deleteNote(api: LingWuApi, id: string): Promise<void> {

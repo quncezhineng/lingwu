@@ -2,7 +2,7 @@
  * 笔记与论点共用 UI：类型/状态 Chip、笔记卡、编辑器、详情、检验记录、确认状态、
  * 标的详情内嵌笔记区。
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, View } from "react-native";
 import type { LingWuApi } from "./api";
 import { Text, TextInput } from "./app-text";
@@ -68,6 +68,25 @@ const STATUS_LABEL: Record<ThesisStatus, TranslationKey> = {
   INVALIDATED: "notes.statusInvalid",
   EXPIRED: "notes.statusExpired",
 };
+
+type EvidenceDraft = {
+  key: string;
+  id?: string;
+  url: string;
+  quoteNumber: string;
+  publishedAt: string;
+};
+
+function evidenceDraftsFrom(note: InvestmentNote | undefined): EvidenceDraft[] {
+  if (!note) return [{ key: "new-0", url: "", quoteNumber: "", publishedAt: "" }];
+  return (note.evidence ?? []).map((item) => ({
+    key: item.id,
+    id: item.id,
+    url: item.url,
+    quoteNumber: item.quoteNumber ?? "",
+    publishedAt: item.publishedAt ?? "",
+  }));
+}
 
 const STATUS_COLOR: Record<ThesisStatus, { text: string; background: string; icon: typeof Check }> =
   {
@@ -409,9 +428,10 @@ export function NoteEditorSheet({
   );
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
-  const [evidenceUrl, setEvidenceUrl] = useState(initial?.evidence?.[0]?.url ?? "");
-  const [evidenceQuote, setEvidenceQuote] = useState(initial?.evidence?.[0]?.quoteNumber ?? "");
-  const [evidenceDate, setEvidenceDate] = useState(initial?.evidence?.[0]?.publishedAt ?? "");
+  const [evidenceDrafts, setEvidenceDrafts] = useState<EvidenceDraft[]>(() =>
+    evidenceDraftsFrom(initial),
+  );
+  const nextEvidenceKey = useRef(initial?.evidence?.length ?? 1);
   const [falsifyKind, setFalsifyKind] = useState<FalsifyKind>(
     initial?.falsifyCondition?.kind ?? "CUSTOM",
   );
@@ -424,26 +444,46 @@ export function NoteEditorSheet({
   const [error, setError] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
+  const initialEvidenceSignature = (initial?.evidence ?? [])
+    .map((item) =>
+      [item.id, item.url, item.quoteNumber ?? "", item.publishedAt ?? ""].join("\u0001"),
+    )
+    .join("\u0002");
+  const evidenceSignature = evidenceDrafts
+    .map((item) => [item.id ?? "", item.url, item.quoteNumber, item.publishedAt].join("\u0001"))
+    .join("\u0002");
   const dirty =
     content !== initialContent ||
     title !== initialTitle ||
-    evidenceUrl !== (initial?.evidence?.[0]?.url ?? "") ||
-    evidenceQuote !== (initial?.evidence?.[0]?.quoteNumber ?? "") ||
-    evidenceDate !== (initial?.evidence?.[0]?.publishedAt ?? "") ||
+    evidenceSignature !== initialEvidenceSignature ||
     falsifyExpression !== (initial?.falsifyCondition?.expression ?? "") ||
     horizonEnd !== (initial?.horizon?.to ?? "") ||
     confidence !== initial?.confidence ||
     (!initial && symbol?.code !== initialSymbolCode);
   const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-  const evidenceUrlValid = /^https?:\/\/\S+$/i.test(evidenceUrl.trim());
+  const evidenceRows = evidenceDrafts.map((item) => ({ ...item, url: item.url.trim() }));
+  const filledEvidence = evidenceRows.filter((item) => item.url);
+  const requiresEvidence = type === "THESIS" && (initial?.status ?? "ACTIVE") === "ACTIVE";
+  const evidenceUrlInvalid = evidenceRows.some(
+    (item) => !!item.url && !/^https?:\/\/\S+$/i.test(item.url),
+  );
+  const evidenceDateInvalid = evidenceRows.some(
+    (item) => !!item.publishedAt && !datePattern.test(item.publishedAt),
+  );
+  // 只填了引用数字/发布日期却没填链接，说明这一行证据不完整，不能静默丢弃。
+  const evidenceIncomplete = evidenceRows.some(
+    (item) => !item.url && (!!item.quoteNumber.trim() || !!item.publishedAt),
+  );
   const evidenceError =
-    type === "THESIS" && !evidenceUrl.trim()
-      ? t("notes.evidenceRequired")
-      : type === "THESIS" && !evidenceUrlValid
-        ? t("notes.evidenceInvalid")
-        : evidenceDate && !datePattern.test(evidenceDate)
-          ? t("notes.dateInvalid")
-          : "";
+    type !== "THESIS"
+      ? ""
+      : requiresEvidence && !filledEvidence.length
+        ? t("notes.evidenceRequired")
+        : evidenceUrlInvalid || evidenceIncomplete
+          ? t("notes.evidenceInvalid")
+          : evidenceDateInvalid
+            ? t("notes.dateInvalid")
+            : "";
   const horizonError = horizonEnd && !datePattern.test(horizonEnd) ? t("notes.dateInvalid") : "";
   const contentError = !content.trim()
     ? t("notes.contentRequired")
@@ -455,14 +495,13 @@ export function NoteEditorSheet({
   const symbolError = !symbol ? t("notes.symbolRequired") : "";
   const canSave = !contentError && !symbolError && !evidenceError && !horizonError && !busy;
   const thesisEvidence: ThesisEvidenceInput[] | undefined =
-    type === "THESIS" && evidenceUrl.trim()
-      ? [
-          {
-            url: evidenceUrl.trim(),
-            ...(evidenceDate ? { publishedAt: evidenceDate } : {}),
-            ...(evidenceQuote.trim() ? { quoteNumber: evidenceQuote.trim() } : {}),
-          },
-        ]
+    type === "THESIS"
+      ? filledEvidence.map((item) => ({
+          ...(item.id ? { id: item.id } : {}),
+          url: item.url,
+          ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}),
+          ...(item.quoteNumber.trim() ? { quoteNumber: item.quoteNumber.trim() } : {}),
+        }))
       : undefined;
   const falsifyCondition: ThesisFalsifyCondition | undefined =
     type === "THESIS" && falsifyExpression.trim()
@@ -472,6 +511,19 @@ export function NoteEditorSheet({
     type === "THESIS" && horizonEnd
       ? { from: initial?.horizon?.from ?? new Date().toISOString().slice(0, 10), to: horizonEnd }
       : undefined;
+
+  const setEvidenceDraft = (key: string, patch: Partial<EvidenceDraft>) =>
+    setEvidenceDrafts((drafts) =>
+      drafts.map((draft) => (draft.key === key ? { ...draft, ...patch } : draft)),
+    );
+  const removeEvidenceDraft = (key: string) =>
+    setEvidenceDrafts((drafts) => drafts.filter((draft) => draft.key !== key));
+  const addEvidenceDraft = () =>
+    setEvidenceDrafts((drafts) => {
+      if (drafts.length >= 10) return drafts;
+      const key = `new-${nextEvidenceKey.current++}`;
+      return [...drafts, { key, url: "", quoteNumber: "", publishedAt: "" }];
+    });
 
   const requestClose = () => {
     if (dirty) setConfirmDiscard(true);
@@ -586,43 +638,97 @@ export function NoteEditorSheet({
       {type === "THESIS" && (
         <View style={{ gap: 10, marginTop: 14 }}>
           <Text style={[s.small, { color: colors.text, fontWeight: "600" }]}>
-            {t("notes.evidenceLabel")} *
+            {t("notes.evidenceLabel")}
+            {requiresEvidence ? " *" : ""}
           </Text>
-          <TextInput
-            value={evidenceUrl}
-            onChangeText={setEvidenceUrl}
-            placeholder={t("notes.evidencePlaceholder")}
-            placeholderTextColor={colors.faint}
-            accessibilityLabel={t("notes.evidenceLabel")}
-            autoCapitalize="none"
-            style={[
-              s.input,
-              !!evidenceError && evidenceUrl.length > 0 && { borderColor: colors.danger },
-            ]}
-          />
+          {evidenceDrafts.map((draft, index) => (
+            <View
+              key={draft.key}
+              style={{
+                gap: 8,
+                padding: 10,
+                borderWidth: 1,
+                borderColor: colors.line,
+                borderRadius: 12,
+                backgroundColor: colors.surface,
+              }}
+            >
+              <View style={[s.between, { gap: 8 }]}>
+                <Text style={[s.small, { fontWeight: "600", color: colors.muted }]}>
+                  {t("notes.evidenceHeading")} {index + 1}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("notes.evidenceRemove")}
+                  onPress={() => removeEvidenceDraft(draft.key)}
+                  style={({ pressed }) => ({
+                    minHeight: 32,
+                    paddingHorizontal: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    borderRadius: 8,
+                    backgroundColor: pressed ? colors.overlay1 : "transparent",
+                  })}
+                >
+                  <Trash2 size={14} color={colors.danger} />
+                  <Text style={[s.small, { color: colors.danger }]}>
+                    {t("notes.evidenceRemove")}
+                  </Text>
+                </Pressable>
+              </View>
+              <TextInput
+                value={draft.url}
+                onChangeText={(text) => setEvidenceDraft(draft.key, { url: text })}
+                placeholder={t("notes.evidencePlaceholder")}
+                placeholderTextColor={colors.faint}
+                accessibilityLabel={t("notes.evidenceLabel")}
+                autoCapitalize="none"
+                style={[
+                  s.input,
+                  !!draft.url.trim() &&
+                    !/^https?:\/\/\S+$/i.test(draft.url.trim()) && { borderColor: colors.danger },
+                ]}
+              />
+              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                <TextInput
+                  value={draft.quoteNumber}
+                  onChangeText={(text) =>
+                    setEvidenceDraft(draft.key, { quoteNumber: text.slice(0, 120) })
+                  }
+                  placeholder={t("notes.evidenceQuotePlaceholder")}
+                  placeholderTextColor={colors.faint}
+                  accessibilityLabel={t("notes.evidenceQuoteLabel")}
+                  style={[s.input, { flex: 1, minWidth: 150 }]}
+                />
+                <TextInput
+                  value={draft.publishedAt}
+                  onChangeText={(text) =>
+                    setEvidenceDraft(draft.key, { publishedAt: text.slice(0, 10) })
+                  }
+                  placeholder={t("notes.evidenceDatePlaceholder")}
+                  placeholderTextColor={colors.faint}
+                  accessibilityLabel={t("notes.evidenceDateLabel")}
+                  style={[
+                    s.input,
+                    { width: 132 },
+                    !!draft.publishedAt &&
+                      !datePattern.test(draft.publishedAt) && { borderColor: colors.danger },
+                  ]}
+                />
+              </View>
+            </View>
+          ))}
+          {evidenceDrafts.length < 10 && (
+            <Button variant="outline" icon={Plus} onPress={addEvidenceDraft}>
+              {t("notes.evidenceAdd")}
+            </Button>
+          )}
           {!!evidenceError && (
             <Text accessibilityRole="alert" style={[s.small, { color: colors.danger }]}>
               {evidenceError}
             </Text>
           )}
-          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-            <TextInput
-              value={evidenceQuote}
-              onChangeText={(text) => setEvidenceQuote(text.slice(0, 120))}
-              placeholder={t("notes.evidenceQuotePlaceholder")}
-              placeholderTextColor={colors.faint}
-              accessibilityLabel={t("notes.evidenceQuoteLabel")}
-              style={[s.input, { flex: 1, minWidth: 150 }]}
-            />
-            <TextInput
-              value={evidenceDate}
-              onChangeText={(text) => setEvidenceDate(text.slice(0, 10))}
-              placeholder={t("notes.evidenceDatePlaceholder")}
-              placeholderTextColor={colors.faint}
-              accessibilityLabel={t("notes.evidenceDateLabel")}
-              style={[s.input, { width: 132 }]}
-            />
-          </View>
           <Text style={[s.small, { color: colors.text, fontWeight: "600" }]}>
             {t("notes.falsifyLabel")}
           </Text>
@@ -743,10 +849,11 @@ export function NoteEditorSheet({
                     content: content.trim(),
                     ...(initial.type === "THESIS"
                       ? {
-                          ...(thesisEvidence ? { evidence: thesisEvidence } : {}),
-                          ...(falsifyCondition ? { falsifyCondition } : {}),
-                          ...(horizon ? { horizon } : {}),
-                          ...(confidence !== undefined ? { confidence } : {}),
+                          // 完整回传所有证据行；空数组是显式清空，不能靠省略字段表示。
+                          evidence: thesisEvidence ?? [],
+                          falsifyCondition: falsifyCondition ?? null,
+                          horizon: horizon ?? null,
+                          confidence: confidence ?? null,
                         }
                       : {}),
                   });
@@ -757,7 +864,7 @@ export function NoteEditorSheet({
                     title: title.trim() || undefined,
                     content: content.trim(),
                     status: type === "THESIS" ? "ACTIVE" : undefined,
-                    ...(thesisEvidence ? { evidence: thesisEvidence } : {}),
+                    ...(thesisEvidence?.length ? { evidence: thesisEvidence } : {}),
                     ...(falsifyCondition ? { falsifyCondition } : {}),
                     ...(horizon ? { horizon } : {}),
                     ...(confidence !== undefined ? { confidence } : {}),

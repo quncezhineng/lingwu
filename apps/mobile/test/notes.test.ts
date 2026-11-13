@@ -10,6 +10,7 @@ import {
   groupNotesByDate,
   type InvestmentNote,
   loadNotes,
+  mergeEvidence,
   newestCheckEntry,
   notesSnapshot,
   parseNote,
@@ -286,4 +287,111 @@ test("标题可选：创建时写入，清空后回退正文摘要", async () =>
   assert.equal(created.title, "毛利率修复");
   const cleared = await updateNote(api, created.id, { title: "" });
   assert.equal(cleared.title, undefined);
+});
+
+test("编辑双证据时完整回传两条证据，并按 id 保留证据身份", async () => {
+  let updateBody: Record<string, unknown> | undefined;
+  const payload = {
+    ...NOTE_PAYLOAD,
+    evidence: [
+      {
+        id: "ev-1",
+        url: "https://example.com/aapl-q3",
+        quote_number: "服务收入同比 +14%",
+        fetched_at: "2026-10-26T08:00:00.000Z",
+        healthy: true,
+      },
+      {
+        id: "ev-2",
+        url: "https://example.com/aapl-guidance",
+        quote_number: "全年指引不变",
+        fetched_at: "2026-10-26T08:00:00.000Z",
+        healthy: true,
+      },
+    ],
+  };
+  const api = fakeApi((path, body, method) => {
+    if (path === "/api/notes?limit=200") return { notes: [payload] };
+    if (path === "/api/notes/thesis-check/latest") return { check: null, next_run: null };
+    if (path.endsWith("/checks?limit=5")) return { checks: [] };
+    if (method === "PUT" || (path.startsWith("/api/notes/") && body !== undefined)) {
+      updateBody = body as Record<string, unknown>;
+      return payload;
+    }
+    return {};
+  });
+  await loadNotes(api, true);
+  await updateNote(api, "n-1", {
+    title: "服务收入占比",
+    content: "服务业务将在 2027 年贡献 30% 营收。",
+    evidence: [
+      {
+        id: "ev-1",
+        url: "https://example.com/aapl-q3",
+        quoteNumber: "服务收入同比 +14%",
+      },
+      {
+        id: "ev-2",
+        url: "https://example.com/aapl-guidance",
+        quoteNumber: "全年指引不变",
+      },
+    ],
+  });
+  const sent = updateBody?.evidence as Array<Record<string, unknown>> | undefined;
+  assert.equal(sent?.length, 2);
+  assert.equal(sent?.[0]?.id, "ev-1");
+  assert.equal(sent?.[1]?.id, "ev-2");
+  assert.equal(sent?.[1]?.url, "https://example.com/aapl-guidance");
+});
+
+test("编辑器显式清空字段发送 null，清空证据发送空数组", async () => {
+  let updateBody: Record<string, unknown> | undefined;
+  const api = fakeApi((path, body, method) => {
+    if (path === "/api/notes?limit=200") return { notes: [{ ...NOTE_PAYLOAD, evidence: [] }] };
+    if (path === "/api/notes/thesis-check/latest") return { check: null, next_run: null };
+    if (path.endsWith("/checks?limit=5")) return { checks: [] };
+    if (method === "PUT" || (path.startsWith("/api/notes/") && body !== undefined)) {
+      updateBody = body as Record<string, unknown>;
+      return { ...NOTE_PAYLOAD, status: "VALIDATED", evidence: [] };
+    }
+    return {};
+  });
+  await loadNotes(api, true);
+  await updateNote(api, "n-1", {
+    evidence: [],
+    falsifyCondition: null,
+    horizon: null,
+    confidence: null,
+  });
+  assert.deepEqual(updateBody?.evidence, []);
+  assert.equal(updateBody?.falsify_condition, null);
+  assert.equal(updateBody?.horizon, null);
+  assert.equal(updateBody?.confidence, null);
+});
+
+test("本地证据合并优先按 id、其次按 URL，并保留抓取时间", () => {
+  const existing = [
+    {
+      id: "ev-1",
+      url: "https://example.com/one",
+      fetchedAt: "2026-10-01T00:00:00.000Z",
+      healthy: true,
+    },
+    {
+      id: "ev-2",
+      url: "https://example.com/two",
+      fetchedAt: "2026-10-02T00:00:00.000Z",
+      healthy: true,
+    },
+  ];
+  const merged = mergeEvidence(existing, [
+    { id: "ev-1", url: "https://example.com/one-updated" },
+    { url: "https://example.com/two" },
+  ]);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0]?.id, "ev-1");
+  assert.equal(merged[0]?.url, "https://example.com/one-updated");
+  assert.equal(merged[0]?.fetchedAt, "2026-10-01T00:00:00.000Z");
+  assert.equal(merged[1]?.id, "ev-2");
+  assert.deepEqual(mergeEvidence(existing, []), []);
 });

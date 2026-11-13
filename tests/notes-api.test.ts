@@ -249,8 +249,29 @@ test("active theses require evidence and validate thesis fields", async () => {
       method: "PUT",
       body: JSON.stringify({ evidence: [] }),
     },
+    422,
+  );
+  const stillActive = await call<InvestmentNote>(
+    `/notes/${note.id}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ status: "ACTIVE" }),
+    },
     200,
   );
+  assert.equal(stillActive.evidence?.length, 1);
+
+  // 已不是活跃状态的论点允许显式清空证据；再次设为 ACTIVE 时仍会被拒绝。
+  const validated = await call<InvestmentNote>(`/notes/${note.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "VALIDATED" }),
+  });
+  assert.equal(validated.status, "VALIDATED");
+  const cleared = await call<InvestmentNote>(`/notes/${note.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ evidence: [] }),
+  });
+  assert.deepEqual(cleared.evidence ?? [], []);
   await call(
     `/notes/${note.id}`,
     {
@@ -259,6 +280,58 @@ test("active theses require evidence and validate thesis fields", async () => {
     },
     422,
   );
+});
+
+test("clearing thesis fields removes the stored values", async () => {
+  const note = await post<InvestmentNote>("/notes", {
+    symbol_code: "MSFT",
+    type: "THESIS",
+    content: "论点字段可以被显式清空",
+    evidence: [evidence],
+    falsify_condition: { kind: "PRICE_BELOW", expression: "跌破 300" },
+    horizon: { from: "2026-11-01", to: "2027-03-31" },
+    confidence: 0.7,
+  });
+  assert.ok(note.falsify_condition);
+  assert.ok(note.horizon);
+  assert.equal(note.confidence, 0.7);
+
+  const cleared = await call<InvestmentNote>(`/notes/${note.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      falsify_condition: null,
+      horizon: null,
+      confidence: null,
+    }),
+  });
+  assert.equal(cleared.falsify_condition, undefined);
+  assert.equal(cleared.horizon, undefined);
+  assert.equal(cleared.confidence, undefined);
+  assert.equal(cleared.evidence?.length, 1);
+});
+
+test("evidence identity is preserved by id when its URL changes", async () => {
+  const note = await post<InvestmentNote>("/notes", {
+    symbol_code: "NVDA",
+    type: "THESIS",
+    content: "证据 URL 更新时保留原证据身份",
+    evidence: [evidence],
+  });
+  const evidenceId = note.evidence?.[0]?.id;
+  const updated = await call<InvestmentNote>(`/notes/${note.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      evidence: [
+        {
+          id: evidenceId,
+          url: "https://example.com/reports/nvda-updated",
+          quote_number: "数据中心收入同比 +56%",
+        },
+      ],
+    }),
+  });
+  assert.equal(updated.evidence?.[0]?.id, evidenceId);
+  assert.equal(updated.evidence?.[0]?.url, "https://example.com/reports/nvda-updated");
 });
 
 test("thesis review due follows the horizon window", () => {

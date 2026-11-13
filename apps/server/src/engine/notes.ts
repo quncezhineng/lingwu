@@ -35,6 +35,7 @@ const httpUrlSchema = z
 
 /** 客户端只提交可复核的原始信息；id / fetched_at / healthy 由服务端维护。 */
 export const evidenceInputSchema = z.object({
+  id: z.string().trim().max(100).optional(),
   url: httpUrlSchema,
   published_at: z.string().date().optional(),
   quote_number: z.string().trim().max(120).optional(),
@@ -103,7 +104,10 @@ export const updateNoteSchema = z
     title: titleSchema.optional(),
     content: z.string().trim().min(1).max(MAX_CONTENT).optional(),
     status: statusSchema.optional(),
-    ...thesisFieldsShape,
+    evidence: z.array(evidenceInputSchema).max(10).optional(),
+    falsify_condition: falsifyConditionSchema.nullable().optional(),
+    horizon: horizonSchema.nullable().optional(),
+    confidence: z.number().min(0).max(1).nullable().optional(),
   })
   .refine(
     (value) =>
@@ -177,7 +181,9 @@ function normalizeEvidence(
   existing: ThesisEvidence[] = [],
 ): ThesisEvidence[] {
   return input.map((item) => {
-    const previous = existing.find((entry) => entry.url === item.url);
+    const previous =
+      (item.id ? existing.find((entry) => entry.id === item.id) : undefined) ??
+      existing.find((entry) => entry.url === item.url);
     return {
       id: previous?.id ?? randomUUID(),
       url: item.url,
@@ -288,7 +294,8 @@ export class NotesService {
       input.evidence !== undefined
         ? normalizeEvidence(input.evidence, at, note.evidence)
         : note.evidence;
-    if (input.status === "ACTIVE" && !evidence?.length)
+    // 以最终状态校验：即便请求没有同时提交 status，也不能把活跃论点的证据清空。
+    if ((input.status ?? note.status) === "ACTIVE" && !evidence?.length)
       throw new AppError("An active thesis needs at least one evidence", 422);
 
     const manualCheck: NoteCheck | undefined = input.status
@@ -323,10 +330,10 @@ export class NotesService {
       ...(manualCheck ? { check: manualCheck } : {}),
       ...(evidence !== undefined ? { evidence } : {}),
       ...(input.falsify_condition !== undefined
-        ? { falsify_condition: input.falsify_condition }
+        ? { falsify_condition: input.falsify_condition ?? undefined }
         : {}),
-      ...(input.horizon !== undefined ? { horizon: input.horizon } : {}),
-      ...(input.confidence !== undefined ? { confidence: input.confidence } : {}),
+      ...(input.horizon !== undefined ? { horizon: input.horizon ?? undefined } : {}),
+      ...(input.confidence !== undefined ? { confidence: input.confidence ?? undefined } : {}),
       ...(statusHistory !== undefined ? { status_history: statusHistory } : {}),
       updated_at: at,
     });

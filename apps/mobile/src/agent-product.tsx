@@ -55,6 +55,7 @@ import {
   Lightbulb,
   LogOut,
   MoreHorizontal,
+  PanelsTopLeft,
   Plus,
   Search,
   Settings2,
@@ -68,7 +69,7 @@ import { ModalOverlay } from "./modal-overlay";
 import { unreadCount } from "./notification-actions";
 import { delegatedSectionTitle } from "./plan-card";
 import { PreferencesScreen } from "./preferences-screen";
-import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./screens";
+import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen, TodayScreen } from "./screens";
 import { GlobalSearchSheet } from "./search-sheet";
 import { TaskHubScreen } from "./task-hub";
 import { breakpoints } from "./theme";
@@ -872,6 +873,32 @@ function AgentRail({
         )}
       </View>
 
+      <Pressable
+        testID="agent-rail-today"
+        accessibilityRole="button"
+        accessibilityLabel={t("app.navToday")}
+        onPress={() => {
+          onClose?.();
+          navigate("today");
+        }}
+        style={({ pressed }) => ({
+          minHeight: 40,
+          marginTop: 14,
+          paddingHorizontal: 10,
+          borderRadius: radius.control,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 9,
+          backgroundColor: pressed ? colors.overlay1 : colors.sky,
+        })}
+      >
+        <PanelsTopLeft size={16} color={colors.primary} />
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: "600", color: colors.primaryStrong }}>
+          {t("app.navToday")}
+        </Text>
+        <ChevronRight size={14} color={colors.primary} />
+      </Pressable>
+
       <ScrollView
         style={{ flex: 1, marginTop: 18 }}
         contentContainerStyle={{ gap: 4, paddingBottom: 20 }}
@@ -1383,33 +1410,35 @@ function AgentHeader({
   const sectionTitle =
     section === "agent"
       ? t("agentSpace.agentDetails")
-      : section === "account"
-        ? t("app.titleAccount")
-        : section === "memories"
-          ? t("app.titleMemories")
-          : section === "files"
-            ? t("app.navFiles")
-            : section === "notes"
-              ? t("app.titleNotes")
-              : section === "watchlist" || section === "portfolio"
-                ? t("app.navWatchlist")
-                : section === "ideas"
-                  ? t("agentSpace.openIdeasPage")
-                  : section === "activity" || section === "goals"
-                    ? t("app.navActivity")
-                    : section === "mail"
-                      ? t("app.titleMail")
-                      : section === "calendar"
-                        ? t("app.titleCalendar")
-                        : section === "browser"
-                          ? t("app.titleBrowser")
-                          : section === "computer"
-                            ? t("threads.agentComputer")
-                            : section === "apps" || section === "connections"
-                              ? t("app.titleApps")
-                              : section === "settings"
-                                ? t("details.settingsTitle")
-                                : t("app.navChat");
+      : section === "today"
+        ? t("app.navToday")
+        : section === "account"
+          ? t("app.titleAccount")
+          : section === "memories"
+            ? t("app.titleMemories")
+            : section === "files"
+              ? t("app.navFiles")
+              : section === "notes"
+                ? t("app.titleNotes")
+                : section === "watchlist" || section === "portfolio"
+                  ? t("app.navWatchlist")
+                  : section === "ideas"
+                    ? t("agentSpace.openIdeasPage")
+                    : section === "activity" || section === "goals"
+                      ? t("app.navActivity")
+                      : section === "mail"
+                        ? t("app.titleMail")
+                        : section === "calendar"
+                          ? t("app.titleCalendar")
+                          : section === "browser"
+                            ? t("app.titleBrowser")
+                            : section === "computer"
+                              ? t("threads.agentComputer")
+                              : section === "apps" || section === "connections"
+                                ? t("app.titleApps")
+                                : section === "settings"
+                                  ? t("details.settingsTitle")
+                                  : t("app.navChat");
   return (
     <View
       style={{
@@ -1482,6 +1511,8 @@ function SecondarySection({
   const stacked = width < breakpoints.mobile;
   const content = (() => {
     switch (section) {
+      case "today":
+        return <TodayScreen />;
       case "account":
         // 「称呼与投资偏好」= PreferencesSheet（称呼 / 投资风格 / 投资时间 / 关注方向），
         // 不是 memories 分区的记忆页；入口挂在 onOpenPreferences 上，不传整块不渲染。
@@ -2000,6 +2031,7 @@ export function AgentProductShell({
                         onAccount={() => setMobileAccountMenu(true)}
                         onNotifications={() => open({ type: "notifications" })}
                         onConnections={() => setAppsSheet(true)}
+                        onOpenToday={() => navigate("today")}
                       />
                     ),
                   },

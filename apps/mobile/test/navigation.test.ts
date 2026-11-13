@@ -27,6 +27,12 @@ test("对话页是根页面，继续返回不会离开它", () => {
   assert.deepEqual(goBack({ section: "watchlist", stack: [] }), ROOT_NAVIGATION);
 });
 
+test("工作台（today）是独立页面，返回会回到进入前的对话页", () => {
+  const today = navigateTo(ROOT_NAVIGATION, "today");
+  assert.deepEqual(today, { section: "today", stack: ["chat"] });
+  assert.deepEqual(goBack(today), ROOT_NAVIGATION);
+});
+
 test("同一页内的页签切换不产生新的层级", () => {
   const chat = ROOT_NAVIGATION;
   const watchlist = navigateTo(chat, "watchlist");

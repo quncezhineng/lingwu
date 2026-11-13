@@ -55,6 +55,8 @@ const notes = {
   "notes.evidenceDatePlaceholder": "YYYY-MM-DD",
   "notes.evidenceRequired": "An active thesis needs at least one openable evidence link",
   "notes.evidenceInvalid": "Evidence links must start with http:// or https://",
+  "notes.evidenceAdd": "Add another evidence",
+  "notes.evidenceRemove": "Remove",
   "notes.dateInvalid": "Dates must use YYYY-MM-DD",
   "notes.falsifyLabel": "Falsification condition",
   "notes.falsifyPriceAbove": "Price above",

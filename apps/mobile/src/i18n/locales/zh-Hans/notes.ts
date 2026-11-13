@@ -54,6 +54,8 @@ const notes = {
   "notes.evidenceDatePlaceholder": "YYYY-MM-DD",
   "notes.evidenceRequired": "活跃论点至少需要一条可点开的证据",
   "notes.evidenceInvalid": "证据链接需以 http:// 或 https:// 开头",
+  "notes.evidenceAdd": "再加一条证据",
+  "notes.evidenceRemove": "移除",
   "notes.dateInvalid": "日期格式应为 YYYY-MM-DD",
   "notes.falsifyLabel": "证伪条件",
   "notes.falsifyPriceAbove": "价格突破",
