@@ -8,6 +8,7 @@ import {
   MonitorService,
   RULE_KIND,
 } from "../apps/server/src/engine/monitor-engine.ts";
+import { isTradingDay } from "../packages/domain/src/market-calendar.ts";
 import {
   type MarketDataProvider,
   MarketDataService,
@@ -15,11 +16,13 @@ import {
   resolveMarket,
 } from "../packages/integrations/src/market-data.ts";
 
-const TRADING = new Date("2026-11-13T12:00:00.000Z");
+const TRADING = new Date("2026-11-13T02:00:00.000Z");
+const DIGEST = new Date("2026-11-13T11:00:00.000Z");
+const LATE = new Date("2026-11-13T12:00:00.000Z");
 const QUIET = new Date("2026-11-13T15:00:00.000Z");
 const WEEKEND = new Date("2026-11-14T12:00:00.000Z");
 
-const prices: Record<string, number> = { AAPL: 200 };
+const prices: Record<string, number> = { AAPL: 200, MSFT: 200, "600519.SS": 1800 };
 
 function quoteFor(symbol: string): Quote {
   const price = prices[symbol] ?? 100;
@@ -63,6 +66,7 @@ function unconfiguredDelivery(db: Store): DeliveryService {
 
 async function withService(
   run: (service: MonitorService, db: Store, notified: string[]) => Promise<void>,
+  options: { holdings?: (owner: string, id: string) => Promise<{ symbol_code: string }[]> } = {},
 ) {
   const db = await createStore();
   const notified: string[] = [];
@@ -70,6 +74,7 @@ async function withService(
     db,
     market: makeMarket(),
     delivery: unconfiguredDelivery(db),
+    ...(options.holdings ? { holdings: options.holdings } : {}),
     notify: async (_owner, title, _body, key) => void notified.push(`${key}:${title}`),
     now: () => TRADING,
   });
@@ -102,7 +107,8 @@ test("legacy rules without new fields keep working with defaults", async () => {
 
     const result = await service.tick("alice", { now: TRADING, force: true });
     assert.equal(result.created, 1);
-    assert.equal(result.events[0]?.state, "delivered");
+    assert.equal(result.events[0]?.state, "archived");
+    assert.equal(result.events[0]?.level, "ARCHIVE");
     assert.equal(result.events[0]?.layer, "L1");
   });
 });
@@ -177,6 +183,91 @@ test("quiet hours defer L1 events but MUST_KNOW L2 can penetrate", async () => {
   });
 });
 
+test("ARCHIVE and LATER stay in Today without notifications or delivery", async () => {
+  await withService(async (service, db, notified) => {
+    await service.createRule("alice", {
+      targetType: "symbol",
+      targetId: "AAPL",
+      eventKinds: ["PRICE_ABOVE"],
+      thresholds: { priceAbove: 190 },
+      quietHours: null,
+    });
+    await service.createRule("alice", {
+      targetType: "symbol",
+      targetId: "MSFT",
+      eventKinds: ["PRICE_ABOVE"],
+      thresholds: { priceAbove: 190 },
+      level: "LATER",
+      quietHours: null,
+    });
+    const result = await service.tick("alice", { now: TRADING, force: true });
+    const archive = result.events.find((event) => event.payload.symbol === "AAPL");
+    const later = result.events.find((event) => event.payload.symbol === "MSFT");
+    assert.equal(archive?.level, "ARCHIVE");
+    assert.equal(archive?.state, "archived");
+    assert.equal(later?.level, "LATER");
+    assert.equal(later?.state, "new");
+    assert.equal(notified.length, 0);
+    assert.equal((await db.list("alice", "delivery_logs")).length, 0);
+    assert.equal((await service.budget("alice", TRADING)).used, 0);
+    const today = await service.today("alice", TRADING);
+    assert.equal(today.events.ARCHIVE.length, 1);
+    assert.equal(today.events.LATER.length, 1);
+  });
+});
+
+test("explicit quietHours null disables quiet hours while omission keeps the default", async () => {
+  await withService(async (service, _db, notified) => {
+    await service.createRule("alice", {
+      targetType: "symbol",
+      targetId: "AAPL",
+      eventKinds: ["PRICE_ABOVE"],
+      thresholds: { priceAbove: 190 },
+      level: "MUST_KNOW",
+      quietHours: null,
+    });
+    await service.createRule("alice", {
+      targetType: "symbol",
+      targetId: "MSFT",
+      eventKinds: ["PRICE_ABOVE"],
+      thresholds: { priceAbove: 190 },
+      level: "MUST_KNOW",
+    });
+    const result = await service.tick("alice", { now: QUIET, force: true });
+    const open = result.events.find((event) => event.payload.symbol === "AAPL");
+    const quiet = result.events.find((event) => event.payload.symbol === "MSFT");
+    assert.equal(open?.state, "delivered");
+    assert.equal(quiet?.state, "archived");
+    assert.equal(quiet?.downgradedReason, "quiet_hours");
+    assert.equal(notified.filter((entry) => entry.startsWith("monitor-event:")).length, 1);
+  });
+});
+
+test("portfolio rules follow each holding's own trading calendar", async () => {
+  const holdings = async () => [{ symbol_code: "600519.SS" }];
+  await withService(
+    async (service) => {
+      await service.createRule("alice", {
+        targetType: "portfolio",
+        targetId: "p1",
+        eventKinds: ["PRICE_ABOVE"],
+        thresholds: { priceAbove: 1000 },
+        level: "MUST_KNOW",
+        quietHours: null,
+      });
+      const now = new Date("2026-11-26T15:00:00.000Z");
+      assert.equal(isTradingDay("CN", "2026-11-26"), true);
+      assert.equal(isTradingDay("US", "2026-11-26"), false);
+      const result = await service.tick("alice", { now, force: true });
+      assert.equal(result.created, 1);
+      assert.equal(result.events[0]?.market, "CN");
+      assert.equal(result.events[0]?.marketDate, "2026-11-26");
+      assert.equal(result.events[0]?.state, "delivered");
+    },
+    { holdings },
+  );
+});
+
 test("non-trading days produce no L1/L2 deliveries", async () => {
   await withService(async (service, _db, notified) => {
     await service.createRule("alice", {
@@ -225,7 +316,7 @@ test("budget overflow downgrades to one 19:00 digest that counts as one delivery
     const downgraded = result.events.find((event) => event.state === "archived");
     assert.equal(downgraded?.downgradedReason, "budget");
 
-    const digest = await service.runDigest("alice", TRADING);
+    const digest = await service.runDigest("alice", DIGEST);
     assert.ok(digest);
     assert.equal(digest?.kind, "DIGEST");
     assert.equal(digest?.state, "delivered");
@@ -242,7 +333,32 @@ test("budget overflow downgrades to one 19:00 digest that counts as one delivery
       (log) => log.result === "skipped" && log.reason === "not_configured",
     );
     assert.equal(digestLogs.length, 4);
-    assert.deepEqual(await service.runDigest("alice", TRADING), digest);
+    assert.deepEqual(await service.runDigest("alice", DIGEST), digest);
+  });
+});
+
+test("budget downgrades after 19:00 roll into the next day's digest", async () => {
+  await withService(async (service) => {
+    await service.setBudgetLimit("alice", 1, LATE);
+    for (const symbol of ["AAPL", "MSFT"]) {
+      await service.createRule("alice", {
+        targetType: "symbol",
+        targetId: symbol,
+        eventKinds: ["PRICE_ABOVE"],
+        thresholds: { priceAbove: 190 },
+        level: "MUST_KNOW",
+        quietHours: null,
+      });
+    }
+    const result = await service.tick("alice", { now: LATE, force: true });
+    const downgraded = result.events.find((event) => event.downgradedReason === "budget");
+    assert.equal(downgraded?.digestDate, "2026-11-14");
+    assert.equal(await service.runDigest("alice", LATE), null);
+
+    const next = await service.runDigest("alice", new Date("2026-11-14T11:00:00.000Z"));
+    assert.ok(next);
+    assert.equal(next?.kind, "DIGEST");
+    assert.equal(next?.occurrences, 1);
   });
 });
 

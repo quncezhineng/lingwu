@@ -72,7 +72,8 @@ export interface MonitorRule {
   level: MonitorLevel;
   cooldownMinutes: number;
   enabled: boolean;
-  quietHours?: MonitorQuietHours;
+  /** 缺省表示使用默认静默期；显式 null 表示用户关闭静默期。 */
+  quietHours?: MonitorQuietHours | null;
   /** L1 轮询间隔（分钟）。 */
   intervalMinutes: number;
   thresholds: MonitorThresholds;

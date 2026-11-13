@@ -126,7 +126,7 @@ test("creating a rule, ticking it and reading Today matches the accepted contrac
   assert.equal(rule.targetId, "AAPL");
   assert.equal(rule.market, "US");
   assert.equal(rule.cooldownMinutes, 240);
-  assert.equal(rule.quietHours, undefined);
+  assert.equal(rule.quietHours, null);
 
   const tick = await post<{ created: number; events: MonitorEvent[] }>("/monitors/tick", {
     force: true,

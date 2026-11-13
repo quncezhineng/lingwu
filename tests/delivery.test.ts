@@ -81,3 +81,30 @@ test("channels without credentials are skipped, never sent", async () => {
     await db.close();
   }
 });
+
+test("a failed channel falls back to the next configured channel", async () => {
+  const db = await createStore();
+  const sent: string[] = [];
+  const failing: DeliveryAdapter = {
+    channel: "apns",
+    providerId: "test-apns",
+    configured: () => true,
+    send: async () => {
+      throw new Error("APNs unavailable");
+    },
+  };
+  const service = new DeliveryService(db, [failing, adapter("fcm", sent)]);
+  try {
+    const logs = await service.dispatch(
+      { ownerId: "alice", event: event(), title: "AAPL 公告", body: "回购" },
+      ["apns", "fcm"],
+    );
+    assert.deepEqual(sent, ["fcm"]);
+    assert.deepEqual(
+      logs.map((log) => `${log.channel}:${log.result}`),
+      ["apns:failed", "fcm:sent"],
+    );
+  } finally {
+    await db.close();
+  }
+});

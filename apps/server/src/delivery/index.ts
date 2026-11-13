@@ -134,6 +134,8 @@ export class DeliveryService {
             error: error instanceof Error ? error.message : "Delivery failed",
           };
         }
+        // 失败后允许回退到下一个已配置通道：一条事件最多成功外呼一次，
+        // 但首个通道失败时仍会尝试后续通道，避免单一通道故障导致漏推。
         if (log.result === "sent") deliveredBy = channel;
       }
       logs.push(await this.db.put(message.ownerId, DELIVERY_LOG_KIND, log));

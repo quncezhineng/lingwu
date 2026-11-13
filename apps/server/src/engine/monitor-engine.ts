@@ -25,7 +25,6 @@ import {
   MarketDataError,
   type MarketDataService,
   type Quote,
-  resolveMarket,
 } from "../../../../packages/integrations/src/market-data.ts";
 import type { Store } from "../db.ts";
 import { DeliveryService } from "../delivery/index.ts";
@@ -153,7 +152,7 @@ export interface MonitorCandidate {
 
 export interface RecordCandidateResult {
   event: MonitorEvent;
-  action: "delivered" | "archived" | "coalesced" | "downgraded";
+  action: "delivered" | "archived" | "in_today" | "coalesced" | "downgraded";
 }
 
 export interface MonitorTickResult {
@@ -180,7 +179,6 @@ export function normalizeMonitorRule(rule: MonitorRule): MonitorRule {
   const market =
     rule.market ?? (rule.targetType === "symbol" ? marketForSymbol(rule.targetId) : undefined);
   const schemaVersion = rule.schemaVersion ?? 1;
-  const legacy = rule.schemaVersion === undefined;
   return {
     ...rule,
     eventKinds,
@@ -193,13 +191,8 @@ export function normalizeMonitorRule(rule: MonitorRule): MonitorRule {
     channels: rule.channels?.length ? rule.channels : DEFAULT_CHANNELS,
     consecutiveDismissals: rule.consecutiveDismissals ?? 0,
     schemaVersion,
-    // 旧记录没有静默期字段时补默认值；新记录缺省代表用户关闭静默期。
-    quietHours:
-      rule.quietHours === null || rule.quietHours === undefined
-        ? legacy
-          ? DEFAULT_QUIET_HOURS
-          : undefined
-        : rule.quietHours,
+    // 字段缺失（含旧记录）使用默认静默期；显式 null 表示用户关闭。
+    quietHours: "quietHours" in rule ? rule.quietHours : DEFAULT_QUIET_HOURS,
   };
 }
 
@@ -306,7 +299,7 @@ export class MonitorService {
       ...(input.level ? { level: input.level } : {}),
       ...(input.cooldownMinutes ? { cooldownMinutes: input.cooldownMinutes } : {}),
       ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
-      ...(input.quietHours !== undefined ? { quietHours: input.quietHours ?? undefined } : {}),
+      ...(input.quietHours !== undefined ? { quietHours: input.quietHours } : {}),
       ...(input.intervalMinutes ? { intervalMinutes: input.intervalMinutes } : {}),
       ...(input.thresholds ? { thresholds: input.thresholds } : {}),
       ...(input.channels ? { channels: input.channels } : {}),
@@ -314,10 +307,6 @@ export class MonitorService {
       updatedAt: at,
       nextCheckAt: at,
     } as MonitorRule);
-    if (input.quietHours === null) {
-      rule.quietHours = undefined;
-      rule.schemaVersion = 1;
-    }
     return this.db.put(owner, RULE_KIND, rule);
   }
 
@@ -345,7 +334,7 @@ export class MonitorService {
       ...(input.level ? { level: input.level } : {}),
       ...(input.cooldownMinutes ? { cooldownMinutes: input.cooldownMinutes } : {}),
       ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
-      ...(input.quietHours !== undefined ? { quietHours: input.quietHours ?? undefined } : {}),
+      ...(input.quietHours !== undefined ? { quietHours: input.quietHours } : {}),
       ...(input.intervalMinutes ? { intervalMinutes: input.intervalMinutes } : {}),
       thresholds,
       ...(input.channels ? { channels: input.channels } : {}),
@@ -542,20 +531,9 @@ export class MonitorService {
   }
 
   private async checkRule(owner: string, rule: MonitorRule, now: Date): Promise<MonitorEvent[]> {
-    const market: TradingMarket =
-      rule.market ?? (rule.targetType === "symbol" ? marketForSymbol(rule.targetId) : "US");
     const nextCheckAt = new Date(now.getTime() + rule.intervalMinutes * 60_000).toISOString();
-    if (!isTradingDay(market, marketClock(market, now).date)) {
-      await this.db.put(owner, RULE_KIND, {
-        ...rule,
-        lastCheckedAt: now.toISOString(),
-        nextCheckAt,
-        lastError: undefined,
-      });
-      return [];
-    }
-    const symbols = await this.symbolsFor(rule);
-    if (!symbols.length) {
+    const targets = await this.targetsFor(rule);
+    if (!targets.length) {
       await this.db.put(owner, RULE_KIND, {
         ...rule,
         lastCheckedAt: now.toISOString(),
@@ -564,12 +542,25 @@ export class MonitorService {
       });
       return [];
     }
+    // Portfolio rules can hold CN/HK/US symbols at once: each symbol follows its own calendar.
+    const trading = targets.filter((target) =>
+      isTradingDay(target.market, marketClock(target.market, now).date),
+    );
+    if (!trading.length) {
+      await this.db.put(owner, RULE_KIND, {
+        ...rule,
+        lastCheckedAt: now.toISOString(),
+        nextCheckAt,
+        lastError: undefined,
+      });
+      return [];
+    }
     const events: MonitorEvent[] = [];
     let updatedRule = rule;
-    for (const symbol of symbols) {
+    for (const target of trading) {
       let quote: Quote;
       try {
-        quote = await this.market.getQuote(symbol);
+        quote = await this.market.getQuote(target.symbol);
       } catch (error) {
         const detail = error instanceof MarketDataError ? error.kind : "provider_error";
         updatedRule = { ...updatedRule, lastError: detail };
@@ -595,11 +586,21 @@ export class MonitorService {
     return events;
   }
 
-  private async symbolsFor(rule: MonitorRule): Promise<string[]> {
-    if (rule.targetType === "symbol") return [rule.targetId];
+  private async targetsFor(
+    rule: MonitorRule,
+  ): Promise<{ symbol: string; market: TradingMarket }[]> {
+    if (rule.targetType === "symbol")
+      return [{ symbol: rule.targetId, market: rule.market ?? marketForSymbol(rule.targetId) }];
     if (rule.targetType === "portfolio" && this.deps.holdings) {
       const holdings = await this.deps.holdings(rule.ownerId, rule.targetId);
-      return [...new Set(holdings.map((holding) => holding.symbol_code))];
+      return [
+        ...new Map(
+          holdings.map((holding) => [
+            holding.symbol_code,
+            { symbol: holding.symbol_code, market: marketForSymbol(holding.symbol_code) },
+          ]),
+        ).values(),
+      ];
     }
     return [];
   }
@@ -702,7 +703,9 @@ export class MonitorService {
     now: Date,
   ): Promise<RecordCandidateResult> {
     const market: TradingMarket =
-      rule.market ?? (candidate.symbol ? resolveMarket(candidate.symbol) : "US");
+      candidate.symbol && rule.targetType === "portfolio"
+        ? marketForSymbol(candidate.symbol)
+        : (rule.market ?? (candidate.symbol ? marketForSymbol(candidate.symbol) : "US"));
     const clock = marketClock(market, now);
     const ownerDate = localDate(this.timeZone, now);
     const dedupeKey = [rule.id, candidate.kind, candidate.symbol ?? rule.targetId].join(":");
@@ -758,9 +761,22 @@ export class MonitorService {
       return { event, action: "archived" };
     }
 
-    const quiet = rule.quietHours ?? DEFAULT_QUIET_HOURS;
-    const ownerClock = localClock(quiet.timeZone ?? this.timeZone, now);
-    if (inQuietHours(quiet, ownerClock.hour) && rule.level !== "MUST_KNOW") {
+    const quiet = rule.quietHours === null ? undefined : (rule.quietHours ?? DEFAULT_QUIET_HOURS);
+    const ownerClock = localClock(quiet?.timeZone ?? this.timeZone, now);
+    const quietActive = inQuietHours(quiet, ownerClock.hour);
+    const layer = layerOf(candidate.kind);
+    // 静默期只约束会打扰的 L1；L2 MUST_KNOW 可穿透。LATER/ARCHIVE 不推送，
+    // 静默期内仅标记为延后，仍在 Today 可见。
+    if (quietActive && rule.level !== "MUST_KNOW") {
+      const event = await this.db.put<MonitorEvent>(owner, EVENT_KIND, {
+        ...baseEvent,
+        state: "archived",
+        downgraded: true,
+        downgradedReason: "quiet_hours",
+      });
+      return { event, action: "archived" };
+    }
+    if (quietActive && rule.level === "MUST_KNOW" && layer === "L1") {
       const event = await this.db.put<MonitorEvent>(owner, EVENT_KIND, {
         ...baseEvent,
         state: "archived",
@@ -771,29 +787,37 @@ export class MonitorService {
       return { event, action: "archived" };
     }
 
-    if (rule.level === "MUST_KNOW") {
-      const budget = await this.ensureBudget(owner, ownerDate);
-      if (budget.used >= budget.limit) {
-        const event = await this.db.put<MonitorEvent>(owner, EVENT_KIND, {
-          ...baseEvent,
-          state: "archived",
-          downgraded: true,
-          downgradedReason: "budget",
-          digestDate: ownerDate,
-        });
-        await this.db.put(owner, BUDGET_KIND, {
-          ...budget,
-          downgradedCount: budget.downgradedCount + 1,
-          updatedAt: now.toISOString(),
-        });
-        return { event, action: "downgraded" };
-      }
+    // 归档 / 稍后：只进入 Today，不写站内通知、不调用任何投递适配器、不占预算。
+    if (rule.level !== "MUST_KNOW") {
+      const event = await this.db.put<MonitorEvent>(owner, EVENT_KIND, {
+        ...baseEvent,
+        state: rule.level === "ARCHIVE" ? "archived" : "new",
+      });
+      return { event, action: rule.level === "ARCHIVE" ? "archived" : "in_today" };
+    }
+
+    const budget = await this.ensureBudget(owner, ownerDate);
+    if (budget.used >= budget.limit) {
+      const event = await this.db.put<MonitorEvent>(owner, EVENT_KIND, {
+        ...baseEvent,
+        state: "archived",
+        downgraded: true,
+        downgradedReason: "budget",
+        // 19:00 之后当天汇总已经过去，滚动到下一日，避免变成永不汇总的孤儿事件。
+        digestDate: ownerClock.hour >= DEFAULT_DIGEST_HOUR ? addDays(ownerDate, 1) : ownerDate,
+      });
       await this.db.put(owner, BUDGET_KIND, {
         ...budget,
-        used: budget.used + 1,
+        downgradedCount: budget.downgradedCount + 1,
         updatedAt: now.toISOString(),
       });
+      return { event, action: "downgraded" };
     }
+    await this.db.put(owner, BUDGET_KIND, {
+      ...budget,
+      used: budget.used + 1,
+      updatedAt: now.toISOString(),
+    });
 
     const event = await this.db.put<MonitorEvent>(owner, EVENT_KIND, {
       ...baseEvent,
@@ -888,7 +912,12 @@ export class MonitorService {
       this.listRules(owner),
       this.budget(owner, now),
     ]);
-    const today = events.filter((event) => event.marketDate === date || event.digestDate === date);
+    // Today 按 owner 本地日期聚合；事件自身的 marketDate 是标的市场日期，
+    // 美股盘前/盘中（北京时间清晨）会落在前一天，不能直接用来过滤。
+    const today = events.filter(
+      (event) =>
+        localDate(this.timeZone, new Date(event.detectedAt)) === date || event.digestDate === date,
+    );
     const visible = today.filter((event) => event.state !== "dismissed");
     const digest = today.find((event) => event.kind === "DIGEST") ?? null;
     return {
