@@ -63,6 +63,7 @@ import {
 } from "./icons";
 import { InsightCard } from "./insight-card";
 import { workbenchInsightView } from "./insight-view";
+import { MonitorTodayCard } from "./monitor-today";
 import {
   type InvestmentNote,
   loadNotes,
@@ -306,6 +307,7 @@ export function TodayScreen() {
             </Pressable>
           ))}
       </View>
+      <MonitorTodayCard />
       <MarketBriefingCard />
       <ThesisReviewCard
         items={reviewQueue}

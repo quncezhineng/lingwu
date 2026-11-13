@@ -66,6 +66,7 @@ import { IosStack } from "./ios-stack";
 import { type BotPreview, botHasUnread, latestBotPreview } from "./mobile-bots";
 import { MobileBotsHome } from "./mobile-bots-home";
 import { ModalOverlay } from "./modal-overlay";
+import { MonitorRulesScreen } from "./monitor-rules-screen";
 import { unreadCount } from "./notification-actions";
 import { delegatedSectionTitle } from "./plan-card";
 import { PreferencesScreen } from "./preferences-screen";
@@ -898,6 +899,31 @@ function AgentRail({
         </Text>
         <ChevronRight size={14} color={colors.primary} />
       </Pressable>
+      <Pressable
+        testID="agent-rail-monitors"
+        accessibilityRole="button"
+        accessibilityLabel={t("app.navMonitors")}
+        onPress={() => {
+          onClose?.();
+          navigate("monitors");
+        }}
+        style={({ pressed }) => ({
+          minHeight: 40,
+          marginTop: 6,
+          paddingHorizontal: 10,
+          borderRadius: radius.control,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 9,
+          backgroundColor: pressed ? colors.overlay1 : "transparent",
+        })}
+      >
+        <Settings2 size={16} color={colors.muted} />
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: "500", color: colors.text }}>
+          {t("app.navMonitors")}
+        </Text>
+        <ChevronRight size={14} color={colors.muted} />
+      </Pressable>
 
       <ScrollView
         style={{ flex: 1, marginTop: 18 }}
@@ -1412,33 +1438,35 @@ function AgentHeader({
       ? t("agentSpace.agentDetails")
       : section === "today"
         ? t("app.navToday")
-        : section === "account"
-          ? t("app.titleAccount")
-          : section === "memories"
-            ? t("app.titleMemories")
-            : section === "files"
-              ? t("app.navFiles")
-              : section === "notes"
-                ? t("app.titleNotes")
-                : section === "watchlist" || section === "portfolio"
-                  ? t("app.navWatchlist")
-                  : section === "ideas"
-                    ? t("agentSpace.openIdeasPage")
-                    : section === "activity" || section === "goals"
-                      ? t("app.navActivity")
-                      : section === "mail"
-                        ? t("app.titleMail")
-                        : section === "calendar"
-                          ? t("app.titleCalendar")
-                          : section === "browser"
-                            ? t("app.titleBrowser")
-                            : section === "computer"
-                              ? t("threads.agentComputer")
-                              : section === "apps" || section === "connections"
-                                ? t("app.titleApps")
-                                : section === "settings"
-                                  ? t("details.settingsTitle")
-                                  : t("app.navChat");
+        : section === "monitors"
+          ? t("app.navMonitors")
+          : section === "account"
+            ? t("app.titleAccount")
+            : section === "memories"
+              ? t("app.titleMemories")
+              : section === "files"
+                ? t("app.navFiles")
+                : section === "notes"
+                  ? t("app.titleNotes")
+                  : section === "watchlist" || section === "portfolio"
+                    ? t("app.navWatchlist")
+                    : section === "ideas"
+                      ? t("agentSpace.openIdeasPage")
+                      : section === "activity" || section === "goals"
+                        ? t("app.navActivity")
+                        : section === "mail"
+                          ? t("app.titleMail")
+                          : section === "calendar"
+                            ? t("app.titleCalendar")
+                            : section === "browser"
+                              ? t("app.titleBrowser")
+                              : section === "computer"
+                                ? t("threads.agentComputer")
+                                : section === "apps" || section === "connections"
+                                  ? t("app.titleApps")
+                                  : section === "settings"
+                                    ? t("details.settingsTitle")
+                                    : t("app.navChat");
   return (
     <View
       style={{
@@ -1513,6 +1541,8 @@ function SecondarySection({
     switch (section) {
       case "today":
         return <TodayScreen />;
+      case "monitors":
+        return <MonitorRulesScreen />;
       case "account":
         // 「称呼与投资偏好」= PreferencesSheet（称呼 / 投资风格 / 投资时间 / 关注方向），
         // 不是 memories 分区的记忆页；入口挂在 onOpenPreferences 上，不传整块不渲染。

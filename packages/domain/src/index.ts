@@ -3,6 +3,7 @@ import { z } from "zod";
 export type WorkspaceMode = "sample" | "live";
 export type Section =
   | "today"
+  | "monitors"
   | "chat"
   | "mail"
   | "calendar"
