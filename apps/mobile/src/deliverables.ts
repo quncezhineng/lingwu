@@ -87,6 +87,7 @@ export interface DeliverablePiiFinding {
   label: string;
   excerpt: string;
   redacted: string;
+  source?: "rule" | "model";
 }
 
 export interface DeliverableViolation {
@@ -269,6 +270,7 @@ function parseCompliance(value: unknown): DeliverableComplianceReport | undefine
               label: text(item.label) ?? "",
               excerpt: text(item.excerpt) ?? "",
               redacted: text(item.redacted) ?? "",
+              ...(item.source === "rule" || item.source === "model" ? { source: item.source } : {}),
             },
           ];
         })
@@ -493,6 +495,12 @@ export function deliverableNumberTokens(content: string): DeliverableNumberToken
     const text = match[0].trim();
     if (!text || !/\d/.test(text)) continue;
     if (/^[-+]?(?:19|20)\d{2}$/.test(text)) continue;
+    // 行首列表序号（`1.` / `- 2)`）与 `## 1.` 标题序号不是结论数字。
+    const start = (match.index ?? 0) + match[0].indexOf(text);
+    const lineStart = masked.lastIndexOf("\n", start - 1) + 1;
+    const prefix = masked.slice(lineStart, start);
+    const suffix = masked.slice(start + text.length);
+    if (/^\s*(?:(?:#{1,6}|[-*+])\s*)?$/.test(prefix) && /^[.)、](?:\s|$)/.test(suffix)) continue;
     const digits = text.replace(/\D/g, "");
     if (/^1[3-9]\d{9}$/.test(digits) || digits.length >= 15) continue;
     const key = normalizeDeliverableNumber(text);

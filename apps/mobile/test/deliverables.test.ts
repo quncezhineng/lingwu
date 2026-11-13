@@ -298,6 +298,11 @@ test("数字 token 保留正负号与单位，未溯源数字按 token 精确定
     { id: "c-2", match: "-5%", occurrence: 1, estimated: true },
   ]);
   assert.deepEqual(pending, [{ text: "+5%", occurrence: 1 }]);
+
+  assert.deepEqual(
+    deliverableNumberTokens("## 1. 摘要\n1. 营收增长\n2. 毛利提升\n- 3) 风险可控\n增长 23%。"),
+    [{ text: "23%", occurrence: 1 }],
+  );
 });
 
 test("手机端数字处理、合规、分享与退回都走服务端受控接口", async () => {

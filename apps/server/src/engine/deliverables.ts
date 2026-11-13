@@ -219,12 +219,17 @@ export function extractNumericTokens(content: string): NumericToken[] {
     const text = raw.trim();
     if (!text || !/\d/.test(text)) continue;
     if (/^[-+]?(?:19|20)\d{2}$/.test(text)) continue;
+    // 行首列表序号（`1.` / `- 2)`）与 `## 1.` 标题序号不是结论数字。
+    const start = (match.index ?? 0) + raw.indexOf(text);
+    const lineStart = masked.lastIndexOf("\n", start - 1) + 1;
+    const prefix = masked.slice(lineStart, start);
+    const suffix = masked.slice(start + text.length);
+    if (/^\s*(?:(?:#{1,6}|[-*+])\s*)?$/.test(prefix) && /^[.)、](?:\s|$)/.test(suffix)) continue;
     const digits = text.replace(/\D/g, "");
     if (/^1[3-9]\d{9}$/.test(digits) || digits.length >= 15) continue;
     const key = normalizeNumericToken(text);
     const occurrence = (occurrences.get(key) ?? 0) + 1;
     occurrences.set(key, occurrence);
-    const start = (match.index ?? 0) + raw.indexOf(text);
     tokens.push({ text, occurrence, start, end: start + text.length });
   }
   return tokens;
@@ -300,6 +305,7 @@ export function detectPii(text: string): DeliverablePiiFinding[] {
         label: rule.label,
         excerpt: match[0].slice(0, 120),
         redacted: rule.mask(match[0]),
+        source: "rule",
       });
     }
   }
@@ -310,6 +316,31 @@ export function redactPii(text: string): string {
   let next = text;
   for (const rule of PII_PATTERNS) next = next.replace(rule.pattern, (match) => rule.mask(match));
   return next;
+}
+
+/**
+ * 应用模型复核给出的 `redacted` 文本。
+ * 命中片段找不到、或 `redacted` 仍等于原文时视为无法脱敏，由调用方阻断发送，
+ * 避免出现「正文未脱敏但审计写 pii_redacted」。
+ */
+export function applyModelPiiFindings(
+  text: string,
+  findings: readonly DeliverablePiiFinding[],
+): { content: string; missing: string[] } {
+  let next = text;
+  const missing: string[] = [];
+  for (const finding of findings) {
+    if (!finding.excerpt || !finding.redacted || finding.redacted === finding.excerpt) {
+      missing.push(finding.excerpt || finding.label);
+      continue;
+    }
+    if (!next.includes(finding.excerpt)) {
+      missing.push(finding.excerpt);
+      continue;
+    }
+    next = next.split(finding.excerpt).join(finding.redacted);
+  }
+  return { content: next, missing };
 }
 
 /** 规则库命中的违禁表述（带片段，便于前端明确提示）。 */
@@ -892,7 +923,12 @@ export class DeliverablesService {
   async checkCompliance(note: Deliverable): Promise<DeliverableComplianceReport> {
     const violations = detectProhibited(note.content);
     const rulePii = detectPii(note.content);
-    const modelPii = this.piiReview ? await this.piiReview(note.content) : [];
+    const modelPii = this.piiReview
+      ? (await this.piiReview(note.content)).map((finding) => ({
+          ...finding,
+          source: "model" as const,
+        }))
+      : [];
     const pii = [...rulePii, ...modelPii];
     const unsourced = findUnsourcedNumbers(note.content, note.citations);
     const disclaimerMissing = !note.content.includes(note.disclaimer);
@@ -948,7 +984,26 @@ export class DeliverablesService {
     }
     const at = this.at();
     // 客户信息在发送前自动脱敏；报告只持久化脱敏后的预览，原始 PII 不落库。
-    const redacted = report.pii.length ? redactPii(note.content) : note.content;
+    const ruleRedacted = report.pii.some((finding) => finding.source === "rule")
+      ? redactPii(note.content)
+      : note.content;
+    const modelFindings = report.pii.filter((finding) => finding.source === "model");
+    const modelApplication = applyModelPiiFindings(ruleRedacted, modelFindings);
+    if (modelApplication.missing.length) {
+      await this.audit(owner, note, "compliance_blocked", {
+        actor: input.actor,
+        actorId: input.actorId,
+        detail: "pii_unredacted",
+        metadata: { findings: modelApplication.missing },
+      });
+      throw new AppError(
+        `Model review found customer information that could not be redacted: ${modelApplication.missing.join(", ")}`,
+        422,
+        "pii_unredacted",
+      );
+    }
+    const redacted = modelApplication.content;
+    const piiChanged = redacted !== note.content;
     const injection = injectDisclaimer(redacted, note.disclaimer);
     let version = note.version;
     let versions = note.versions;
@@ -989,7 +1044,7 @@ export class DeliverablesService {
       },
       updatedAt: at,
     });
-    if (report.pii.length)
+    if (piiChanged)
       await this.audit(owner, saved, "pii_redacted", {
         actor: "system",
         detail: `发送前自动脱敏 ${report.pii.length} 处客户信息`,
@@ -1020,6 +1075,8 @@ export class DeliverablesService {
       archivedAt: at,
       updatedAt: at,
     });
+    // 归档后旧分享链接立即失效，分享列表也不再展示。
+    await this.revokeSharesFor(owner, note.id, "交付物归档");
     await this.audit(owner, saved, "archived", {
       actor: input.actor,
       actorId: input.actorId,

@@ -82,6 +82,8 @@ export interface DeliverablePiiFinding {
   label: string;
   excerpt: string;
   redacted: string;
+  /** rule = 本地规则库；model = 模型复核钩子。发送时只对 model 命中项应用 redacted。 */
+  source?: "rule" | "model";
 }
 
 export interface DeliverableViolation {

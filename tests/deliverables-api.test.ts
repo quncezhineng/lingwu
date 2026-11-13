@@ -447,6 +447,8 @@ test("share links lock the sent snapshot and stop working after revocation or ar
   await post(`/deliverables/${created.id}/archive`, {});
   const archived = await server.app.request(`/d/${second.id}`);
   assert.equal(archived.status, 404);
+  const shares = await call<{ shares: unknown[] }>(`/deliverables/${created.id}/shares`);
+  assert.equal(shares.shares.length, 0, "归档后分享列表应立即为空");
 });
 
 test("in_review can be returned, approved edits roll back to draft, and templates carry their contract", async () => {
@@ -516,4 +518,71 @@ test("scheduled task outputs are captured idempotently and appear in /api/today"
   }>("/today");
   assert.ok(today.deliverables.pending_review_count >= 1);
   assert.ok(today.deliverables.pending_review.some((item) => item.id === first.id));
+});
+
+test("ordered list markers and heading ordinals are not treated as unsourced numbers", async () => {
+  const created = await post<Deliverable>(
+    "/deliverables",
+    {
+      kind: "REPORT",
+      title: "编号研报",
+      content: "## 1. 摘要\n1. 营收增长\n2. 毛利提升\n- 3) 风险可控\n结论：维持买入。",
+    },
+    201,
+  );
+  await post(`/deliverables/${created.id}/submit`, {});
+  const approved = await post<Deliverable>(`/deliverables/${created.id}/approve`, {});
+  assert.equal(approved.status, "approved");
+});
+
+test("model PII findings are actually redacted, and unredactable findings block sending", async () => {
+  const hooked = new DeliverablesService(db, {
+    piiReview: async (content) =>
+      content.includes("王先生")
+        ? [{ code: "client_name", label: "客户姓名", excerpt: "王先生", redacted: "王**" }]
+        : [{ code: "client_name", label: "客户姓名", excerpt: "李女士", redacted: "李女士" }],
+  });
+
+  const ok = await hooked.create(
+    "model-owner-a",
+    createDeliverableSchema.parse({ title: "模型脱敏", content: "王先生同意该方案。" }),
+  );
+  await hooked.submit("model-owner-a", ok.id);
+  await hooked.approve("model-owner-a", ok.id);
+  const sent = await hooked.send("model-owner-a", ok.id, {
+    recipients: ["reader@example.com"],
+    channel: "manual",
+    actor: "user",
+  });
+  assert.equal(sent.status, "sent");
+  assert.doesNotMatch(sent.content, /王先生/);
+  assert.match(sent.content, /王\*\*/);
+  assert.equal(sent.compliance?.modelReview, "flagged");
+  const audit = await hooked.audits("model-owner-a", ok.id);
+  assert.ok(audit.some((entry) => entry.action === "pii_redacted"));
+
+  const blocked = await hooked.create(
+    "model-owner-b",
+    createDeliverableSchema.parse({ title: "无法脱敏", content: "李女士同意该方案。" }),
+  );
+  await hooked.submit("model-owner-b", blocked.id);
+  await hooked.approve("model-owner-b", blocked.id);
+  await assert.rejects(
+    () =>
+      hooked.send("model-owner-b", blocked.id, {
+        recipients: ["reader@example.com"],
+        channel: "manual",
+        actor: "user",
+      }),
+    (error: { code?: string }) => error.code === "pii_unredacted",
+  );
+  const stored = await hooked.get("model-owner-b", blocked.id);
+  assert.equal(stored.status, "approved");
+  assert.match(stored.content, /李女士/);
+  const blockedAudit = await hooked.audits("model-owner-b", blocked.id);
+  assert.ok(blockedAudit.some((entry) => entry.detail === "pii_unredacted"));
+  assert.equal(
+    blockedAudit.some((entry) => entry.action === "pii_redacted"),
+    false,
+  );
 });

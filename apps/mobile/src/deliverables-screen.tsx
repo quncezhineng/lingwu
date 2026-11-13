@@ -451,6 +451,9 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
             : t("screens.deliverableArchived"),
       );
       await loadDeliverableAudit(api, id);
+      // 归档会撤销分享链接，状态变化后立即刷新分享列表与合规结果。
+      await loadDeliverableShares(api, id).catch(() => undefined);
+      await loadDeliverableCompliance(api, id).catch(() => undefined);
     } catch (failure) {
       setError(complianceMessage(failure, t));
       await loadDeliverableAudit(api, id).catch(() => undefined);
