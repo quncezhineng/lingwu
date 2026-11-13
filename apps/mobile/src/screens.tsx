@@ -63,6 +63,8 @@ import {
 } from "./icons";
 import { InsightCard } from "./insight-card";
 import { workbenchInsightView } from "./insight-view";
+import { loadMonitor, requestMonitorTab } from "./monitor";
+import { MonitorTodayCard } from "./monitor-screen";
 import {
   type InvestmentNote,
   loadNotes,
@@ -124,6 +126,7 @@ export function TodayScreen() {
   const reviewQueue = useMemo(() => thesisReviewQueue(notesState.notes), [notesState.notes]);
   useEffect(() => {
     void loadNotes(api);
+    void loadMonitor(api);
   }, [api]);
   const today = todayDate();
   const events = w.events
@@ -313,6 +316,12 @@ export function TodayScreen() {
         onOpenAll={() => {
           setNotesIntent({ tab: "theses" });
           navigate("notes");
+        }}
+      />
+      <MonitorTodayCard
+        onOpenAll={() => {
+          requestMonitorTab();
+          navigate("activity");
         }}
       />
       {(!HIDDEN_TODAY_SECTIONS.has("calendar") || !HIDDEN_TODAY_SECTIONS.has("mail")) && (

@@ -178,6 +178,7 @@ const app = {
   "app.taskHubEyebrow": "持续工作",
   "app.taskHubTasks": "任务",
   "app.taskHubReminders": "自动化",
+  "app.taskHubMonitor": "盯",
   "app.personalContextHeading": "个人上下文",
   "app.memoryShortcutDetail": "{count} 条记忆 · 目标、风险与关注领域",
   "app.titleConnections": "应用与技能",

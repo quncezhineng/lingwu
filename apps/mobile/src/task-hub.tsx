@@ -6,13 +6,15 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { HubTabs } from "./hub-tabs";
 import { useTranslation } from "./i18n";
+import { consumeMonitorTab, loadMonitor, useMonitorState } from "./monitor";
+import { MonitorScreen } from "./monitor-screen";
 import { listedWorkTasks } from "./task-presentation";
 import { colors, fonts } from "./theme";
 import { TrackingScreen } from "./tracking-screen";
 import { buildTrackingView } from "./tracking-view";
 import { useWorkspace } from "./workspace";
 
-type TaskHubTab = "tasks" | "tracking";
+type TaskHubTab = "tasks" | "tracking" | "monitor";
 
 /**
  * 把「动态」和「目标与提醒」收拢成同一任务中心。
@@ -22,9 +24,14 @@ type TaskHubTab = "tasks" | "tracking";
 export function TaskHubScreen({ initialTab }: { initialTab?: TaskHubTab } = {}) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
-  const { section, reminderIntent, clearReminderIntent } = useWorkspace();
+  const { api, section, reminderIntent, clearReminderIntent } = useWorkspace();
+  const monitorState = useMonitorState();
   const defaultTab = initialTab ?? (reminderIntent || section === "goals" ? "tracking" : "tasks");
   const [tab, setTab] = useState<TaskHubTab>(defaultTab);
+
+  useEffect(() => {
+    void loadMonitor(api);
+  }, [api]);
 
   useEffect(() => {
     setTab(defaultTab);
@@ -35,6 +42,11 @@ export function TaskHubScreen({ initialTab }: { initialTab?: TaskHubTab } = {}) 
   useEffect(() => {
     if (reminderIntent) setTab("tracking");
   }, [reminderIntent]);
+
+  // Today 的「今天替你盯到的」卡片通过一次性信号把用户送到盯盘页。
+  useEffect(() => {
+    if (monitorState.tabRequested && consumeMonitorTab()) setTab("monitor");
+  }, [monitorState.tabRequested]);
 
   const totalTasks = listedWorkTasks(data?.tasks ?? []).length;
   const tracking = data ? buildTrackingView(data) : undefined;
@@ -59,16 +71,24 @@ export function TaskHubScreen({ initialTab }: { initialTab?: TaskHubTab } = {}) 
               ? (tracking?.counts.tracking ?? 0)
               : (tracking?.reminders.length ?? 0),
           },
+          {
+            id: "monitor",
+            label: t("app.taskHubMonitor"),
+            count:
+              (monitorState.today?.mustKnow.length ?? 0) + (monitorState.today?.later.length ?? 0),
+          },
         ]}
       />
       {tab === "tasks" ? (
         <AgentActivityScreen />
-      ) : (
+      ) : tab === "tracking" ? (
         <TrackingScreen
           embedded
           reminderIntent={reminderIntent}
           onReminderIntentHandled={clearReminderIntent}
         />
+      ) : (
+        <MonitorScreen />
       )}
     </View>
   );

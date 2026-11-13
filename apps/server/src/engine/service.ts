@@ -51,6 +51,7 @@ import { FinancialsService } from "./financials.ts";
 import { HindsightClient } from "./hindsight.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { executeModelTask } from "./model.ts";
+import { MonitorEngine } from "./monitor-engine.ts";
 import { readMonitoredPrice } from "./monitor-price.ts";
 import { NotesService } from "./notes.ts";
 import {
@@ -119,6 +120,7 @@ export class AgentService {
   readonly notes: NotesService;
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
+  readonly monitor: MonitorEngine;
   /** 多 Agent 记忆引擎（Hindsight），未配置时降级为本地关键词召回。 */
   readonly memory: HindsightClient;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
@@ -143,6 +145,12 @@ export class AgentService {
     this.notes = new NotesService(db);
     this.financials = new FinancialsService(db);
     this.priceAlerts = new PriceAlertsService(db, market);
+    this.monitor = new MonitorEngine(db, market, {
+      notify: async (owner, title, body, key) => {
+        const notification = await this.notify(owner, title, body, undefined, key);
+        return { id: notification.id };
+      },
+    });
     this.memory = new HindsightClient({
       baseUrl: config.hindsightBaseUrl,
       apiKey: config.hindsightApiKey,
@@ -200,6 +208,11 @@ export class AgentService {
           .check(owner, value.id, this.alertNotifier(owner))
           .catch((error) => backgroundFailure("price alert check", error));
       }
+      // L1 行情规则按各自 interval 巡检；预算/冷却/投递由 MonitorEngine 统一决定。
+      for (const owner of await this.db.owners("monitor_rules"))
+        await this.monitor
+          .checkPriceRules(owner)
+          .catch((error) => backgroundFailure("monitor price check", error));
       // Daily briefing: durable task creation, idempotent per owner and UTC date.
       await this.briefings
         .runOnce()

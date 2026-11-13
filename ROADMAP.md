@@ -8,6 +8,7 @@ The release is a personal-agent alpha: delegate a job, inspect its plan, supply 
 - Server-owned jobs, plans, checkpoints, leases, retries, cancellation, and action receipts.
 - Ideas with evidence, Goals, milestones, public-page tracking, and an in-app notification inbox.
 - A thesis ledger with mandatory evidence, falsification conditions, review horizons, confidence, manual status audit, and a Today review queue.
+- Event watching rules with a per-user attention budget, trading-day calendar, quiet hours, cooldowns, delivery logs, and a Today feed for must-know events.
 - Persistent Chromium sessions, public-page reading, screenshots, manual interaction, and PDF downloads.
 - A private Docker Linux computer with bounded terminal commands, persistent workspace files, a text editor, PDF import/export, command receipts, and stop/restart recovery. Terminal networking is disabled.
 - PDF viewing and supported form filling, reviewed Gmail/Calendar adapters, CSV spending artifacts, identity, and editable memory.
