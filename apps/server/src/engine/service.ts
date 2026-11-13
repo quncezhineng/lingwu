@@ -51,6 +51,7 @@ import { FinancialsService } from "./financials.ts";
 import { HindsightClient } from "./hindsight.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { executeModelTask } from "./model.ts";
+import { MonitorService } from "./monitor-engine.ts";
 import { readMonitoredPrice } from "./monitor-price.ts";
 import { NotesService } from "./notes.ts";
 import {
@@ -119,6 +120,7 @@ export class AgentService {
   readonly notes: NotesService;
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
+  readonly monitors: MonitorService;
   /** 多 Agent 记忆引擎（Hindsight），未配置时降级为本地关键词召回。 */
   readonly memory: HindsightClient;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
@@ -143,6 +145,12 @@ export class AgentService {
     this.notes = new NotesService(db);
     this.financials = new FinancialsService(db);
     this.priceAlerts = new PriceAlertsService(db, market);
+    this.monitors = new MonitorService({
+      db,
+      market,
+      holdings: (owner, portfolioId) => this.portfolios.holdings(owner, portfolioId),
+      notify: (owner, title, body, key) => this.notify(owner, title, body, undefined, key),
+    });
     this.memory = new HindsightClient({
       baseUrl: config.hindsightBaseUrl,
       apiKey: config.hindsightApiKey,
@@ -200,6 +208,10 @@ export class AgentService {
           .check(owner, value.id, this.alertNotifier(owner))
           .catch((error) => backgroundFailure("price alert check", error));
       }
+      // L1/L2 monitor rules, dedupe/cooldown, quiet hours, budget and 19:00 digest.
+      await this.monitors
+        .runMaintenance()
+        .catch((error) => backgroundFailure("monitor maintenance", error));
       // Daily briefing: durable task creation, idempotent per owner and UTC date.
       await this.briefings
         .runOnce()
