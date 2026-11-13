@@ -72,6 +72,50 @@ export interface DeliverableSend {
   sentBy?: string;
   recipients: string[];
   channel: "manual" | "email" | "share";
+  /** 发送时锁定的版本；分享链接只读这个快照。 */
+  sentVersion?: number;
+}
+
+/** 客户信息规则检测结果；脱敏后的值只用于预览，不写入交付物正文。 */
+export interface DeliverablePiiFinding {
+  code: "phone" | "id_card" | "email" | "bank_account" | "client_name";
+  label: string;
+  excerpt: string;
+  redacted: string;
+}
+
+export interface DeliverableViolation {
+  code: string;
+  label: string;
+  excerpt: string;
+}
+
+/**
+ * 合规检查报告。`model_review` 如实标注模型复核是否配置，
+ * 未配置时不伪造「双检通过」。
+ */
+export interface DeliverableComplianceReport {
+  checkedAt: string;
+  passed: boolean;
+  disclaimer: string;
+  disclaimerMissing: boolean;
+  violations: DeliverableViolation[];
+  pii: DeliverablePiiFinding[];
+  unsourcedNumbers: string[];
+  ruleEngine: "ok";
+  modelReview: "ok" | "flagged" | "not_configured";
+}
+
+/** 只读分享链接：锁定发送版本，撤销后立即失效。 */
+export interface DeliverableShare {
+  id: string;
+  deliverableId: string;
+  ownerId: string;
+  createdAt: string;
+  revoked: boolean;
+  revokedReason?: string;
+  sentVersion: number;
+  disclaimer: string;
 }
 
 export interface Deliverable {
@@ -88,6 +132,13 @@ export interface Deliverable {
   disclaimer: string;
   review: DeliverableReview;
   send?: DeliverableSend;
+  /** 最近一次合规检查结果（发送时落库）。 */
+  compliance?: DeliverableComplianceReport;
+  /** 由定时任务自动落库时的任务 id，用于幂等重放。 */
+  sourceTaskId?: string;
+  /** 模板契约（为 #25 的模板中心预留）。 */
+  template_id?: string;
+  template_version?: string;
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -103,9 +154,16 @@ export interface DeliverableAuditEntry {
     | "updated"
     | "submitted"
     | "approved"
+    | "returned"
     | "sent"
     | "archived"
-    | "compliance_blocked";
+    | "compliance_blocked"
+    | "number_sourced"
+    | "number_estimated"
+    | "number_removed"
+    | "pii_redacted"
+    | "shared"
+    | "share_revoked";
   actor: "user" | "agent" | "system";
   actorId?: string;
   at: string;

@@ -1502,6 +1502,22 @@ export class AgentService {
         task.id,
         `task-done:${task.id}`,
       );
+      // 定时任务 / 研究产出的正文自动落到交付物中心（同一任务幂等）。
+      if (
+        task.result &&
+        ["market_briefing", "research", "document", "finance"].includes(task.kind)
+      ) {
+        try {
+          await this.deliverables.captureFromTask(owner, {
+            id: task.id,
+            title: task.title,
+            kind: task.kind,
+            result: task.result,
+          });
+        } catch (error) {
+          console.error("deliverable capture failed", { taskId: task.id, error });
+        }
+      }
       // 投融资决策规则兜底：模型未主动 write_memory 时，从任务结果捕捉决策信号落一条 decision 记忆。
       if (task.result) {
         const signals = detectDealSignals(task.result);

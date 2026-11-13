@@ -25,12 +25,19 @@ import {
   KIND_LABEL_KEYS,
   loadDeliverable,
   loadDeliverableAudit,
+  loadDeliverableCompliance,
   loadDeliverableDiff,
+  loadDeliverableShares,
   loadDeliverables,
   nextDeliverableTransition,
+  reopenDeliverable,
+  resolveDeliverableNumber,
+  revokeDeliverableShare,
   STATUS_LABEL_KEYS,
   sendDeliverable,
+  shareDeliverable,
   transitionDeliverable,
+  unsourcedDeliverableNumbers,
   updateDeliverable,
   useDeliverablesState,
   validateDeliverableDraft,
@@ -407,6 +414,7 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [citationMatch, setCitationMatch] = useState("");
   const [citationUrl, setCitationUrl] = useState("");
   const [citationExcerpt, setCitationExcerpt] = useState("");
+  const [citationOccurrence, setCitationOccurrence] = useState("1");
   const [fromVersion, setFromVersion] = useState(1);
   const [toVersion, setToVersion] = useState(1);
   const [diff, setDiff] = useState<DeliverableDiff>();
@@ -416,6 +424,8 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
     setDiff(undefined);
     void loadDeliverable(api, id).catch((failure) => setError(complianceMessage(failure, t)));
     void loadDeliverableAudit(api, id).catch(() => undefined);
+    void loadDeliverableCompliance(api, id).catch(() => undefined);
+    void loadDeliverableShares(api, id).catch(() => undefined);
   }, [api, id, t]);
 
   useEffect(() => {
@@ -487,33 +497,94 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   async function addCitation() {
     if (!citationMatch.trim()) return;
-    const next = [
-      ...citations,
-      {
-        match: citationMatch.trim(),
-        occurrence: 1,
-        ...(citationUrl.trim() ? { url: citationUrl.trim() } : {}),
-        ...(citationExcerpt.trim() ? { excerpt: citationExcerpt.trim() } : {}),
-        ...(citationUrl.trim() ? { fetchedAt: new Date().toISOString() } : {}),
-      },
-    ];
+    if (!citationUrl.trim() || !citationExcerpt.trim()) {
+      setError(t("screens.deliverableCitationRequired"));
+      return;
+    }
     setBusy(true);
     setError(undefined);
     try {
-      const note = await updateDeliverable(api, id, {
-        citations: next.map((citation) => ({
-          match: citation.match,
-          occurrence: citation.occurrence,
-          ...(citation.url ? { url: citation.url } : {}),
-          ...(citation.fetchedAt ? { fetchedAt: citation.fetchedAt } : {}),
-          ...(citation.excerpt ? { excerpt: citation.excerpt } : {}),
-        })),
+      const note = await resolveDeliverableNumber(api, id, {
+        resolution: "source",
+        match: citationMatch.trim(),
+        occurrence: Math.max(1, Number(citationOccurrence) || 1),
+        url: citationUrl.trim(),
+        excerpt: citationExcerpt.trim(),
       });
       setCitations(note.citations);
       setCitationMatch("");
       setCitationUrl("");
       setCitationExcerpt("");
+      setCitationOccurrence("1");
       notify(t("screens.deliverableCitationAdded"));
+      await loadDeliverableCompliance(api, id).catch(() => undefined);
+    } catch (failure) {
+      setError(complianceMessage(failure, t));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resolveToken(
+    token: { text: string; occurrence: number },
+    action: "estimate" | "remove",
+  ) {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const note = await resolveDeliverableNumber(api, id, {
+        resolution: action,
+        match: token.text,
+        occurrence: token.occurrence,
+      });
+      setCitations(note.citations);
+      setContent(note.content);
+      notify(
+        action === "estimate"
+          ? t("screens.deliverableNumberEstimated")
+          : t("screens.deliverableNumberRemoved"),
+      );
+      await loadDeliverableCompliance(api, id).catch(() => undefined);
+    } catch (failure) {
+      setError(complianceMessage(failure, t));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reopen() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await reopenDeliverable(api, id);
+      notify(t("screens.deliverableReturned"));
+      await loadDeliverableAudit(api, id);
+    } catch (failure) {
+      setError(complianceMessage(failure, t));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function share() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const created = await shareDeliverable(api, id);
+      notify(t("screens.deliverableShared", { url: created.url ?? "" }));
+    } catch (failure) {
+      setError(complianceMessage(failure, t));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke(shareId: string) {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await revokeDeliverableShare(api, shareId);
+      notify(t("screens.deliverableShareRevoked"));
     } catch (failure) {
       setError(complianceMessage(failure, t));
     } finally {
@@ -543,6 +614,7 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   const action = detail ? nextDeliverableTransition(detail.status) : undefined;
   const editable = detail ? canEditDeliverable(detail.status) : false;
+  const pendingNumbers = detail ? unsourcedDeliverableNumbers(content, citations) : [];
 
   return (
     <View style={{ gap: 16 }}>
@@ -614,6 +686,11 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
                   </Button>
                 </>
               ) : null}
+              {detail.status === "in_review" || detail.status === "approved" ? (
+                <Button quietBusy onPress={() => void reopen()}>
+                  {t("screens.deliverableReturn")}
+                </Button>
+              ) : null}
               {detail.status !== "archived" ? (
                 <Button icon={Archive} quietBusy onPress={() => void run("archive")}>
                   {t("screens.deliverableArchive")}
@@ -639,6 +716,52 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
               title={t("screens.deliverableCitations")}
               count={detail.citations.length}
             />
+            {pendingNumbers.length ? (
+              <View style={{ gap: 6 }}>
+                <Text style={[s.small, { color: colors.danger }]}>
+                  {t("screens.deliverableUnsourcedHeading", { count: pendingNumbers.length })}
+                </Text>
+                {pendingNumbers.map((token) => (
+                  <View
+                    key={`${token.text}:${token.occurrence}`}
+                    style={[s.between, { gap: 8, flexWrap: "wrap" }]}
+                  >
+                    <Text style={s.text}>
+                      {token.text}
+                      {token.occurrence > 1 ? ` #${token.occurrence}` : ""}
+                    </Text>
+                    {editable ? (
+                      <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>
+                        <Button
+                          small
+                          onPress={() => {
+                            setCitationMatch(token.text);
+                            setCitationOccurrence(String(token.occurrence));
+                          }}
+                        >
+                          {t("screens.deliverableAddCitation")}
+                        </Button>
+                        <Button
+                          small
+                          quietBusy
+                          onPress={() => void resolveToken(token, "estimate")}
+                        >
+                          {t("screens.deliverableMarkEstimate")}
+                        </Button>
+                        <Button
+                          small
+                          danger
+                          quietBusy
+                          onPress={() => void resolveToken(token, "remove")}
+                        >
+                          {t("screens.deliverableRemoveNumber")}
+                        </Button>
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {detail.citations.length === 0 ? (
               <Text style={s.small}>{t("screens.deliverableNoCitations")}</Text>
             ) : (
@@ -667,6 +790,11 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
                   onChangeText={setCitationMatch}
                 />
                 <Field
+                  label={t("screens.deliverableCitationOccurrence")}
+                  value={citationOccurrence}
+                  onChangeText={setCitationOccurrence}
+                />
+                <Field
                   label={t("screens.deliverableCitationUrl")}
                   value={citationUrl}
                   onChangeText={setCitationUrl}
@@ -687,6 +815,46 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
                 </Button>
               </View>
             ) : null}
+          </Card>
+
+          <Card style={{ gap: 10 }}>
+            <SectionHeading
+              title={t("screens.deliverableCompliance")}
+              count={state.compliance?.unsourcedNumbers.length ?? pendingNumbers.length}
+            />
+            {state.compliance ? (
+              <>
+                <Text style={s.small}>
+                  {t("screens.deliverableModelReview")}:{" "}
+                  {t(
+                    state.compliance.modelReview === "ok"
+                      ? "screens.deliverableModelReviewOk"
+                      : state.compliance.modelReview === "flagged"
+                        ? "screens.deliverableModelReviewFlagged"
+                        : "screens.deliverableModelReviewMissing",
+                  )}
+                </Text>
+                {state.compliance.violations.length ? (
+                  <Text style={[s.small, { color: colors.danger }]}>
+                    {t("screens.deliverableProhibitedError")}
+                  </Text>
+                ) : null}
+                {state.compliance.pii.length ? (
+                  state.compliance.pii.map((finding) => (
+                    <View key={`${finding.code}:${finding.excerpt}`} style={{ gap: 2 }}>
+                      <Text style={[s.small, { color: colors.orange }]}>
+                        {finding.label}: {finding.redacted}
+                      </Text>
+                      <Text style={s.small}>{t("screens.deliverablePiiAutoRedact")}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={s.small}>{t("screens.deliverableNoPii")}</Text>
+                )}
+              </>
+            ) : (
+              <Text style={s.small}>{t("screens.deliverableCompliancePending")}</Text>
+            )}
           </Card>
 
           <Card style={{ gap: 10 }}>
@@ -765,6 +933,29 @@ function DeliverableDetail({ id, onBack }: { id: string; onBack: () => void }) {
                 HTML
               </Button>
             </View>
+          </Card>
+
+          <Card style={{ gap: 10 }}>
+            <SectionHeading title={t("screens.deliverableShares")} count={state.shares.length} />
+            {detail.status === "sent" ? (
+              <Button small busy={busy} onPress={() => void share()}>
+                {t("screens.deliverableShare")}
+              </Button>
+            ) : (
+              <Text style={s.small}>{t("screens.deliverableShareHint")}</Text>
+            )}
+            {state.shares.map((share) => (
+              <View key={share.id} style={[s.between, { gap: 8, flexWrap: "wrap" }]}>
+                <View style={{ flex: 1, minWidth: 160 }}>
+                  <Text style={s.small} numberOfLines={1}>
+                    {share.url ?? `${t("screens.deliverableShareVersion")} v${share.sentVersion}`}
+                  </Text>
+                </View>
+                <Button small danger quietBusy onPress={() => void revoke(share.id)}>
+                  {t("screens.deliverableRevokeShare")}
+                </Button>
+              </View>
+            ))}
           </Card>
         </>
       )}

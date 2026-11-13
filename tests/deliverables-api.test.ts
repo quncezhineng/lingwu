@@ -6,7 +6,13 @@ import { after, before, test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
-import { DEFAULT_DISCLAIMER, DeliverablesService } from "../apps/server/src/engine/deliverables.ts";
+import {
+  createDeliverableSchema,
+  DEFAULT_DISCLAIMER,
+  DeliverablesService,
+  detectPii,
+  redactPii,
+} from "../apps/server/src/engine/deliverables.ts";
 import type {
   Deliverable,
   DeliverableAuditEntry,
@@ -169,7 +175,7 @@ test("send enforces prohibited wording and records the block", async () => {
       kind: "ONE_PAGER",
       title: "收益承诺测试",
       content: "这只股票稳赚，目标价 120 元。",
-      citations: [{ match: "120", estimated: true }],
+      citations: [{ match: "120 元", estimated: true }],
     },
     201,
   );
@@ -190,7 +196,7 @@ test("send enforces prohibited wording and records the block", async () => {
   assert.equal(stored.status, "approved");
 });
 
-test("invalid transitions and edits after approval are rejected", async () => {
+test("invalid transitions are rejected and approved edits roll back to draft", async () => {
   const created = await post<Deliverable>(
     "/deliverables",
     { kind: "CUSTOM", title: "状态机", content: "内容 1 条。" },
@@ -207,11 +213,10 @@ test("invalid transitions and edits after approval are rejected", async () => {
   await post(`/deliverables/${created.id}/submit`, {});
   await put(`/deliverables/${created.id}`, { citations: [{ match: "1", estimated: true }] });
   await post(`/deliverables/${created.id}/approve`, {});
-  await call(
-    `/deliverables/${created.id}`,
-    { method: "PUT", body: JSON.stringify({ content: "批准后不能改" }) },
-    409,
-  );
+  const edited = await put<Deliverable>(`/deliverables/${created.id}`, {
+    content: "批准后修改会退回草稿。",
+  });
+  assert.equal(edited.status, "draft");
   const archived = await post<Deliverable>(`/deliverables/${created.id}/archive`, {});
   assert.equal(archived.status, "archived");
 });
@@ -275,4 +280,240 @@ test("Markdown and HTML exports include citations, sources and the disclaimer", 
   assert.match(page, /<h1>导出测试<\/h1>/);
   assert.match(page, /https:\/\/example.com\/report/);
   assert.match(page, new RegExp(DEFAULT_DISCLAIMER));
+});
+
+test("numeric tokens keep sign and unit, so mismatched citations cannot fake approval", async () => {
+  const created = await post<Deliverable>(
+    "/deliverables",
+    {
+      kind: "REPORT",
+      title: "单位与符号",
+      content: "营收 10 亿元，净利 -5%，同比 +5%。",
+    },
+    201,
+  );
+  await post(`/deliverables/${created.id}/submit`, { actor: "user" });
+
+  const blocked = await server.app.request(`/api/deliverables/${created.id}/approve`, {
+    method: "POST",
+    headers: headers(),
+    body: "{}",
+  });
+  assert.equal(blocked.status, 422, "没有来源的数字必须先处理");
+
+  // 只补“10”，不能覆盖正文里的“10 亿元”。
+  const wrong = await server.app.request(`/api/deliverables/${created.id}/numbers/resolve`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      resolution: "source",
+      match: "10",
+      url: "https://example.com/revenue",
+      excerpt: "营收 10 亿元",
+    }),
+  });
+  assert.equal(wrong.status, 404);
+
+  await post<Deliverable>(`/deliverables/${created.id}/numbers/resolve`, {
+    resolution: "source",
+    match: "10 亿元",
+    url: "https://example.com/revenue",
+    excerpt: "营收 10 亿元",
+  });
+
+  const approvedTooEarly = await server.app.request(`/api/deliverables/${created.id}/approve`, {
+    method: "POST",
+    headers: headers(),
+    body: "{}",
+  });
+  assert.equal(approvedTooEarly.status, 422, "-5% 与 +5% 不能被互相覆盖");
+  const body = await approvedTooEarly.json();
+  assert.match(body.error, /-5%|%2B5%|\+5%/);
+
+  await post<Deliverable>(`/deliverables/${created.id}/numbers/resolve`, {
+    resolution: "estimate",
+    match: "-5%",
+  });
+  const removed = await post<Deliverable>(`/deliverables/${created.id}/numbers/resolve`, {
+    resolution: "remove",
+    match: "+5%",
+  });
+  assert.equal(removed.version, created.version + 1);
+  assert.doesNotMatch(removed.content, /\+5%/);
+
+  const approved = await post<Deliverable>(`/deliverables/${created.id}/approve`, {
+    actor: "user",
+  });
+  assert.equal(approved.status, "approved");
+});
+
+test("PII is detected, redacted before sending, and the model review hook is reported honestly", async () => {
+  assert.deepEqual(
+    detectPii("客户：张三 电话 13800138000 邮箱 zhangsan@example.com").map((item) => item.code),
+    ["phone", "email", "client_name"],
+  );
+  assert.doesNotMatch(
+    redactPii("客户：张三 电话 13800138000 邮箱 zhangsan@example.com"),
+    /13800138000|zhangsan@example\.com|张三/,
+  );
+
+  const created = await post<Deliverable>(
+    "/deliverables",
+    {
+      kind: "REPORT",
+      title: "客户信息脱敏",
+      content: "客户：张三 电话 13800138000，邮箱 zhangsan@example.com。结论：增长稳定。",
+    },
+    201,
+  );
+  await post(`/deliverables/${created.id}/submit`, {});
+  await post(`/deliverables/${created.id}/approve`, {});
+  const compliance = await call<{ pii: { code: string }[]; modelReview: string }>(
+    `/deliverables/${created.id}/compliance`,
+  );
+  assert.equal(compliance.pii.length, 3);
+  assert.equal(compliance.modelReview, "not_configured");
+
+  const sent = await post<Deliverable>(`/deliverables/${created.id}/send`, {
+    recipients: ["reviewer@example.com"],
+  });
+  assert.equal(sent.status, "sent");
+  assert.doesNotMatch(sent.content, /13800138000|zhangsan@example\.com|张三/);
+  assert.match(sent.content, /客户：\[已脱敏\]/);
+  assert.equal(sent.compliance?.modelReview, "not_configured");
+  const audit = await call<{ audit: DeliverableAuditEntry[] }>(`/deliverables/${created.id}/audit`);
+  assert.ok(audit.audit.some((entry) => entry.action === "pii_redacted"));
+
+  const hooked = new DeliverablesService(db, {
+    piiReview: async () => [
+      { code: "client_name", label: "模型复核", excerpt: "张三", redacted: "张*" },
+    ],
+  });
+  const note = await hooked.create(
+    "hook-owner",
+    createDeliverableSchema.parse({ title: "模型复核", content: "客户资料见附件。" }),
+  );
+  const report = await hooked.checkCompliance(note);
+  assert.equal(report.modelReview, "flagged");
+  assert.equal(report.pii[0]?.label, "模型复核");
+});
+
+test("share links lock the sent snapshot and stop working after revocation or archive", async () => {
+  const created = await post<Deliverable>(
+    "/deliverables",
+    {
+      kind: "REPORT",
+      title: "分享快照",
+      content: "营收 10 亿元。",
+      citations: [
+        {
+          match: "10 亿元",
+          url: "https://example.com/revenue",
+          fetchedAt: "2026-11-13T08:00:00.000Z",
+          excerpt: "营收 10 亿元",
+        },
+      ],
+    },
+    201,
+  );
+  await post(`/deliverables/${created.id}/submit`, {});
+  await post(`/deliverables/${created.id}/approve`, {});
+  await post(`/deliverables/${created.id}/send`, { recipients: ["reader@example.com"] });
+
+  const share = await post<{ id: string; url: string; sentVersion: number }>(
+    `/deliverables/${created.id}/share`,
+    {},
+    201,
+  );
+  assert.ok(share.id);
+  assert.match(share.url, /\/d\//);
+
+  const page = await server.app.request(`/d/${share.id}`);
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /分享快照/);
+  assert.match(html, /noindex/);
+  assert.match(html, new RegExp(DEFAULT_DISCLAIMER));
+
+  const revoke = await server.app.request(`/api/deliverables/shares/${share.id}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  assert.equal(revoke.status, 204);
+  const revoked = await server.app.request(`/d/${share.id}`);
+  assert.equal(revoked.status, 404);
+
+  const second = await post<{ id: string }>(`/deliverables/${created.id}/share`, {}, 201);
+  await post(`/deliverables/${created.id}/archive`, {});
+  const archived = await server.app.request(`/d/${second.id}`);
+  assert.equal(archived.status, 404);
+});
+
+test("in_review can be returned, approved edits roll back to draft, and templates carry their contract", async () => {
+  const created = await post<Deliverable>(
+    "/deliverables",
+    {
+      kind: "BRIEFING",
+      title: "退回修改",
+      content: "无数字结论。",
+      template_id: "tpl-weekly",
+      template_version: "3",
+    },
+    201,
+  );
+  assert.equal(created.template_id, "tpl-weekly");
+  assert.equal(created.template_version, "3");
+
+  await post(`/deliverables/${created.id}/submit`, {});
+  const reopened = await post<Deliverable>(`/deliverables/${created.id}/reopen`, {
+    actor: "user",
+    note: "补充风险提示",
+  });
+  assert.equal(reopened.status, "draft");
+
+  await post(`/deliverables/${created.id}/submit`, {});
+  const approved = await post<Deliverable>(`/deliverables/${created.id}/approve`, {});
+  assert.equal(approved.status, "approved");
+
+  const edited = await put<Deliverable>(`/deliverables/${created.id}`, {
+    content: "无数字结论，补充风险提示。",
+  });
+  assert.equal(edited.status, "draft");
+  assert.equal(edited.version, approved.version + 1);
+  assert.equal(edited.review.approvedAt, undefined);
+
+  const approvedAgenda = await post<Deliverable>(`/deliverables/${created.id}/submit`, {});
+  assert.equal(approvedAgenda.status, "in_review");
+  const reopenedApproved = await post<Deliverable>(`/deliverables/${created.id}/reopen`, {});
+  assert.equal(reopenedApproved.status, "draft");
+});
+
+test("scheduled task outputs are captured idempotently and appear in /api/today", async () => {
+  const service = new DeliverablesService(db);
+  const first = await service.captureFromTask("local-user", {
+    id: "scheduled-task-1",
+    title: "盘前晨报",
+    kind: "market_briefing",
+    result: "隔夜美股收涨。",
+  });
+  const second = await service.captureFromTask("local-user", {
+    id: "scheduled-task-1",
+    title: "盘前晨报",
+    kind: "market_briefing",
+    result: "隔夜美股收涨。",
+  });
+  assert.equal(first.id, second.id);
+  assert.equal(first.status, "draft");
+  assert.equal(first.kind, "BRIEFING");
+  assert.deepEqual(
+    first.sources.map((source) => source.type),
+    ["task"],
+  );
+
+  await post(`/deliverables/${first.id}/submit`, {});
+  const today = await call<{
+    deliverables: { pending_review_count: number; pending_review: { id: string }[] };
+  }>("/today");
+  assert.ok(today.deliverables.pending_review_count >= 1);
+  assert.ok(today.deliverables.pending_review.some((item) => item.id === first.id));
 });

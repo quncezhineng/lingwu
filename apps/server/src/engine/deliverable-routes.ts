@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   createDeliverableSchema,
   deliverableListQuerySchema,
+  resolveNumberSchema,
   sendDeliverableSchema,
   transitionDeliverableSchema,
   updateDeliverableSchema,
@@ -76,9 +77,41 @@ export function deliverableRoutes(service: AgentService): Hono<Env> {
     const input = transitionDeliverableSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await service.deliverables.approve(c.get("owner"), c.req.param("id"), input));
   });
+  app.post("/:id/reopen", async (c) => {
+    const input = transitionDeliverableSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(
+      await service.deliverables.returnToDraft(c.get("owner"), c.req.param("id"), input),
+    );
+  });
   app.post("/:id/send", async (c) => {
     const input = sendDeliverableSchema.parse(await c.req.json());
     return c.json(await service.deliverables.send(c.get("owner"), c.req.param("id"), input));
+  });
+  app.post("/:id/numbers/resolve", async (c) => {
+    const input = resolveNumberSchema.parse(await c.req.json());
+    return c.json(
+      await service.deliverables.resolveNumber(c.get("owner"), c.req.param("id"), input),
+    );
+  });
+  app.get("/:id/compliance", async (c) =>
+    c.json(await service.deliverables.compliance(c.get("owner"), c.req.param("id"))),
+  );
+  app.get("/:id/shares", async (c) =>
+    c.json({ shares: await service.deliverables.shares(c.get("owner"), c.req.param("id")) }),
+  );
+  app.post("/:id/share", async (c) => {
+    const share = await service.deliverables.share(c.get("owner"), c.req.param("id"));
+    return c.json(
+      {
+        ...share,
+        url: `${c.req.url.split("/api/deliverables/")[0]}/d/${share.id}`,
+      },
+      201,
+    );
+  });
+  app.delete("/shares/:shareId", async (c) => {
+    await service.deliverables.revokeShare(c.get("owner"), c.req.param("shareId"));
+    return c.body(null, 204);
   });
   app.post("/:id/archive", async (c) => {
     const input = transitionDeliverableSchema.parse(await c.req.json().catch(() => ({})));

@@ -74,8 +74,47 @@ export interface Deliverable {
   approvedAt?: string;
   sentAt?: string;
   recipients?: string[];
+  sentVersion?: number;
+  templateId?: string;
+  templateVersion?: string;
+  compliance?: DeliverableComplianceReport;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DeliverablePiiFinding {
+  code: string;
+  label: string;
+  excerpt: string;
+  redacted: string;
+}
+
+export interface DeliverableViolation {
+  code: string;
+  label: string;
+  excerpt: string;
+}
+
+export interface DeliverableComplianceReport {
+  checkedAt: string;
+  passed: boolean;
+  disclaimer: string;
+  disclaimerMissing: boolean;
+  violations: DeliverableViolation[];
+  pii: DeliverablePiiFinding[];
+  unsourcedNumbers: string[];
+  ruleEngine: "ok";
+  modelReview: "ok" | "flagged" | "not_configured";
+}
+
+export interface DeliverableShare {
+  id: string;
+  deliverableId: string;
+  createdAt: string;
+  revoked: boolean;
+  sentVersion: number;
+  disclaimer: string;
+  url?: string;
 }
 
 export interface DeliverableListItem {
@@ -200,6 +239,70 @@ function parseVersions(value: unknown): DeliverableVersion[] {
   });
 }
 
+function parseCompliance(value: unknown): DeliverableComplianceReport | undefined {
+  if (!isRecord(value)) return undefined;
+  const checkedAt = text(value.checkedAt);
+  if (!checkedAt) return undefined;
+  return {
+    checkedAt,
+    passed: value.passed === true,
+    disclaimer: text(value.disclaimer) ?? "",
+    disclaimerMissing: value.disclaimerMissing === true,
+    violations: Array.isArray(value.violations)
+      ? value.violations.flatMap((item) => {
+          if (!isRecord(item)) return [];
+          return [
+            {
+              code: text(item.code) ?? "",
+              label: text(item.label) ?? "",
+              excerpt: text(item.excerpt) ?? "",
+            },
+          ];
+        })
+      : [],
+    pii: Array.isArray(value.pii)
+      ? value.pii.flatMap((item) => {
+          if (!isRecord(item)) return [];
+          return [
+            {
+              code: text(item.code) ?? "",
+              label: text(item.label) ?? "",
+              excerpt: text(item.excerpt) ?? "",
+              redacted: text(item.redacted) ?? "",
+            },
+          ];
+        })
+      : [],
+    unsourcedNumbers: Array.isArray(value.unsourcedNumbers)
+      ? value.unsourcedNumbers.filter((item): item is string => typeof item === "string")
+      : [],
+    ruleEngine: "ok",
+    modelReview:
+      oneOf(value.modelReview, ["ok", "flagged", "not_configured"] as const) ?? "not_configured",
+  };
+}
+
+function parseShares(value: unknown): DeliverableShare[] {
+  if (!isRecord(value) || !Array.isArray(value.shares)) return [];
+  return value.shares.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const id = text(item.id);
+    const deliverableId = text(item.deliverableId);
+    if (!id || !deliverableId) return [];
+    return [
+      {
+        id,
+        deliverableId,
+        createdAt: text(item.createdAt) ?? "",
+        revoked: item.revoked === true,
+        sentVersion: num(item.sentVersion) ?? 1,
+        disclaimer: text(item.disclaimer) ?? "",
+        ...(text(item.url) ? { url: text(item.url) } : {}),
+      },
+    ];
+  });
+}
+
 export function parseDeliverable(value: unknown): Deliverable | undefined {
   if (!isRecord(value)) return undefined;
   const id = text(value.id);
@@ -232,6 +335,10 @@ export function parseDeliverable(value: unknown): Deliverable | undefined {
     ...(Array.isArray(send.recipients)
       ? { recipients: send.recipients.filter((item): item is string => typeof item === "string") }
       : {}),
+    ...(num(send.sentVersion) ? { sentVersion: num(send.sentVersion) } : {}),
+    ...(text(value.template_id) ? { templateId: text(value.template_id) } : {}),
+    ...(text(value.template_version) ? { templateVersion: text(value.template_version) } : {}),
+    ...(parseCompliance(value.compliance) ? { compliance: parseCompliance(value.compliance) } : {}),
     createdAt: text(value.createdAt) ?? "",
     updatedAt: text(value.updatedAt) ?? "",
   };
@@ -336,7 +443,8 @@ export function nextDeliverableTransition(
 }
 
 export function canEditDeliverable(status: DeliverableStatus) {
-  return status === "draft" || status === "in_review";
+  // approved 也允许编辑，但服务端会把它退回 draft 并撤销分享链接。
+  return status === "draft" || status === "in_review" || status === "approved";
 }
 
 export function draftDeliverable(note?: Deliverable): DeliverableDraft {
@@ -354,6 +462,62 @@ export function validateDeliverableDraft(draft: DeliverableDraft): "title" | "co
   return undefined;
 }
 
+export interface DeliverableNumberToken {
+  text: string;
+  occurrence: number;
+}
+
+const NUMBER_PATTERN =
+  /(?<![\w#/.-])[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:\s?(?:亿元|亿美元|万美元|亿港元|万港元|%|％|bps|bp|x|X|倍|亿|万|美元|港元|元|点))?/g;
+
+function maskedContent(content: string) {
+  return content
+    .replace(/```[\s\S]*?```/g, (block) => " ".repeat(block.length))
+    .replace(/`[^`\n]*`/g, (code) => " ".repeat(code.length))
+    .replace(/https?:\/\/[^\s)]+/gi, (url) => " ".repeat(url.length))
+    .replace(/\b\d{4}-\d{1,2}-\d{1,2}\b/g, (date) => " ".repeat(date.length))
+    .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, (time) => " ".repeat(time.length))
+    .replace(/\b(?:19|20)\d{2}年/g, (year) => " ".repeat(year.length));
+}
+
+export function normalizeDeliverableNumber(text: string) {
+  return text.replace(/\s+/g, "").replace(/％/g, "%").replace(/−/g, "-").toLowerCase();
+}
+
+/** 与服务端同口径的数字 token：保留正负号与单位/币种。 */
+export function deliverableNumberTokens(content: string): DeliverableNumberToken[] {
+  const masked = maskedContent(content);
+  const occurrences = new Map<string, number>();
+  const tokens: DeliverableNumberToken[] = [];
+  for (const match of masked.matchAll(NUMBER_PATTERN)) {
+    const text = match[0].trim();
+    if (!text || !/\d/.test(text)) continue;
+    if (/^[-+]?(?:19|20)\d{2}$/.test(text)) continue;
+    const digits = text.replace(/\D/g, "");
+    if (/^1[3-9]\d{9}$/.test(digits) || digits.length >= 15) continue;
+    const key = normalizeDeliverableNumber(text);
+    const occurrence = (occurrences.get(key) ?? 0) + 1;
+    occurrences.set(key, occurrence);
+    tokens.push({ text, occurrence });
+  }
+  return tokens;
+}
+
+/** 手机端待处理数字：正文里存在、但没有 URL 或估算标记的 token。 */
+export function unsourcedDeliverableNumbers(
+  content: string,
+  citations: readonly DeliverableCitation[],
+): DeliverableNumberToken[] {
+  return deliverableNumberTokens(content).filter(
+    (token) =>
+      !citations.some(
+        (citation) =>
+          normalizeDeliverableNumber(citation.match) === normalizeDeliverableNumber(token.text) &&
+          citation.occurrence === token.occurrence,
+      ),
+  );
+}
+
 export interface DeliverablesState {
   status: "idle" | "loading" | "ready" | "error";
   items: DeliverableListItem[];
@@ -362,6 +526,8 @@ export interface DeliverablesState {
   versions: DeliverableVersion[];
   diff?: DeliverableDiff;
   audit: DeliverableAudit[];
+  compliance?: DeliverableComplianceReport;
+  shares: DeliverableShare[];
   error?: string;
 }
 
@@ -371,6 +537,7 @@ const INITIAL_STATE: DeliverablesState = {
   detailStatus: "idle",
   versions: [],
   audit: [],
+  shares: [],
 };
 
 let state: DeliverablesState = INITIAL_STATE;
@@ -524,6 +691,107 @@ export async function transitionDeliverable(
     items: upsertItem(state.items, note),
   });
   return note;
+}
+
+/** in_review / approved 退回草稿修改。 */
+export async function reopenDeliverable(
+  api: LingWuApi,
+  id: string,
+  note?: string,
+): Promise<Deliverable> {
+  const detail = requireDeliverable(
+    await api.request<unknown>(
+      `/api/deliverables/${encodeURIComponent(id)}/reopen`,
+      { actor: "user", ...(note ? { note } : {}) },
+      "POST",
+    ),
+  );
+  setState({
+    detail,
+    detailStatus: "ready",
+    versions: detail.versions,
+    items: upsertItem(state.items, detail),
+    shares: [],
+  });
+  return detail;
+}
+
+export type DeliverableNumberResolution =
+  | {
+      resolution: "source";
+      match: string;
+      occurrence?: number;
+      url: string;
+      excerpt: string;
+      fetchedAt?: string;
+    }
+  | { resolution: "estimate"; match: string; occurrence?: number }
+  | { resolution: "remove"; match: string; occurrence?: number };
+
+export async function resolveDeliverableNumber(
+  api: LingWuApi,
+  id: string,
+  input: DeliverableNumberResolution,
+): Promise<Deliverable> {
+  const detail = requireDeliverable(
+    await api.request<unknown>(
+      `/api/deliverables/${encodeURIComponent(id)}/numbers/resolve`,
+      { ...input, occurrence: input.occurrence ?? 1 },
+      "POST",
+    ),
+  );
+  setState({
+    detail,
+    detailStatus: "ready",
+    versions: detail.versions,
+    items: upsertItem(state.items, detail),
+    compliance: undefined,
+  });
+  return detail;
+}
+
+export async function loadDeliverableCompliance(
+  api: LingWuApi,
+  id: string,
+): Promise<DeliverableComplianceReport> {
+  const report = parseCompliance(
+    await api.request<unknown>(`/api/deliverables/${encodeURIComponent(id)}/compliance`),
+  );
+  if (!report) throw new Error("Unexpected compliance payload");
+  setState({ compliance: report });
+  return report;
+}
+
+export async function loadDeliverableShares(
+  api: LingWuApi,
+  id: string,
+): Promise<DeliverableShare[]> {
+  const shares = parseShares(
+    await api.request<unknown>(`/api/deliverables/${encodeURIComponent(id)}/shares`),
+  );
+  setState({ shares });
+  return shares;
+}
+
+export async function shareDeliverable(api: LingWuApi, id: string): Promise<DeliverableShare> {
+  const payload = await api.request<unknown>(
+    `/api/deliverables/${encodeURIComponent(id)}/share`,
+    {},
+    "POST",
+  );
+  const [share] = parseShares({ shares: [payload] });
+  if (!share) throw new Error("Unexpected share payload");
+  setState({ shares: [share, ...state.shares.filter((item) => item.id !== share.id)] });
+  return share;
+}
+
+export async function revokeDeliverableShare(api: LingWuApi, shareId: string): Promise<void> {
+  await api.request<unknown>(
+    `/api/deliverables/shares/${encodeURIComponent(shareId)}`,
+    undefined,
+    "DELETE",
+  );
+  setState({ shares: state.shares.filter((share) => share.id !== shareId) });
 }
 
 export async function sendDeliverable(
