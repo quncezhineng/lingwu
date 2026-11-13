@@ -18,6 +18,7 @@ export type Section =
   | "portfolio"
   | "notes"
   | "deliverables"
+  | "templates"
   | "apps"
   | "settings"
   | "agent"

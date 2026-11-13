@@ -16,6 +16,7 @@ import research from "./research";
 import screens from "./screens";
 import search from "./search";
 import status from "./status";
+import templates from "./templates";
 import threads from "./threads";
 import tools from "./tools";
 import ui from "./ui";
@@ -43,6 +44,7 @@ export const en = {
   ...financials,
   ...computer,
   ...deliverables,
+  ...templates,
   ...threads,
   ...tools,
 } satisfies Dictionary;

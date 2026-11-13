@@ -44,7 +44,7 @@ export interface DeliverableNumberRef {
 }
 
 export interface DeliverableSourceLink {
-  type: "task" | "briefing" | "symbol" | "thesis" | "note" | "artifact" | "url";
+  type: "task" | "briefing" | "symbol" | "thesis" | "note" | "artifact" | "deliverable" | "url";
   id: string;
   label?: string;
   url?: string;
@@ -198,7 +198,9 @@ function parseSourceLink(value: unknown): DeliverableSourceLink | undefined {
   if (
     !id ||
     !type ||
-    !["task", "briefing", "symbol", "thesis", "note", "artifact", "url"].includes(type)
+    !["task", "briefing", "symbol", "thesis", "note", "artifact", "deliverable", "url"].includes(
+      type,
+    )
   )
     return undefined;
   return {
@@ -400,6 +402,13 @@ export function numberSummary(deliverable: Deliverable): {
   return count;
 }
 
+/** 发送时免责声明已注入正文；展示时去掉尾部注入块，避免渲染两遍。 */
+export function stripInjectedDisclaimer(content: string, disclaimer: string): string {
+  if (!disclaimer) return content;
+  const suffix = `\n\n---\n\n${disclaimer}`;
+  return content.endsWith(suffix) ? content.slice(0, -suffix.length) : content;
+}
+
 export function canApprove(deliverable: Deliverable): boolean {
   return deliverable.status === "in_review" && unresolvedNumbers(deliverable).length === 0;
 }
@@ -496,6 +505,8 @@ export interface CreateDeliverableInput {
     fetched_at?: string;
   }[];
   source_links?: DeliverableSourceLink[];
+  template_id?: string;
+  template_version?: string;
   disclaimer?: string;
   recipient?: string;
 }

@@ -394,7 +394,8 @@ export function Rail() {
                 collapsed={collapsed}
                 active={
                   section === item.id ||
-                  (item.id === "files" && (section === "notes" || section === "deliverables"))
+                  (item.id === "files" &&
+                    (section === "notes" || section === "deliverables" || section === "templates"))
                 }
                 badge={item.id === "activity" && activeCount ? activeCount : undefined}
                 onPress={() => navigate(item.id)}

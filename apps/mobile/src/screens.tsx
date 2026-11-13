@@ -79,6 +79,7 @@ import { NotesScreen } from "./notes-screen";
 import { PageHeader } from "./page-header";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
 import { StatusBadge, type StatusTone } from "./status-badge";
+import { TemplateScreen } from "./template-screen";
 import { breakpoints, fonts, radius, space } from "./theme";
 import {
   Button,
@@ -1234,7 +1235,7 @@ export function BrowserScreen() {
     </View>
   );
 }
-type LibrarySection = "files" | "insights" | "notes" | "deliverables";
+type LibrarySection = "files" | "insights" | "notes" | "deliverables" | "templates";
 
 /**
  * 资料库承接三类内容：文件、收藏的领悟卡和个人笔记。
@@ -1321,6 +1322,7 @@ export function FilesScreen({
     { id: "insights", label: t("screens.libraryInsights") },
     { id: "notes", label: t("screens.libraryNotes") },
     { id: "deliverables", label: t("screens.libraryDeliverables") },
+    { id: "templates", label: t("templates.title") },
   ];
   const sourceFilters: ReadonlyArray<{ id: FileSourceFilter; label: string; count: number }> = [
     { id: "all", label: t("screens.filesFilterAll"), count: fileCounts.all },
@@ -1989,6 +1991,7 @@ export function FilesScreen({
 
       {section === "notes" && <NotesScreen />}
       {section === "deliverables" && <DeliverableScreen />}
+      {section === "templates" && <TemplateScreen />}
     </View>
   );
 }

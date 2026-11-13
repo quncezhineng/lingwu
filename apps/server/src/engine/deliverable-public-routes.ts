@@ -6,7 +6,7 @@
  */
 import { Hono } from "hono";
 import MarkdownIt from "markdown-it";
-import type { DeliverablesService } from "./deliverables.ts";
+import { type DeliverablesService, stripInjectedDisclaimer } from "./deliverables.ts";
 
 const markdown = new MarkdownIt({ html: false, linkify: true, breaks: false });
 
@@ -51,7 +51,7 @@ export function deliverablePublicRoutes(deliverables: DeliverablesService): Hono
         `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>链接不可用</title></head><body><p>这条分享链接已失效或未获批准。</p></body></html>`,
         404,
       );
-    const body = markdown.render(view.content);
+    const body = markdown.render(stripInjectedDisclaimer(view.content, view.disclaimer));
     return c.html(
       `<!doctype html><html lang="zh-CN"><head>
 <meta charset="utf-8">

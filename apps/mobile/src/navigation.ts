@@ -27,6 +27,7 @@ const SECTION_LEVEL: Partial<Record<Section, string>> = {
   files: "library",
   notes: "library",
   deliverables: "library",
+  templates: "library",
   activity: "tasks",
   goals: "tasks",
 };
