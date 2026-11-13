@@ -66,6 +66,7 @@ import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
 import { summarizeReport } from "./report-brief.ts";
 import { generateResearchReport, researchSymbolSchema } from "./research.ts";
+import { TemplatesService } from "./templates.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
 
@@ -123,6 +124,7 @@ export class AgentService {
   readonly priceAlerts: PriceAlertsService;
   readonly monitors: MonitorService;
   readonly deliverables: DeliverablesService;
+  readonly templates: TemplatesService;
   /** 多 Agent 记忆引擎（Hindsight），未配置时降级为本地关键词召回。 */
   readonly memory: HindsightClient;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
@@ -154,6 +156,7 @@ export class AgentService {
       notify: (owner, title, body, key) => this.notify(owner, title, body, undefined, key),
     });
     this.deliverables = new DeliverablesService(db);
+    this.templates = new TemplatesService(db);
     this.memory = new HindsightClient({
       baseUrl: config.hindsightBaseUrl,
       apiKey: config.hindsightApiKey,

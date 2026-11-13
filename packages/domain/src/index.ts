@@ -5,6 +5,7 @@ export type Section =
   | "today"
   | "monitors"
   | "deliverables"
+  | "templates"
   | "chat"
   | "mail"
   | "calendar"

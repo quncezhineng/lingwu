@@ -96,3 +96,20 @@ test("交付物是独立层级，可从 Today 进入并返回", () => {
   assert.equal(entered.section, "deliverables");
   assert.deepEqual(entered.stack, ["chat"]);
 });
+
+test("SecondarySection 实际渲染 TemplateScreen 并有侧栏入口", () => {
+  const file = parse("agent-product.tsx");
+  const secondary = namedFunction(file, "SecondarySection");
+  let caseClause: ts.CaseClause | undefined;
+  visit(secondary, (node) => {
+    if (
+      ts.isCaseClause(node) &&
+      ts.isStringLiteral(node.expression) &&
+      node.expression.text === "templates"
+    )
+      caseClause = node;
+  });
+  assert.ok(caseClause, 'SecondarySection 必须包含 case "templates"');
+  assert.equal(hasJsxTag(caseClause, "TemplateScreen"), true);
+  assert.equal(hasStringLiteral(namedFunction(file, "AgentRail"), "agent-rail-templates"), true);
+});

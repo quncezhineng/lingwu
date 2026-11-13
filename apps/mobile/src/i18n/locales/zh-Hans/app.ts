@@ -139,6 +139,7 @@ const app = {
   "app.navToday": "工作台",
   "app.navMonitors": "监控规则",
   "app.navDeliverables": "交付物",
+  "app.navTemplates": "我的模板",
   "app.goHome": "返回首页",
   "app.navChat": "对话",
   "app.navWatchlist": "自选与组合",

@@ -452,19 +452,35 @@ test("share links lock the sent snapshot and stop working after revocation or ar
 });
 
 test("in_review can be returned, approved edits roll back to draft, and templates carry their contract", async () => {
+  const source = await post<Deliverable>(
+    "/deliverables",
+    {
+      kind: "BRIEFING",
+      title: "模板来源",
+      content: "# 结论\n无数字结论。",
+    },
+    201,
+  );
+  const template = await post<{ id: string; version: number }>(
+    "/templates/from-deliverable",
+    {
+      deliverable_id: source.id,
+      name: "服务周报模板",
+    },
+    201,
+  );
   const created = await post<Deliverable>(
     "/deliverables",
     {
       kind: "BRIEFING",
       title: "退回修改",
       content: "无数字结论。",
-      template_id: "tpl-weekly",
-      template_version: "3",
+      template_id: template.id,
     },
     201,
   );
-  assert.equal(created.template_id, "tpl-weekly");
-  assert.equal(created.template_version, "3");
+  assert.equal(created.template_id, template.id);
+  assert.equal(created.template_version, `${template.id}@v${template.version}`);
 
   await post(`/deliverables/${created.id}/submit`, {});
   const reopened = await post<Deliverable>(`/deliverables/${created.id}/reopen`, {

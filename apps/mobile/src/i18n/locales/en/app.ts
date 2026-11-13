@@ -156,6 +156,7 @@ const app = {
   "app.navToday": "Workbench",
   "app.navMonitors": "Monitor rules",
   "app.navDeliverables": "Deliverables",
+  "app.navTemplates": "My templates",
   "app.goHome": "Back to home",
   "app.navChat": "Chat",
   "app.navWatchlist": "Watchlist & portfolios",

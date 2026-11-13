@@ -212,3 +212,113 @@ export const deliverableCitationSchema = z
 
 export type DeliverableSourceInput = z.infer<typeof deliverableSourceSchema>;
 export type DeliverableCitationInput = z.infer<typeof deliverableCitationSchema>;
+
+/* ------------------------------------------------------------------ *
+ * OPT-03 我的模板：从产出反推口径
+ * ------------------------------------------------------------------ */
+
+export interface TemplateSection {
+  id: string;
+  title: string;
+  order: number;
+  required: boolean;
+  instructions?: string;
+}
+
+export interface TemplateField {
+  id: string;
+  label: string;
+  required: boolean;
+  unit?: string;
+}
+
+export interface TemplateVoice {
+  tone: "formal" | "direct" | "concise";
+  language: "zh" | "en" | "mixed";
+  units: string[];
+  conventions: string[];
+}
+
+export interface TemplateCounterexample {
+  id: string;
+  text: string;
+  reason: "removed" | "rewritten";
+  preferred?: string;
+}
+
+export interface TemplateVersion {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
+  structure: TemplateSection[];
+  fields: TemplateField[];
+  voice: TemplateVoice;
+  counterexamples: TemplateCounterexample[];
+  summary: string;
+  created_at: string;
+}
+
+/** 一次模板复用；同一交付物重复保存只更新最后一条记录。 */
+export interface TemplateUsageRecord {
+  deliverable_id: string;
+  version: number;
+  edit_ratio: number;
+  edited_chars: number;
+  total_chars: number;
+  at: string;
+}
+
+export interface TemplateMetrics {
+  reuse_count: number;
+  first_edit_ratio?: number;
+  latest_edit_ratio?: number;
+  /** 复用后人工改动超过 30%，提示口径可能不清晰。 */
+  needs_clarification: boolean;
+  match_total: number;
+  accepted: number;
+  rejections: number;
+  /** accepted / (accepted + rejections)；没有反馈时为 1。 */
+  match_accuracy: number;
+}
+
+export interface TemplateSourceLink {
+  type: "deliverable";
+  id: string;
+  label?: string;
+}
+
+export interface UserTemplate {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  kind: DeliverableKind;
+  version: number;
+  structure: TemplateSection[];
+  fields: TemplateField[];
+  voice: TemplateVoice;
+  counterexamples: TemplateCounterexample[];
+  /** 从产出反推时保留的正文样例，用于「用这个模板」预填与改动率计算。 */
+  sample_content: string;
+  created_from?: TemplateSourceLink;
+  versions: TemplateVersion[];
+  usage: TemplateUsageRecord[];
+  metrics: TemplateMetrics;
+  shared: boolean;
+  shared_at?: string;
+  /** 内置能力单独展示，用户模板永远为 false。 */
+  built_in: false;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateMatch {
+  template_id: string;
+  name: string;
+  version: number;
+  score: number;
+  reasons: string[];
+  sample_content: string;
+  metrics: TemplateMetrics;
+}

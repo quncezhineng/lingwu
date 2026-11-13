@@ -152,6 +152,8 @@ export interface DeliverableDraft {
   title: string;
   content: string;
   sources: DeliverableSource[];
+  template_id?: string;
+  template_version?: string;
 }
 
 export type DeliverableTransition = "submit" | "approve" | "archive";

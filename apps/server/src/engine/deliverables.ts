@@ -65,6 +65,7 @@ export const updateDeliverableSchema = z
     citations: z.array(deliverableCitationSchema).max(100).optional(),
     template_id: z.string().trim().min(1).max(100).optional(),
     template_version: z.string().trim().min(1).max(60).optional(),
+    change_summary: z.string().trim().max(200).optional(),
     editor: z.enum(["user", "agent"]).default("user"),
   })
   .strict()
@@ -682,7 +683,9 @@ export class DeliverablesService {
     if (demoted) await this.revokeSharesFor(owner, note.id, "approved 修改退回 draft");
     await this.audit(owner, saved, "updated", {
       actor: input.editor,
-      detail: demoted ? "已批准交付物发生实质修改，已退回草稿并撤销分享链接" : undefined,
+      detail:
+        input.change_summary ??
+        (demoted ? "已批准交付物发生实质修改，已退回草稿并撤销分享链接" : undefined),
       metadata: {
         content_changed: contentChanged,
         sources_changed: input.sources !== undefined,

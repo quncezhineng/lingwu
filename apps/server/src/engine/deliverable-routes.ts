@@ -36,14 +36,30 @@ export function deliverableRoutes(service: AgentService): Hono<Env> {
   });
   app.post("/", async (c) => {
     const input = createDeliverableSchema.parse(await c.req.json());
-    return c.json(await service.deliverables.create(c.get("owner"), input), 201);
+    const owner = c.get("owner");
+    if (input.template_id) {
+      const resolved = await service.templates.resolveUsable(owner, input.template_id);
+      input.template_id = resolved.template.id;
+      input.template_version = `${resolved.template.id}@v${resolved.template.version}`;
+    }
+    const created = await service.deliverables.create(owner, input);
+    await service.templates.recordDeliverableUsage(owner, created);
+    return c.json(created, 201);
   });
   app.get("/:id", async (c) =>
     c.json(await service.deliverables.get(c.get("owner"), c.req.param("id"))),
   );
   app.put("/:id", async (c) => {
     const input = updateDeliverableSchema.parse(await c.req.json());
-    return c.json(await service.deliverables.update(c.get("owner"), c.req.param("id"), input));
+    const owner = c.get("owner");
+    if (input.template_id) {
+      const resolved = await service.templates.resolveUsable(owner, input.template_id);
+      input.template_id = resolved.template.id;
+      input.template_version = `${resolved.template.id}@v${resolved.template.version}`;
+    }
+    const updated = await service.deliverables.update(owner, c.req.param("id"), input);
+    await service.templates.recordDeliverableUsage(owner, updated);
+    return c.json(updated);
   });
   app.get("/:id/versions", async (c) =>
     c.json({
