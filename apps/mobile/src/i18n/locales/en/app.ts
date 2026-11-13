@@ -154,6 +154,7 @@ const app = {
     "Local workspaces open without a key. Make sure your LingWu server is running at {url}.",
   "app.openingWorkspace": "Opening your workspace…",
   "app.navToday": "Workbench",
+  "app.navMonitors": "Monitor rules",
   "app.goHome": "Back to home",
   "app.navChat": "Chat",
   "app.navWatchlist": "Watchlist & portfolios",
@@ -169,6 +170,9 @@ const app = {
   "app.titleToday": "Workbench",
   "app.subtitleToday":
     "Ask a question, follow your targets and keep every research thread in view.",
+  "app.titleMonitors": "Monitor rules",
+  "app.subtitleMonitors":
+    "Manage event monitoring by market and interruption level, including cooldown, quiet hours and delivery channels.",
   "app.titleWatchlist": "My watchlist",
   "app.titlePortfolio": "Portfolios",
   "app.subtitlePortfolio": "Holdings, P/L and allocation.",
