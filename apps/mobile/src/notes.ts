@@ -20,6 +20,40 @@ import type { LingWuApi } from "./api";
 export type NoteType = "BUY_REASON" | "SELL_REASON" | "RESEARCH" | "THESIS";
 export type ThesisStatus = "ACTIVE" | "VALIDATED" | "INVALIDATED" | "EXPIRED";
 export type CheckOutcome = "valid" | "invalid" | "inconclusive" | "pending_confirmation";
+export type FalsifyKind = "PRICE_ABOVE" | "PRICE_BELOW" | "CHANGE_PCT" | "CUSTOM";
+
+/** 可点开、可复核的论点证据。 */
+export interface ThesisEvidence {
+  id: string;
+  url: string;
+  publishedAt?: string;
+  quoteNumber?: string;
+  fetchedAt: string;
+  healthy: boolean;
+}
+
+export interface ThesisEvidenceInput {
+  url: string;
+  publishedAt?: string;
+  quoteNumber?: string;
+}
+
+export interface ThesisFalsifyCondition {
+  kind: FalsifyKind;
+  expression: string;
+}
+
+export interface ThesisHorizon {
+  from: string;
+  to: string;
+}
+
+export interface ThesisStatusChange {
+  from?: ThesisStatus;
+  to: ThesisStatus;
+  at: string;
+  source: "user" | "automated";
+}
 
 export interface NoteCheck {
   outcome: CheckOutcome;
@@ -44,6 +78,11 @@ export interface InvestmentNote {
   status?: ThesisStatus;
   check?: NoteCheck;
   lastCheckedAt?: string;
+  evidence?: ThesisEvidence[];
+  falsifyCondition?: ThesisFalsifyCondition;
+  horizon?: ThesisHorizon;
+  confidence?: number;
+  statusHistory?: ThesisStatusChange[];
   createdAt: string;
   updatedAt: string;
 }
@@ -108,6 +147,70 @@ function checkOutcome(value: unknown): CheckOutcome | undefined {
     : undefined;
 }
 
+function falsifyKind(value: unknown): FalsifyKind | undefined {
+  return value === "PRICE_ABOVE" ||
+    value === "PRICE_BELOW" ||
+    value === "CHANGE_PCT" ||
+    value === "CUSTOM"
+    ? value
+    : undefined;
+}
+
+function parseEvidence(value: unknown): ThesisEvidence[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items = value.flatMap((entry): ThesisEvidence[] => {
+    if (!isRecord(entry)) return [];
+    const id = str(entry.id);
+    const url = str(entry.url);
+    const fetchedAt = str(entry.fetched_at) ?? str(entry.fetchedAt);
+    if (!id || !url || !fetchedAt) return [];
+    return [
+      {
+        id,
+        url,
+        publishedAt: str(entry.published_at) ?? str(entry.publishedAt),
+        quoteNumber: str(entry.quote_number) ?? str(entry.quoteNumber),
+        fetchedAt,
+        healthy: entry.healthy !== false,
+      },
+    ];
+  });
+  return items.length ? items : undefined;
+}
+
+function parseFalsify(value: unknown): ThesisFalsifyCondition | undefined {
+  if (!isRecord(value)) return undefined;
+  const kind = falsifyKind(value.kind);
+  const expression = str(value.expression);
+  return kind && expression ? { kind, expression } : undefined;
+}
+
+function parseHorizon(value: unknown): ThesisHorizon | undefined {
+  if (!isRecord(value)) return undefined;
+  const from = str(value.from);
+  const to = str(value.to);
+  return from && to ? { from, to } : undefined;
+}
+
+function parseStatusHistory(value: unknown): ThesisStatusChange[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items = value.flatMap((entry): ThesisStatusChange[] => {
+    if (!isRecord(entry)) return [];
+    const to = thesisStatus(entry.to);
+    const at = str(entry.at);
+    if (!to || !at) return [];
+    return [
+      {
+        from: thesisStatus(entry.from),
+        to,
+        at,
+        source: entry.source === "automated" ? "automated" : "user",
+      },
+    ];
+  });
+  return items.length ? items : undefined;
+}
+
 export function parseNote(value: unknown): InvestmentNote | undefined {
   if (!isRecord(value)) return undefined;
   const id = str(value.id);
@@ -136,6 +239,11 @@ export function parseNote(value: unknown): InvestmentNote | undefined {
           }
         : undefined,
     lastCheckedAt: str(value.last_checked_at) ?? str(value.lastCheckedAt),
+    evidence: parseEvidence(value.evidence),
+    falsifyCondition: parseFalsify(value.falsify_condition ?? value.falsifyCondition),
+    horizon: parseHorizon(value.horizon),
+    confidence: typeof value.confidence === "number" ? value.confidence : undefined,
+    statusHistory: parseStatusHistory(value.status_history ?? value.statusHistory),
     createdAt: str(value.created_at) ?? str(value.createdAt) ?? new Date().toISOString(),
     updatedAt: str(value.updated_at) ?? str(value.updatedAt) ?? new Date().toISOString(),
   };
@@ -211,6 +319,22 @@ function daysAgo(days: number, hour = 9, minute = 12) {
   return date.toISOString();
 }
 
+function mockEvidence(
+  url: string,
+  quoteNumber: string,
+  publishedAt: string,
+  fetchedAt = daysAgo(1, 8, 0),
+): ThesisEvidence {
+  return {
+    id: `evidence-${url}`,
+    url,
+    quoteNumber,
+    publishedAt,
+    fetchedAt,
+    healthy: true,
+  };
+}
+
 function mockNotes(): InvestmentNote[] {
   const pendingCheck: NoteCheck = {
     outcome: "pending_confirmation",
@@ -235,6 +359,16 @@ function mockNotes(): InvestmentNote[] {
       status: "ACTIVE",
       check: pendingCheck,
       lastCheckedAt: pendingCheck.checkedAt,
+      evidence: [
+        mockEvidence(
+          "https://www.apple.com/newsroom/2026/10/apple-reports-fourth-quarter-results/",
+          "服务收入同比 +14%",
+          "2026-10-30",
+        ),
+      ],
+      falsifyCondition: { kind: "CUSTOM", expression: "服务收入增速连续两个季度低于 10%" },
+      horizon: { from: daysAgo(30).slice(0, 10), to: daysAgo(-14).slice(0, 10) },
+      confidence: 0.7,
       createdAt: daysAgo(1, 9, 12),
       updatedAt: daysAgo(1, 9, 12),
     },
@@ -251,6 +385,16 @@ function mockNotes(): InvestmentNote[] {
         note: "最近两个季度 FSD 递延收入环比增长，订阅渗透率提升。",
       },
       lastCheckedAt: daysAgo(1, 8, 0),
+      evidence: [
+        mockEvidence(
+          "https://ir.tesla.com/press-release/tesla-fourth-quarter-2025-update",
+          "FSD 递延收入环比 +8%",
+          "2026-01-28",
+        ),
+      ],
+      falsifyCondition: { kind: "CUSTOM", expression: "FSD 订阅渗透率连续两个季度下降" },
+      horizon: { from: daysAgo(60).slice(0, 10), to: daysAgo(-30).slice(0, 10) },
+      confidence: 0.55,
       createdAt: daysAgo(2, 11, 5),
       updatedAt: daysAgo(1, 8, 0),
     },
@@ -267,6 +411,14 @@ function mockNotes(): InvestmentNote[] {
         note: "人工确认：批价企稳，动销环比改善。",
       },
       lastCheckedAt: daysAgo(3, 10, 0),
+      evidence: [
+        mockEvidence(
+          "https://www.moutaichina.com/en/investor-relations/announcements",
+          "渠道库存约 1.5 个月",
+          "2026-10-26",
+        ),
+      ],
+      confidence: 0.8,
       createdAt: daysAgo(6, 15, 30),
       updatedAt: daysAgo(3, 10, 0),
     },
@@ -486,16 +638,34 @@ export async function createNote(
     title?: string;
     content: string;
     status?: ThesisStatus;
+    evidence?: ThesisEvidenceInput[];
+    falsifyCondition?: ThesisFalsifyCondition;
+    horizon?: ThesisHorizon;
+    confidence?: number;
   },
 ): Promise<InvestmentNote> {
   const title = input.title?.trim();
   if (state.source === "api") {
+    const evidence = apiEvidence(input.evidence);
     const payload = await api.request<unknown>("/api/notes", {
       symbol_code: input.symbolCode,
       type: input.type,
       ...(title ? { title } : {}),
       content: input.content,
       ...(input.type === "THESIS" ? { status: input.status ?? "ACTIVE" } : {}),
+      ...(input.type === "THESIS" && evidence ? { evidence } : {}),
+      ...(input.type === "THESIS" && input.falsifyCondition
+        ? {
+            falsify_condition: {
+              kind: input.falsifyCondition.kind,
+              expression: input.falsifyCondition.expression,
+            },
+          }
+        : {}),
+      ...(input.type === "THESIS" && input.horizon ? { horizon: input.horizon } : {}),
+      ...(input.type === "THESIS" && input.confidence !== undefined
+        ? { confidence: input.confidence }
+        : {}),
     });
     const note = parseNote(payload);
     if (!note) throw new Error("Unexpected note payload");
@@ -510,6 +680,25 @@ export async function createNote(
     ...(title ? { title } : {}),
     content: input.content,
     ...(input.type === "THESIS" ? { status: input.status ?? "ACTIVE" } : {}),
+    ...(input.type === "THESIS" && input.evidence?.length
+      ? {
+          evidence: input.evidence.map((item, index) => ({
+            id: `local-evidence-${index}`,
+            url: item.url,
+            publishedAt: item.publishedAt,
+            quoteNumber: item.quoteNumber,
+            fetchedAt: now,
+            healthy: true,
+          })),
+        }
+      : {}),
+    ...(input.type === "THESIS" && input.falsifyCondition
+      ? { falsifyCondition: input.falsifyCondition }
+      : {}),
+    ...(input.type === "THESIS" && input.horizon ? { horizon: input.horizon } : {}),
+    ...(input.type === "THESIS" && input.confidence !== undefined
+      ? { confidence: input.confidence }
+      : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -520,15 +709,35 @@ export async function createNote(
 export async function updateNote(
   api: LingWuApi,
   id: string,
-  patch: { title?: string; content?: string; status?: ThesisStatus },
+  patch: {
+    title?: string;
+    content?: string;
+    status?: ThesisStatus;
+    evidence?: ThesisEvidenceInput[];
+    falsifyCondition?: ThesisFalsifyCondition;
+    horizon?: ThesisHorizon;
+    confidence?: number;
+  },
 ): Promise<InvestmentNote> {
   if (state.source === "api") {
+    const evidence = apiEvidence(patch.evidence);
     const payload = await api.request<unknown>(
       `/api/notes/${encodeURIComponent(id)}`,
       {
         ...(patch.title === undefined ? {} : { title: patch.title }),
         ...(patch.content === undefined ? {} : { content: patch.content }),
         ...(patch.status === undefined ? {} : { status: patch.status }),
+        ...(evidence === undefined ? {} : { evidence }),
+        ...(patch.falsifyCondition === undefined
+          ? {}
+          : {
+              falsify_condition: {
+                kind: patch.falsifyCondition.kind,
+                expression: patch.falsifyCondition.expression,
+              },
+            }),
+        ...(patch.horizon === undefined ? {} : { horizon: patch.horizon }),
+        ...(patch.confidence === undefined ? {} : { confidence: patch.confidence }),
       },
       "PUT",
     );
@@ -544,10 +753,34 @@ export async function updateNote(
     ...(patch.title === undefined ? {} : { title: patch.title.trim() || undefined }),
     ...(patch.content === undefined ? {} : { content: patch.content }),
     ...(patch.status === undefined ? {} : { status: patch.status }),
+    ...(patch.evidence === undefined
+      ? {}
+      : {
+          evidence: patch.evidence.map((item, index) => ({
+            id: existing.evidence?.[index]?.id ?? `local-evidence-${index}`,
+            url: item.url,
+            publishedAt: item.publishedAt,
+            quoteNumber: item.quoteNumber,
+            fetchedAt: existing.evidence?.[index]?.fetchedAt ?? new Date().toISOString(),
+            healthy: true,
+          })),
+        }),
+    ...(patch.falsifyCondition === undefined ? {} : { falsifyCondition: patch.falsifyCondition }),
+    ...(patch.horizon === undefined ? {} : { horizon: patch.horizon }),
+    ...(patch.confidence === undefined ? {} : { confidence: patch.confidence }),
     updatedAt: new Date().toISOString(),
   };
   setState({ notes: state.notes.map((item) => (item.id === id ? updated : item)) });
   return updated;
+}
+
+function apiEvidence(evidence?: ThesisEvidenceInput[]) {
+  if (!evidence?.length) return evidence;
+  return evidence.map((item) => ({
+    url: item.url,
+    ...(item.publishedAt ? { published_at: item.publishedAt } : {}),
+    ...(item.quoteNumber ? { quote_number: item.quoteNumber } : {}),
+  }));
 }
 
 export async function deleteNote(api: LingWuApi, id: string): Promise<void> {
@@ -607,6 +840,40 @@ export function sortTheses(notes: InvestmentNote[]) {
     if (statusA !== statusB) return statusA - statusB;
     return (b.lastCheckedAt ?? b.updatedAt).localeCompare(a.lastCheckedAt ?? a.updatedAt);
   });
+}
+
+/**
+ * 回检优先级：到期待确认 > 已过期 > 7 天内到期 > 其余活跃论点。
+ * 没有期限的活跃论点只在人工/周检时处理。
+ */
+export function thesisReviewPriority(
+  note: InvestmentNote,
+  now = new Date(),
+): "confirm" | "overdue" | "due_soon" | "later" {
+  if (note.type !== "THESIS" || note.status !== "ACTIVE") return "later";
+  if (note.check?.outcome === "pending_confirmation") return "confirm";
+  if (!note.horizon) return "later";
+  const end = new Date(`${note.horizon.to}T00:00:00.000Z`).getTime();
+  if (Number.isNaN(end)) return "later";
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const days = (end - today) / 86_400_000;
+  if (days < 0) return "overdue";
+  if (days <= 7) return "due_soon";
+  return "later";
+}
+
+/** Today 只递上需要动作的论点，避免把「全部论点」变成第二个列表页。 */
+export function thesisReviewQueue(notes: InvestmentNote[], now = new Date()) {
+  const rank = { confirm: 0, overdue: 1, due_soon: 2, later: 3 };
+  return notes
+    .filter((note) => note.type === "THESIS" && note.status === "ACTIVE")
+    .map((note) => ({ note, priority: thesisReviewPriority(note, now) }))
+    .filter((item) => item.priority !== "later")
+    .sort(
+      (a, b) =>
+        rank[a.priority] - rank[b.priority] ||
+        (a.note.horizon?.to ?? "").localeCompare(b.note.horizon?.to ?? ""),
+    );
 }
 
 export type DateBucket = "today" | "yesterday" | "week" | "earlier";

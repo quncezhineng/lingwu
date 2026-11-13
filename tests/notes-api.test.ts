@@ -6,7 +6,7 @@ import { after, before, beforeEach, test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
-import { isoWeekKey, NotesService } from "../apps/server/src/engine/notes.ts";
+import { isoWeekKey, NotesService, thesisReviewDue } from "../apps/server/src/engine/notes.ts";
 import type { InvestmentNote } from "../packages/domain/src/agent.ts";
 import { MarketDataService } from "../packages/integrations/src/market-data.ts";
 
@@ -17,6 +17,11 @@ let token: string;
 let config: Config;
 
 const headers = () => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" });
+const evidence = {
+  url: "https://example.com/reports/aapl-q3",
+  published_at: "2026-10-30",
+  quote_number: "服务收入同比 +14%",
+};
 async function call<T>(path: string, init: RequestInit = {}, status = 200): Promise<T> {
   const response = await server.app.request(`/api${path}`, {
     ...init,
@@ -84,12 +89,28 @@ test("creates a thesis note with ACTIVE status and a pending check", async () =>
     symbol_code: "aapl",
     type: "THESIS",
     content: "看好服务业务增长与现金流",
+    evidence: [evidence],
+    falsify_condition: { kind: "PRICE_BELOW", expression: "跌破 180 美元" },
+    horizon: { from: "2026-10-01", to: "2027-03-31" },
+    confidence: 0.7,
   });
   assert.equal(note.symbol_code, "AAPL");
   assert.equal(note.status, "ACTIVE");
   assert.equal(note.check?.outcome, "pending_confirmation");
   assert.equal(note.check?.source, "automated");
   assert.ok(note.last_checked_at);
+  assert.equal(note.evidence?.length, 1);
+  assert.equal(note.evidence?.[0]?.url, evidence.url);
+  assert.equal(note.evidence?.[0]?.quote_number, evidence.quote_number);
+  assert.equal(note.evidence?.[0]?.healthy, true);
+  assert.ok(note.evidence?.[0]?.id);
+  assert.ok(note.evidence?.[0]?.fetched_at);
+  assert.deepEqual(note.falsify_condition, {
+    kind: "PRICE_BELOW",
+    expression: "跌破 180 美元",
+  });
+  assert.deepEqual(note.horizon, { from: "2026-10-01", to: "2027-03-31" });
+  assert.equal(note.confidence, 0.7);
 });
 
 test("validates thesis length and rejects status on non-thesis notes", async () => {
@@ -137,6 +158,7 @@ test("manual status updates mark the check as manual", async () => {
     symbol_code: "AAPL",
     type: "THESIS",
     content: "论点内容足够长可以验证",
+    evidence: [evidence],
   });
   const updated = await call<InvestmentNote>(`/notes/${note.id}`, {
     method: "PUT",
@@ -145,6 +167,119 @@ test("manual status updates mark the check as manual", async () => {
   assert.equal(updated.status, "VALIDATED");
   assert.equal(updated.check?.source, "manual");
   assert.equal(updated.check?.outcome, "valid");
+  assert.equal(updated.status_history?.length, 1);
+  assert.deepEqual(
+    {
+      from: updated.status_history?.[0]?.from,
+      to: updated.status_history?.[0]?.to,
+      source: updated.status_history?.[0]?.source,
+    },
+    { from: "ACTIVE", to: "VALIDATED", source: "user" },
+  );
+});
+
+test("active theses require evidence and validate thesis fields", async () => {
+  await call(
+    "/notes",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        symbol_code: "AAPL",
+        type: "THESIS",
+        content: "没有证据的论点不允许设为活跃",
+      }),
+    },
+    422,
+  );
+  await call(
+    "/notes",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        symbol_code: "AAPL",
+        type: "THESIS",
+        content: "证据链接必须是 http 或 https",
+        evidence: [{ url: "ftp://example.com/file" }],
+      }),
+    },
+    422,
+  );
+  await call(
+    "/notes",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        symbol_code: "AAPL",
+        type: "THESIS",
+        content: "期限结束不能早于开始",
+        evidence: [evidence],
+        horizon: { from: "2027-01-01", to: "2026-01-01" },
+      }),
+    },
+    422,
+  );
+  await call(
+    "/notes",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        symbol_code: "AAPL",
+        type: "BUY_REASON",
+        content: "非论点不应携带论点字段",
+        evidence: [evidence],
+      }),
+    },
+    422,
+  );
+  const note = await post<InvestmentNote>("/notes", {
+    symbol_code: "AAPL",
+    type: "THESIS",
+    content: "证据可以后补，但活跃状态不能没有证据",
+    evidence: [evidence],
+  });
+  const kept = await call<InvestmentNote>(`/notes/${note.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ content: "内容更新后证据身份不变", evidence: [evidence] }),
+  });
+  assert.equal(kept.evidence?.[0]?.id, note.evidence?.[0]?.id);
+  assert.equal(kept.evidence?.[0]?.fetched_at, note.evidence?.[0]?.fetched_at);
+  await call(
+    `/notes/${note.id}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ evidence: [] }),
+    },
+    200,
+  );
+  await call(
+    `/notes/${note.id}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ status: "ACTIVE" }),
+    },
+    422,
+  );
+});
+
+test("thesis review due follows the horizon window", () => {
+  const now = new Date("2026-11-13T08:00:00.000Z");
+  const base = {
+    type: "THESIS" as const,
+    status: "ACTIVE" as const,
+  };
+  assert.equal(
+    thesisReviewDue({ ...base, horizon: { from: "2026-10-01", to: "2026-11-01" } }, now),
+    "overdue",
+  );
+  assert.equal(
+    thesisReviewDue({ ...base, horizon: { from: "2026-10-01", to: "2026-11-20" } }, now),
+    "due_soon",
+  );
+  assert.equal(
+    thesisReviewDue({ ...base, horizon: { from: "2026-10-01", to: "2027-03-31" } }, now),
+    "later",
+  );
+  assert.equal(thesisReviewDue({ ...base }, now), "later");
 });
 
 test("weekly thesis check is idempotent and never overwrites manual status", async () => {
@@ -155,12 +290,14 @@ test("weekly thesis check is idempotent and never overwrites manual status", asy
     symbol_code: "AAPL",
     type: "THESIS",
     content: "手动确认过的论点内容",
+    evidence: [{ url: evidence.url }],
   });
   await notes.update(owner, manual.id, { status: "VALIDATED" });
   await notes.create(owner, {
     symbol_code: "MSFT",
     type: "THESIS",
     content: "尚未确认的论点内容说明",
+    evidence: [{ url: evidence.url }],
   });
 
   const now = new Date("2026-10-28T03:00:00Z");
@@ -185,7 +322,12 @@ test("weekly thesis check is idempotent and never overwrites manual status", asy
 });
 
 test("thesis-check routes expose the latest record and next run", async () => {
-  await post("/notes", { symbol_code: "AAPL", type: "THESIS", content: "论点内容足够长可以验证" });
+  await post("/notes", {
+    symbol_code: "AAPL",
+    type: "THESIS",
+    content: "论点内容足够长可以验证",
+    evidence: [evidence],
+  });
   const check = await post<{ week: string; pending: number }>("/notes/thesis-check", {}, 200);
   assert.match(check.week, /^\d{4}-W\d{2}$/);
   assert.ok(check.pending >= 1);
@@ -247,6 +389,7 @@ test("per-note check history is newest first and exposes failed checks", async (
     symbol_code: "AAPL",
     type: "THESIS",
     content: "论点内容足够长可以验证",
+    evidence: [{ url: evidence.url }],
   });
   await db.put("local-user", "thesis_checks", {
     id: "chk-ok",

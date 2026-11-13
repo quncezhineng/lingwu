@@ -58,10 +58,19 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
+  Target,
   Upload,
 } from "./icons";
 import { InsightCard } from "./insight-card";
 import { workbenchInsightView } from "./insight-view";
+import {
+  type InvestmentNote,
+  loadNotes,
+  setNotesIntent,
+  type thesisReviewPriority,
+  thesisReviewQueue,
+  useNotesState,
+} from "./notes";
 import { NotesScreen } from "./notes-screen";
 import { PageHeader } from "./page-header";
 import { toggleSavedInsight, useSavedInsightIds } from "./saved-insights";
@@ -93,7 +102,7 @@ import { useWorkspace } from "./workspace";
  * 日历版块已恢复，目前只隐藏邮件；只隐藏渲染入口，页面、统计与数据逻辑全部保留；
  * 需要恢复时清空这个集合即可。
  */
-const HIDDEN_TODAY_SECTIONS = new Set<string>(["mail"]);
+const HIDDEN_TODAY_SECTIONS = new Set<string>(["mail", "calendar"]);
 
 function todayDate() {
   return localDateTime(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone)
@@ -103,11 +112,19 @@ function eventDate(event: CalendarEvent) {
   return event.allDay ? event.start : localDateTime(event.start, event.timeZone).date;
 }
 export function TodayScreen() {
-  const { workspace: w, navigate, open, prefillPrompt } = useWorkspace();
+  const { workspace: w, api, navigate, open, prefillPrompt } = useWorkspace();
   const { t } = useTranslation();
   const wide = useWindowDimensions().width > 1180;
   const pending = w.actions.filter((a) => a.status === "awaiting_review");
-  const unread = w.mail.filter((m) => m.unread);
+  const notesState = useNotesState();
+  const activeTheses = useMemo(
+    () => notesState.notes.filter((note) => note.type === "THESIS" && note.status === "ACTIVE"),
+    [notesState.notes],
+  );
+  const reviewQueue = useMemo(() => thesisReviewQueue(notesState.notes), [notesState.notes]);
+  useEffect(() => {
+    void loadNotes(api);
+  }, [api]);
   const today = todayDate();
   const events = w.events
     .filter((e) => eventDate(e) === today)
@@ -151,11 +168,10 @@ export function TodayScreen() {
           <Text
             style={[s.muted, { maxWidth: 420, color: colors.faint, fontSize: 13, lineHeight: 20 }]}
           >
-            {events.length
-              ? t("screens.todayEventsCount", { count: events.length })
-              : t("screens.todayCalendarRoom")}
-            {unread.length ? t("screens.todayUnreadEmails", { count: unread.length }) : ""}.{"\n"}
-            {t("screens.todayLetMakeSpace")}
+            {t("screens.todayThesisSummary", {
+              review: reviewQueue.length,
+              approvals: pending.length,
+            })}
           </Text>
           <Button
             onPress={() => prefillPrompt(t("screens.todayPlanDayPrompt"))}
@@ -236,18 +252,18 @@ export function TodayScreen() {
       <View style={{ flexDirection: "row", gap: 13, flexWrap: "wrap" }}>
         {[
           {
-            label: t("screens.todayStatUnreadLabel"),
-            value: unread.length,
-            note: t("screens.todayStatUnreadNote"),
-            icon: Mail,
-            section: "mail" as const,
+            label: t("screens.todayStatReviewLabel"),
+            value: reviewQueue.length,
+            note: t("screens.todayStatReviewNote"),
+            icon: Clock3,
+            section: "notes" as const,
           },
           {
-            label: t("screens.todayStatCalendarLabel"),
-            value: events.length,
-            note: t("screens.todayStatCalendarNote"),
-            icon: CalendarDays,
-            section: "calendar" as const,
+            label: t("screens.todayStatThesisLabel"),
+            value: activeTheses.length,
+            note: t("screens.todayStatThesisNote"),
+            icon: Target,
+            section: "notes" as const,
           },
           {
             label: t("screens.todayStatPendingLabel"),
@@ -291,6 +307,14 @@ export function TodayScreen() {
           ))}
       </View>
       <MarketBriefingCard />
+      <ThesisReviewCard
+        items={reviewQueue}
+        activeCount={activeTheses.length}
+        onOpenAll={() => {
+          setNotesIntent({ tab: "theses" });
+          navigate("notes");
+        }}
+      />
       {(!HIDDEN_TODAY_SECTIONS.has("calendar") || !HIDDEN_TODAY_SECTIONS.has("mail")) && (
         <View style={{ flexDirection: wide ? "row" : "column", gap: 16 }}>
           {!HIDDEN_TODAY_SECTIONS.has("calendar") && (
@@ -468,6 +492,79 @@ export function TodayScreen() {
     </View>
   );
 }
+
+/** 今天递上来的不是「全部论点」，而是需要动作的那几条。 */
+function ThesisReviewCard({
+  items,
+  activeCount,
+  onOpenAll,
+}: {
+  items: { note: InvestmentNote; priority: ReturnType<typeof thesisReviewPriority> }[];
+  activeCount: number;
+  onOpenAll: () => void;
+}) {
+  const { t } = useTranslation();
+  const priorityLabel: Record<ReturnType<typeof thesisReviewPriority>, string> = {
+    confirm: t("screens.todayThesisConfirm"),
+    overdue: t("screens.todayThesisOverdue"),
+    due_soon: t("screens.todayThesisDueSoon"),
+    later: "",
+  };
+  return (
+    <Card>
+      <SectionHeading
+        title={t("screens.todayThesisHeading")}
+        action={t("screens.todayThesisAction")}
+        onPress={onOpenAll}
+      />
+      {items.length ? (
+        items.slice(0, 4).map(({ note, priority }, index) => (
+          <Pressable
+            key={note.id}
+            accessibilityRole="button"
+            onPress={onOpenAll}
+            style={({ pressed }) => [
+              s.row,
+              {
+                gap: 12,
+                paddingVertical: 10,
+                borderTopWidth: index ? 1 : 0,
+                borderTopColor: colors.line,
+                borderRadius: 10,
+              },
+              pressed && { backgroundColor: colors.overlay1 },
+            ]}
+          >
+            <View style={[s.iconBox, { width: 34, height: 34, borderRadius: 10 }]}>
+              <Target size={15} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, gap: 3 }}>
+              <View style={s.between}>
+                <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>{note.symbolCode}</Text>
+                <Chip>{priorityLabel[priority]}</Chip>
+              </View>
+              <Text numberOfLines={2} style={[s.small, { fontSize: 12, lineHeight: 18 }]}>
+                {note.title ?? note.content}
+              </Text>
+              {!!note.horizon && (
+                <Text style={[s.small, { color: colors.faint, fontSize: 11 }]}>
+                  {t("screens.todayThesisHorizon", { date: note.horizon.to })}
+                </Text>
+              )}
+            </View>
+          </Pressable>
+        ))
+      ) : (
+        <Empty
+          icon={Target}
+          title={t("screens.todayThesisEmptyTitle")}
+          detail={t("screens.todayThesisEmptyDetail", { count: activeCount })}
+        />
+      )}
+    </Card>
+  );
+}
+
 function Avatar({ name, index = 0 }: { name: string; index?: number }) {
   return (
     <View
