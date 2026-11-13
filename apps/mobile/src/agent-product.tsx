@@ -39,6 +39,7 @@ import { ChatScreen, WorkspaceTools } from "./chat";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ComputerScreen } from "./computer";
 import { type ThreadHistoryPage, threadHistoryPagePath } from "./conversation-history";
+import { DeliverableScreen } from "./deliverable-screen";
 import { columnMaxWidth, desktopColumns } from "./desktop-columns";
 import { Details, SettingsScreen } from "./details";
 import { useTranslation } from "./i18n";
@@ -1391,25 +1392,27 @@ function AgentHeader({
             ? t("app.navFiles")
             : section === "notes"
               ? t("app.titleNotes")
-              : section === "watchlist" || section === "portfolio"
-                ? t("app.navWatchlist")
-                : section === "ideas"
-                  ? t("agentSpace.openIdeasPage")
-                  : section === "activity" || section === "goals"
-                    ? t("app.navActivity")
-                    : section === "mail"
-                      ? t("app.titleMail")
-                      : section === "calendar"
-                        ? t("app.titleCalendar")
-                        : section === "browser"
-                          ? t("app.titleBrowser")
-                          : section === "computer"
-                            ? t("threads.agentComputer")
-                            : section === "apps" || section === "connections"
-                              ? t("app.titleApps")
-                              : section === "settings"
-                                ? t("details.settingsTitle")
-                                : t("app.navChat");
+              : section === "deliverables"
+                ? t("deliverables.title")
+                : section === "watchlist" || section === "portfolio"
+                  ? t("app.navWatchlist")
+                  : section === "ideas"
+                    ? t("agentSpace.openIdeasPage")
+                    : section === "activity" || section === "goals"
+                      ? t("app.navActivity")
+                      : section === "mail"
+                        ? t("app.titleMail")
+                        : section === "calendar"
+                          ? t("app.titleCalendar")
+                          : section === "browser"
+                            ? t("app.titleBrowser")
+                            : section === "computer"
+                              ? t("threads.agentComputer")
+                              : section === "apps" || section === "connections"
+                                ? t("app.titleApps")
+                                : section === "settings"
+                                  ? t("details.settingsTitle")
+                                  : t("app.navChat");
   return (
     <View
       style={{
@@ -1496,6 +1499,8 @@ function SecondarySection({
       case "files":
       case "notes":
         return <FilesScreen initialSection={section === "notes" ? "notes" : "files"} />;
+      case "deliverables":
+        return <DeliverableScreen />;
       case "activity":
       case "goals":
         return <TaskHubScreen />;

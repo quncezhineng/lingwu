@@ -84,6 +84,7 @@ const titles: Partial<Record<Section, { titleKey: TranslationKey; subtitleKey: T
     watchlist: { titleKey: "app.titleWatchlist", subtitleKey: "app.subtitleWatchlist" },
     portfolio: { titleKey: "app.titlePortfolio", subtitleKey: "app.subtitlePortfolio" },
     notes: { titleKey: "app.titleNotes", subtitleKey: "app.subtitleNotes" },
+    deliverables: { titleKey: "deliverables.title", subtitleKey: "deliverables.subtitle" },
     activity: { titleKey: "app.titleActivity", subtitleKey: "app.subtitleActivity" },
     ideas: { titleKey: "app.titleIdeas", subtitleKey: "app.subtitleIdeas" },
     goals: { titleKey: "app.titleGoals", subtitleKey: "app.subtitleGoals" },
@@ -737,23 +738,25 @@ function WorkspaceShell({
   const Screen =
     section === "today"
       ? WorkbenchScreen
-      : section === "watchlist" || section === "portfolio"
-        ? WatchlistHubScreen
-        : section === "mail"
-          ? MailScreen
-          : section === "calendar"
-            ? CalendarScreen
-            : section === "browser"
-              ? BrowserScreen
-              : section === "activity" || section === "goals"
-                ? TaskHubScreen
-                : section === "ideas"
-                  ? IdeasScreen
-                  : section === "memories"
-                    ? PreferencesScreen
-                    : section === "settings"
-                      ? SettingsScreen
-                      : CapabilityHubScreen;
+      : section === "deliverables"
+        ? FilesScreen
+        : section === "watchlist" || section === "portfolio"
+          ? WatchlistHubScreen
+          : section === "mail"
+            ? MailScreen
+            : section === "calendar"
+              ? CalendarScreen
+              : section === "browser"
+                ? BrowserScreen
+                : section === "activity" || section === "goals"
+                  ? TaskHubScreen
+                  : section === "ideas"
+                    ? IdeasScreen
+                    : section === "memories"
+                      ? PreferencesScreen
+                      : section === "settings"
+                        ? SettingsScreen
+                        : CapabilityHubScreen;
   return (
     <>
       <WorkspaceTools />
@@ -949,6 +952,7 @@ function WorkspaceShell({
                       section !== "activity" &&
                       section !== "files" &&
                       section !== "notes" &&
+                      section !== "deliverables" &&
                       section !== "goals" && (
                         <PageHeader
                           title={title ? t(title.titleKey) : ""}
@@ -959,8 +963,16 @@ function WorkspaceShell({
                     <ErrorNotice error={error} />
                     {section === "account" ? (
                       <AccountScreen onSignOut={onSignOut} />
-                    ) : section === "files" || section === "notes" ? (
-                      <FilesScreen initialSection={section === "notes" ? "notes" : "files"} />
+                    ) : section === "files" || section === "notes" || section === "deliverables" ? (
+                      <FilesScreen
+                        initialSection={
+                          section === "notes"
+                            ? "notes"
+                            : section === "deliverables"
+                              ? "deliverables"
+                              : "files"
+                        }
+                      />
                     ) : (
                       <Screen />
                     )}
@@ -1027,7 +1039,8 @@ function WorkspaceShell({
                         (item.id === "watchlist" && section === "portfolio") ||
                         (item.id === "activity" && section === "goals") ||
                         (item.id === "today" && ["watchlist", "portfolio"].includes(section)) ||
-                        (item.id === "files" && section === "notes") ||
+                        (item.id === "files" &&
+                          (section === "notes" || section === "deliverables")) ||
                         (item.id === "account" &&
                           ["memories", "apps", "connections"].includes(section));
                       return (

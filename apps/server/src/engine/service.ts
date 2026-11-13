@@ -46,6 +46,7 @@ import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
 import { createBriefingScheduler } from "./briefing-scheduler.ts";
 import { detectDealSignals } from "./deal-signal.ts";
+import { type DeliverableAuditSink, DeliverablesService } from "./deliverables.ts";
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
 import { HindsightClient } from "./hindsight.ts";
@@ -118,6 +119,7 @@ export class AgentService {
   readonly watchlists: WatchlistsService;
   readonly portfolios: PortfoliosService;
   readonly notes: NotesService;
+  readonly deliverables: DeliverablesService;
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
   readonly monitor: MonitorEngine;
@@ -137,12 +139,14 @@ export class AgentService {
     readonly computer: ComputerService = new ComputerService(db, config),
     market: MarketDataService = new MarketDataService(),
     search?: SearchService,
+    auditSink?: DeliverableAuditSink,
   ) {
     this.search = search ?? new SearchService(db);
     this.market = market;
     this.watchlists = new WatchlistsService(db, market);
     this.portfolios = new PortfoliosService(db, market);
     this.notes = new NotesService(db);
+    this.deliverables = new DeliverablesService(db, auditSink);
     this.financials = new FinancialsService(db);
     this.priceAlerts = new PriceAlertsService(db, market);
     this.monitor = new MonitorEngine(db, market, {
@@ -1452,6 +1456,25 @@ export class AgentService {
         },
       );
       task = await context.checkpoint({ artifactIds: [artifact.id] });
+      // OPT-04：定时简报不只留在对话里，同时进入交付物中心，默认 draft 待人审。
+      await this.deliverables
+        .captureFromTask(owner, task, {
+          kind: "BRIEFING",
+          title: `每日市场简报 · ${briefing.date}`,
+          content: briefing.content,
+          source_links: [
+            { type: "task", id: task.id, label: task.title },
+            { type: "briefing", id: briefing.id, label: briefing.date },
+            ...Object.keys(briefing.symbol_updates)
+              .slice(0, 10)
+              .map((symbol) => ({
+                type: "symbol" as const,
+                id: symbol,
+                label: symbol,
+              })),
+          ],
+        })
+        .catch((error) => backgroundFailure("briefing deliverable capture", error));
       return this.finish(task, context, briefing.summary.join("\n"));
     }
     if (task.kind === "finance") {

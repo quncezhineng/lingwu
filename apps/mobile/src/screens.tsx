@@ -20,6 +20,8 @@ import { Text, TextInput } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
+import { DeliverableScreen } from "./deliverable-screen";
+import { loadDeliverables, unresolvedNumbers, useDeliverablesState } from "./deliverables";
 import { saveRemoteFile, shareRemoteFile } from "./file-export";
 import { fileBadge, fileExtension, fileKind } from "./file-kind";
 import {
@@ -119,14 +121,23 @@ export function TodayScreen() {
   const wide = useWindowDimensions().width > 1180;
   const pending = w.actions.filter((a) => a.status === "awaiting_review");
   const notesState = useNotesState();
+  const deliverableState = useDeliverablesState();
   const activeTheses = useMemo(
     () => notesState.notes.filter((note) => note.type === "THESIS" && note.status === "ACTIVE"),
     [notesState.notes],
   );
   const reviewQueue = useMemo(() => thesisReviewQueue(notesState.notes), [notesState.notes]);
+  const reviewDeliverables = useMemo(
+    () =>
+      deliverableState.deliverables.filter(
+        (item) => item.status === "in_review" || item.status === "draft",
+      ),
+    [deliverableState.deliverables],
+  );
   useEffect(() => {
     void loadNotes(api);
     void loadMonitor(api);
+    void loadDeliverables(api);
   }, [api]);
   const today = todayDate();
   const events = w.events
@@ -309,6 +320,55 @@ export function TodayScreen() {
             </Pressable>
           ))}
       </View>
+      <Card>
+        <SectionHeading
+          title={t("screens.todayDeliverablesHeading")}
+          action={t("screens.todayDeliverablesAction")}
+          onPress={() => navigate("deliverables")}
+        />
+        {reviewDeliverables.length ? (
+          reviewDeliverables.slice(0, 3).map((item) => {
+            const unsourced = unresolvedNumbers(item).length;
+            return (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                onPress={() => navigate("deliverables")}
+                style={({ pressed }) => [
+                  s.row,
+                  {
+                    gap: 10,
+                    paddingVertical: 10,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.line,
+                    borderRadius: 10,
+                  },
+                  pressed && { backgroundColor: colors.overlay1 },
+                ]}
+              >
+                <View style={[s.iconBox, { width: 30, height: 30 }]}>
+                  <FileText size={14} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={s.text} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={s.small}>
+                    {item.status === "draft"
+                      ? t("screens.todayDeliverableDraft")
+                      : unsourced
+                        ? t("screens.todayDeliverableUnsourced", { count: unsourced })
+                        : t("screens.todayDeliverableReady")}
+                  </Text>
+                </View>
+                <ChevronRight size={14} color={colors.faint} />
+              </Pressable>
+            );
+          })
+        ) : (
+          <Text style={[s.small, { paddingTop: 8 }]}>{t("screens.todayDeliverablesEmpty")}</Text>
+        )}
+      </Card>
       <MarketBriefingCard />
       <ThesisReviewCard
         items={reviewQueue}
@@ -1174,7 +1234,7 @@ export function BrowserScreen() {
     </View>
   );
 }
-type LibrarySection = "files" | "insights" | "notes";
+type LibrarySection = "files" | "insights" | "notes" | "deliverables";
 
 /**
  * 资料库承接三类内容：文件、收藏的领悟卡和个人笔记。
@@ -1260,6 +1320,7 @@ export function FilesScreen({
     { id: "files", label: t("screens.libraryFiles") },
     { id: "insights", label: t("screens.libraryInsights") },
     { id: "notes", label: t("screens.libraryNotes") },
+    { id: "deliverables", label: t("screens.libraryDeliverables") },
   ];
   const sourceFilters: ReadonlyArray<{ id: FileSourceFilter; label: string; count: number }> = [
     { id: "all", label: t("screens.filesFilterAll"), count: fileCounts.all },
@@ -1927,6 +1988,7 @@ export function FilesScreen({
         ))}
 
       {section === "notes" && <NotesScreen />}
+      {section === "deliverables" && <DeliverableScreen />}
     </View>
   );
 }

@@ -4,6 +4,7 @@ import app from "./app";
 import chat from "./chat";
 import common from "./common";
 import computer from "./computer";
+import deliverables from "./deliverables";
 import details from "./details";
 import financials from "./financials";
 import markets from "./markets";
@@ -41,6 +42,7 @@ export const en = {
   ...quotes,
   ...financials,
   ...computer,
+  ...deliverables,
   ...threads,
   ...tools,
 } satisfies Dictionary;

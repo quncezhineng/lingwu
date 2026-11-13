@@ -573,3 +573,133 @@ export interface MonitorToday {
   archive: MonitorEvent[];
   rules: MonitorRule[];
 }
+
+/* ------------------------------------------------------------------ *
+ * OPT-04 / OPT-05 交付物中心与溯源合规门
+ * ------------------------------------------------------------------ */
+
+export type DeliverableKind =
+  | "BRIEFING"
+  | "REPORT"
+  | "MINUTES"
+  | "ONE_PAGER"
+  | "REVIEW"
+  | "TABLE"
+  | "CUSTOM";
+
+/** 默认 draft；sent 只能由人触发，且必须先经过合规门。 */
+export type DeliverableStatus = "draft" | "in_review" | "approved" | "sent" | "archived";
+
+/** 数字级出处的解析状态。estimate 表示用户明确标注为估算。 */
+export type DeliverableNumberStatus = "sourced" | "unsourced" | "estimate" | "removed";
+
+export interface DeliverableCitation {
+  id: string;
+  /** 被引用的数字原文，例如 "30%"、"1.2 亿"。 */
+  number_text: string;
+  source_url: string;
+  /** 出处原文片段，点开即可复核。 */
+  excerpt: string;
+  fetched_at: string;
+}
+
+export interface DeliverableNumberRef {
+  id: string;
+  text: string;
+  /** 在当前版本正文中的字符位置；用于无源数字的定向处理。 */
+  start: number;
+  end: number;
+  status: DeliverableNumberStatus;
+  citation_id?: string;
+  /** 该数字是否出现在最新版本正文中；删除数字后旧引用保留为 false。 */
+  present: boolean;
+}
+
+export interface DeliverableSourceLink {
+  type: "task" | "briefing" | "symbol" | "thesis" | "note" | "artifact" | "url";
+  id: string;
+  label?: string;
+  url?: string;
+}
+
+export interface DeliverableVersion {
+  id: string;
+  version: number;
+  title: string;
+  content: string;
+  author: "agent" | "user" | "system";
+  summary: string;
+  created_at: string;
+}
+
+export interface DeliverableAuditEntry {
+  id: string;
+  at: string;
+  actor: "agent" | "user" | "system";
+  action: string;
+  detail?: string;
+  version?: number;
+}
+
+export interface DeliverableViolation {
+  code: string;
+  label: string;
+  excerpt: string;
+}
+
+export interface DeliverablePiiFinding {
+  code: string;
+  label: string;
+  excerpt: string;
+  redacted: string;
+}
+
+export interface DeliverableComplianceReport {
+  checked_at: string;
+  duration_ms: number;
+  passed: boolean;
+  disclaimer: string;
+  disclaimer_missing: boolean;
+  violations: DeliverableViolation[];
+  pii: DeliverablePiiFinding[];
+  unsourced_numbers: string[];
+  /** 规则库已执行；模型复核未配置时如实标注，不伪造双检通过。 */
+  rule_engine: "ok";
+  model_review: "not_configured";
+}
+
+export interface DeliverableDiff {
+  from_version: number;
+  to_version: number;
+  added: string[];
+  removed: string[];
+  changed: boolean;
+}
+
+export interface Deliverable {
+  id: string;
+  user_id: string;
+  kind: DeliverableKind;
+  title: string;
+  /** 最新版本正文；版本历史保留在 versions。 */
+  content: string;
+  status: DeliverableStatus;
+  version: number;
+  citations: DeliverableCitation[];
+  numbers: DeliverableNumberRef[];
+  versions: DeliverableVersion[];
+  source_links: DeliverableSourceLink[];
+  template_version?: string;
+  disclaimer: string;
+  recipient?: string;
+  last_compliance?: DeliverableComplianceReport;
+  approved_at?: string;
+  approved_by?: string;
+  sent_at?: string;
+  sent_version?: number;
+  /** 与生成该交付物的任务 / 简报 / 论点 / 纪要的回链。 */
+  created_from?: DeliverableSourceLink;
+  audit: DeliverableAuditEntry[];
+  created_at: string;
+  updated_at: string;
+}
