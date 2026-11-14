@@ -72,6 +72,7 @@ export function PromptComposer({
   const [focused, setFocused] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [inputHeight, setInputHeight] = useState(inputMinHeight);
+  const [shellHeight, setShellHeight] = useState(composerMetrics.minHeight);
   const [inputHost, setInputHost] = useState<HTMLElement | null>(null);
   const composing = useRef(false);
   const compositionEndedAt = useRef(0);
@@ -115,7 +116,13 @@ export function PromptComposer({
   };
   const controlSize = inline ? composerMetrics.control : dense ? 34 : 36;
   const multiline = inputHeight > inputMinHeight + composerMetrics.growSlack;
-  const composerRadius = multiline ? composerMetrics.pillRadius : radius.full;
+  // A full pill follows the short side. Chips or extra lines make the shell
+  // taller than one line; that same radius then becomes a huge end cap and
+  // the send button sits outside the curve. Keep the semicircle for one
+  // line, and the fixed corner once the shell grows.
+  const shellGrown = shellHeight > composerMetrics.minHeight + composerMetrics.growSlack;
+  const grown = multiline || shellGrown;
+  const composerRadius = grown ? composerMetrics.pillRadius : radius.full;
   const cornerButton = cornerAction ? (
     <Pressable
       accessibilityRole="button"
@@ -222,6 +229,7 @@ export function PromptComposer({
       style={({ pressed }) => ({
         width: controlSize,
         height: controlSize,
+        flexShrink: 0,
         borderRadius: radius.full,
         alignItems: "center",
         justifyContent: "center",
@@ -259,17 +267,22 @@ export function PromptComposer({
           },
           style,
         ]}
+        onLayout={(event) => {
+          const next = Math.ceil(event.nativeEvent.layout.height);
+          setShellHeight((current) => (Math.abs(current - next) < 1 ? current : next));
+        }}
       >
         {cornerButton}
         {attachments}
         <View
           style={{
             flexDirection: "row",
-            alignItems: multiline ? "flex-end" : "center",
+            alignItems: grown ? "flex-end" : "center",
+            flexWrap: "nowrap",
             gap: 4,
           }}
         >
-          <View style={{ position: "relative", zIndex: 10 }}>
+          <View style={{ position: "relative", zIndex: 10, flexShrink: 0 }}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={tools[0]?.label}
@@ -278,6 +291,7 @@ export function PromptComposer({
               style={({ pressed }) => ({
                 width: controlSize,
                 height: controlSize,
+                flexShrink: 0,
                 borderRadius: radius.control,
                 alignItems: "center",
                 justifyContent: "center",
