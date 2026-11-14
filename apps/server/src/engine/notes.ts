@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { InvestmentNote, NoteCheck } from "../../../../packages/domain/src/agent.ts";
+import type {
+  InvestmentNote,
+  NoteCheck,
+  ThesisEvidence,
+  ThesisStatusChange,
+} from "../../../../packages/domain/src/agent.ts";
 import { normalizeYahooSymbol } from "../../../../packages/integrations/src/market-data.ts";
 import type { Store } from "../db.ts";
 import { AppError } from "../errors.ts";
@@ -21,6 +26,57 @@ const statusSchema = z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]);
 
 const titleSchema = z.string().trim().max(80);
 
+const httpUrlSchema = z
+  .string()
+  .trim()
+  .max(1000)
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value), "Evidence URL must use http(s)");
+
+/** 客户端只提交可复核的原始信息；id / fetched_at / healthy 由服务端维护。 */
+export const evidenceInputSchema = z.object({
+  id: z.string().trim().max(100).optional(),
+  url: httpUrlSchema,
+  published_at: z.string().date().optional(),
+  quote_number: z.string().trim().max(120).optional(),
+});
+export type EvidenceInput = z.infer<typeof evidenceInputSchema>;
+
+const falsifyConditionSchema = z.object({
+  kind: z.enum(["PRICE_ABOVE", "PRICE_BELOW", "CHANGE_PCT", "CUSTOM"]),
+  expression: z.string().trim().min(1).max(200),
+});
+
+const horizonSchema = z
+  .object({
+    from: z.string().date(),
+    to: z.string().date(),
+  })
+  .refine((value) => value.to >= value.from, {
+    message: "Horizon end must not be before its start",
+  });
+
+const thesisFieldsShape = {
+  evidence: z.array(evidenceInputSchema).max(10).optional(),
+  falsify_condition: falsifyConditionSchema.optional(),
+  horizon: horizonSchema.optional(),
+  confidence: z.number().min(0).max(1).optional(),
+};
+
+function onlyThesisFields(value: {
+  evidence?: unknown;
+  falsify_condition?: unknown;
+  horizon?: unknown;
+  confidence?: unknown;
+}) {
+  return (
+    value.evidence === undefined &&
+    value.falsify_condition === undefined &&
+    value.horizon === undefined &&
+    value.confidence === undefined
+  );
+}
+
 export const createNoteSchema = z
   .object({
     symbol_code: symbolSchema,
@@ -28,12 +84,19 @@ export const createNoteSchema = z
     title: titleSchema.optional(),
     content: z.string().trim().min(1).max(MAX_CONTENT),
     status: statusSchema.optional(),
+    ...thesisFieldsShape,
   })
   .superRefine((value, ctx) => {
     if (value.type === "THESIS" && value.content.length < MIN_THESIS_CONTENT)
       ctx.addIssue({ code: "custom", message: "Thesis content needs at least 10 characters" });
     if (value.status && value.type !== "THESIS")
       ctx.addIssue({ code: "custom", message: "Only THESIS notes carry a status" });
+    if (value.type !== "THESIS" && !onlyThesisFields(value))
+      ctx.addIssue({ code: "custom", message: "Only THESIS notes carry thesis fields" });
+    if (value.type === "THESIS" && (value.status ?? "ACTIVE") === "ACTIVE") {
+      if (!value.evidence?.length)
+        ctx.addIssue({ code: "custom", message: "An active thesis needs at least one evidence" });
+    }
   });
 
 export const updateNoteSchema = z
@@ -41,11 +104,18 @@ export const updateNoteSchema = z
     title: titleSchema.optional(),
     content: z.string().trim().min(1).max(MAX_CONTENT).optional(),
     status: statusSchema.optional(),
+    evidence: z.array(evidenceInputSchema).max(10).optional(),
+    falsify_condition: falsifyConditionSchema.nullable().optional(),
+    horizon: horizonSchema.nullable().optional(),
+    confidence: z.number().min(0).max(1).nullable().optional(),
   })
   .refine(
     (value) =>
-      value.title !== undefined || value.content !== undefined || value.status !== undefined,
-    { message: "Provide title, content or status to update" },
+      value.title !== undefined ||
+      value.content !== undefined ||
+      value.status !== undefined ||
+      !onlyThesisFields(value),
+    { message: "Provide title, content, status or thesis fields to update" },
   );
 
 export type CreateNoteInput = z.infer<typeof createNoteSchema>;
@@ -105,6 +175,44 @@ function manualOutcome(status: InvestmentNote["status"]): NoteCheck["outcome"] {
   }
 }
 
+function normalizeEvidence(
+  input: EvidenceInput[],
+  at: string,
+  existing: ThesisEvidence[] = [],
+): ThesisEvidence[] {
+  return input.map((item) => {
+    const previous =
+      (item.id ? existing.find((entry) => entry.id === item.id) : undefined) ??
+      existing.find((entry) => entry.url === item.url);
+    return {
+      id: previous?.id ?? randomUUID(),
+      url: item.url,
+      ...(item.published_at ? { published_at: item.published_at } : {}),
+      ...(item.quote_number ? { quote_number: item.quote_number } : {}),
+      fetched_at: previous?.fetched_at ?? at,
+      healthy: previous?.healthy ?? true,
+    };
+  });
+}
+
+/**
+ * 到点回检：已到期 / 7 天内到期 / 尚早。
+ * 只看处于 ACTIVE 且带期限的论点；没有期限的论点交给周检。
+ */
+export function thesisReviewDue(
+  note: Pick<InvestmentNote, "type" | "status" | "horizon">,
+  now = new Date(),
+): "overdue" | "due_soon" | "later" {
+  if (note.type !== "THESIS" || note.status !== "ACTIVE" || !note.horizon) return "later";
+  const end = new Date(`${note.horizon.to}T00:00:00.000Z`).getTime();
+  if (Number.isNaN(end)) return "later";
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const days = (end - today) / 86_400_000;
+  if (days < 0) return "overdue";
+  if (days <= 7) return "due_soon";
+  return "later";
+}
+
 export class NotesService {
   constructor(private readonly db: Store) {}
 
@@ -137,6 +245,10 @@ export class NotesService {
 
   async create(owner: string, input: CreateNoteInput): Promise<InvestmentNote> {
     const at = new Date().toISOString();
+    const isThesis = input.type === "THESIS";
+    if (isThesis && (input.status ?? "ACTIVE") === "ACTIVE" && !input.evidence?.length)
+      throw new AppError("An active thesis needs at least one evidence", 422);
+    const evidence = isThesis && input.evidence ? normalizeEvidence(input.evidence, at) : undefined;
     const note: InvestmentNote = {
       id: randomUUID(),
       user_id: owner,
@@ -154,6 +266,10 @@ export class NotesService {
               note: "尚未检验；请在周检后人工确认。",
             },
             last_checked_at: at,
+            ...(evidence ? { evidence } : {}),
+            ...(input.falsify_condition ? { falsify_condition: input.falsify_condition } : {}),
+            ...(input.horizon ? { horizon: input.horizon } : {}),
+            ...(input.confidence !== undefined ? { confidence: input.confidence } : {}),
           }
         : {}),
       created_at: at,
@@ -166,10 +282,22 @@ export class NotesService {
     const note = await this.require(owner, id);
     if (input.status && note.type !== "THESIS")
       throw new AppError("Only THESIS notes carry a status", 422);
+    if (note.type !== "THESIS" && !onlyThesisFields(input))
+      throw new AppError("Only THESIS notes carry thesis fields", 422);
     const at = new Date().toISOString();
     const content = input.content ?? note.content;
     if (note.type === "THESIS" && content.length < MIN_THESIS_CONTENT)
       throw new AppError("Thesis content needs at least 10 characters", 422);
+
+    // 证据是「活跃论点」的准入门槛：允许历史数据只读，但不允许把无证据的论点重新置为活跃。
+    const evidence =
+      input.evidence !== undefined
+        ? normalizeEvidence(input.evidence, at, note.evidence)
+        : note.evidence;
+    // 以最终状态校验：即便请求没有同时提交 status，也不能把活跃论点的证据清空。
+    if ((input.status ?? note.status) === "ACTIVE" && !evidence?.length)
+      throw new AppError("An active thesis needs at least one evidence", 422);
+
     const manualCheck: NoteCheck | undefined = input.status
       ? {
           outcome: manualOutcome(input.status),
@@ -178,6 +306,18 @@ export class NotesService {
           note: "用户手动更新论点状态。",
         }
       : note.check;
+    const statusChanged = input.status !== undefined && input.status !== note.status;
+    const statusHistory: ThesisStatusChange[] | undefined = statusChanged
+      ? [
+          ...(note.status_history ?? []),
+          {
+            ...(note.status ? { from: note.status } : {}),
+            to: input.status as NonNullable<InvestmentNote["status"]>,
+            at,
+            source: "user" as const,
+          },
+        ].slice(-50)
+      : note.status_history;
     return this.db.put(owner, NOTE_KIND, {
       ...note,
       content,
@@ -188,6 +328,13 @@ export class NotesService {
         : {}),
       ...(input.status ? { status: input.status } : {}),
       ...(manualCheck ? { check: manualCheck } : {}),
+      ...(evidence !== undefined ? { evidence } : {}),
+      ...(input.falsify_condition !== undefined
+        ? { falsify_condition: input.falsify_condition ?? undefined }
+        : {}),
+      ...(input.horizon !== undefined ? { horizon: input.horizon ?? undefined } : {}),
+      ...(input.confidence !== undefined ? { confidence: input.confidence ?? undefined } : {}),
+      ...(statusHistory !== undefined ? { status_history: statusHistory } : {}),
       updated_at: at,
     });
   }

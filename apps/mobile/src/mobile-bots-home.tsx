@@ -8,7 +8,7 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
 import { type ThreadHistoryPage, threadHistoryPagePath } from "./conversation-history";
 import { useTranslation } from "./i18n";
-import { Bell, Link2, Plus, Search } from "./icons";
+import { Bell, Link2, PanelsTopLeft, Plus, Search } from "./icons";
 import {
   type BotPreview,
   botHasUnread,
@@ -37,12 +37,14 @@ export function MobileBotsHome({
   onAccount,
   onNotifications,
   onConnections,
+  onOpenToday,
 }: {
   onOpenBot: (agent: AgentDefinition) => void;
   onCreate: () => void;
   onAccount: () => void;
   onNotifications: () => void;
   onConnections: () => void;
+  onOpenToday: () => void;
 }) {
   const { t } = useTranslation();
   const { api, workspace } = useWorkspace();
@@ -239,6 +241,19 @@ export function MobileBotsHome({
           />
         </Pressable>
         <View pointerEvents="none" style={{ flex: 1 }} />
+        <Pressable
+          testID="mobile-bots-today"
+          accessibilityRole="button"
+          accessibilityLabel={t("app.navToday")}
+          onPress={onOpenToday}
+          style={({ pressed }) => [
+            mobileGlassStyle(pressed),
+            floatingControl,
+            { borderRadius: radius.full },
+          ]}
+        >
+          <PanelsTopLeft size={20} color={colors.text} />
+        </Pressable>
         <Pressable
           testID="mobile-bots-create"
           accessibilityRole="button"

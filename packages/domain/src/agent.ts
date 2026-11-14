@@ -397,6 +397,40 @@ export const noteCheckSchema = z.object({
 });
 export type NoteCheck = z.infer<typeof noteCheckSchema>;
 
+/** 论点证据：必须可点开、可复核；fetched_at 记录抓取时间，healthy 由链接巡检维护。 */
+export const thesisEvidenceSchema = z.object({
+  id: z.string().min(1).max(64),
+  url: z.string().url().max(1000),
+  published_at: z.string().date().optional(),
+  /** 证据中的关键数字或原文短句，便于日后比对。 */
+  quote_number: z.string().max(120).optional(),
+  fetched_at: z.string().datetime(),
+  healthy: z.boolean().default(true),
+});
+export type ThesisEvidence = z.infer<typeof thesisEvidenceSchema>;
+
+/** 论点的证伪条件，后续可映射为监控规则（OPT-01 的 L4）。 */
+export const thesisFalsifyConditionSchema = z.object({
+  kind: z.enum(["PRICE_ABOVE", "PRICE_BELOW", "CHANGE_PCT", "CUSTOM"]),
+  expression: z.string().trim().min(1).max(200),
+});
+export type ThesisFalsifyCondition = z.infer<typeof thesisFalsifyConditionSchema>;
+
+export const thesisHorizonSchema = z.object({
+  from: z.string().date(),
+  to: z.string().date(),
+});
+export type ThesisHorizon = z.infer<typeof thesisHorizonSchema>;
+
+/** 论点状态变更留痕；自动检验只能建议，source=user 才代表状态真的变了。 */
+export const thesisStatusChangeSchema = z.object({
+  from: z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]).optional(),
+  to: z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]),
+  at: z.string().datetime(),
+  source: z.enum(["user", "automated"]),
+});
+export type ThesisStatusChange = z.infer<typeof thesisStatusChangeSchema>;
+
 /** 投资笔记 / 论点 */
 export const investmentNoteSchema = z.object({
   id: z.string().uuid(),
@@ -411,6 +445,14 @@ export const investmentNoteSchema = z.object({
   /** 最近一次检验；无模型时 outcome=pending_confirmation，绝不伪造结论。 */
   check: noteCheckSchema.optional(),
   last_checked_at: z.string().datetime().optional(),
+  /** 论点证据（仅 THESIS 使用）。 */
+  evidence: z.array(thesisEvidenceSchema).max(10).optional(),
+  falsify_condition: thesisFalsifyConditionSchema.optional(),
+  horizon: thesisHorizonSchema.optional(),
+  /** 0–1；不做百分比换算，保持可聚合。 */
+  confidence: z.number().min(0).max(1).optional(),
+  /** 仅记录人工确认的状态变化，用于「上次的判断后来怎样」。 */
+  status_history: z.array(thesisStatusChangeSchema).max(50).optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });

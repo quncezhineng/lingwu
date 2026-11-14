@@ -10,6 +10,7 @@ import {
   groupNotesByDate,
   type InvestmentNote,
   loadNotes,
+  mergeEvidence,
   newestCheckEntry,
   notesSnapshot,
   parseNote,
@@ -17,6 +18,8 @@ import {
   parseThesisCheck,
   runThesisCheck,
   sortTheses,
+  thesisReviewPriority,
+  thesisReviewQueue,
   updateNote,
 } from "../src/notes.ts";
 
@@ -84,6 +87,90 @@ test("检验记录解析：items 与 pending/manual_updates", () => {
   assert.equal(record?.pending, 2);
   assert.equal(record?.items[0]?.previousStatus, "ACTIVE");
   assert.equal(record?.items[1]?.source, "manual");
+});
+
+test("论点证据与状态留痕：解析 snake_case 且不伪造缺失字段", () => {
+  const note = parseNote({
+    ...NOTE_PAYLOAD,
+    evidence: [
+      {
+        id: "e-1",
+        url: "https://example.com/report",
+        published_at: "2026-10-30",
+        quote_number: "服务收入 +14%",
+        fetched_at: "2026-11-01T08:00:00.000Z",
+        healthy: true,
+      },
+    ],
+    falsify_condition: { kind: "PRICE_BELOW", expression: "跌破 180 美元" },
+    horizon: { from: "2026-10-01", to: "2027-03-31" },
+    confidence: 0.7,
+    status_history: [
+      {
+        from: "ACTIVE",
+        to: "VALIDATED",
+        at: "2026-11-02T08:00:00.000Z",
+        source: "user",
+      },
+    ],
+  });
+  assert.ok(note);
+  assert.equal(note?.evidence?.[0]?.publishedAt, "2026-10-30");
+  assert.equal(note?.evidence?.[0]?.quoteNumber, "服务收入 +14%");
+  assert.deepEqual(note?.falsifyCondition, {
+    kind: "PRICE_BELOW",
+    expression: "跌破 180 美元",
+  });
+  assert.deepEqual(note?.horizon, { from: "2026-10-01", to: "2027-03-31" });
+  assert.equal(note?.confidence, 0.7);
+  assert.equal(note?.statusHistory?.[0]?.source, "user");
+
+  const missing = parseNote({
+    ...NOTE_PAYLOAD,
+    evidence: [{ url: "https://example.com/no-id" }],
+  });
+  assert.equal(missing?.evidence, undefined);
+});
+
+test("Today 回检队列：只收入需要动作的活跃论点并优先待确认", () => {
+  const now = new Date("2026-11-13T08:00:00.000Z");
+  const base = (id: string, patch: Partial<InvestmentNote>): InvestmentNote => ({
+    id,
+    symbolCode: "AAPL",
+    type: "THESIS",
+    content: id,
+    status: "ACTIVE",
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+    ...patch,
+  });
+  const notes = [
+    base("later", { horizon: { from: "2026-10-01", to: "2027-03-31" } }),
+    base("overdue", { horizon: { from: "2026-10-01", to: "2026-10-31" } }),
+    base("due", {
+      check: {
+        outcome: "valid",
+        source: "automated",
+        checkedAt: "2026-11-01T00:00:00.000Z",
+      },
+      horizon: { from: "2026-10-01", to: "2026-11-18" },
+    }),
+    base("confirm", {
+      check: {
+        outcome: "pending_confirmation",
+        source: "automated",
+        checkedAt: "2026-11-01T00:00:00.000Z",
+      },
+    }),
+    base("closed", { status: "VALIDATED" }),
+  ];
+  const later = notes[0];
+  assert.ok(later);
+  assert.equal(thesisReviewPriority(later, now), "later");
+  assert.deepEqual(
+    thesisReviewQueue(notes, now).map((item) => item.note.id),
+    ["confirm", "overdue", "due"],
+  );
 });
 
 test("检验历史：按时间倒序，failed 保留原因而非结论", () => {
@@ -200,4 +287,111 @@ test("标题可选：创建时写入，清空后回退正文摘要", async () =>
   assert.equal(created.title, "毛利率修复");
   const cleared = await updateNote(api, created.id, { title: "" });
   assert.equal(cleared.title, undefined);
+});
+
+test("编辑双证据时完整回传两条证据，并按 id 保留证据身份", async () => {
+  let updateBody: Record<string, unknown> | undefined;
+  const payload = {
+    ...NOTE_PAYLOAD,
+    evidence: [
+      {
+        id: "ev-1",
+        url: "https://example.com/aapl-q3",
+        quote_number: "服务收入同比 +14%",
+        fetched_at: "2026-10-26T08:00:00.000Z",
+        healthy: true,
+      },
+      {
+        id: "ev-2",
+        url: "https://example.com/aapl-guidance",
+        quote_number: "全年指引不变",
+        fetched_at: "2026-10-26T08:00:00.000Z",
+        healthy: true,
+      },
+    ],
+  };
+  const api = fakeApi((path, body, method) => {
+    if (path === "/api/notes?limit=200") return { notes: [payload] };
+    if (path === "/api/notes/thesis-check/latest") return { check: null, next_run: null };
+    if (path.endsWith("/checks?limit=5")) return { checks: [] };
+    if (method === "PUT" || (path.startsWith("/api/notes/") && body !== undefined)) {
+      updateBody = body as Record<string, unknown>;
+      return payload;
+    }
+    return {};
+  });
+  await loadNotes(api, true);
+  await updateNote(api, "n-1", {
+    title: "服务收入占比",
+    content: "服务业务将在 2027 年贡献 30% 营收。",
+    evidence: [
+      {
+        id: "ev-1",
+        url: "https://example.com/aapl-q3",
+        quoteNumber: "服务收入同比 +14%",
+      },
+      {
+        id: "ev-2",
+        url: "https://example.com/aapl-guidance",
+        quoteNumber: "全年指引不变",
+      },
+    ],
+  });
+  const sent = updateBody?.evidence as Array<Record<string, unknown>> | undefined;
+  assert.equal(sent?.length, 2);
+  assert.equal(sent?.[0]?.id, "ev-1");
+  assert.equal(sent?.[1]?.id, "ev-2");
+  assert.equal(sent?.[1]?.url, "https://example.com/aapl-guidance");
+});
+
+test("编辑器显式清空字段发送 null，清空证据发送空数组", async () => {
+  let updateBody: Record<string, unknown> | undefined;
+  const api = fakeApi((path, body, method) => {
+    if (path === "/api/notes?limit=200") return { notes: [{ ...NOTE_PAYLOAD, evidence: [] }] };
+    if (path === "/api/notes/thesis-check/latest") return { check: null, next_run: null };
+    if (path.endsWith("/checks?limit=5")) return { checks: [] };
+    if (method === "PUT" || (path.startsWith("/api/notes/") && body !== undefined)) {
+      updateBody = body as Record<string, unknown>;
+      return { ...NOTE_PAYLOAD, status: "VALIDATED", evidence: [] };
+    }
+    return {};
+  });
+  await loadNotes(api, true);
+  await updateNote(api, "n-1", {
+    evidence: [],
+    falsifyCondition: null,
+    horizon: null,
+    confidence: null,
+  });
+  assert.deepEqual(updateBody?.evidence, []);
+  assert.equal(updateBody?.falsify_condition, null);
+  assert.equal(updateBody?.horizon, null);
+  assert.equal(updateBody?.confidence, null);
+});
+
+test("本地证据合并优先按 id、其次按 URL，并保留抓取时间", () => {
+  const existing = [
+    {
+      id: "ev-1",
+      url: "https://example.com/one",
+      fetchedAt: "2026-10-01T00:00:00.000Z",
+      healthy: true,
+    },
+    {
+      id: "ev-2",
+      url: "https://example.com/two",
+      fetchedAt: "2026-10-02T00:00:00.000Z",
+      healthy: true,
+    },
+  ];
+  const merged = mergeEvidence(existing, [
+    { id: "ev-1", url: "https://example.com/one-updated" },
+    { url: "https://example.com/two" },
+  ]);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0]?.id, "ev-1");
+  assert.equal(merged[0]?.url, "https://example.com/one-updated");
+  assert.equal(merged[0]?.fetchedAt, "2026-10-01T00:00:00.000Z");
+  assert.equal(merged[1]?.id, "ev-2");
+  assert.deepEqual(mergeEvidence(existing, []), []);
 });

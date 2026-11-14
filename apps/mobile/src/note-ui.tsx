@@ -2,8 +2,8 @@
  * 笔记与论点共用 UI：类型/状态 Chip、笔记卡、编辑器、详情、检验记录、确认状态、
  * 标的详情内嵌笔记区。
  */
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Linking, Pressable, View } from "react-native";
 import type { LingWuApi } from "./api";
 import { Text, TextInput } from "./app-text";
 import { type TranslationFn, useTranslation } from "./i18n";
@@ -29,6 +29,7 @@ import { ModalOverlay } from "./modal-overlay";
 import {
   createNote,
   deleteNote,
+  type FalsifyKind,
   type InvestmentNote,
   loadNoteChecks,
   loadNotes,
@@ -36,6 +37,9 @@ import {
   type NoteCheck,
   type NoteCheckEntry,
   type NoteType,
+  type ThesisEvidenceInput,
+  type ThesisFalsifyCondition,
+  type ThesisHorizon,
   type ThesisStatus,
   updateNote,
   useNotesState,
@@ -64,6 +68,25 @@ const STATUS_LABEL: Record<ThesisStatus, TranslationKey> = {
   INVALIDATED: "notes.statusInvalid",
   EXPIRED: "notes.statusExpired",
 };
+
+type EvidenceDraft = {
+  key: string;
+  id?: string;
+  url: string;
+  quoteNumber: string;
+  publishedAt: string;
+};
+
+function evidenceDraftsFrom(note: InvestmentNote | undefined): EvidenceDraft[] {
+  if (!note) return [{ key: "new-0", url: "", quoteNumber: "", publishedAt: "" }];
+  return (note.evidence ?? []).map((item) => ({
+    key: item.id,
+    id: item.id,
+    url: item.url,
+    quoteNumber: item.quoteNumber ?? "",
+    publishedAt: item.publishedAt ?? "",
+  }));
+}
 
 const STATUS_COLOR: Record<ThesisStatus, { text: string; background: string; icon: typeof Check }> =
   {
@@ -405,14 +428,63 @@ export function NoteEditorSheet({
   );
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
+  const [evidenceDrafts, setEvidenceDrafts] = useState<EvidenceDraft[]>(() =>
+    evidenceDraftsFrom(initial),
+  );
+  const nextEvidenceKey = useRef(initial?.evidence?.length ?? 1);
+  const [falsifyKind, setFalsifyKind] = useState<FalsifyKind>(
+    initial?.falsifyCondition?.kind ?? "CUSTOM",
+  );
+  const [falsifyExpression, setFalsifyExpression] = useState(
+    initial?.falsifyCondition?.expression ?? "",
+  );
+  const [horizonEnd, setHorizonEnd] = useState(initial?.horizon?.to ?? "");
+  const [confidence, setConfidence] = useState<number | undefined>(initial?.confidence);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
+  const initialEvidenceSignature = (initial?.evidence ?? [])
+    .map((item) =>
+      [item.id, item.url, item.quoteNumber ?? "", item.publishedAt ?? ""].join("\u0001"),
+    )
+    .join("\u0002");
+  const evidenceSignature = evidenceDrafts
+    .map((item) => [item.id ?? "", item.url, item.quoteNumber, item.publishedAt].join("\u0001"))
+    .join("\u0002");
   const dirty =
     content !== initialContent ||
     title !== initialTitle ||
+    evidenceSignature !== initialEvidenceSignature ||
+    falsifyExpression !== (initial?.falsifyCondition?.expression ?? "") ||
+    horizonEnd !== (initial?.horizon?.to ?? "") ||
+    confidence !== initial?.confidence ||
     (!initial && symbol?.code !== initialSymbolCode);
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const evidenceRows = evidenceDrafts.map((item) => ({ ...item, url: item.url.trim() }));
+  const filledEvidence = evidenceRows.filter((item) => item.url);
+  const requiresEvidence = type === "THESIS" && (initial?.status ?? "ACTIVE") === "ACTIVE";
+  const evidenceUrlInvalid = evidenceRows.some(
+    (item) => !!item.url && !/^https?:\/\/\S+$/i.test(item.url),
+  );
+  const evidenceDateInvalid = evidenceRows.some(
+    (item) => !!item.publishedAt && !datePattern.test(item.publishedAt),
+  );
+  // 只填了引用数字/发布日期却没填链接，说明这一行证据不完整，不能静默丢弃。
+  const evidenceIncomplete = evidenceRows.some(
+    (item) => !item.url && (!!item.quoteNumber.trim() || !!item.publishedAt),
+  );
+  const evidenceError =
+    type !== "THESIS"
+      ? ""
+      : requiresEvidence && !filledEvidence.length
+        ? t("notes.evidenceRequired")
+        : evidenceUrlInvalid || evidenceIncomplete
+          ? t("notes.evidenceInvalid")
+          : evidenceDateInvalid
+            ? t("notes.dateInvalid")
+            : "";
+  const horizonError = horizonEnd && !datePattern.test(horizonEnd) ? t("notes.dateInvalid") : "";
   const contentError = !content.trim()
     ? t("notes.contentRequired")
     : type === "THESIS" && content.trim().length < 10
@@ -421,7 +493,37 @@ export function NoteEditorSheet({
         ? t("notes.contentCounter", { count: 2000 })
         : "";
   const symbolError = !symbol ? t("notes.symbolRequired") : "";
-  const canSave = !contentError && !symbolError && !busy;
+  const canSave = !contentError && !symbolError && !evidenceError && !horizonError && !busy;
+  const thesisEvidence: ThesisEvidenceInput[] | undefined =
+    type === "THESIS"
+      ? filledEvidence.map((item) => ({
+          ...(item.id ? { id: item.id } : {}),
+          url: item.url,
+          ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}),
+          ...(item.quoteNumber.trim() ? { quoteNumber: item.quoteNumber.trim() } : {}),
+        }))
+      : undefined;
+  const falsifyCondition: ThesisFalsifyCondition | undefined =
+    type === "THESIS" && falsifyExpression.trim()
+      ? { kind: falsifyKind, expression: falsifyExpression.trim() }
+      : undefined;
+  const horizon: ThesisHorizon | undefined =
+    type === "THESIS" && horizonEnd
+      ? { from: initial?.horizon?.from ?? new Date().toISOString().slice(0, 10), to: horizonEnd }
+      : undefined;
+
+  const setEvidenceDraft = (key: string, patch: Partial<EvidenceDraft>) =>
+    setEvidenceDrafts((drafts) =>
+      drafts.map((draft) => (draft.key === key ? { ...draft, ...patch } : draft)),
+    );
+  const removeEvidenceDraft = (key: string) =>
+    setEvidenceDrafts((drafts) => drafts.filter((draft) => draft.key !== key));
+  const addEvidenceDraft = () =>
+    setEvidenceDrafts((drafts) => {
+      if (drafts.length >= 10) return drafts;
+      const key = `new-${nextEvidenceKey.current++}`;
+      return [...drafts, { key, url: "", quoteNumber: "", publishedAt: "" }];
+    });
 
   const requestClose = () => {
     if (dirty) setConfirmDiscard(true);
@@ -534,7 +636,199 @@ export function NoteEditorSheet({
         </Text>
       </View>
       {type === "THESIS" && (
-        <Text style={[s.small, { marginTop: 8 }]}>{t("notes.thesisHint")}</Text>
+        <View style={{ gap: 10, marginTop: 14 }}>
+          <Text style={[s.small, { color: colors.text, fontWeight: "600" }]}>
+            {t("notes.evidenceLabel")}
+            {requiresEvidence ? " *" : ""}
+          </Text>
+          {evidenceDrafts.map((draft, index) => (
+            <View
+              key={draft.key}
+              style={{
+                gap: 8,
+                padding: 10,
+                borderWidth: 1,
+                borderColor: colors.line,
+                borderRadius: 12,
+                backgroundColor: colors.surface,
+              }}
+            >
+              <View style={[s.between, { gap: 8 }]}>
+                <Text style={[s.small, { fontWeight: "600", color: colors.muted }]}>
+                  {t("notes.evidenceHeading")} {index + 1}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("notes.evidenceRemove")}
+                  onPress={() => removeEvidenceDraft(draft.key)}
+                  style={({ pressed }) => ({
+                    minHeight: 32,
+                    paddingHorizontal: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    borderRadius: 8,
+                    backgroundColor: pressed ? colors.overlay1 : "transparent",
+                  })}
+                >
+                  <Trash2 size={14} color={colors.danger} />
+                  <Text style={[s.small, { color: colors.danger }]}>
+                    {t("notes.evidenceRemove")}
+                  </Text>
+                </Pressable>
+              </View>
+              <TextInput
+                value={draft.url}
+                onChangeText={(text) => setEvidenceDraft(draft.key, { url: text })}
+                placeholder={t("notes.evidencePlaceholder")}
+                placeholderTextColor={colors.faint}
+                accessibilityLabel={t("notes.evidenceLabel")}
+                autoCapitalize="none"
+                style={[
+                  s.input,
+                  !!draft.url.trim() &&
+                    !/^https?:\/\/\S+$/i.test(draft.url.trim()) && { borderColor: colors.danger },
+                ]}
+              />
+              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                <TextInput
+                  value={draft.quoteNumber}
+                  onChangeText={(text) =>
+                    setEvidenceDraft(draft.key, { quoteNumber: text.slice(0, 120) })
+                  }
+                  placeholder={t("notes.evidenceQuotePlaceholder")}
+                  placeholderTextColor={colors.faint}
+                  accessibilityLabel={t("notes.evidenceQuoteLabel")}
+                  style={[s.input, { flex: 1, minWidth: 150 }]}
+                />
+                <TextInput
+                  value={draft.publishedAt}
+                  onChangeText={(text) =>
+                    setEvidenceDraft(draft.key, { publishedAt: text.slice(0, 10) })
+                  }
+                  placeholder={t("notes.evidenceDatePlaceholder")}
+                  placeholderTextColor={colors.faint}
+                  accessibilityLabel={t("notes.evidenceDateLabel")}
+                  style={[
+                    s.input,
+                    { width: 132 },
+                    !!draft.publishedAt &&
+                      !datePattern.test(draft.publishedAt) && { borderColor: colors.danger },
+                  ]}
+                />
+              </View>
+            </View>
+          ))}
+          {evidenceDrafts.length < 10 && (
+            <Button variant="outline" icon={Plus} onPress={addEvidenceDraft}>
+              {t("notes.evidenceAdd")}
+            </Button>
+          )}
+          {!!evidenceError && (
+            <Text accessibilityRole="alert" style={[s.small, { color: colors.danger }]}>
+              {evidenceError}
+            </Text>
+          )}
+          <Text style={[s.small, { color: colors.text, fontWeight: "600" }]}>
+            {t("notes.falsifyLabel")}
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {(
+              [
+                ["PRICE_ABOVE", "notes.falsifyPriceAbove"],
+                ["PRICE_BELOW", "notes.falsifyPriceBelow"],
+                ["CHANGE_PCT", "notes.falsifyChangePct"],
+                ["CUSTOM", "notes.falsifyCustom"],
+              ] as Array<[FalsifyKind, TranslationKey]>
+            ).map(([kind, label]) => {
+              const selected = falsifyKind === kind;
+              return (
+                <Pressable
+                  key={kind}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  onPress={() => setFalsifyKind(kind)}
+                  style={{
+                    minHeight: 36,
+                    paddingHorizontal: 12,
+                    justifyContent: "center",
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: selected ? colors.primary : colors.line,
+                    backgroundColor: selected ? colors.sky : colors.paper,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "600",
+                      color: selected ? colors.primary : colors.muted,
+                    }}
+                  >
+                    {t(label)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <TextInput
+            value={falsifyExpression}
+            onChangeText={(text) => setFalsifyExpression(text.slice(0, 200))}
+            placeholder={t("notes.falsifyPlaceholder")}
+            placeholderTextColor={colors.faint}
+            accessibilityLabel={t("notes.falsifyLabel")}
+            style={s.input}
+          />
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            <TextInput
+              value={horizonEnd}
+              onChangeText={(text) => setHorizonEnd(text.slice(0, 10))}
+              placeholder={t("notes.horizonPlaceholder")}
+              placeholderTextColor={colors.faint}
+              accessibilityLabel={t("notes.horizonLabel")}
+              style={[s.input, { width: 160, flex: 1 }]}
+            />
+            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+              {[0.3, 0.5, 0.7, 0.9].map((value) => {
+                const selected = confidence === value;
+                return (
+                  <Pressable
+                    key={value}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => setConfidence(selected ? undefined : value)}
+                    style={{
+                      minHeight: 36,
+                      minWidth: 44,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: selected ? colors.primary : colors.line,
+                      backgroundColor: selected ? colors.sky : colors.paper,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "600",
+                        color: selected ? colors.primary : colors.muted,
+                      }}
+                    >
+                      {Math.round(value * 100)}%
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          {!!horizonError && (
+            <Text accessibilityRole="alert" style={[s.small, { color: colors.danger }]}>
+              {horizonError}
+            </Text>
+          )}
+          <Text style={[s.small, { color: colors.faint }]}>{t("notes.thesisHint")}</Text>
+        </View>
       )}
       <ErrorNotice error={error} />
       <View style={[s.row, { gap: 10, marginTop: 16, flexWrap: "wrap" }]}>
@@ -553,6 +847,15 @@ export function NoteEditorSheet({
                   await updateNote(api, initial.id, {
                     title: title.trim(),
                     content: content.trim(),
+                    ...(initial.type === "THESIS"
+                      ? {
+                          // 完整回传所有证据行；空数组是显式清空，不能靠省略字段表示。
+                          evidence: thesisEvidence ?? [],
+                          falsifyCondition: falsifyCondition ?? null,
+                          horizon: horizon ?? null,
+                          confidence: confidence ?? null,
+                        }
+                      : {}),
                   });
                 } else {
                   await createNote(api, {
@@ -561,6 +864,10 @@ export function NoteEditorSheet({
                     title: title.trim() || undefined,
                     content: content.trim(),
                     status: type === "THESIS" ? "ACTIVE" : undefined,
+                    ...(thesisEvidence?.length ? { evidence: thesisEvidence } : {}),
+                    ...(falsifyCondition ? { falsifyCondition } : {}),
+                    ...(horizon ? { horizon } : {}),
+                    ...(confidence !== undefined ? { confidence } : {}),
                   });
                 }
                 onSaved();
@@ -827,6 +1134,9 @@ export function NoteDetailSheet({
   const [confirmStatus, setConfirmStatus] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const lastStatusChange = note.statusHistory?.length
+    ? note.statusHistory[note.statusHistory.length - 1]
+    : undefined;
 
   return (
     <Sheet title={`${note.symbolCode} · ${t(TYPE_LABEL[note.type])}`} onClose={onClose}>
@@ -866,6 +1176,58 @@ export function NoteDetailSheet({
           </Text>
           {!!note.check?.note && (
             <Text style={[s.small, { color: colors.faint }]}>{note.check.note}</Text>
+          )}
+          {!!note.evidence?.length && (
+            <View style={{ gap: 6 }}>
+              <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
+                {t("notes.evidenceHeading")}
+              </Text>
+              {note.evidence.map((item) => (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="link"
+                  accessibilityLabel={item.quoteNumber ?? item.url}
+                  onPress={() => void Linking.openURL(item.url)}
+                  style={[s.row, { gap: 8, minHeight: 36 }]}
+                >
+                  <FileText size={14} color={colors.primary} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}
+                    >
+                      {item.quoteNumber || item.url}
+                    </Text>
+                    <Text numberOfLines={1} style={[s.small, { color: colors.faint }]}>
+                      {item.url}
+                      {item.publishedAt ? ` · ${item.publishedAt}` : ""}
+                      {item.healthy ? "" : ` · ${t("notes.evidenceUnhealthy")}`}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {!!note.falsifyCondition && (
+            <Text style={[s.small, { color: colors.muted }]}>
+              {t("notes.falsifyHeading")} {note.falsifyCondition.expression}
+            </Text>
+          )}
+          {(!!note.horizon || note.confidence !== undefined) && (
+            <Text style={[s.small, { color: colors.muted }]}>
+              {note.horizon ? `${t("notes.horizonLabel")} ${note.horizon.to}` : ""}
+              {note.confidence !== undefined
+                ? ` · ${t("notes.confidenceLabel")} ${Math.round(note.confidence * 100)}%`
+                : ""}
+            </Text>
+          )}
+          {!!lastStatusChange && (
+            <Text style={[s.small, { color: colors.faint }]}>
+              {t("notes.statusHistory", {
+                status: t(STATUS_LABEL[lastStatusChange.to]),
+                time: new Date(lastStatusChange.at).toLocaleString(),
+              })}
+            </Text>
           )}
           <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
             <Button small style={{ minHeight: 44 }} onPress={() => setConfirmStatus(true)}>
