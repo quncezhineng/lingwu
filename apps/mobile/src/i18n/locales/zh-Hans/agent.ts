@@ -419,6 +419,7 @@ const agent = {
   "agent.scheduleEvery15m": "每 15 分钟",
   "agent.scheduleHourly": "每小时",
   "agent.scheduleEvery6h": "每 6 小时",
+  "agent.scheduleEveryMinutes": "每 {minutes} 分钟",
   "agent.scheduleDaily": "每天",
   "agent.stopConfirm": "确认停止",
   "agent.trackingEmpty": "股价、财报，或你正在关注的某个标的。",

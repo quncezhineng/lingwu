@@ -473,6 +473,7 @@ const agent = {
   "agent.scheduleEvery15m": "Every 15 min",
   "agent.scheduleHourly": "Hourly",
   "agent.scheduleEvery6h": "Every 6 hours",
+  "agent.scheduleEveryMinutes": "Every {minutes} min",
   "agent.scheduleDaily": "Daily",
   "agent.stopConfirm": "Confirm stop",
   "agent.trackingEmpty": "A stock price, an earnings report, a target you’re watching.",

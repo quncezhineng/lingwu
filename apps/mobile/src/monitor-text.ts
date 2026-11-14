@@ -26,6 +26,26 @@ export function monitorConditionText(monitor: Monitor, t: TranslationFn) {
       : t("agent.priceBelow", { value: monitorPriceLabel(monitor) });
 }
 
+/** 编辑表单里始终提供的检查间隔（分钟）。 */
+export const MONITOR_INTERVAL_PRESETS = [15, 60, 360] as const;
+
+/**
+ * 编辑「按间隔」时的可选项。已保存的间隔不在预设里时（例如系统写成 30 分钟）
+ * 仍要出现并可以被选中，否则三项都不亮，看起来像还没配完。
+ */
+export function monitorIntervalOptions(currentMinutes: number | undefined): number[] {
+  const options = new Set<number>(MONITOR_INTERVAL_PRESETS);
+  if (
+    currentMinutes != null &&
+    Number.isInteger(currentMinutes) &&
+    currentMinutes >= 1 &&
+    currentMinutes <= 10080
+  ) {
+    options.add(currentMinutes);
+  }
+  return [...options].sort((a, b) => a - b);
+}
+
 export function monitorScheduleText(monitor: Monitor, t: TranslationFn) {
   if (monitor.schedule === "daily")
     return t("agent.scheduleDailyAt", { time: monitor.timeOfDay ?? "09:00" });

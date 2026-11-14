@@ -1,4 +1,4 @@
-import { type ReactNode, type RefObject, useEffect, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Text, TextInput } from "./app-text";
 import { ArrowUp, type IconComponent, Plus, Square } from "./icons";
+import { enterConfirmsIme } from "./prompt-composer-ime";
 import { colors, composerMetrics, fonts, radius, semantic, shadow } from "./ui";
 
 const noFocusRing =
@@ -71,6 +72,36 @@ export function PromptComposer({
   const [focused, setFocused] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [inputHeight, setInputHeight] = useState(inputMinHeight);
+  const [inputHost, setInputHost] = useState<HTMLElement | null>(null);
+  const composing = useRef(false);
+  const compositionEndedAt = useRef(0);
+  const assignInputRef = useCallback(
+    (node: TextInput | null) => {
+      setInputHost((current) => {
+        const host = node as unknown as HTMLElement | null;
+        return current === host ? current : host;
+      });
+      if (inputRef) inputRef.current = node;
+    },
+    [inputRef],
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !inputHost) return;
+    const start = () => {
+      composing.current = true;
+    };
+    const end = () => {
+      composing.current = false;
+      compositionEndedAt.current = Date.now();
+    };
+    inputHost.addEventListener("compositionstart", start);
+    inputHost.addEventListener("compositionend", end);
+    return () => {
+      inputHost.removeEventListener("compositionstart", start);
+      inputHost.removeEventListener("compositionend", end);
+    };
+  }, [inputHost]);
 
   useEffect(() => {
     if (!value) setInputHeight(inputMinHeight);
@@ -115,7 +146,7 @@ export function PromptComposer({
 
   const input = (
     <TextInput
-      ref={inputRef}
+      ref={assignInputRef}
       value={value}
       onChangeText={onChangeText}
       onFocus={() => {
@@ -136,13 +167,24 @@ export function PromptComposer({
       onKeyPress={
         Platform.OS === "web"
           ? (event) => {
+              const native = event.nativeEvent as {
+                key?: string;
+                keyCode?: number;
+                isComposing?: boolean;
+                shiftKey?: boolean;
+              };
+              if (native.key !== "Enter" || native.shiftKey) return;
+              // 输入法用回车确认候选。这时不要 preventDefault，把按键留给输入法。
               if (
-                event.nativeEvent.key === "Enter" &&
-                !("shiftKey" in event.nativeEvent && event.nativeEvent.shiftKey)
-              ) {
-                event.preventDefault();
-                action();
-              }
+                enterConfirmsIme(
+                  { keyCode: native.keyCode, isComposing: native.isComposing },
+                  { composing: composing.current, compositionEndedAt: compositionEndedAt.current },
+                  Date.now(),
+                )
+              )
+                return;
+              event.preventDefault();
+              action();
             }
           : undefined
       }
