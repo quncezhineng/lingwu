@@ -73,7 +73,12 @@ import {
   Users,
   X,
 } from "./icons";
-import { monitorConditionText, monitorScheduleText, WEEKDAYS } from "./monitor-text";
+import {
+  monitorConditionText,
+  monitorIntervalOptions,
+  monitorScheduleText,
+  WEEKDAYS,
+} from "./monitor-text";
 import { notificationExcerpt } from "./notification-text";
 import { buildNotificationGroups } from "./notification-view";
 import { PageHeader } from "./page-header";
@@ -2399,12 +2404,12 @@ export function GoalCard({
     </Card>
   );
 }
-/** 按间隔检查的 3 档预设（分钟）；每天/每周由独立调度字段承载。 */
-const MONITOR_SCHEDULES = [
-  { minutes: 15, labelKey: "agent.scheduleEvery15m" },
-  { minutes: 60, labelKey: "agent.scheduleHourly" },
-  { minutes: 360, labelKey: "agent.scheduleEvery6h" },
-] as const satisfies ReadonlyArray<{ minutes: number; labelKey: TranslationKey }>;
+/** 预设间隔的固定文案。不在这三档里的已保存间隔用 `agent.scheduleEveryMinutes`。 */
+const MONITOR_SCHEDULE_LABELS = {
+  15: "agent.scheduleEvery15m",
+  60: "agent.scheduleHourly",
+  360: "agent.scheduleEvery6h",
+} as const satisfies Record<number, TranslationKey>;
 
 type ReminderSchedule = NonNullable<Monitor["schedule"]>;
 
@@ -2800,14 +2805,16 @@ export function MonitorForm({
       </View>
       {schedule === "interval" ? (
         <View style={[s.row, { gap: 7, flexWrap: "wrap", marginBottom: 16 }]}>
-          {MONITOR_SCHEDULES.map((item) => (
+          {monitorIntervalOptions(Number(interval)).map((minutes) => (
             <Button
               small
-              primary={interval === String(item.minutes)}
-              key={item.minutes}
-              onPress={() => setInterval(String(item.minutes))}
+              primary={interval === String(minutes)}
+              key={minutes}
+              onPress={() => setInterval(String(minutes))}
             >
-              {t(item.labelKey)}
+              {minutes in MONITOR_SCHEDULE_LABELS
+                ? t(MONITOR_SCHEDULE_LABELS[minutes as keyof typeof MONITOR_SCHEDULE_LABELS])
+                : t("agent.scheduleEveryMinutes", { minutes })}
             </Button>
           ))}
         </View>
