@@ -805,6 +805,10 @@ export async function createApp(
       .parse(await c.req.json());
     return c.json(await files.fill(c.get("owner"), c.req.param("id"), body.fields), 201);
   });
+  app.delete("/api/files/:id", async (c) => {
+    await files.remove(c.get("owner"), c.req.param("id"));
+    return c.json({ ok: true });
+  });
   app.post("/api/mail/import-attachment", async (c) => {
     const body = z.object({ reference: z.string() }).parse(await c.req.json());
     return c.json(await workspace.importAttachment(c.get("owner"), body.reference), 201);

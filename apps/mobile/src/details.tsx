@@ -65,7 +65,7 @@ import {
   Reply,
   RotateCw,
   Save,
-  Send,
+  // Send 图标原用于「附加到邮件」按钮（已暂时隐藏，见文件预览区），恢复该功能时需重新导入。
   ShieldCheck,
   Sparkles,
   Star,
@@ -1135,12 +1135,13 @@ function FileDetail({ file: f }: { file: Artifact }) {
           <Button icon={Download} onPress={() => void share()}>
             {Platform.OS === "web" ? t("details.openDownload") : t("details.saveOrShare")}
           </Button>
-          <Button
+          {/*「附加到邮件」功能暂时用不上，先隐藏（保留代码，便于以后恢复）。*/}
+          {/* <Button
             icon={Send}
             onPress={() => open({ type: "email", draft: { attachmentIds: [f.id] } })}
           >
             {t("details.attachToEmail")}
-          </Button>
+          </Button> */}
         </View>
         <ErrorNotice error={error} />
         <Text style={[s.small, { marginTop: 15 }]}>
@@ -1223,12 +1224,13 @@ function FileDetail({ file: f }: { file: Artifact }) {
         <Button icon={Download} onPress={() => void share()}>
           {Platform.OS === "web" ? t("details.openDownload") : t("details.saveOrShare")}
         </Button>
-        <Button
+        {/*「附加到邮件」功能暂时用不上，先隐藏（保留代码，便于以后恢复）。*/}
+        {/* <Button
           icon={Send}
           onPress={() => open({ type: "email", draft: { attachmentIds: [f.id] } })}
         >
           {t("details.attachToEmail")}
-        </Button>
+        </Button> */}
       </View>
       {f.fields && f.fields.length > 0 && (
         <Card>

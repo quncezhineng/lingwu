@@ -57,6 +57,7 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Upload,
 } from "./icons";
 import { InsightCard } from "./insight-card";
@@ -1222,6 +1223,25 @@ export function FilesScreen({
     }
   }
 
+  /** 删除我上传的资料：服务端删记录与物理文件后，刷新列表并清理该文件的选中态。 */
+  async function deleteFile(file: Artifact) {
+    setError("");
+    try {
+      await api.request(`/api/files/${encodeURIComponent(file.id)}`, undefined, "DELETE");
+      await refresh();
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(file.id);
+        return next;
+      });
+      notify(t("screens.filesDeleted", { name: file.name }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setError(message);
+      notify(t("screens.filesDeleteFailed", { name: file.name }));
+    }
+  }
+
   async function upload() {
     setError("");
     setBusy(true);
@@ -1566,6 +1586,8 @@ export function FilesScreen({
                 const kind = fileKind(file);
                 const extension = fileExtension(file);
                 const selected = selectedIds.has(file.id);
+                // 只有我上传的源文件可删；分析生成/导出的产物保留下载与投入分析入口。
+                const isUpload = fileSourceBucket(file) === "upload";
                 const fileMeta = (() => {
                   if (kind === "pdf")
                     return `${file.pageCount} ${t(
@@ -1661,34 +1683,45 @@ export function FilesScreen({
                           </Text>
                           <Text numberOfLines={1} style={[s.small, { color: colors.faint }]}>
                             {Math.max(1, Math.round(file.size / 1024))} KB · {fileMeta} ·{" "}
-                            {fileSourceLabel(file.source, t)} · {dateLabel(file.createdAt)}
+                            {!isUpload && `${fileSourceLabel(file.source, t)} · `}
+                            {dateLabel(file.createdAt)}
                           </Text>
                         </View>
                       </Pressable>
+                      {isUpload && (
+                        <IconButton
+                          icon={Trash2}
+                          label={t("screens.filesDelete", { name: file.name })}
+                          size={compact ? 40 : 34}
+                          onPress={() => void deleteFile(file)}
+                        />
+                      )}
                     </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "flex-start",
-                        gap: 6,
-                      }}
-                    >
-                      <IconButton
-                        icon={ArrowDownToLine}
-                        label={t("screens.filesDownload", { name: file.name })}
-                        size={compact ? 40 : 34}
-                        onPress={() => void download(file)}
-                      />
-                      <Button
-                        small
-                        icon={Sparkles}
-                        style={{ minHeight: compact ? 40 : 32 }}
-                        onPress={() => analyzeFiles([file])}
+                    {!isUpload && (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "flex-start",
+                          gap: 6,
+                        }}
                       >
-                        {t("screens.filesAnalyze")}
-                      </Button>
-                    </View>
+                        <IconButton
+                          icon={ArrowDownToLine}
+                          label={t("screens.filesDownload", { name: file.name })}
+                          size={compact ? 40 : 34}
+                          onPress={() => void download(file)}
+                        />
+                        <Button
+                          small
+                          icon={Sparkles}
+                          style={{ minHeight: compact ? 40 : 32 }}
+                          onPress={() => analyzeFiles([file])}
+                        >
+                          {t("screens.filesAnalyze")}
+                        </Button>
+                      </View>
+                    )}
                   </View>
                 );
               })}

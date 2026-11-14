@@ -597,7 +597,10 @@ function ServerToolCard({
 }
 /** 从第一条用户消息生成对话标题：去掉附件说明、压缩空白，最多保留 24 个字符。 */
 function titleFrom(text: string): string {
-  const plain = withoutSelectedSkills(text).split("\n\nAttached documents:")[0].replace(/\s+/g, " ").trim();
+  const plain = withoutSelectedSkills(text)
+    .split("\n\nAttached documents:")[0]
+    .replace(/\s+/g, " ")
+    .trim();
   if (!plain) return "";
   return plain.length > 24 ? `${plain.slice(0, 24)}…` : plain;
 }

@@ -5,7 +5,7 @@ import { AssistantResponse } from "./assistant-response";
 import { saveTextFile } from "./csv-file";
 import { useTranslation } from "./i18n";
 import { ArrowDownToLine, Copy, Image, Link2, Share2, ThumbsDown, ThumbsUp } from "./icons";
-import { copyText, shareLink, shareText } from "./message-share";
+import { copyText, shareText } from "./message-share";
 import { captureAndShare } from "./message-share-image";
 import { formatMessageTime } from "./message-time";
 import { colors, radius } from "./theme";
@@ -103,13 +103,13 @@ export function MessageActions({
     setShareOpen(false);
     if (publishing) return;
 
-    // 首选：把这一轮对话发布成公开网页，分享页面链接（收件人无需登录即可阅读）。
+    // 首选：把这一轮对话发布成公开网页，复制页面链接（收件人无需登录即可阅读）。
     if (onPublishShare) {
       setPublishing(true);
       try {
         const url = await onPublishShare({ question, answer: markdown });
-        const result = await shareLink(url, question || undefined);
-        onNotify?.(t(result === "copied" ? "chat.sharePageCopied" : "chat.sharePageShared"));
+        await copyText(url);
+        onNotify?.(t("chat.sharePageCopied"));
       } catch {
         onNotify?.(t("chat.sharePageFailed"));
       } finally {

@@ -17,7 +17,7 @@ import { type ArtifactExportFormat, artifactExportText, artifactFileName } from 
 import { renderArtifactMarkdown } from "./artifact-html";
 import { saveTextFile } from "./csv-file";
 import { statusLabel } from "./i18n/translate";
-import { shareLink } from "./message-share";
+import { copyText } from "./message-share";
 import { publishShare } from "./share-page";
 
 /** 导出报告，返回实际使用的文件名（用于给用户提示）。 */
@@ -35,21 +35,20 @@ export async function exportArtifact(
 }
 
 /**
- * 发布报告分享页并唤起分享面板。
+ * 发布报告分享页并把链接复制到剪贴板。
  *
  * `question` 字段复用为「标题 · 类型」：分享页会把它渲染在正文上方，
  * 收件人先看到这是哪份报告，再读正文。
- * 返回公开链接与分享方式：浏览器不支持系统分享时 `shareLink` 会退回复制链接，
- * 调用方据此给出不同提示。
+ * 返回公开链接；链接已自动复制到系统剪贴板，调用方按「已复制」提示即可。
  */
 export async function shareArtifactLink(
   api: LingWuApi,
   artifact: AgentArtifact,
-): Promise<{ url: string; result: "shared" | "copied" }> {
+): Promise<{ url: string; result: "copied" }> {
   const url = await publishShare(api, {
     question: `${artifact.title} · ${statusLabel(artifact.kind)}`,
     answer: renderArtifactMarkdown(artifact),
   });
-  const result = await shareLink(url, artifact.title);
-  return { url, result };
+  await copyText(url);
+  return { url, result: "copied" };
 }

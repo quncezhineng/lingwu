@@ -142,7 +142,10 @@ test("a skill that is only selected in the browser is not installed", async () =
       { value: JSON.stringify({ skills: [{ id: "earnings-analysis", name: "财报分析" }] }) },
     ],
     messages: [
-      { role: "user", content: "看一下\n\nSelected skills: 财报分析 (skill ID: earnings-analysis)" },
+      {
+        role: "user",
+        content: "看一下\n\nSelected skills: 财报分析 (skill ID: earnings-analysis)",
+      },
     ],
   });
   assert.deepEqual(selected, [{ id: "earnings-analysis", name: "财报分析" }]);

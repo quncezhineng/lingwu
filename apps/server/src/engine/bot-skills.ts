@@ -95,7 +95,10 @@ const SKILL_LINE = /\n\nSelected skills:\s*([^\n]*)/;
 const SKILL_ENTRY = /(.+?)\s+\(skill ID:\s*([^)]+)\)(?:\s*,\s*|$)/g;
 
 function skillKey(value: string) {
-  return value.trim().toLowerCase().replace(/[\s_]+/g, "-");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
 }
 
 function messageText(content: unknown) {
@@ -161,7 +164,10 @@ function agentForThread(space: SkillSpace | null | undefined, threadId: string |
     const match = agents.find((item) => item.threadId === id);
     if (match) return match;
   }
-  return agents.find((item) => item.id === "system-agent") ?? (agents.length === 1 ? agents[0] : undefined);
+  return (
+    agents.find((item) => item.id === "system-agent") ??
+    (agents.length === 1 ? agents[0] : undefined)
+  );
 }
 
 export function installedSkillViews(
@@ -222,7 +228,10 @@ function matchSkill(skills: ReadonlyMap<string, ResolvedSkill>, requested: strin
 }
 
 /** use_skill reads the server agent record only: catalog ids and library references. */
-function installedBodies(space: SkillSpace | null | undefined, threadId: string | null | undefined) {
+function installedBodies(
+  space: SkillSpace | null | undefined,
+  threadId: string | null | undefined,
+) {
   const views = installedSkillViews(space, threadId);
   const catalog = new Map<string, ResolvedSkill>();
   for (const summary of views.summaries) {

@@ -28,8 +28,8 @@ import {
   draftAgentSpace,
   normalizeAgentSpace,
   resolveRemoteAgentSpace,
-  type SkillEdit,
   type SelectionLike,
+  type SkillEdit,
   SYSTEM_AGENT_ID,
 } from "./agent-space-model";
 import { useTranslation } from "./i18n";

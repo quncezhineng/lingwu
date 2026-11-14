@@ -5,6 +5,65 @@
 
 ## 变更记录
 
+### 2026-11-14 · 界面：文件预览弹层暂时隐藏「附加到邮件」按钮
+
+**背景**
+
+打开上传文件资料时，预览弹层底部有一排操作按钮，其中「附加到邮件」功能暂时用不上，用户希望先隐藏（保留代码，便于以后恢复）。
+
+**处理**
+
+- [details.tsx](../apps/mobile/src/details.tsx)：文件预览弹层两处「附加到邮件」`<Button icon={Send}>`（HTML 预览区与普通文件预览区，对应 `details.attachToEmail` 文案）用 JSX 注释包裹隐藏，下载/保存按钮不受影响；同步删除仅在按钮上使用的 `Send` 图标导入，并留注释说明恢复时需重新导入。
+
+**验证**
+
+- biome 通过；`apps/mobile` typecheck 仅剩既有 `prompt-composer.tsx:272` 错误（与本次改动无关）。
+- 请在 `localhost:8081` 刷新后确认：打开任意上传的资料，预览弹层底部只显示下载/保存按钮，不再出现「附加到邮件」。
+
+### 2026-11-14 · 功能：「我的上传」文件卡片改造——移除底部按钮、右上角新增删除
+
+**背景**
+
+在资料页「我的上传」里，用户希望上传的资料卡片更简洁：删掉卡片底部的「下载」和「投入分析」按钮；并在卡片右上角提供一个「删除」按钮，点击即可删除该上传文件。分析生成 / 导出的产物卡片不受影响，保留下载与投入分析入口。
+
+**处理**
+
+- [files.ts](../apps/server/src/files.ts)：`Files` 类新增 `remove(owner, id)`——先用 `get` 校验文件存在，再按 mimeType/扩展名推导物理文件路径（与 `bytes()` 同款推导链），先删数据库记录（`db.remove`），再用 `rm(path, { force: true })` 清理磁盘文件；物理文件删除失败只记 `backgroundFailure`，不影响接口成功返回（避免记录已删却报错的「幽灵失败」）。
+- [app.ts](../apps/server/src/app.ts)：新增 `DELETE /api/files/:id` 路由，调用 `files.remove(c.get("owner"), c.req.param("id"))`，返回 `{ ok: true }`。
+- [screens.tsx](../apps/mobile/src/screens.tsx)：
+  - 新增 `deleteFile(file)`：`api.request(\`/api/files/${id}\`, undefined, "DELETE")` → `refresh()` 刷新列表 → 清理该文件的选中态 → toast「已删除」；失败时 `ErrorNotice` 显示错误 + toast「删除失败」。
+  - 卡片内新增 `isUpload` 判定（`fileSourceBucket(file) === "upload"`）：上传文件卡片隐藏底部「下载/投入分析」按钮组，并在卡片头部行右侧（扩展名徽章与文件名之后的右上角）渲染 `Trash2` 删除按钮；非上传产物卡片行为不变。
+  - 上传文件卡片的元信息行不再显示来源文字（如「我的上传」——在该页签下它恒为上传，显示重复）；「分析生成」「导出」等来源标签对其他卡片保留。
+- [screens.ts](../apps/mobile/src/i18n/locales/zh-Hans/screens.ts) 与 [screens.ts](../apps/mobile/src/i18n/locales/en/screens.ts)：新增 `filesDelete`（删除 {name}）、`filesDeleted`（已删除）、`filesDeleteFailed`（删除失败）文案，中英 key 与占位符对齐。
+
+**验证**
+
+- root `tsc --noEmit`（含服务端）通过；`apps/mobile` typecheck 除既有 `prompt-composer.tsx:272` 错误外无新增诊断；biome 5 个文件通过。
+- 全量测试 1163 例全过（含 i18n 中英 key 对齐 16 例）。
+- 请在 `localhost:8081` 刷新后确认：资料页「我的上传」卡片不再显示底部下载/投入分析按钮，右上角出现删除图标；点击删除后文件立即消失并 toast「已删除」；「全部」「分析生成」页签下的产物卡片仍保留下载与投入分析。
+
+### 2026-11-14 · 功能：「分享为链接」类按钮点击后立即生成页面链接并自动复制
+
+**背景**
+
+用户希望简报、对话、报告三处「分享为链接」按钮点击后，能立刻拿到对应的公开页面链接并自动复制到剪贴板，而不是弹系统分享面板让用户再多一步操作。
+
+**处理**
+
+- [message-share.ts](../apps/mobile/src/message-share.ts)：
+  - `copyText` 原生端从「打开系统分享面板」（未装剪贴板库的临时方案）改为真正写入系统剪贴板——新增 `expo-clipboard` 依赖（`Clipboard.setStringAsync`）；Web 端保持 `navigator.clipboard` + `execCommand` 兜底不变。
+  - 删除不再被引用的 `shareLink`（原来优先弹 `navigator.share` 系统面板），仅保留通用文本分享 `shareText`。
+- 三处「分享为链接」统一改为：`publishShare` 生成公开链接 → `copyText(url)` 自动复制 → toast 提示「已复制」：
+  - [message-actions.tsx](../apps/mobile/src/message-actions.tsx)（智能体对话「分享为链接」）：发布后复制，提示 `chat.sharePageCopied`。
+  - [briefing-card.tsx](../apps/mobile/src/briefing-card.tsx)（市场简报「分享简报」）：发布后复制，提示 `markets.briefingShareCopied`。
+  - [artifact-share.ts](../apps/mobile/src/artifact-share.ts)（资料报告「分享报告」）：`shareArtifactLink` 发布后复制，返回 `result: "copied"`，`artifact-actions.tsx` 直接提示已复制。
+
+**验证**
+
+- `apps/mobile` `pnpm typecheck` 中改动文件无诊断错误；`pnpm exec tsx --test` 跑 mobile + share 相关 397 例全过；biome lint 通过。
+- 注意：`pnpm typecheck` 存在一个与本次改动无关的既有错误（`prompt-composer.tsx:272` 的 `SetStateAction<52>` 字面量收窄问题），需单独处理。
+- 请在 `localhost:8081` 刷新后确认：三处分享按钮点击后生成链接并自动复制，toast 提示「分享链接已复制，可直接发送」。
+
 ### 2026-11-14 · 功能：智能体对话「我的资料」列出上传资料 + 全部对话分析产物
 
 **背景**

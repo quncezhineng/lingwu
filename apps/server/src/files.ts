@@ -7,6 +7,7 @@ import type { Auth } from "./auth.ts";
 import type { Config } from "./config.ts";
 import type { Store } from "./db.ts";
 import { AppError } from "./errors.ts";
+import { backgroundFailure } from "./log.ts";
 
 const FILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -290,6 +291,21 @@ export class Files {
       FILE_FORMATS[file.name.toLowerCase().split(".").pop() ?? ""]?.extension ??
       "pdf";
     return readFile(this.pathFor(id, extension));
+  }
+  /** 删除已上传的文件：先删数据库记录，再尽力清理磁盘上的物理文件。 */
+  async remove(owner: string, id: string): Promise<void> {
+    const file = await this.get(owner, id);
+    const extension =
+      definitionForMime(file.mimeType)?.extension ??
+      FILE_FORMATS[file.name.toLowerCase().split(".").pop() ?? ""]?.extension ??
+      "pdf";
+    // 记录先删：即使物理文件清理失败，用户侧也不会再看到这条「幽灵文件」。
+    await this.db.remove(owner, "files", id);
+    try {
+      await rm(this.pathFor(id, extension), { force: true });
+    } catch (error) {
+      backgroundFailure(`files.remove(${id})`, error);
+    }
   }
   async fill(
     owner: string,

@@ -51,7 +51,7 @@ import {
   todayISO,
   useBriefingState,
 } from "./market";
-import { shareLink } from "./message-share";
+import { copyText } from "./message-share";
 import { markdownPreviewDocument } from "./open-html-document";
 import { publishShare } from "./share-page";
 import { Button, Card, colors, DisclaimerNote, dateLabel, ErrorNotice, s, typography } from "./ui";
@@ -446,7 +446,7 @@ export function MarketBriefingCard({
     }
   };
 
-  /** 分享简报：与报告产物一致，发布成公开网页再把链接交给系统分享面板。 */
+  /** 分享简报：与报告产物一致，发布成公开网页并把链接自动复制到剪贴板。 */
   const share = async () => {
     if (!briefing) return;
     try {
@@ -454,10 +454,8 @@ export function MarketBriefingCard({
         question: `${briefing.date} · ${title}`,
         answer: briefingMarkdown(briefing, t, lead || t("markets.briefingFallbackLead")),
       });
-      const result = await shareLink(url, title);
-      notify(
-        t(result === "copied" ? "markets.briefingShareCopied" : "markets.briefingShareShared"),
-      );
+      await copyText(url);
+      notify(t("markets.briefingShareCopied"));
     } catch {
       notify(t("markets.briefingShareFailed"));
     }

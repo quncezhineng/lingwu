@@ -646,9 +646,12 @@ export function setLibrarySkillRef(
         (skill) =>
           skill.id !== id &&
           [skill.name, skill.purpose, skill.instructions, skill.outputFormat].join("\u0000") !==
-            [librarySkill.name, librarySkill.purpose, librarySkill.instructions, librarySkill.outputFormat].join(
-              "\u0000",
-            ),
+            [
+              librarySkill.name,
+              librarySkill.purpose,
+              librarySkill.instructions,
+              librarySkill.outputFormat,
+            ].join("\u0000"),
       )
     : target.customSkills.filter((skill) => skill.id !== id);
   if (
@@ -661,9 +664,7 @@ export function setLibrarySkillRef(
   return {
     ...state,
     agents: state.agents.map((agent) =>
-      agent.id === agentId
-        ? { ...agent, skillRefs: [...refs].slice(0, 60), customSkills }
-        : agent,
+      agent.id === agentId ? { ...agent, skillRefs: [...refs].slice(0, 60), customSkills } : agent,
     ),
   };
 }
@@ -677,7 +678,8 @@ export function collapseSkillEdits(edits: readonly SkillEdit[]): SkillEdit[] {
   const kept: SkillEdit[] = [];
   for (const edit of edits) {
     const index = kept.findIndex(
-      (item) => item.kind === edit.kind && item.agentId === edit.agentId && item.skillId === edit.skillId,
+      (item) =>
+        item.kind === edit.kind && item.agentId === edit.agentId && item.skillId === edit.skillId,
     );
     if (index >= 0) kept.splice(index, 1);
     kept.push(edit);
@@ -685,7 +687,10 @@ export function collapseSkillEdits(edits: readonly SkillEdit[]): SkillEdit[] {
   return kept;
 }
 
-export function applySkillEdits(state: AgentSpaceState, edits: readonly SkillEdit[]): AgentSpaceState {
+export function applySkillEdits(
+  state: AgentSpaceState,
+  edits: readonly SkillEdit[],
+): AgentSpaceState {
   return edits.reduce((current, edit) => {
     if (edit.kind === "catalog") {
       return setCatalogSkillInstalled(current, edit.agentId, edit.skillId, edit.installed);
