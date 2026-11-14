@@ -446,6 +446,7 @@ function WatchTable({
           flex: 1,
           minWidth: TABLE_TREND_MIN,
           textAlign: "center",
+          marginLeft: TABLE_GAP,
         })}
         {header(t("markets.tableActions"), {
           flex: 1,
@@ -539,7 +540,15 @@ function WatchTable({
             >
               {changePercent === undefined ? "—" : formatPercent(changePercent)}
             </Text>
-            <View style={{ flex: 1, minWidth: TABLE_TREND_MIN, alignItems: "center" }}>
+            <View
+              style={{
+                flex: 1,
+                minWidth: TABLE_TREND_MIN,
+                alignItems: "center",
+                // 走势：marginLeft 拉大与左边涨跌幅的间距。
+                marginLeft: TABLE_GAP,
+              }}
+            >
               <Sparkline points={quote?.sparkline} width={68} height={22} />
               {!quote?.sparkline && (
                 <Text style={{ fontSize: 10, color: colors.faint }}>
@@ -1572,12 +1581,14 @@ export function WatchlistScreen({
           alignItems: width >= 760 ? "flex-end" : "stretch",
           justifyContent: "space-between",
           gap: 12,
+          // 下间距放在外层，避免搜索框的内边距让它悬浮，导致与 tab 栏下框线不对齐。
+          marginBottom: 12,
         }}
       >
         <View style={{ flex: 1, minWidth: 0 }}>
           <SegmentedTabs counts={counts} active={marketFilter} onChange={setMarketFilter} />
         </View>
-        <View style={{ width: width >= 760 ? 280 : "100%", paddingBottom: 12 }}>
+        <View style={{ width: width >= 760 ? 280 : "100%" }}>
           <FilterSearch value={filterQuery} onChange={setFilterQuery} />
         </View>
       </View>

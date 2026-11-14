@@ -395,6 +395,7 @@ export function IconButton({
   size = sizing.controlMd,
   variant = "ghost",
   disabled = false,
+  style,
 }: {
   icon: IconComponent;
   label: string;
@@ -403,6 +404,8 @@ export function IconButton({
   size?: number;
   variant?: "ghost" | "outline" | "secondary";
   disabled?: boolean;
+  /** 附加样式，例如用 marginLeft: "auto" 把按钮推到行尾。 */
+  style?: ViewStyle;
 }) {
   return (
     <HoverPressable
@@ -421,6 +424,7 @@ export function IconButton({
         !disabled && variant === "ghost" && hovered && !pressed && s.iconButtonHover,
         focused && s.focusRing,
         { opacity: disabled ? 0.35 : 1 },
+        style,
       ]}
     >
       <Icon size={size >= sizing.controlLg ? 18 : 16} color={semantic.mutedForeground} />

@@ -132,7 +132,7 @@ const screens = {
   "screens.filesKindText": "Text",
   "screens.filesKindOther": "File",
   "screens.filesVisibleCount": "{count} files shown",
-  "screens.filesSelectedCount": "{count} files selected",
+  "screens.filesSelectedCount": "{count} items selected",
   "screens.filesClearSelection": "Clear selection",
   "screens.filesAttachSelected": "Add to analysis",
   "screens.filesAnalyze": "Add to analysis",

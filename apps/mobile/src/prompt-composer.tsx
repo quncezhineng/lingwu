@@ -72,7 +72,8 @@ export function PromptComposer({
   const [focused, setFocused] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [inputHeight, setInputHeight] = useState(inputMinHeight);
-  const [shellHeight, setShellHeight] = useState(composerMetrics.minHeight);
+  // 显式声明 number：composerMetrics 是 `as const`，直接推导会把状态锁成字面量 52。
+  const [shellHeight, setShellHeight] = useState<number>(composerMetrics.minHeight);
   const [inputHost, setInputHost] = useState<HTMLElement | null>(null);
   const composing = useRef(false);
   const compositionEndedAt = useRef(0);

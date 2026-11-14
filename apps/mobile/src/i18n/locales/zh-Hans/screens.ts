@@ -129,7 +129,7 @@ const screens = {
   "screens.filesKindText": "文本",
   "screens.filesKindOther": "文件",
   "screens.filesVisibleCount": "显示 {count} 个文件",
-  "screens.filesSelectedCount": "已选择 {count} 个文件",
+  "screens.filesSelectedCount": "已选择 {count} 项资料",
   "screens.filesClearSelection": "取消选择",
   "screens.filesAttachSelected": "投入分析",
   "screens.filesAnalyze": "投入分析",

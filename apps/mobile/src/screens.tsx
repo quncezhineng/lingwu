@@ -1138,7 +1138,10 @@ export function FilesScreen({
     (total, group) => total + group.artifacts.length,
     0,
   );
+  // 选中集合同时覆盖「我上传的文件」与「智能体产出的报告」：两者都能投入对话。
   const selectedFiles = library.files.filter((file) => selectedIds.has(file.id));
+  const selectedArtifacts = library.artifacts.filter((artifact) => selectedIds.has(artifact.id));
+  const selectedCount = selectedFiles.length + selectedArtifacts.length;
   const filtersActive = sourceFilter !== "all" || formatFilter !== "all" || query.trim().length > 0;
   const compact = width < breakpoints.mobile;
   // 资料库可能是整页、也可能挂在全屏浮层里，两种容器宽度不同：用实测宽度决定栅格列数。
@@ -1196,13 +1199,13 @@ export function FilesScreen({
     });
   }
 
-  /** 投入分析只把文件与提示词预填进对话框，是否开始由用户确认。 */
-  function analyzeFiles(files: readonly Artifact[]) {
-    if (!files.length) return;
-    prefillPrompt(
-      t("screens.filesAnalyzePrompt"),
-      files.map((file) => file.id),
-    );
+  /**
+   * 投入分析只把资料与提示词预填进对话框，是否开始由用户确认。
+   * 入参是 id 集合，因此上传文件与智能体报告可以混选后一起带进对话。
+   */
+  function attachToChat(ids: readonly string[]) {
+    if (!ids.length) return;
+    prefillPrompt(t("screens.filesAnalyzePrompt"), ids);
     setSelectedIds(new Set());
     onOpenChat?.();
   }
@@ -1540,7 +1543,7 @@ export function FilesScreen({
             {!compact && <Plus size={15} color={colors.faint} />}
           </Pressable>
 
-          {!!selectedFiles.length && (
+          {selectedCount > 0 && (
             <View
               style={[
                 s.row,
@@ -1557,7 +1560,7 @@ export function FilesScreen({
               ]}
             >
               <Text style={[s.text, { fontSize: 13, fontWeight: "500", flex: 1, minWidth: 140 }]}>
-                {t("screens.filesSelectedCount", { count: selectedFiles.length })}
+                {t("screens.filesSelectedCount", { count: selectedCount })}
               </Text>
               <Button
                 small
@@ -1571,7 +1574,12 @@ export function FilesScreen({
                 small
                 icon={Sparkles}
                 style={{ minHeight: compact ? 44 : 34 }}
-                onPress={() => analyzeFiles(selectedFiles)}
+                onPress={() =>
+                  attachToChat([
+                    ...selectedFiles.map((file) => file.id),
+                    ...selectedArtifacts.map((artifact) => artifact.id),
+                  ])
+                }
               >
                 {t("screens.filesAttachSelected")}
               </Button>
@@ -1716,7 +1724,7 @@ export function FilesScreen({
                           small
                           icon={Sparkles}
                           style={{ minHeight: compact ? 40 : 32 }}
-                          onPress={() => analyzeFiles([file])}
+                          onPress={() => attachToChat([file.id])}
                         >
                           {t("screens.filesAnalyze")}
                         </Button>
@@ -1738,11 +1746,19 @@ export function FilesScreen({
                 </Text>
               </View>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
-                {group.artifacts.map((artifact) => (
-                  <View key={artifact.id} style={{ flexGrow: 1, flexBasis: 260, maxWidth: 520 }}>
-                    <ArtifactCard artifact={artifact} />
-                  </View>
-                ))}
+                {group.artifacts.map((artifact) => {
+                  const selected = selectedIds.has(artifact.id);
+                  return (
+                    // 与上传文件卡片共用同一套栅格宽度，两栏资料的卡片边缘能对齐。
+                    <View key={artifact.id} style={{ width: fileCardWidth }}>
+                      <ArtifactCard
+                        artifact={artifact}
+                        selected={selected}
+                        onToggleSelect={() => toggleSelection(artifact.id)}
+                      />
+                    </View>
+                  );
+                })}
               </View>
             </View>
           ))}

@@ -17,11 +17,11 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Text } from "./app-text";
-import { useTranslation } from "./i18n";
+import { activeLocaleTag, useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import { AlertTriangle, CircleDollarSign, MoreHorizontal, Plus, RefreshCw, Upload } from "./icons";
 import { metaFor } from "./market";
-import { directionOf, formatPercent, formatPrice } from "./market-format";
+import { currencySymbol, directionOf, formatPercent, formatPrice } from "./market-format";
 import { ModalOverlay } from "./modal-overlay";
 import {
   activePortfolio,
@@ -95,8 +95,20 @@ const QUOTE_ERROR_KEYS: Record<string, TranslationKey> = {
   provider_error: "portfolio.errorProvider",
 };
 
+/**
+ * 金额展示：百万级以上改用「万 / 亿」（英文 K / M / B），小额保留两位小数。
+ *
+ * 概览主数字与表格金额列都用它，避免 ¥237,700,000.00 这类长数字
+ * 在窄卡片里折成两三行、把版式撑破；精确值在持仓详情里再看。
+ */
 function formatMoney(value: number | undefined, currency: Currency) {
-  return value === undefined ? "—" : formatPrice(value, currency);
+  if (value === undefined) return "—";
+  if (Math.abs(value) < 1_000_000) return formatPrice(value, currency);
+  const text = new Intl.NumberFormat(activeLocaleTag(), {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value);
+  return `${currencySymbol(currency)}${text}`;
 }
 
 function quoteErrorLabel(error: string | undefined, t: (key: TranslationKey) => string) {
@@ -172,13 +184,34 @@ function SegmentedChips<T extends string>({
   );
 }
 
+/** 概览卡里的次级指标：标签在上、数值在下，两三格并排成一条扫读带。 */
+function Kpi({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <Text style={[s.small, { color: colors.faint }]} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text
+        numberOfLines={1}
+        style={[
+          s.metric,
+          { fontSize: 15, lineHeight: 21, fontWeight: "600", color: color ?? colors.text },
+        ]}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 /**
- * 组合概览：一个视觉锚点。
+ * 组合概览卡：一个视觉锚点 + 一条次要指标带。
  *
- * 市值做主数字、浮动盈亏紧跟其右并用轻底标签强调比例，
- * 成本与覆盖情况降级为次要行，避免三块同等重量的指标互相抢焦点。
+ * 市值做主数字（百万级以上走紧凑单位，绝不换行），收益率做成轻底标签贴在右侧；
+ * 成本与浮动盈亏并排成 KPI 带，覆盖情况降级成底部小字。
+ * 整卡控制在 ~150px 高，让两个币种的概览能在同一屏内并排读完。
  */
-function SummaryHero({ group, desktop }: { group: CurrencyGroup; desktop: boolean }) {
+function OverviewCard({ group, desktop }: { group: CurrencyGroup; desktop: boolean }) {
   const { t } = useTranslation();
   const pnlDirection = directionOf(group.pnl);
   const pnlColor = marketDirectionColor(pnlDirection);
@@ -193,87 +226,97 @@ function SummaryHero({ group, desktop }: { group: CurrencyGroup; desktop: boolea
   return (
     <View
       style={{
+        flexBasis: desktop ? 260 : "100%",
+        flexGrow: 1,
+        flexShrink: 1,
         borderRadius: radius.composer,
         borderWidth: 1,
         borderColor: colors.line,
         backgroundColor: colors.paper,
-        padding: desktop ? 22 : 16,
-        gap: 16,
+        padding: desktop ? 18 : 16,
+        gap: 12,
       }}
     >
-      <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-        <Text style={[s.label, { color: colors.muted }]}>{group.currency}</Text>
+      <View style={[s.row, { gap: 8 }]}>
+        <View
+          style={{
+            paddingHorizontal: 7,
+            paddingVertical: 1,
+            borderRadius: radius.small,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: colors.paper,
+          }}
+        >
+          <Text
+            style={[
+              s.metric,
+              { fontSize: 11, lineHeight: 16, fontWeight: "600", color: colors.heading },
+            ]}
+          >
+            {group.currency}
+          </Text>
+        </View>
         <Chip>{t("portfolio.notConverted")}</Chip>
-        <View style={{ flex: 1, minWidth: 8 }} />
-        <Text style={[s.small, { color: colors.faint }]}>
+        <View style={{ flex: 1, minWidth: 4 }} />
+        <Text style={[s.small, { color: colors.faint }]} numberOfLines={1}>
           {t("portfolio.holdingsCount", { count: group.totalCount })}
         </Text>
       </View>
 
-      <View
-        style={{
-          flexDirection: desktop ? "row" : "column",
-          alignItems: desktop ? "flex-end" : "stretch",
-          gap: desktop ? 32 : 14,
-        }}
-      >
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text style={s.small}>{t("portfolio.metricsMarketValue")}</Text>
+      <View style={{ gap: 2 }}>
+        <Text style={[s.small, { color: colors.faint }]}>{t("portfolio.metricsMarketValue")}</Text>
+        <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
           <Text
+            numberOfLines={1}
             style={[
               s.metric,
               {
-                fontSize: desktop ? 34 : 28,
-                lineHeight: desktop ? 42 : 36,
+                fontSize: desktop ? 26 : 24,
+                lineHeight: desktop ? 34 : 32,
                 fontWeight: "600",
                 color: colors.text,
+                flexShrink: 1,
               },
             ]}
           >
             {formatMoney(group.marketValue, group.currency)}
           </Text>
-          <Text style={[s.small, { color: colors.faint }]}>
-            {t("portfolio.heroCost", { value: formatMoney(group.cost, group.currency) })}
-          </Text>
-        </View>
-
-        <View style={{ gap: 4, alignItems: desktop ? "flex-end" : "flex-start" }}>
-          <Text style={s.small}>{t("portfolio.metricsPnl")}</Text>
-          <View style={[s.row, { gap: 10, flexWrap: "wrap" }]}>
-            <Text
-              style={[
-                s.metric,
-                {
-                  fontSize: desktop ? 24 : 20,
-                  lineHeight: desktop ? 32 : 28,
-                  fontWeight: "600",
-                  color: pnlColor,
-                },
-              ]}
+          {group.pnlPct !== undefined && (
+            <View
+              style={{
+                paddingHorizontal: 7,
+                paddingVertical: 2,
+                borderRadius: radius.control,
+                backgroundColor: pnlSurface,
+              }}
             >
-              {formatMoney(group.pnl, group.currency)}
-            </Text>
-            {group.pnlPct !== undefined && (
-              <View
-                style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: radius.control,
-                  backgroundColor: pnlSurface,
-                }}
+              <Text
+                style={[
+                  s.metric,
+                  { fontSize: 11, lineHeight: 16, fontWeight: "600", color: pnlColor },
+                ]}
               >
-                <Text style={[s.metric, { fontSize: 12, fontWeight: "600", color: pnlColor }]}>
-                  {formatPercent(group.pnlPct)}
-                </Text>
-              </View>
-            )}
-          </View>
+                {formatPercent(group.pnlPct)}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
       <View style={{ height: 1, backgroundColor: colors.lineSoft }} />
 
-      <View style={{ gap: 4 }}>
+      <View style={[s.row, { gap: 14, alignItems: "flex-start" }]}>
+        <Kpi label={t("portfolio.metricsCost")} value={formatMoney(group.cost, group.currency)} />
+        <View style={{ width: 1, alignSelf: "stretch", backgroundColor: colors.lineSoft }} />
+        <Kpi
+          label={t("portfolio.metricsPnl")}
+          value={formatMoney(group.pnl, group.currency)}
+          color={pnlColor}
+        />
+      </View>
+
+      <View style={{ gap: 3 }}>
         <Text
           style={[
             s.small,
@@ -293,7 +336,7 @@ function SummaryHero({ group, desktop }: { group: CurrencyGroup; desktop: boolea
           </Text>
         )}
         {group.totalCount > 0 && group.pricedCount === 0 && (
-          <Text style={s.small}>{t("portfolio.noPriced")}</Text>
+          <Text style={[s.small, { color: colors.faint }]}>{t("portfolio.noPriced")}</Text>
         )}
       </View>
     </View>
@@ -302,44 +345,40 @@ function SummaryHero({ group, desktop }: { group: CurrencyGroup; desktop: boolea
 
 type RiskMetric = { label: string; value: string; hint?: string; color?: string };
 
-/** 指标条单元格：桌面四列、移动 2×2，用细分割线代替四张独立卡片。 */
+/** 指标条单元格：桌面四列、移动 2×2，只用细分割线分隔，不再各自套一层卡片。 */
 function stripCellStyle(desktop: boolean, index: number): ViewStyle {
   const columns = desktop ? 4 : 2;
+  const secondRow = Math.floor(index / columns) > 0;
+  const firstInRow = index % columns === 0;
+  const lastInRow = index % columns === columns - 1;
   return {
     flexBasis: desktop ? "25%" : "50%",
     flexGrow: 1,
-    paddingHorizontal: desktop ? 18 : 14,
-    paddingVertical: desktop ? 16 : 14,
-    gap: 4,
-    borderLeftWidth: index % columns ? 1 : 0,
+    paddingLeft: firstInRow ? 0 : 14,
+    paddingRight: lastInRow ? 0 : 14,
+    paddingTop: secondRow ? 12 : 0,
+    paddingBottom: secondRow ? 0 : 12,
+    gap: 3,
+    borderLeftWidth: firstInRow ? 0 : 1,
     borderLeftColor: colors.lineSoft,
-    borderTopWidth: Math.floor(index / columns) ? 1 : 0,
+    borderTopWidth: secondRow ? 1 : 0,
     borderTopColor: colors.lineSoft,
   };
 }
 
 function RiskStrip({ metrics, desktop }: { metrics: RiskMetric[]; desktop: boolean }) {
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        flexWrap: "wrap",
-        borderWidth: 1,
-        borderColor: colors.line,
-        borderRadius: radius.composer,
-        backgroundColor: colors.paper,
-        overflow: "hidden",
-      }}
-    >
+    <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
       {metrics.map((metric, index) => (
         <View key={metric.label} style={stripCellStyle(desktop, index)}>
           <Text style={[s.small, { fontSize: 11, color: colors.faint }]}>{metric.label}</Text>
           <Text
+            numberOfLines={1}
             style={[
               s.metric,
               {
-                fontSize: 20,
-                lineHeight: 26,
+                fontSize: desktop ? 19 : 18,
+                lineHeight: 25,
                 fontWeight: "600",
                 color: metric.color ?? colors.text,
               },
@@ -358,14 +397,17 @@ function RiskStrip({ metrics, desktop }: { metrics: RiskMetric[]; desktop: boole
   );
 }
 
-/** 收益对比的读数格子：标签在上、数值在下，三格并排成一条扫读带。 */
+/** 收益读数行：标签在左、数值在右，三行叠成一条与曲线等高的扫读列。 */
 function PerformanceStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <View style={{ gap: 3, minWidth: 92 }}>
-      <Text style={[s.small, { color: colors.faint }]} numberOfLines={1}>
+    <View style={[s.between, { gap: 12, minHeight: 26 }]}>
+      <Text style={[s.small, { flexShrink: 1 }]} numberOfLines={1}>
         {label}
       </Text>
-      <Text style={[s.metric, { fontSize: 17, lineHeight: 24, fontWeight: "600", color }]}>
+      <Text
+        numberOfLines={1}
+        style={[s.metric, { fontSize: 15, lineHeight: 22, fontWeight: "600", color }]}
+      >
         {value}
       </Text>
     </View>
@@ -446,186 +488,189 @@ function RiskSection({
     },
   ];
 
+  const pad = desktop ? 18 : 14;
+
+  const body = loading ? (
+    <View
+      style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: pad, paddingTop: pad }}
+    >
+      {[0, 1, 2, 3].map((index) => (
+        <View key={index} style={stripCellStyle(desktop, index)}>
+          <View
+            style={{ height: 9, width: "50%", borderRadius: 4, backgroundColor: colors.tertiary }}
+          />
+          <View
+            style={{ height: 17, width: "70%", borderRadius: 4, backgroundColor: colors.tertiary }}
+          />
+        </View>
+      ))}
+    </View>
+  ) : pricedIncomplete ? (
+    <View style={{ padding: pad }}>
+      <Text style={[s.small, { color: colors.alertVolumeText }]}>
+        {t("portfolio.insufficientData")} ·{" "}
+        {t("portfolio.pricedCount", { priced: group.pricedCount, total: group.totalCount })}
+      </Text>
+    </View>
+  ) : !risk ? (
+    <View style={{ padding: pad, gap: 10 }}>
+      <Text style={s.small}>{t("portfolio.riskUnavailable")}</Text>
+      <Button
+        small
+        icon={RefreshCw}
+        hitSlop={6}
+        onPress={onRetry}
+        style={desktop ? { alignSelf: "flex-start" } : { minHeight: 44, alignSelf: "flex-start" }}
+      >
+        {t("portfolio.retry")}
+      </Button>
+    </View>
+  ) : (
+    <View style={{ paddingHorizontal: pad, paddingTop: pad }}>
+      <RiskStrip metrics={metrics} desktop={desktop} />
+    </View>
+  );
+
   return (
     <View style={{ gap: 12 }}>
-      <View style={[s.between, { gap: 10, flexWrap: "wrap" }]}>
-        <Text style={[s.heading, { fontSize: 15 }]}>
-          {t("portfolio.riskTitle", { currency: group.currency })}
-        </Text>
-        <View style={[s.row, { gap: 12 }]}>
-          <Text style={[s.small, { color: colors.faint }]}>{t("portfolio.riskPeriod")}</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onExplain}
-            hitSlop={desktop ? 6 : undefined}
-            style={{ minHeight: desktop ? 30 : 44, justifyContent: "center" }}
-          >
-            <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
-              {t("portfolio.riskExplain")}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {loading ? (
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            borderWidth: 1,
-            borderColor: colors.line,
-            borderRadius: radius.composer,
-            backgroundColor: colors.paper,
-            overflow: "hidden",
-          }}
-        >
-          {[0, 1, 2, 3].map((index) => (
-            <View key={index} style={stripCellStyle(desktop, index)}>
-              <View
-                style={{
-                  height: 9,
-                  width: "50%",
-                  borderRadius: 4,
-                  backgroundColor: colors.tertiary,
-                }}
-              />
-              <View
-                style={{
-                  height: 17,
-                  width: "70%",
-                  borderRadius: 4,
-                  backgroundColor: colors.tertiary,
-                }}
-              />
-            </View>
-          ))}
-        </View>
-      ) : pricedIncomplete ? (
-        <Card style={{ padding: 14 }}>
-          <Text style={[s.small, { color: colors.alertVolumeText }]}>
-            {t("portfolio.insufficientData")} ·{" "}
-            {t("portfolio.pricedCount", { priced: group.pricedCount, total: group.totalCount })}
-          </Text>
-        </Card>
-      ) : !risk ? (
-        <Card style={{ padding: 14, gap: 10 }}>
-          <Text style={s.small}>{t("portfolio.riskUnavailable")}</Text>
-          <Button
-            small
-            icon={RefreshCw}
-            hitSlop={6}
-            onPress={onRetry}
-            style={
-              desktop ? { alignSelf: "flex-start" } : { minHeight: 44, alignSelf: "flex-start" }
-            }
-          >
-            {t("portfolio.retry")}
-          </Button>
-        </Card>
-      ) : (
-        <RiskStrip metrics={metrics} desktop={desktop} />
-      )}
-
-      {showReturns && !!risk && (
-        <View
-          style={{
-            borderRadius: radius.composer,
-            borderWidth: 1,
-            borderColor: colors.line,
-            backgroundColor: colors.paper,
-            padding: desktop ? 18 : 14,
-            gap: 16,
-          }}
-        >
-          <View style={[s.between, { gap: 12, flexWrap: "wrap" }]}>
-            <Text style={[s.text, { fontSize: 14, fontWeight: "600" }]}>
-              {t("portfolio.returnsTitle")}
-            </Text>
-            <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
-              <Text style={[s.small, { color: colors.faint }]}>{t("portfolio.benchmark")}</Text>
-              <SegmentedChips
-                compact={desktop}
-                items={BENCHMARKS[group.currency].map((item) => ({
-                  id: item.id,
-                  label: t(item.labelKey),
-                }))}
-                selected={benchmark}
-                onSelect={onBenchmark}
-              />
-            </View>
-          </View>
-
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: desktop ? 36 : 22 }}>
-            <PerformanceStat
-              label={t("portfolio.chartPortfolio")}
-              value={rangeReturn === undefined ? "—" : formatPercent(rangeReturn)}
-              color={
-                rangeReturn === undefined
-                  ? colors.faint
-                  : marketDirectionColor(directionOf(rangeReturn))
-              }
-            />
-            <PerformanceStat
-              label={
-                benchmarkMatches
-                  ? `${t("portfolio.chartBenchmark")} · ${benchmarkName}`
-                  : t("portfolio.chartBenchmark")
-              }
-              value={
-                benchmarkMatches && benchmarkReturn !== undefined
-                  ? formatPercent(benchmarkReturn)
-                  : "—"
-              }
-              color={
-                benchmarkMatches && benchmarkReturn !== undefined
-                  ? marketDirectionColor(directionOf(benchmarkReturn))
-                  : colors.faint
-              }
-            />
-            <PerformanceStat
-              label={t("portfolio.excess")}
-              value={excess === undefined ? "—" : `${excess > 0 ? "+" : ""}${excess.toFixed(1)}pp`}
-              color={
-                excess === undefined ? colors.faint : marketDirectionColor(directionOf(excess))
-              }
-            />
-          </View>
-
-          {benchmarkMatches ? (
-            benchmarkReturn === undefined ? (
-              <Text style={[s.small, { color: colors.faint }]}>
-                {t("portfolio.benchmarkReturnMissing")}
+      <SectionHeading
+        title={t("portfolio.riskHeading")}
+        actions={
+          <View style={[s.row, { gap: 12 }]}>
+            <Text style={[s.small, { color: colors.faint }]}>{t("portfolio.riskPeriod")}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onExplain}
+              hitSlop={desktop ? 6 : undefined}
+              style={{ minHeight: desktop ? 30 : 44, justifyContent: "center" }}
+            >
+              <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
+                {t("portfolio.riskExplain")}
               </Text>
-            ) : null
-          ) : (
-            <Text style={[s.small, { color: colors.faint }]}>
-              {t("portfolio.benchmarkDataUnavailable")}
-            </Text>
-          )}
+            </Pressable>
+          </View>
+        }
+        style={{ marginBottom: 0 }}
+      />
 
-          <ReturnComparisonChart
-            series={risk.series}
-            benchmarkName={benchmarkName}
-            loading={false}
-            emptyLabel={t("portfolio.chartEmpty")}
-            tableLabel={t("portfolio.chartTable")}
-            chartLabel={t("portfolio.chartLabel", {
-              portfolio: rangeReturn === undefined ? "—" : formatPercent(rangeReturn),
-              benchmark: benchmarkName,
-              benchmarkReturn: benchmarkReturn === undefined ? "—" : formatPercent(benchmarkReturn),
-              excess: `${(excess ?? 0).toFixed(1)}`,
-            })}
-            labels={{
-              portfolio: t("portfolio.chartPortfolio"),
-              benchmark: t("portfolio.chartBenchmark"),
-              date: t("portfolio.chartDate"),
-            }}
-          />
-          <Text style={[s.small, { fontSize: 10, color: colors.faint }]}>
-            {t("portfolio.chartNormalized")}
-          </Text>
-        </View>
-      )}
+      <View
+        style={{
+          borderRadius: radius.composer,
+          borderWidth: 1,
+          borderColor: colors.line,
+          backgroundColor: colors.paper,
+          paddingBottom: pad,
+        }}
+      >
+        {body}
+
+        {showReturns && !!risk && (
+          <View style={{ paddingHorizontal: pad, paddingTop: 14, gap: 14 }}>
+            <View style={{ height: 1, backgroundColor: colors.lineSoft }} />
+            <View style={[s.between, { gap: 10, flexWrap: "wrap" }]}>
+              <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]}>
+                {t("portfolio.returnsTitle")}
+              </Text>
+              <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
+                <Text style={[s.small, { color: colors.faint }]}>{t("portfolio.benchmark")}</Text>
+                <SegmentedChips
+                  compact={desktop}
+                  items={BENCHMARKS[group.currency].map((item) => ({
+                    id: item.id,
+                    label: t(item.labelKey),
+                  }))}
+                  selected={benchmark}
+                  onSelect={onBenchmark}
+                />
+              </View>
+            </View>
+
+            <View
+              style={{
+                flexDirection: desktop ? "row" : "column",
+                gap: desktop ? 28 : 16,
+                alignItems: desktop ? "flex-start" : "stretch",
+              }}
+            >
+              <View style={{ width: desktop ? 208 : "100%", gap: 8 }}>
+                <PerformanceStat
+                  label={t("portfolio.chartPortfolio")}
+                  value={rangeReturn === undefined ? "—" : formatPercent(rangeReturn)}
+                  color={
+                    rangeReturn === undefined
+                      ? colors.faint
+                      : marketDirectionColor(directionOf(rangeReturn))
+                  }
+                />
+                <PerformanceStat
+                  label={
+                    benchmarkMatches
+                      ? `${t("portfolio.chartBenchmark")} · ${benchmarkName}`
+                      : t("portfolio.chartBenchmark")
+                  }
+                  value={
+                    benchmarkMatches && benchmarkReturn !== undefined
+                      ? formatPercent(benchmarkReturn)
+                      : "—"
+                  }
+                  color={
+                    benchmarkMatches && benchmarkReturn !== undefined
+                      ? marketDirectionColor(directionOf(benchmarkReturn))
+                      : colors.faint
+                  }
+                />
+                <PerformanceStat
+                  label={t("portfolio.excess")}
+                  value={
+                    excess === undefined ? "—" : `${excess > 0 ? "+" : ""}${excess.toFixed(1)}pp`
+                  }
+                  color={
+                    excess === undefined ? colors.faint : marketDirectionColor(directionOf(excess))
+                  }
+                />
+              </View>
+
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <ReturnComparisonChart
+                  series={risk.series}
+                  benchmarkName={benchmarkName}
+                  loading={false}
+                  emptyLabel={t("portfolio.chartEmpty")}
+                  tableLabel={t("portfolio.chartTable")}
+                  chartLabel={t("portfolio.chartLabel", {
+                    portfolio: rangeReturn === undefined ? "—" : formatPercent(rangeReturn),
+                    benchmark: benchmarkName,
+                    benchmarkReturn:
+                      benchmarkReturn === undefined ? "—" : formatPercent(benchmarkReturn),
+                    excess: `${(excess ?? 0).toFixed(1)}`,
+                  })}
+                  labels={{
+                    portfolio: t("portfolio.chartPortfolio"),
+                    benchmark: t("portfolio.chartBenchmark"),
+                    date: t("portfolio.chartDate"),
+                  }}
+                />
+              </View>
+            </View>
+
+            {benchmarkMatches ? (
+              benchmarkReturn === undefined ? (
+                <Text style={[s.small, { color: colors.faint }]}>
+                  {t("portfolio.benchmarkReturnMissing")}
+                </Text>
+              ) : null
+            ) : (
+              <Text style={[s.small, { color: colors.faint }]}>
+                {t("portfolio.benchmarkDataUnavailable")}
+              </Text>
+            )}
+
+            <Text style={[s.small, { fontSize: 10, color: colors.faint }]}>
+              {t("portfolio.chartNormalized")}
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -723,9 +768,9 @@ function AllocationSection({
               <View
                 key={slice.key}
                 style={{
-                  flexBasis: desktop ? "30%" : "46%",
+                  flexBasis: desktop ? "23%" : "46%",
                   flexGrow: 1,
-                  minWidth: 130,
+                  minWidth: 120,
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 7,
@@ -865,10 +910,15 @@ function HoldingsSection({
           <View
             style={[
               s.row,
-              { minHeight: 36, paddingHorizontal: 10, backgroundColor: colors.surface },
+              {
+                minHeight: 36,
+                paddingHorizontal: 10,
+                gap: 12,
+                backgroundColor: colors.surface,
+              },
             ]}
           >
-            <Text style={[s.small, { flex: 1, minWidth: 150 }]}>
+            <Text style={[s.small, { flex: 1, minWidth: 150, maxWidth: 200 }]}>
               {t("portfolio.holdingSymbol")}
             </Text>
             <Text style={[s.small, { width: 84, textAlign: "right" }]}>
@@ -886,10 +936,14 @@ function HoldingsSection({
             <Text style={[s.small, { width: 112, textAlign: "right" }]}>
               {t("portfolio.metricsPnl")}
             </Text>
-            <Text style={[s.small, { width: 64, textAlign: "right" }]}>
+            {/* 占比：marginLeft 12 拉开与浮动盈亏的间距（操作列贴最右，不受影响）。*/}
+            <Text style={[s.small, { width: 64, textAlign: "right", marginLeft: 12 }]}>
               {t("portfolio.sortByWeight")}
             </Text>
-            <View style={{ width: 40 }} />
+            {/* 操作列：marginLeft auto 推到表格最右，与数据行操作按钮对齐。*/}
+            <Text style={[s.small, { width: 40, textAlign: "center", marginLeft: "auto" }]}>
+              {t("portfolio.actions")}
+            </Text>
           </View>
           {positions.map((position, index) => (
             <View
@@ -899,7 +953,7 @@ function HoldingsSection({
                 {
                   minHeight: 48,
                   paddingHorizontal: 10,
-                  gap: 6,
+                  gap: 12,
                   borderTopWidth: index ? 1 : 0,
                   borderTopColor: colors.line,
                 },
@@ -908,7 +962,7 @@ function HoldingsSection({
               <Pressable
                 accessibilityRole="button"
                 onPress={() => onOpen(position)}
-                style={{ flex: 1, minWidth: 150 }}
+                style={{ flex: 1, minWidth: 150, maxWidth: 200 }}
               >
                 <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]} numberOfLines={1}>
                   {position.symbolCode}
@@ -967,13 +1021,15 @@ function HoldingsSection({
                   {position.pnlPct === undefined ? "—" : formatPercent(position.pnlPct)}
                 </Text>
               </View>
-              <Text style={[s.metric, s.small, { width: 64, textAlign: "right" }]}>
+              <Text style={[s.metric, s.small, { width: 64, textAlign: "right", marginLeft: 12 }]}>
                 {position.weight === undefined ? "—" : `${position.weight.toFixed(1)}%`}
               </Text>
+              {/* 操作列：marginLeft auto 推到表格最右，与表头操作列对齐。*/}
               <IconButton
                 icon={MoreHorizontal}
                 label={t("portfolio.portfolioMenu")}
                 size={40}
+                style={{ marginLeft: "auto" }}
                 onPress={() => onMenu(position)}
               />
             </View>
@@ -1226,8 +1282,15 @@ export function PortfolioScreen({ embedded = false }: { embedded?: boolean } = {
     );
   }
 
+  const updatedLabel =
+    state.summaryStatus === "loading"
+      ? t("portfolio.refreshing")
+      : refreshedAt
+        ? t("portfolio.updatedAt", { time: new Date(refreshedAt).toLocaleTimeString() })
+        : "";
+
   return (
-    <View style={{ gap: 20 }}>
+    <View style={{ gap: desktop ? 28 : 24 }}>
       <View style={[s.between, { gap: 10, flexWrap: "wrap" }]}>
         <View style={[s.row, { gap: 8, flexWrap: "wrap", flex: 1 }]}>
           <SegmentedChips
@@ -1294,16 +1357,51 @@ export function PortfolioScreen({ embedded = false }: { embedded?: boolean } = {
         </Empty>
       )}
 
-      <View style={{ flexDirection: desktop ? "row" : "column", gap: 14 }}>
-        {groups.map((group) => (
-          <View key={`overview-${group.currency}`} style={{ flex: 1 }}>
-            <SummaryHero group={group} desktop={desktop} />
+      {/* 第一层：总览。各币种并排成一张矮卡，一眼读完市值 / 盈亏 / 成本。*/}
+      {groups.length > 0 && (
+        <View style={{ gap: 12 }}>
+          <SectionHeading
+            title={t("portfolio.overviewTitle")}
+            actions={
+              !!updatedLabel && (
+                <Text style={[s.small, { color: colors.faint }]}>{updatedLabel}</Text>
+              )
+            }
+            style={{ marginBottom: 0 }}
+          />
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+            {groups.map((group) => (
+              <OverviewCard key={group.currency} group={group} desktop={desktop} />
+            ))}
           </View>
-        ))}
-      </View>
+        </View>
+      )}
 
-      {groups.map((group) => (
-        <View key={group.currency} style={{ gap: 24 }}>
+      {/* 第二层：明细。每个币种一个分区，分区之间用一条细线 + 更大留白断开。*/}
+      {groups.map((group, index) => (
+        <View
+          key={group.currency}
+          style={{
+            gap: 18,
+            paddingTop: index ? 26 : 0,
+            borderTopWidth: index ? 1 : 0,
+            borderTopColor: colors.line,
+          }}
+        >
+          <View style={[s.between, { gap: 10, flexWrap: "wrap" }]}>
+            <Text style={[s.heading, { fontSize: 15 }]}>
+              {t("portfolio.groupTitle", { currency: group.currency })}
+            </Text>
+            {(group.pricedCount < group.totalCount || group.unvaluedCount > 0) && (
+              <Text style={[s.small, { color: colors.alertVolumeText }]}>
+                {t("portfolio.pricedCount", {
+                  priced: group.pricedCount,
+                  total: group.totalCount,
+                })}
+              </Text>
+            )}
+          </View>
+
           <RiskSection
             group={group}
             benchmark={benchmarks[group.currency]}
@@ -1331,13 +1429,6 @@ export function PortfolioScreen({ embedded = false }: { embedded?: boolean } = {
         </View>
       ))}
 
-      <Text style={[s.small, { textAlign: "right" }]}>
-        {state.summaryStatus === "loading"
-          ? t("portfolio.refreshing")
-          : refreshedAt
-            ? t("portfolio.updatedAt", { time: new Date(refreshedAt).toLocaleTimeString() })
-            : ""}
-      </Text>
       {!embedded ? <DisclaimerNote /> : null}
 
       {createOpen && (

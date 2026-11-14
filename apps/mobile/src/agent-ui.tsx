@@ -39,6 +39,7 @@ import {
   Brain,
   CalendarClock,
   CalendarDays,
+  Check,
   ChevronRight,
   CircleDollarSign,
   Clock3,
@@ -970,7 +971,24 @@ export function TaskDetail({ taskId }: { taskId: string }) {
     </Sheet>
   );
 }
-export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
+/**
+ * 研究产物卡片。
+ *
+ * 传入 `onToggleSelect` 时左侧长出勾选框，与「我的资料」里的上传文件卡片同一套
+ * 选择语汇：勾选后可以一起投入对话分析；未传入时就是一张纯打开详情的卡。
+ */
+export function ArtifactCard({
+  artifact,
+  selected = false,
+  onToggleSelect,
+  selectLabel,
+}: {
+  artifact: AgentArtifact;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+  /** 勾选框的无障碍标签（默认回落到产物标题）。 */
+  selectLabel?: string;
+}) {
   const { t } = useTranslation();
   const { open } = useWorkspace();
   const Icon = artifact.kind === "finance" ? CircleDollarSign : FileText;
@@ -981,37 +999,66 @@ export function ArtifactCard({ artifact }: { artifact: AgentArtifact }) {
       style={{
         width: "100%",
         maxWidth: 520,
+        padding: onToggleSelect ? 12 : 0,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: colors.line,
-        backgroundColor: colors.paper,
+        borderColor: selected ? colors.primary : colors.line,
+        backgroundColor: selected ? colors.sky : colors.paper,
         overflow: "hidden",
       }}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={artifact.title}
-        onPress={() => open({ type: "artifact", artifact })}
-        style={({ pressed }) => [
-          { padding: 12, gap: 6 },
-          pressed && { backgroundColor: colors.overlay1 },
-        ]}
-      >
-        <View style={[s.row, { gap: 10 }]}>
-          <View style={[s.glyph, { width: 34, height: 34, backgroundColor: colors.surface }]}>
-            <Icon size={16} color={colors.primary} />
+      <View style={{ flexDirection: "row", alignItems: "stretch", gap: 10 }}>
+        {onToggleSelect && (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityLabel={
+              selectLabel ?? t("screens.filesSelectLabel", { name: artifact.title })
+            }
+            accessibilityState={{ checked: selected }}
+            onPress={onToggleSelect}
+            style={{ width: 32, minHeight: 40, alignItems: "center", justifyContent: "center" }}
+          >
+            <View
+              style={{
+                width: 18,
+                height: 18,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: radius.badge,
+                borderWidth: 1,
+                borderColor: selected ? colors.primary : colors.lineStrong,
+                backgroundColor: selected ? colors.primary : colors.paper,
+              }}
+            >
+              {selected && <Check size={12} color={colors.onPrimary} />}
+            </View>
+          </Pressable>
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={artifact.title}
+          onPress={() => open({ type: "artifact", artifact })}
+          style={({ pressed }) => [
+            { flex: 1, minWidth: 0, padding: onToggleSelect ? 0 : 12, gap: 6 },
+            pressed && { opacity: 0.72 },
+          ]}
+        >
+          <View style={[s.row, { gap: 10 }]}>
+            <View style={[s.glyph, { width: 34, height: 34, backgroundColor: colors.surface }]}>
+              <Icon size={16} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={{ fontSize: 10, lineHeight: 14, color: colors.faint }}>
+                {`${statusLabel(artifact.kind)} · ${t("agent.artifactOpenDetail")}`}
+              </Text>
+              <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
+                {artifact.title}
+              </Text>
+            </View>
+            <ArrowUpRight size={15} color={colors.faint} />
           </View>
-          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <Text style={{ fontSize: 10, lineHeight: 14, color: colors.faint }}>
-              {`${statusLabel(artifact.kind)} · ${t("agent.artifactOpenDetail")}`}
-            </Text>
-            <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
-              {artifact.title}
-            </Text>
-          </View>
-          <ArrowUpRight size={15} color={colors.faint} />
-        </View>
-      </Pressable>
+        </Pressable>
+      </View>
     </View>
   );
 }
