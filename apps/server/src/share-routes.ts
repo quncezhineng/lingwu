@@ -133,18 +133,23 @@ const PAGE_STYLES = `
     --primary: #3A83F7;
     --primary-strong: #245FC4;
   }
+  /* 色板保持原样；以下只按 TDesign 4px 栅格与字号 +8 行高韵律重排间距与层级，
+     并与前端 SPA 分享页（share-page-view.web.tsx）使用同一套阅读列与内距。 */
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body {
     background: var(--canvas);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
       "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
     font-size: 15px;
-    line-height: 1.75;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-kerning: normal;
   }
-  .page { max-width: 720px; margin: 0 auto; padding: 40px 20px 56px; }
+  .page { max-width: 760px; margin: 0 auto; padding: 48px 24px 64px; }
   .brand {
     display: flex; align-items: center; gap: 8px;
     margin-bottom: 16px; font-size: 13px; letter-spacing: .02em;
@@ -160,42 +165,43 @@ const PAGE_STYLES = `
     text-decoration: none;
     border: 1px solid var(--line); border-radius: 999px;
     background: var(--paper);
-    padding: 4px 14px; line-height: 1.6;
+    padding: 4px 16px; line-height: 1.6;
   }
   .brand-home:hover { border-color: var(--primary); }
   .card {
     background: var(--paper);
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 22px 24px;
+    padding: 24px;
   }
   .ask {
     background: var(--soft);
     border-radius: 8px;
-    padding: 12px 14px;
-    margin-bottom: 20px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
   }
   .ask-label {
     font-size: 11px; letter-spacing: .04em; color: var(--muted);
-    margin-bottom: 5px;
+    margin-bottom: 4px;
   }
-  .ask-text { margin: 0; font-size: 15px; line-height: 1.7; white-space: pre-wrap; }
+  .ask-text { margin: 0; font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
   .answer > :first-child { margin-top: 0; }
   .answer > :last-child { margin-bottom: 0; }
-  .answer p { margin: 0 0 12px; }
+  .answer p { margin: 0 0 16px; }
   .answer h1, .answer h2, .answer h3, .answer h4 {
-    margin: 24px 0 10px; line-height: 1.4; font-weight: 600; color: #1F1F1F;
+    margin: 24px 0 12px; font-weight: 600; color: #1F1F1F;
   }
-  .answer h1 { font-size: 22px; }
-  .answer h2 { font-size: 19px; }
-  .answer h3 { font-size: 17px; }
-  .answer h4 { font-size: 15px; }
-  .answer ul, .answer ol { margin: 0 0 12px; padding-left: 22px; }
-  .answer li { margin: 4px 0; }
+  /* 固定像素行高落在 2px 栅格上，标题层级比倍率行高更稳定。 */
+  .answer h1 { font-size: 22px; line-height: 32px; }
+  .answer h2 { font-size: 19px; line-height: 28px; }
+  .answer h3 { font-size: 17px; line-height: 26px; }
+  .answer h4 { font-size: 15px; line-height: 24px; }
+  .answer ul, .answer ol { margin: 0 0 16px; padding-left: 24px; }
+  .answer li { margin: 6px 0; }
   .answer a { color: var(--primary-strong); text-decoration: underline; }
   .answer strong { font-weight: 600; }
   .answer blockquote {
-    margin: 12px 0; padding: 10px 14px;
+    margin: 16px 0; padding: 12px 16px;
     border-left: 3px solid var(--line);
     background: var(--soft); border-radius: 6px;
     color: var(--muted);
@@ -207,25 +213,26 @@ const PAGE_STYLES = `
     border-radius: 5px; padding: 1px 5px;
   }
   .answer pre {
-    background: #EEEEEE; border: 1px solid var(--line); border-radius: 10px;
-    padding: 12px 14px; overflow-x: auto; margin: 0 0 14px;
+    background: #EEEEEE; border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 16px; overflow-x: auto; margin: 0 0 16px;
   }
   .answer pre code { background: none; padding: 0; color: var(--text); }
   .answer table {
-    width: 100%; border-collapse: collapse; margin: 0 0 14px; font-size: 14px;
+    width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 14px;
   }
   .answer th, .answer td {
-    border: 1px solid var(--line); padding: 7px 10px; text-align: left;
+    border: 1px solid var(--line); padding: 8px 12px; text-align: left;
   }
   .answer th { background: var(--soft); font-weight: 600; }
-  .answer hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
+  .answer hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
   .answer img { max-width: 100%; height: auto; border-radius: 8px; }
   .foot {
-    margin-top: 18px; font-size: 12px; color: var(--muted); text-align: center;
+    margin-top: 20px; font-size: 12px; line-height: 20px;
+    color: var(--muted); text-align: center;
   }
   @media (max-width: 480px) {
-    .page { padding: 24px 14px 40px; }
-    .card { padding: 18px 16px; border-radius: 10px; }
+    .page { padding: 24px 16px 40px; }
+    .card { padding: 20px 16px; border-radius: 8px; }
   }
 `;
 

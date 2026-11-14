@@ -7,17 +7,18 @@ import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
 import { ChevronLeft, ChevronRight, Menu } from "./icons";
 import { MOBILE_CONTROL, mobileGlassStyle } from "./mobile-chrome";
-import { colors, radius, semantic, shadow } from "./theme";
+import { colors, elevation, radius, semantic, sizing, space } from "./theme";
 import { HoverPressable } from "./ui";
 
-const top = 12;
-const height = 44;
+/** 悬浮头与内容列的间距、尺寸统一走 TDesign 4px 栅格与控件尺寸刻度。 */
+const top = space.sm;
+const height = sizing.touch;
 /** 桌面圆形控件直径：低于胶囊高度，让中间的 Agent 身份成为唯一焦点。 */
-const control = 36;
+const control = sizing.inputMd;
 
 /** Scroll content starts below the controls, but its viewport extends underneath them. */
 export function floatingHeaderClearance() {
-  return top + height + 16;
+  return top + height + space.md;
 }
 
 /**
@@ -60,10 +61,10 @@ export function AgentFloatingHeader({
           width: "100%",
           maxWidth: agentLayout.columnMaxWidth,
           height,
-          paddingHorizontal: 17,
+          paddingHorizontal: space.md,
           flexDirection: "row",
           alignItems: "center",
-          gap: 8,
+          gap: space.xs,
         }}
       >
         <View
@@ -121,18 +122,18 @@ export function AgentFloatingHeader({
                 maxWidth: "100%",
                 // 手机返回按钮是 44。胶囊与它对齐，头像和字号跟着长高。
                 height: onBack ? MOBILE_CONTROL : undefined,
-                minHeight: onBack ? MOBILE_CONTROL : 38,
-                paddingLeft: 6,
-                paddingRight: hovered ? 10 : onBack ? 12 : 14,
-                paddingVertical: onBack ? 0 : 4,
-                borderRadius: radius.full,
+                minHeight: onBack ? MOBILE_CONTROL : sizing.controlLg,
+                paddingLeft: space.compact,
+                paddingRight: hovered ? space.tight : onBack ? space.sm : space.md,
+                paddingVertical: onBack ? 0 : space.xxs,
+                borderRadius: radius.circle,
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 8,
+                gap: space.xs,
                 borderWidth: 1,
                 borderColor: semantic.controlBorder,
                 backgroundColor: pressed ? colors.surface : colors.paper,
-                ...shadow.card,
+                ...elevation.level1,
               })}
             >
               <AgentOrb avatar={avatar} size={onBack ? 32 : 28} />

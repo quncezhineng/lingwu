@@ -25,6 +25,11 @@
       body {
         height: 100%;
       }
+      html {
+        /* 移动端横竖屏切换时保持字号一致，避免浏览器自动放大标题层级。 */
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
@@ -33,12 +38,18 @@
         color: #303030;
         /* Keep the static entry shell in sync with src/font-family.ts. */
         font-family: "Noto Serif SC", "Songti SC", STSong, Georgia, serif;
+        /* 只改善字形渲染与字距，配色与字体族保持原样。 */
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        font-kerning: normal;
       }
       button,
       input,
       textarea,
       select {
         font-family: inherit;
+        font-kerning: inherit;
       }
       /* These styles make the root element full-height */
       #root {

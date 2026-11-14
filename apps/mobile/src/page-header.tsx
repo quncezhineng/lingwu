@@ -1,21 +1,17 @@
 import type { ReactNode } from "react";
 import { type StyleProp, View, type ViewStyle } from "react-native";
 import { Text } from "./app-text";
-import { colors, space, typography } from "./theme";
+import { colors, space, textScale, typography } from "./theme";
 
 /**
  * 页面标题区：眉标（可选）+ H1 + 说明 + 右侧动作。
  *
- * 规格来自 Demo `.page-head`：26/37、w500、字距 0.5、**sans**（衬线只留给
- * 问候语与洞察卡标题），标题色 `colors.heading`（#4A4A4A），
- * 说明文案 11/1.8 用 `colors.faint`（比 Demo 的 #999 更严格，达 AA），
- * 下边距桌面 28 / 移动 23。
+ * 排版按 TDesign 字阶与 4px 栅格校准：眉标 10 / H1 20/28 / 说明 12/20 三档层级清晰，
+ * 眉标—标题—说明的垂直间距走 2 / 6 刻度，区块下留白桌面 24 / 窄屏 20，
+ * 标题与右侧动作之间留 16 的分区呼吸；动作区下沉 2，与 H1 的视觉中线对齐。
  *
- * 决策 D5（页面 H1 是否保留衬线）尚未批复；当前按 Demo 实测用 sans，
- * 若产品选择品牌延续，只需把 `serif` 打开。
- *
- * 视觉按 shadcn 的 Typography 层级收紧：H1 20/28 w600、说明单行弱化、
- * 区块下留白统一到 16 / 20；配色与字体保持项目原有主题不变。
+ * 标题色沿用 `colors.pageTitle`，说明沿用 `colors.faint`（AA 对比度），
+ * 字体沿用全局 `fonts`，配色与字体完全不变；`serif` 仅切换 H1 字体族。
  */
 export function PageHeader({
   eyebrow,
@@ -29,11 +25,11 @@ export function PageHeader({
   /** 眉标：日期、分类等 10 号大写小标签。 */
   eyebrow?: string;
   title: string;
-  /** 一句话说明（Demo .page-head p）。 */
+  /** 一句话说明。 */
   description?: string;
   /** 右侧动作区（按钮、返回入口等）。 */
   actions?: ReactNode;
-  /** 窄屏形态（下边距 23），默认桌面 28。 */
+  /** 窄屏形态（下留白 20、说明可折两行），默认桌面（下留白 24）。 */
   compact?: boolean;
   /** 可选：页面 H1 使用衬线（品牌延续方案）。 */
   serif?: boolean;
@@ -47,38 +43,54 @@ export function PageHeader({
           flexDirection: "row",
           alignItems: "flex-start",
           justifyContent: "space-between",
-          gap: space.sm,
-          marginBottom: compact ? 16 : 20,
+          gap: space.md,
+          marginBottom: compact ? space.lg : space.xl,
         },
         style,
       ]}
     >
-      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-        {!!eyebrow && <Text style={[typography.eyebrow, { color: colors.faint }]}>{eyebrow}</Text>}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {!!eyebrow && (
+          <Text style={[typography.eyebrow, { color: colors.faint, marginBottom: space.hairline }]}>
+            {eyebrow}
+          </Text>
+        )}
         <Text
           accessibilityRole="header"
-          style={{
-            ...typography.h1,
-            fontSize: 20,
-            lineHeight: 28,
-            fontWeight: "600",
-            color: colors.pageTitle,
-            ...(serif ? { fontFamily: typography.insightTitle.fontFamily } : null),
-          }}
+          style={[
+            typography.h1,
+            textScale.titleLarge,
+            {
+              color: colors.pageTitle,
+              ...(serif ? { fontFamily: typography.insightTitle.fontFamily } : null),
+            },
+          ]}
         >
           {title}
         </Text>
         {!!description && (
           <Text
             numberOfLines={compact ? 2 : 1}
-            style={[typography.meta, { lineHeight: 19, color: colors.faint, maxWidth: 640 }]}
+            style={[
+              textScale.bodySmall,
+              { marginTop: space.compact, color: colors.faint, maxWidth: 640 },
+            ]}
           >
             {description}
           </Text>
         )}
       </View>
       {!!actions && (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>{actions}</View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: space.xs,
+            paddingTop: space.hairline,
+          }}
+        >
+          {actions}
+        </View>
       )}
     </View>
   );

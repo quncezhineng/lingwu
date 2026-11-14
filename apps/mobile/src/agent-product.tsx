@@ -85,6 +85,7 @@ import {
   s,
   semantic,
   shadow,
+  sizing,
   space,
   typography,
 } from "./ui";
@@ -2019,8 +2020,8 @@ export function AgentProductShell({
                               <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
                                 <View
                                   style={{
-                                    height: 52,
-                                    paddingHorizontal: 12,
+                                    height: sizing.rowLg,
+                                    paddingHorizontal: space.sm,
                                     flexDirection: "row",
                                     alignItems: "center",
                                   }}
@@ -2031,9 +2032,9 @@ export function AgentProductShell({
                                     accessibilityLabel={t("common.back")}
                                     onPress={requestPop}
                                     style={({ pressed }) => ({
-                                      width: 36,
-                                      height: 36,
-                                      borderRadius: radius.full,
+                                      width: sizing.inputMd,
+                                      height: sizing.inputMd,
+                                      borderRadius: radius.circle,
                                       alignItems: "center",
                                       justifyContent: "center",
                                       backgroundColor: pressed ? colors.overlay1 : "transparent",

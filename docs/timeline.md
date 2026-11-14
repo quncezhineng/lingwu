@@ -5,6 +5,78 @@
 
 ## 变更记录
 
+### 2026-11-14 · 功能：智能体对话「我的资料」列出上传资料 + 全部对话分析产物
+
+**背景**
+
+在智能体对话页点「选择资料」之前只列出上传/分析文件（`Artifact`），对话分析生成的产物（`AgentArtifact`，即资料库「分析生成」页签的内容）不在弹层里。用户希望弹层默认列出全部资料——既包括上传的资料，也包括对话分析的资料，但不包括领悟卡（被收藏的分析产物）和笔记（`InvestmentNote`，独立体系）。
+
+**处理**
+
+- [file-picker.tsx](../apps/mobile/src/file-picker.tsx)：
+  - 新增 `PickerEntry` 统一条目类型与 `pickerEntries()`（上传/分析文件 + 全部 `AgentArtifact` 按 `createdAt` 倒序合并）、`pickerEntryTitle/Id` 助手。
+  - `ComposerAttachments` 与 `FilePickerSheet` 新增可选 `analysis?: readonly AgentArtifact[]`：附件胶囊与弹层卡片都能渲染分析产物（类型徽章 `statusLabel(kind)` + `title` + 日期；上传文件保持扩展名徽章 + 大小·来源），弹层继续双列 `FileGrid`、选中高亮、底部计数与确认逻辑不变。
+  - 挂载点 [workbench.tsx](../apps/mobile/src/workbench.tsx)（已有 `useAgentWorkspace()` 的 `data`）与 [chat.tsx](../apps/mobile/src/chat.tsx)（已有 `agentWorkspace`）传入 `analysis={data?.artifacts ?? []}`。
+- [chat.tsx](../apps/mobile/src/chat.tsx)：预填与手动发送两处 `prompt.attachmentIds`/`attachments` 过滤从只匹配 `w.files` 扩展为同时匹配 `agentWorkspace?.artifacts`，分析产物 id 也能被识别并随消息发送。
+- [chat-content.ts](../apps/mobile/src/chat-content.ts)：`promptWithAttachments` 增加第三参 `analysis`——分析产物以「标题 + 摘要摘录（`markdownExcerpt` 240 字）」的形式内联进模型输入（服务端没有按产物 id 读取内容的工具，模型只能依赖内联文本）；渲染端仍只把 `name (artifact ID: id)` 提取成附件胶囊，摘要块不会泄露到用户可见气泡。
+- [chat-content.test.ts](../apps/mobile/test/chat-content.test.ts)：新增用例验证分析产物引用 + 摘要块注入、markdown 围栏被抹平、气泡只显示标题胶囊。
+
+**验证**
+
+- `pnpm typecheck`（tsc 两处）通过；`pnpm exec tsx --test apps/mobile/test/chat-content.test.ts` 9 个用例全过；改动的 5 个文件经 biome 格式化。
+- 全量 `pnpm test` 中 `tests/computer-e2b-desktop.test.ts` 1 例失败（E2B 沙箱环境不可用所致，与本次改动无关）。
+- 请在 `localhost:8081` 刷新后确认：智能体对话「选择资料」弹层同时列出上传资料与「分析生成」的分析产物，二者皆可勾选随消息发送；领悟卡与笔记不出现在弹层里。
+
+### 2026-11-14 · 界面：智能体对话的资料/连接器选择弹层改为双列布局
+
+**背景**
+
+在智能体对话框里点「选择资料」（我的资料）与「选择连接器」会弹出两个弹窗，之前都是单列列表（整行 + 分隔线），显得空旷且与技能选择弹层的双列网格不统一，用户希望两者都改成双列布局。
+
+**处理**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx)：
+  - `OptionRow`（连接器行）网格化——去掉 `first`/`borderTopWidth` 分隔线逻辑，新增 `cellWidth` 参数，改为独立小卡片（`borderWidth: 1` + `borderColor: checked ? primary : line` + `borderRadius: radius.field`，选中 `colors.sky` 底），窄格子优先显示状态（如「未连接」），宽格子才补描述；保留「去连接」引导与不可勾选逻辑。
+  - `ConnectorPickerSheet` 由 `OptionList > OptionRow` 改为 `OptionGrid > OptionRow` 双列网格。
+  - 删除不再使用的 `OptionList` 容器。
+- [file-picker.tsx](../apps/mobile/src/file-picker.tsx)（`FilePickerSheet`）：
+  - 新增 `FileGrid` 双列网格容器（复用 `OptionGrid` 的 `onLayout` 实测宽度换算列宽，`(width - 8) / 2`，48% 兜底）。
+  - 资料行由单列列表改为双列卡片：去掉 `index`/`borderTopWidth` 分隔线，卡片样式仿技能卡片（边框 + 圆角 + 选中 `colors.sky` 高亮），扩展名块调整为 32×40，文件名 13px。
+  - 底部「已选择 N 个」汇总与确认按钮保留。
+
+**验证**
+
+- `pnpm typecheck`（tsc 两处）、`pnpm format`（biome check，575 文件）均通过。
+- 请在 `localhost:8081` 刷新后确认：智能体对话里「选择资料」与「选择连接器」两个弹层均为双列卡片。
+
+### 2026-11-14 · 界面：上传文件卡片改为三列布局
+
+**背景**
+
+上传文件卡片上一轮改为桌面双列，用户希望进一步换成三列。
+
+**处理**
+
+- [screens.tsx](../apps/mobile/src/screens.tsx)（`FilesScreen`）：文件卡片栅格与「分析生成」产物卡片完全对齐——宽度 ≥840px 三列（31.8%）、≥560px 双列（48.5%）、更窄单列（100%）。
+
+**验证**
+
+- `pnpm typecheck`（tsc 两处）、`pnpm format`（biome check，575 文件）均通过。
+
+### 2026-11-14 · 界面：上传文件卡片的操作按钮改为左对齐
+
+**背景**
+
+资料库上传文件卡片改成双列布局后，卡片底部「下载 + 投入分析」按钮行默认右对齐，用户希望移到卡片左侧。
+
+**处理**
+
+- [screens.tsx](../apps/mobile/src/screens.tsx)（`FilesScreen` 文件卡片）：操作按钮行由 `justifyContent: "flex-end"` 改为 `"flex-start"`，下载与投入分析按钮靠卡片左侧排列。
+
+**验证**
+
+- `pnpm typecheck`（tsc 两处）、`pnpm format`（biome check，575 文件）均通过。
+
 ### 2026-11-14 · 界面：智能体对话选择弹层的确认按钮改为「确认」
 
 **背景**

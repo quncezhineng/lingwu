@@ -18,6 +18,12 @@
  * background/foreground、card、popover、primary、secondary、muted、accent、
  * destructive、border、input、ring 成对出现，组件只消费语义令牌，不直接写色名。
  * 这一层完全是别名，所有色值仍来自上方 `colors`，主题颜色不发生变化。
+ *
+ * 排版与布局按 TDesign 设计体系校准（见 `space` / `sizing` / `grid` / `elevation` /
+ * `textScale`）：4px 基准栅格、字号 +8 的行高韵律、small / medium / large 三级控件
+ * 尺寸、small→default→medium→large→circle 圆角梯度、三层递进阴影。
+ * 这一层只约束尺寸、留白与层级，不引入也不改写任何色值，主题配色保持不变；
+ * 项目使用 React Native（非 DOM），因此落地的是 TDesign 的设计规范而非 Web 组件实现。
  */
 import type { TextStyle, ViewStyle } from "react-native";
 import { Platform } from "react-native";
@@ -174,27 +180,41 @@ export const fonts = {
 } as const;
 
 /**
- * 间距刻度（4 的倍数）。
+ * 间距刻度（TDesign 4px 基准栅格）。
  *
- * 分层约束（Delta §4.6）：页面级用 page/pageMobile，区块级用 section*，
- * 组件内允许 2 的倍数（6/10/14 就近写在组件里，不入令牌），
- * 文本行内允许 1–2px 微调。现状 `gap: 8/10/12` 三分天下，新增代码优先取令牌。
+ * 既有档位与取值全部保留，保证老代码零回归；补齐 2 / 6 / 10 / 28 / 40 / 48 档，
+ * 让原先散落在组件里的裸值有统一的归属。分层约束不变：页面级用 page/pageMobile，
+ * 区块级用 section/xxl/xxxl，组件内用 hairline…lg，文本行内才允许 1–2px 微调。
  */
 export const space = {
+  /** 2：分隔线两侧、图标与文字的微调。 */
+  hairline: 2,
   xxs: 4,
+  /** 6：紧凑控件内距、标题与副标题的垂直呼吸。 */
+  compact: 6,
   xs: 8,
+  /** 10：列表行内部的图标—文字间距。 */
+  tight: 10,
   sm: 12,
   md: 16,
   lg: 20,
   xl: 24,
+  /** 28：卡片组之间的中等留白。 */
+  relaxed: 28,
   xxl: 32,
+  /** 40：分区之间、桌面工作台栏间距。 */
+  xxxl: 40,
+  /** 48：页面大区块之间的呼吸 / 列表底部留白。 */
+  section: 48,
+  /** 64：登录页双栏、空状态等大尺度分区间距。 */
+  hero: 64,
   /** 桌面页面横向 padding。 */
   page: 42,
   /** App 页面横向 padding。 */
   pageMobile: 22,
   /** 桌面工作台三栏栅格间距。 */
   gutter: 40,
-  /** 触控目标下限。 */
+  /** 触控目标下限（RN 无障碍基线，TDesign 触控态同样要求 ≥44）。 */
   touch: 44,
 } as const;
 
@@ -204,17 +224,76 @@ export const space = {
  * 从原来的 6/8/12/16 四档收敛为「徽标 4 / 控件 6 / 容器 8 / 浮层 12」：
  * 半径越小、层级越少，界面越安静，也更接近 shadcn 的克制感。
  * `micro` / `field` / `panel` 保留为语义别名，避免既有引用散落裸值。
+ *
+ * 下方 `default` / `medium` / `large` / `extraLarge` / `circle` 是 TDesign 的
+ * small→default→medium→large→circle 梯度别名；数值沿用既有档位，不新增视觉档。
  */
 export const radius = {
+  small: 4,
   badge: 4,
   micro: 4,
+  default: 6,
   control: 6,
   field: 6,
+  /** 卡片 / 面板：TDesign medium 梯度，保持既有 8px 收敛感。 */
+  medium: 8,
   card: 8,
   panel: 8,
+  large: 12,
   composer: 12,
   sheet: 12,
+  /** 底部抽屉 / 大浮层：原先写死在组件里的 16 收敛为令牌。 */
+  extraLarge: 16,
+  circle: 999,
   full: 999,
+} as const;
+
+/**
+ * 控件尺寸（TDesign small / medium / large 三级）。
+ *
+ * 桌面紧凑档可低于触控下限，但调用方需配 `hitSlop`；移动端一律不低于
+ * `touch` 44。把原先散落在各页面里的 28 / 32 / 34 / 36 / 40 收敛到同一套刻度，
+ * 让按钮、输入框、图标按钮、列表行在同一行里能自然对齐。
+ */
+export const sizing = {
+  /** 小号：密集表格、行内操作。 */
+  controlSm: 28,
+  /** 中号（默认）：常规按钮、图标按钮、输入框。 */
+  controlMd: 32,
+  /** 大号：主操作、表单确认。 */
+  controlLg: 40,
+  /** 特大号：移动端主按钮、底部操作。 */
+  controlXl: 48,
+  /** 输入框：比按钮略高，容纳 14/22 行高 + 上下内距。 */
+  inputMd: 36,
+  inputLg: 40,
+  /** 列表行最小高度：单行 40 / 双行 56。 */
+  rowMd: 40,
+  rowLg: 56,
+  /** 图标底座：与按钮同档，避免同一行里两个方块不一样高。 */
+  iconSm: 28,
+  iconMd: 32,
+  iconLg: 40,
+  /** 触控目标下限。 */
+  touch: 44,
+} as const;
+
+/**
+ * 内容栅格（TDesign 24 栅格的简化落地）。
+ *
+ * 页面统一按「12 列 + 固定 gutter」思考：列宽 = (容器宽 - gutter × (列数 - 1)) / 列数。
+ * 这里只登记常量，供 `CardGrid`、`PageHeader` 与壳层复用，不改变任何页面结构。
+ */
+export const grid = {
+  columns: 12,
+  /** 卡片网格间距（原 `CardGrid` 里写死的 10 收敛为 4px 栅格值）。 */
+  gap: 12,
+  /** 桌面内容列与侧栏之间的间距。 */
+  gutter: 24,
+  /** 窄屏卡片网格间距。 */
+  gapCompact: 8,
+  /** 阅读列最佳行宽，长文超过这个宽度就主动收窄。 */
+  readingMax: 760,
 } as const;
 
 /**
@@ -350,6 +429,88 @@ export const typography = {
 export const type = typography;
 
 /**
+ * TDesign 语义字阶：行高按「字号 + 8」的韵律对齐到 2px 栅格。
+ *
+ * 项目原有的 `typography` 十三档保持不变（避免长文阅读感与既有布局回归）；
+ * 这一组别名专门给「页面里写死 fontSize: 13 / 14 / 18」的通用组件用，
+ * 让同一层级在不同页面落到同一档字号 / 行高 / 字重上。
+ * fontFamily 一律复用既有 `fonts`，字体与配色都不变。
+ */
+export const textScale = {
+  /** 10/18：眉标、计数、徽标。 */
+  markSmall: {
+    fontSize: 10,
+    lineHeight: 18,
+    fontWeight: "600",
+    letterSpacing: 0.8,
+    fontFamily: fonts.sans,
+  },
+  /** 12/20：时间戳、辅助说明、表单标签。 */
+  markMedium: {
+    fontSize: 12,
+    lineHeight: 20,
+    fontWeight: "500",
+    fontFamily: fonts.sans,
+  },
+  /** 12/20：列表次要信息。 */
+  bodySmall: {
+    fontSize: 12,
+    lineHeight: 20,
+    fontWeight: "400",
+    fontFamily: fonts.sans,
+  },
+  /** 14/22：界面正文、按钮、输入。 */
+  bodyMedium: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "400",
+    fontFamily: fonts.sans,
+  },
+  /** 16/24：大号正文、强调行。 */
+  bodyLarge: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "400",
+    fontFamily: fonts.sans,
+  },
+  /** 14/22：最小一级区块标题。 */
+  titleSmall: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+    fontFamily: fonts.sans,
+  },
+  /** 16/24：区块标题。 */
+  titleMedium: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "600",
+    fontFamily: fonts.sans,
+  },
+  /** 20/28：页面 H1 / 弹层主标题。 */
+  titleLarge: {
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: "600",
+    fontFamily: fonts.sans,
+  },
+  /** 24/32：数据强调、大标题。 */
+  headlineSmall: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: "500",
+    fontFamily: fonts.serif,
+  },
+  /** 28/36：工作台问候。 */
+  headlineMedium: {
+    fontSize: 28,
+    lineHeight: 36,
+    fontWeight: "500",
+    fontFamily: fonts.serif,
+  },
+} as const satisfies Record<string, TextStyle>;
+
+/**
  * 阴影：只保留「浮在画布之上」这一层极淡的晕（shadcn 以 1px 描边为主）。
  *
  * 色值保持原样，只收紧扩散半径、位移与不透明度，让卡片与浮层更平整；
@@ -386,6 +547,40 @@ export const shadow = {
     shadowOpacity: 0.06,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
+} as const satisfies Record<string, ViewStyle>;
+
+/**
+ * 层级阴影（TDesign shadow-1 / shadow-2 / shadow-3 三级递进）。
+ *
+ * 阴影色一律复用上方 `shadow` 里已登记的色值，不引入任何新颜色；
+ * 只把位移、扩散与不透明度排成「贴着画布 / 浮在画布 / 盖在画布上」三级，
+ * 卡片默认仍靠 1px 描边建立层级，只有浮层消费 level2 / level3。
+ */
+export const elevation = {
+  /** 贴着画布：需要强调的卡片、悬停态容器。 */
+  level1: {
+    shadowColor: shadow.card.shadowColor,
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  /** 浮在画布：输入区、下拉菜单、抽屉。 */
+  level2: {
+    shadowColor: shadow.composer.shadowColor,
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  /** 盖在画布上：模态面板、全屏浮层。 */
+  level3: {
+    shadowColor: shadow.sheet.shadowColor,
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   },
 } as const satisfies Record<string, ViewStyle>;

@@ -7,9 +7,10 @@
  */
 import { type ReactNode, useState } from "react";
 import { View } from "react-native";
+import { grid } from "./theme";
 
-/** 网格列间距。 */
-const GRID_GAP = 10;
+/** 网格列间距：统一取 TDesign 4px 基准栅格上的 `grid.gap`。 */
+const GRID_GAP = grid.gap;
 
 export function CardGrid<T>({
   items,

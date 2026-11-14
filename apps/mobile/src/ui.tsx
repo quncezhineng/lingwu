@@ -23,7 +23,19 @@ import { tr } from "./i18n/translate";
 import { AlertTriangle, ArrowUpRight, Check, ChevronRight, type IconComponent, X } from "./icons";
 import { shouldCompletePop, useIosSheetShift } from "./ios-transition";
 import { ModalOverlay } from "./modal-overlay";
-import { breakpoints, colors, fonts, radius, semantic, shadow, space, typography } from "./theme";
+import {
+  breakpoints,
+  colors,
+  elevation,
+  fonts,
+  grid,
+  radius,
+  semantic,
+  sizing,
+  space,
+  textScale,
+  typography,
+} from "./theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -37,14 +49,18 @@ export {
   chartSeries,
   colors,
   composerMetrics,
+  elevation,
   fonts,
+  grid,
   iconStroke,
   radius,
   semantic,
   serviceBrands,
   shadow,
+  sizing,
   space,
   statusColors,
+  textScale,
   typography,
 } from "./theme";
 
@@ -59,52 +75,65 @@ export const s = StyleSheet.create({
   /** 浮层标题：与页面 H1 同一档字阶（22/32）。 */
   title: { color: colors.heading, ...typography.h1 },
   heading: { color: colors.heading, ...typography.heading },
-  /** 白纸卡片：1px 描边 + 8px 圆角，靠描边与留白建立层级（无阴影）。 */
+  /** 白纸卡片：1px 描边 + medium 圆角，靠描边与留白建立层级（无阴影）。 */
   card: {
     backgroundColor: semantic.card,
-    borderRadius: radius.card,
+    borderRadius: radius.medium,
     borderWidth: 1,
     borderColor: semantic.border,
     padding: space.md,
   },
+  /** 需要浮起时叠加的 TDesign level1 阴影（色值沿用既有令牌）。 */
+  cardElevated: { ...elevation.level1 },
   divider: { height: 1, backgroundColor: semantic.border, marginVertical: space.sm },
   input: {
     borderWidth: 1,
     borderColor: semantic.input,
-    borderRadius: radius.field,
+    borderRadius: radius.default,
     paddingHorizontal: space.sm,
-    paddingVertical: 8,
+    paddingVertical: space.xs,
     color: semantic.foreground,
-    fontSize: 14,
-    lineHeight: 20,
+    ...textScale.bodyMedium,
     backgroundColor: semantic.card,
-    minHeight: 36,
+    minHeight: sizing.inputMd,
     fontFamily: fonts.sans,
   },
-  field: { gap: 6, marginBottom: space.sm },
-  /** 表单字段标签：12/18 w500，供 Field 与自定义字段（如带预览的输入区）共用。 */
+  field: { gap: space.compact, marginBottom: space.sm },
+  /** 表单字段标签：TDesign markMedium 档 12/20 w500。 */
   fieldLabel: {
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "500",
+    ...textScale.markMedium,
     color: semantic.foreground,
   },
-  /** 按钮：6px 圆角、无冗余描边，高度 34（sm 28 / lg 40），触控可达 44。 */
+  /** 按钮：TDesign small / medium / large 三级高度，左右内距随档位递进。 */
   button: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    minHeight: 34,
-    paddingVertical: 6,
-    borderRadius: radius.control,
+    gap: space.compact,
+    paddingHorizontal: space.sm,
+    minHeight: sizing.controlMd,
+    paddingVertical: space.compact,
+    borderRadius: radius.default,
     borderWidth: 1,
     borderColor: "transparent",
   },
-  buttonSm: { minHeight: 28, paddingVertical: 4, paddingHorizontal: 10 },
-  buttonLg: { minHeight: 40, paddingVertical: 9, paddingHorizontal: 16 },
-  buttonIcon: { width: 34, height: 34, minHeight: 34, paddingHorizontal: 0, paddingVertical: 0 },
+  buttonSm: {
+    minHeight: sizing.controlSm,
+    paddingVertical: space.xxs,
+    paddingHorizontal: space.tight,
+  },
+  buttonLg: {
+    minHeight: sizing.controlLg,
+    paddingVertical: space.tight,
+    paddingHorizontal: space.md,
+  },
+  buttonIcon: {
+    width: sizing.controlMd,
+    height: sizing.controlMd,
+    minHeight: sizing.controlMd,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   /** shadcn variant → 表面色，全部复用既有主题色。 */
   buttonDefault: { backgroundColor: semantic.action, borderColor: semantic.action },
   buttonSecondary: { backgroundColor: semantic.secondary, borderColor: semantic.secondary },
@@ -118,16 +147,17 @@ export const s = StyleSheet.create({
   primary: { backgroundColor: colors.primaryAction, borderColor: colors.primaryAction },
   secondary: { backgroundColor: colors.paper, borderColor: colors.line },
   dangerSurface: { backgroundColor: colors.errorSoft, borderColor: colors.errorSoft },
-  buttonText: { fontSize: 13, fontWeight: "500", fontFamily: fonts.sans },
-  buttonTextSm: { fontSize: 12 },
-  buttonTextLg: { fontSize: 14 },
+  /** 13/20：按钮文字固定行高，保证三档高度里都垂直居中。 */
+  buttonText: { fontSize: 13, lineHeight: 20, fontWeight: "500", fontFamily: fonts.sans },
+  buttonTextSm: { fontSize: 12, lineHeight: 18 },
+  buttonTextLg: { fontSize: 14, lineHeight: 22 },
   /** RN 没有 outline，用 1px ring 色描边表达 focus / focus-visible。 */
   focusRing: { borderColor: semantic.ring },
-  /** 徽标：4px 圆角 + 紧凑内距，对应 shadcn Badge 的 secondary 形态。 */
+  /** 徽标：small 圆角 + 2/6 紧凑内距。 */
   chip: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radius.badge,
+    paddingHorizontal: space.compact,
+    paddingVertical: space.hairline,
+    borderRadius: radius.small,
     borderWidth: 1,
     borderColor: "transparent",
     alignSelf: "flex-start",
@@ -135,11 +165,9 @@ export const s = StyleSheet.create({
   },
   chipOutline: { backgroundColor: "transparent", borderColor: semantic.border },
   chipText: {
-    fontSize: typography.caption.fontSize,
-    lineHeight: typography.caption.lineHeight,
-    fontWeight: "500",
+    ...textScale.markSmall,
+    letterSpacing: 0,
     color: semantic.mutedForeground,
-    fontFamily: fonts.sans,
   },
   /** 图标按钮：默认 ghost，仅在 hover / pressed 时出现一层极浅的底。 */
   iconButton: {
@@ -154,32 +182,32 @@ export const s = StyleSheet.create({
   iconButtonPressed: { backgroundColor: colors.overlay2 },
   iconButtonOutline: { backgroundColor: semantic.card, borderColor: semantic.controlBorder },
   iconButtonSecondary: { backgroundColor: semantic.secondary },
-  /** 触控目标底座：36×36（可配合 hitSlop 达到 44）。 */
+  /** 触控目标底座：与输入框同高（可配合 hitSlop 达到 44）。 */
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.control,
+    width: sizing.inputMd,
+    height: sizing.inputMd,
+    borderRadius: radius.default,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: semantic.secondary,
   },
-  /** 任务行 / 列表图标底座：36×36 / r6。 */
+  /** 任务行 / 列表图标底座：与输入框同高、默认圆角。 */
   glyph: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.field,
+    width: sizing.inputMd,
+    height: sizing.inputMd,
+    borderRadius: radius.default,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: semantic.secondary,
   },
-  /** 错误提示：shadcn Alert 的紧凑形态，图标 + 文本 + 左侧语义条。 */
+  /** 错误提示：紧凑形态，图标 + 文本 + 左侧语义条。 */
   error: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: space.xs,
     paddingHorizontal: space.sm,
-    paddingVertical: 10,
-    borderRadius: radius.card,
+    paddingVertical: space.tight,
+    borderRadius: radius.medium,
     borderLeftWidth: 2,
     borderLeftColor: semantic.destructive,
     backgroundColor: colors.errorSoft,
@@ -191,12 +219,12 @@ export const s = StyleSheet.create({
     alignItems: "center",
     padding: space.lg,
   },
-  /** 弹窗面板：白底 + 1px 描边 + 12px 圆角，最大宽度对齐设计库 .panel 的 760。 */
+  /** 弹窗面板：白底 + 1px 描边 + large 圆角，阅读列上限统一取 grid.readingMax。 */
   sheet: {
     backgroundColor: semantic.popover,
-    borderRadius: radius.sheet,
+    borderRadius: radius.large,
     width: "100%",
-    maxWidth: 760,
+    maxWidth: grid.readingMax,
     maxHeight: "94%",
     flexShrink: 1,
     overflow: "hidden",
@@ -364,14 +392,14 @@ export function IconButton({
   icon: Icon,
   label,
   onPress,
-  size = 34,
+  size = sizing.controlMd,
   variant = "ghost",
   disabled = false,
 }: {
   icon: IconComponent;
   label: string;
   onPress: () => void;
-  /** Touch target; pass 44 for dense table rows that need a larger hit area. */
+  /** Touch target; pass `sizing.touch` for dense table rows that need a larger hit area. */
   size?: number;
   variant?: "ghost" | "outline" | "secondary";
   disabled?: boolean;
@@ -382,7 +410,7 @@ export function IconButton({
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
       disabled={disabled}
-      hitSlop={disabled ? undefined : 6}
+      hitSlop={disabled ? undefined : space.compact}
       onPress={onPress}
       style={({ pressed, hovered, focused }) => [
         s.iconButton,
@@ -395,7 +423,7 @@ export function IconButton({
         { opacity: disabled ? 0.35 : 1 },
       ]}
     >
-      <Icon size={size >= 40 ? 18 : 16} color={semantic.mutedForeground} />
+      <Icon size={size >= sizing.controlLg ? 18 : 16} color={semantic.mutedForeground} />
     </HoverPressable>
   );
 }
@@ -485,11 +513,26 @@ export function Empty({
   children?: ReactNode;
 }) {
   return (
-    <View style={{ alignItems: "center", paddingVertical: 32, paddingHorizontal: 24, gap: 6 }}>
+    <View
+      style={{
+        alignItems: "center",
+        paddingVertical: space.xxl,
+        paddingHorizontal: space.xl,
+        gap: space.compact,
+      }}
+    >
       <Icon size={22} color={semantic.mutedForeground} />
-      <Text style={[s.heading, { fontSize: 14, marginTop: 6 }]}>{title}</Text>
+      <Text style={[s.heading, textScale.titleSmall, { marginTop: space.compact }]}>{title}</Text>
       <Text
-        style={[s.small, { textAlign: "center", maxWidth: 340, color: semantic.mutedForeground }]}
+        style={[
+          s.small,
+          {
+            textAlign: "center",
+            maxWidth: grid.readingMax / 2,
+            lineHeight: textScale.bodySmall.lineHeight,
+            color: semantic.mutedForeground,
+          },
+        ]}
       >
         {detail}
       </Text>
@@ -613,8 +656,8 @@ export function Sheet({
             bottomSheet ? { transform: [{ translateY: shift }] } : null,
             !compact && {
               maxHeight: Math.max(0, height - space.xl * 2),
-              borderRadius: radius.sheet,
-              ...shadow.sheet,
+              borderRadius: radius.large,
+              ...elevation.level3,
             },
             wide && { maxWidth: 1050 },
             medium && { maxWidth: 680 },
@@ -631,8 +674,8 @@ export function Sheet({
               maxHeight: "100%",
               marginBottom: 0,
               borderWidth: 0,
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
+              borderTopLeftRadius: radius.extraLarge,
+              borderTopRightRadius: radius.extraLarge,
               borderBottomLeftRadius: 0,
               borderBottomRightRadius: 0,
               paddingBottom: 0,
@@ -698,7 +741,7 @@ export function Sheet({
           >
             <View
               style={[
-                { flex: 1, gap: 4 },
+                { flex: 1, gap: space.xxs },
                 contentMaxWidth
                   ? {
                       flex: undefined,
@@ -735,7 +778,7 @@ export function Sheet({
               </View>
               {!!subtitle &&
                 (typeof subtitle === "string" ? (
-                  <Text style={[s.muted, { fontSize: 12, lineHeight: 18 }]}>{subtitle}</Text>
+                  <Text style={[s.muted, textScale.markMedium]}>{subtitle}</Text>
                 ) : (
                   subtitle
                 ))}
@@ -810,13 +853,13 @@ export function CheckRow({
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       onPress={onPress}
-      style={[s.row, { gap: 10, paddingVertical: 9 }]}
+      style={[s.row, { gap: space.tight, paddingVertical: space.tight }]}
     >
       <View
         style={{
           width: 16,
           height: 16,
-          borderRadius: radius.micro,
+          borderRadius: radius.small,
           borderWidth: 1,
           borderColor: checked ? semantic.primary : colors.lineStrong,
           backgroundColor: checked ? semantic.primary : semantic.card,
@@ -854,24 +897,26 @@ export function SectionHeading({
 }) {
   return (
     <View style={[s.between, { marginBottom: space.sm, gap: space.xs }, style]}>
-      <View style={[s.row, { gap: 6, flexShrink: 1, minWidth: 0 }]}>
-        <Text
-          style={{ fontSize: 13, lineHeight: 20, fontWeight: "600", color: semantic.foreground }}
-        >
-          {title}
-        </Text>
+      <View style={[s.row, { gap: space.compact, flexShrink: 1, minWidth: 0 }]}>
+        <Text style={[textScale.titleSmall, { color: semantic.foreground }]}>{title}</Text>
         {count !== undefined && (
           <View
             style={{
               minWidth: 16,
-              paddingHorizontal: 4,
+              paddingHorizontal: space.xxs,
               paddingVertical: 1,
-              borderRadius: radius.badge,
+              borderRadius: radius.small,
               backgroundColor: semantic.secondary,
               alignItems: "center",
             }}
           >
-            <Text style={[s.metric, { fontSize: 10, lineHeight: 16, color: colors.muted }]}>
+            <Text
+              style={[
+                s.metric,
+                textScale.markSmall,
+                { lineHeight: 16, letterSpacing: 0, color: colors.muted },
+              ]}
+            >
               {count}
             </Text>
           </View>
@@ -908,11 +953,11 @@ export function LinkRow({
       style={({ pressed }) => [
         s.row,
         {
-          paddingVertical: 8,
-          paddingHorizontal: 6,
-          marginHorizontal: -6,
-          gap: 10,
-          borderRadius: radius.control,
+          paddingVertical: space.xs,
+          paddingHorizontal: space.compact,
+          marginHorizontal: -space.compact,
+          gap: space.tight,
+          borderRadius: radius.default,
         },
         pressed && { backgroundColor: colors.overlay1 },
       ]}
@@ -921,7 +966,7 @@ export function LinkRow({
         style={[
           s.iconButton,
           s.iconButtonOutline,
-          { width: 28, height: 28 },
+          { width: sizing.iconSm, height: sizing.iconSm },
           tint ? { backgroundColor: tint } : null,
         ]}
       >
@@ -1023,7 +1068,7 @@ export function marketDirectionColor(direction: "up" | "down" | "flat") {
 export function DisclaimerNote({ style }: { style?: StyleProp<TextStyle> }) {
   const { t } = useTranslation();
   return (
-    <Text style={[s.small, { color: colors.faint, marginTop: 12 }, style]}>
+    <Text style={[s.small, { color: colors.faint, marginTop: space.sm }, style]}>
       {t("ui.disclaimer")}
     </Text>
   );

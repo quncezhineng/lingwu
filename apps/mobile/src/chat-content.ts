@@ -1,4 +1,6 @@
 import type { Artifact } from "../../../packages/domain/src";
+import type { AgentArtifact } from "../../../packages/domain/src/agent";
+import { markdownExcerpt } from "./file-library";
 
 export interface UserAttachment {
   id: string;
@@ -31,15 +33,30 @@ export function displayUserMessage(content: string): DisplayUserMessage {
   return { text, attachments };
 }
 
-/** Appends the stable artifact references the agent uses to load selected files. */
+/** Appends the stable artifact references the agent uses to load selected files.
+ *  Analysis artifacts have no server read path, so a bounded summary excerpt is
+ *  inlined after the reference list to give the model content to reason about.
+ *  The bubble renderer only turns "name (artifact ID: id)" pairs into chips and
+ *  ignores the excerpt block, so the visible message stays clean. */
 export function promptWithAttachments(
   text: string,
   files: readonly Pick<Artifact, "id" | "name">[],
+  analysis?: readonly AgentArtifact[],
 ): string {
-  if (!files.length) return text;
-  return `${text.trimEnd()}\n\nAttached documents: ${files
-    .map((file) => `${file.name} (artifact ID: ${file.id})`)
-    .join(", ")}`;
+  const documents = [
+    ...files.map((file) => `${file.name} (artifact ID: ${file.id})`),
+    ...(analysis ?? []).map((artifact) => `${artifact.title} (artifact ID: ${artifact.id})`),
+  ];
+  if (!documents.length) return text;
+  let content = `${text.trimEnd()}\n\nAttached documents: ${documents.join(", ")}`;
+  // 分析产物摘要块跟在引用列表之后，以尾逗号收尾以便渲染端把最后一条也识别成附件；
+  // 气泡渲染只提取 "name (artifact ID: id)"，摘要块本身不会泄露到用户可见消息里。
+  if (analysis?.length) {
+    content += `,\n\nAttached analysis documents:\n${analysis
+      .map((artifact) => `- ${artifact.title}: ${markdownExcerpt(artifact.summary, 240)}`)
+      .join("\n")}`;
+  }
+  return content;
 }
 
 function decodeReference(value: string) {

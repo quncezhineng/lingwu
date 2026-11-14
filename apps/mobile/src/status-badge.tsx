@@ -1,7 +1,7 @@
 import { type StyleProp, View, type ViewStyle } from "react-native";
 import type { TaskStatus } from "../../../packages/domain/src/agent";
 import { Text } from "./app-text";
-import { colors, radius, statusColors, typography } from "./theme";
+import { colors, radius, space, statusColors, textScale, typography } from "./theme";
 
 /**
  * 状态语义。
@@ -64,9 +64,9 @@ export function StatusBadge({
       style={[
         {
           alignSelf: "flex-start",
-          paddingHorizontal: 6,
-          paddingVertical: 2,
-          borderRadius: radius.badge,
+          paddingHorizontal: space.compact,
+          paddingVertical: space.hairline,
+          borderRadius: radius.small,
           backgroundColor: palette.background,
         },
         style,
@@ -74,12 +74,15 @@ export function StatusBadge({
     >
       <Text
         numberOfLines={1}
-        style={{
-          fontSize: typography.eyebrow.fontSize,
-          lineHeight: 14,
-          fontWeight: "600",
-          color: textColor ?? palette.foreground,
-        }}
+        style={[
+          textScale.markSmall,
+          {
+            fontSize: typography.eyebrow.fontSize,
+            lineHeight: textScale.markSmall.lineHeight,
+            letterSpacing: 0,
+            color: textColor ?? palette.foreground,
+          },
+        ]}
       >
         {label}
       </Text>

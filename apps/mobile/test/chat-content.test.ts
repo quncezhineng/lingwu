@@ -44,6 +44,34 @@ test("selected files are appended as stable artifact references", () => {
   assert.equal(promptWithAttachments("No files", []), "No files");
 });
 
+test("analysis artifacts are appended with references plus a bounded summary excerpt", () => {
+  const content = promptWithAttachments(
+    "结合市场简报",
+    [],
+    [
+      {
+        id: "artifact-1",
+        taskId: "task-1",
+        kind: "market_briefing",
+        title: "今日市场简报",
+        summary: "```markdown\n沪指收涨 0.8%，北向资金净流入 45 亿元。\n``` 半导体板块领涨。",
+        data: {},
+        createdAt: "2026-11-14T09:00:00.000Z",
+      },
+    ],
+  );
+  // 引用列表以尾逗号收尾，摘要块跟在后面供模型阅读。
+  assert.match(content, /Attached documents: 今日市场简报 \(artifact ID: artifact-1\),\n/);
+  assert.match(content, /Attached analysis documents:\n- 今日市场简报: 半导体板块领涨/);
+  // 摘要里的 markdown 代码围栏与控制字符被抹平，不会把内部标记泄露成附件。
+  assert.doesNotMatch(content, /```/);
+  // 气泡只渲染标题胶囊：摘要块不进入用户可见正文，也不产生多余附件。
+  assert.deepEqual(displayUserMessage(content), {
+    text: "结合市场简报",
+    attachments: [{ name: "今日市场简报", id: "artifact-1" }],
+  });
+});
+
 test("inline code and relative links resolve to thread files", () => {
   const files = [
     { id: "file-1", name: "catl_report.html" },

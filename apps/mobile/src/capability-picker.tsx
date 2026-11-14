@@ -170,6 +170,11 @@ function SelectionBox({ checked }: { checked: boolean }) {
   );
 }
 
+/**
+ * 网格单元：与 OptionCard 同款卡片样式，但为连接器保留「去连接」引导。
+ * 两列时把原来的「整行 + 分隔线」压成独立小卡片，
+ * 勾选态用底色 + 描边表达；未连接时整卡交给上层引导连接。
+ */
 function OptionRow({
   checked,
   disabled,
@@ -177,7 +182,7 @@ function OptionRow({
   title,
   detail,
   status,
-  first,
+  cellWidth,
   accessibilityLabel,
   onPress,
   onConnect,
@@ -189,17 +194,20 @@ function OptionRow({
   title: string;
   detail?: string;
   status?: string;
-  first: boolean;
+  /** 由 OptionGrid 实测出的列宽，卡片据此撑满半栏。 */
+  cellWidth: number;
   accessibilityLabel: string;
   onPress: () => void;
-  /** 未连接的连接器行提供「去连接」引导：整行可点击并交给外层进入连接流程。 */
+  /** 未连接的连接器行提供「去连接」引导：整卡可点击并交给外层进入连接流程。 */
   onConnect?: () => void;
   /** 「去连接」引导文字，仅在 disabled 且提供了 onConnect 时展示。 */
   connectLabel?: string;
 }) {
   // 仅当既未连接、又没有连接引导时才真正屏蔽点击；
-  // 提供 onConnect 的行保留整行点击，交给上层引导用户去完成连接。
+  // 提供 onConnect 的卡片保留整卡点击，交给上层引导用户去完成连接。
   const blocked = disabled && !onConnect;
+  // 状态（如「未连接」）比描述更重要，窄格子也要保留；描述只在宽格子补一行。
+  const sub = status ?? (cellWidth >= OPTION_CELL_DETAIL_MIN_WIDTH ? detail : undefined);
   return (
     <Pressable
       accessibilityRole={blocked ? "checkbox" : "button"}
@@ -210,22 +218,25 @@ function OptionRow({
       style={({ pressed }) => [
         s.row,
         {
-          gap: 12,
-          minHeight: 58,
-          paddingHorizontal: 14,
-          paddingVertical: 10,
-          borderTopWidth: first ? 0 : 1,
-          borderTopColor: colors.line,
-          backgroundColor: pressed && !blocked ? colors.surface : colors.paper,
+          width: cellWidth || "48%",
+          gap: 9,
+          minHeight: 52,
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          borderWidth: 1,
+          borderColor: checked ? colors.primary : colors.line,
+          borderRadius: radius.field,
+          backgroundColor:
+            checked && !blocked ? colors.sky : pressed && !blocked ? colors.surface : colors.paper,
           opacity: disabled ? 0.5 : 1,
         },
       ]}
     >
       <View
         style={{
-          width: 32,
-          height: 32,
-          borderRadius: 9,
+          width: 26,
+          height: 26,
+          borderRadius: 8,
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: colors.surface,
@@ -233,25 +244,17 @@ function OptionRow({
           borderColor: colors.line,
         }}
       >
-        <Icon size={16} color={colors.muted} />
+        <Icon size={14} color={colors.muted} />
       </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>
           {title}
         </Text>
-        <View style={[s.row, { gap: 6, flexWrap: "wrap" }]}>
-          {!!detail && (
-            <Text
-              numberOfLines={2}
-              style={{ flexShrink: 1, fontSize: 11, lineHeight: 15, color: colors.faint }}
-            >
-              {detail}
-            </Text>
-          )}
-          {!!status && (
-            <Text style={{ fontSize: 11, lineHeight: 15, color: colors.muted }}>{status}</Text>
-          )}
-        </View>
+        {!!sub && (
+          <Text numberOfLines={1} style={{ fontSize: 11, lineHeight: 15, color: colors.faint }}>
+            {sub}
+          </Text>
+        )}
       </View>
       {disabled ? (
         onConnect && connectLabel ? (
@@ -328,12 +331,6 @@ function PickerFooter({
         {confirmLabel}
       </Button>
     </View>
-  );
-}
-
-function OptionList({ children }: { children: ReactNode }) {
-  return (
-    <View style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12 }}>{children}</View>
   );
 }
 
@@ -633,28 +630,30 @@ export function ConnectorPickerSheet({
     >
       <View style={{ gap: 14 }}>
         {options.length > 0 ? (
-          <OptionList>
-            {options.map((option, index) => (
-              <OptionRow
-                key={option.id}
-                first={index === 0}
-                checked={selectedIds.includes(option.id)}
-                disabled={!option.connected}
-                icon={option.icon}
-                title={option.name}
-                detail={option.detail}
-                status={t(
-                  option.connected
-                    ? "chat.connectorPickerConnected"
-                    : "chat.connectorPickerDisconnected",
-                )}
-                accessibilityLabel={option.name}
-                onPress={() => onToggle(option.id)}
-                onConnect={option.connected ? undefined : () => onConnect?.(option.id)}
-                connectLabel={option.connected ? undefined : t("chat.connectorPickerConnect")}
-              />
-            ))}
-          </OptionList>
+          <OptionGrid>
+            {(cellWidth) =>
+              options.map((option) => (
+                <OptionRow
+                  key={option.id}
+                  cellWidth={cellWidth}
+                  checked={selectedIds.includes(option.id)}
+                  disabled={!option.connected}
+                  icon={option.icon}
+                  title={option.name}
+                  detail={option.detail}
+                  status={t(
+                    option.connected
+                      ? "chat.connectorPickerConnected"
+                      : "chat.connectorPickerDisconnected",
+                  )}
+                  accessibilityLabel={option.name}
+                  onPress={() => onToggle(option.id)}
+                  onConnect={option.connected ? undefined : () => onConnect?.(option.id)}
+                  connectLabel={option.connected ? undefined : t("chat.connectorPickerConnect")}
+                />
+              ))
+            }
+          </OptionGrid>
         ) : (
           <Empty
             icon={Link2}

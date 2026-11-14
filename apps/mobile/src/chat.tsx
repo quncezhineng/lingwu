@@ -1140,9 +1140,11 @@ export function ChatScreen({
     if (prompt.draft) {
       if (!claimPrompt(prompt.id)) return;
       if (prompt.text.trim()) composerRef.current?.setText(prompt.text);
-      // 附件同样只预选，用户可以在发送前移除。
-      const ids = (prompt.attachmentIds ?? []).filter((id) =>
-        w.files.some((file) => file.id === id),
+      // 附件同样只预选，用户可以在发送前移除。上传文件与对话分析产物都算资料。
+      const ids = (prompt.attachmentIds ?? []).filter(
+        (id) =>
+          w.files.some((file) => file.id === id) ||
+          (agentWorkspace?.artifacts ?? []).some((artifact) => artifact.id === id),
       );
       if (ids.length) setAttachments(ids);
       // 技能以 chip 形式带入输入区，与「技能选择」里的选中项合并。
@@ -1154,8 +1156,11 @@ export function ChatScreen({
     }
     if (!isReady || !loaded || !claimPrompt(prompt.id)) return;
     const files = w.files.filter((file) => prompt.attachmentIds?.includes(file.id));
-    enqueue(promptWithAttachments(prompt.text, files));
-  }, [active, prompt, isReady, loaded, enqueue, claimPrompt, w.files]);
+    const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
+      prompt.attachmentIds?.includes(artifact.id),
+    );
+    enqueue(promptWithAttachments(prompt.text, files, analysis));
+  }, [active, prompt, isReady, loaded, enqueue, claimPrompt, w.files, agentWorkspace]);
   useEffect(() => {
     const subscription = copilotkit.subscribe({
       onError: (event) => {
@@ -1224,7 +1229,10 @@ export function ChatScreen({
     setShowResults(false);
     lastSent.current = text;
     const files = w.files.filter((f) => attachments.includes(f.id));
-    enqueue(promptWithAttachments(text, files));
+    const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
+      attachments.includes(artifact.id),
+    );
+    enqueue(promptWithAttachments(text, files, analysis));
     composerRef.current?.clear();
     setAttachments([]);
     setPicking(false);
@@ -2301,6 +2309,7 @@ export function ChatScreen({
                   />
                   <ComposerAttachments
                     files={w.files}
+                    analysis={agentWorkspace?.artifacts ?? []}
                     selectedIds={attachments}
                     onRemove={(id) =>
                       setAttachments((ids) => ids.filter((candidate) => candidate !== id))
@@ -2320,6 +2329,7 @@ export function ChatScreen({
       {picking && (
         <FilePickerSheet
           files={w.files}
+          analysis={agentWorkspace?.artifacts ?? []}
           selectedIds={pickerSelection}
           onToggle={(id) =>
             setPickerSelection((ids) =>

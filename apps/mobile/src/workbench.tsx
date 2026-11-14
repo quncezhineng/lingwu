@@ -585,6 +585,7 @@ export function WorkbenchScreen() {
               attachments={
                 <ComposerAttachments
                   files={workspace.files}
+                  analysis={data?.artifacts ?? []}
                   selectedIds={attachments}
                   onRemove={(id) =>
                     setAttachments((ids) => ids.filter((candidate) => candidate !== id))
@@ -775,6 +776,7 @@ export function WorkbenchScreen() {
       {picking && (
         <FilePickerSheet
           files={workspace.files}
+          analysis={data?.artifacts ?? []}
           selectedIds={pickerSelection}
           onToggle={(id) =>
             setPickerSelection((ids) =>

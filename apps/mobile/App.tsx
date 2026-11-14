@@ -61,6 +61,7 @@ import {
   radius,
   s,
   space,
+  textScale,
   typography,
 } from "./src/ui";
 import { WatchlistHubScreen } from "./src/watchlist-hub";
@@ -133,12 +134,17 @@ const AUTH_CONCEPT_POINTS = [
   { number: "03", titleKey: "app.authPointWorkflow" },
 ] as const;
 
-/** 登录前的品牌叙事：桌面展开完整三点，移动端只保留精简开场。 */
+/**
+ * 登录前的品牌叙事：桌面展开完整三点，移动端只保留精简开场。
+ *
+ * 排版按 TDesign 字阶 + 4px 栅格：字号与行高成 28/36、40/48 的规整阶梯，
+ * 眉标—标题—说明—要点列表的区块间距收敛到 12 / 16 / 24 / 48 四档。
+ */
 function AuthWelcome({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();
   return (
-    <View style={{ gap: compact ? 14 : 24 }}>
-      <View style={[s.row, { gap: 8 }]}>
+    <View style={{ gap: compact ? space.md : space.xl }}>
+      <View style={[s.row, { gap: space.xs }]}>
         <View
           style={{
             width: compact ? 14 : 18,
@@ -151,7 +157,7 @@ function AuthWelcome({ compact = false }: { compact?: boolean }) {
             typography.eyebrow,
             {
               color: colors.primaryStrong,
-              fontSize: compact ? 9 : 10,
+              fontSize: textScale.markSmall.fontSize,
               lineHeight: compact ? 14 : 16,
             },
           ]}
@@ -159,12 +165,12 @@ function AuthWelcome({ compact = false }: { compact?: boolean }) {
           {t("app.authConceptEyebrow")}
         </Text>
       </View>
-      <View style={{ gap: compact ? 8 : 12 }}>
+      <View style={{ gap: compact ? space.xs : space.sm }}>
         <Text
           style={{
             color: colors.text,
-            fontSize: compact ? 27 : 40,
-            lineHeight: compact ? 39 : 52,
+            fontSize: compact ? textScale.headlineMedium.fontSize : 40,
+            lineHeight: compact ? textScale.headlineMedium.lineHeight : 48,
             fontWeight: "500",
             letterSpacing: compact ? 0.2 : 0.5,
             fontFamily: fonts.serif,
@@ -180,8 +186,8 @@ function AuthWelcome({ compact = false }: { compact?: boolean }) {
             s.muted,
             {
               maxWidth: compact ? 360 : 500,
-              fontSize: compact ? 13 : 15,
-              lineHeight: compact ? 22 : 25,
+              fontSize: compact ? textScale.bodyMedium.fontSize : typography.body.fontSize,
+              lineHeight: compact ? textScale.bodyMedium.lineHeight : typography.body.lineHeight,
             },
           ]}
         >
@@ -191,19 +197,25 @@ function AuthWelcome({ compact = false }: { compact?: boolean }) {
       {!compact && (
         <View
           style={{
-            gap: 12,
+            gap: space.sm,
             maxWidth: 500,
-            paddingTop: 18,
+            paddingTop: space.lg,
             borderTopWidth: 1,
             borderTopColor: colors.line,
           }}
         >
           {AUTH_CONCEPT_POINTS.map((point) => (
-            <View key={point.number} style={{ flexDirection: "row", gap: 12 }}>
+            <View key={point.number} style={{ flexDirection: "row", gap: space.sm }}>
               <Text
                 style={[
                   typography.eyebrow,
-                  { minWidth: 22, color: colors.faint, fontSize: 9, lineHeight: 19 },
+                  textScale.markSmall,
+                  {
+                    minWidth: 24,
+                    color: colors.faint,
+                    lineHeight: textScale.bodySmall.lineHeight,
+                    letterSpacing: 0,
+                  },
                 ]}
               >
                 {point.number}
@@ -329,8 +341,8 @@ function Root() {
               flexGrow: 1,
               justifyContent: "center",
               alignItems: "center",
-              paddingHorizontal: wideAuth ? space.page : 24,
-              paddingVertical: 28,
+              paddingHorizontal: wideAuth ? space.page : space.xl,
+              paddingVertical: space.xxl,
             }}
             keyboardShouldPersistTaps="handled"
           >
@@ -341,7 +353,7 @@ function Root() {
                 flexDirection: wideAuth ? "row" : "column",
                 alignItems: "stretch",
                 justifyContent: "center",
-                gap: wideAuth ? 64 : 22,
+                gap: wideAuth ? space.hero : space.xl,
               }}
             >
               {wideAuth && (
@@ -349,20 +361,20 @@ function Root() {
                   style={{
                     flex: 1,
                     minWidth: 0,
-                    paddingVertical: 36,
-                    paddingRight: 48,
+                    paddingVertical: space.xxxl,
+                    paddingRight: space.section,
                     borderRightWidth: 1,
                     borderRightColor: colors.line,
                     justifyContent: "space-between",
-                    gap: 54,
+                    gap: space.section,
                   }}
                 >
-                  <View style={[s.row, { gap: 10 }]}>
+                  <View style={[s.row, { gap: space.tight }]}>
                     <BrandMark size={32} />
                     <Text
                       style={{
-                        fontSize: 22,
-                        lineHeight: 30,
+                        fontSize: typography.h1.fontSize,
+                        lineHeight: typography.h1.lineHeight,
                         fontWeight: "600",
                         color: colors.text,
                         letterSpacing: 2.4,
@@ -380,13 +392,13 @@ function Root() {
                   width: wideAuth ? 390 : "100%",
                   maxWidth: 440,
                   alignSelf: wideAuth ? "center" : "auto",
-                  gap: 22,
+                  gap: space.xl,
                   alignItems: "stretch",
                 }}
               >
                 {!wideAuth && (
-                  <View style={{ gap: 18, marginBottom: 2 }}>
-                    <View style={[s.row, { justifyContent: "center", gap: 9 }]}>
+                  <View style={{ gap: space.md, marginBottom: space.hairline }}>
+                    <View style={[s.row, { justifyContent: "center", gap: space.tight }]}>
                       <BrandMark size={29} />
                       <Text
                         style={{
@@ -403,8 +415,14 @@ function Root() {
                     <AuthWelcome compact />
                   </View>
                 )}
-                <Card style={{ padding: 22, borderRadius: radius.panel }}>
-                  <View style={{ alignItems: "center", gap: 8, marginBottom: 20 }}>
+                <Card style={{ padding: space.xl, borderRadius: radius.medium }}>
+                  <View
+                    style={{
+                      alignItems: "center",
+                      gap: space.xs,
+                      marginBottom: space.lg,
+                    }}
+                  >
                     <Mascot size={wideAuth ? 52 : 60} />
                     <Text
                       style={{
@@ -443,7 +461,9 @@ function Root() {
                             {t("app.sendCode")}
                           </Button>
                           {codeSent && (
-                            <Text style={[s.small, { textAlign: "center", marginTop: 10 }]}>
+                            <Text
+                              style={[s.small, { textAlign: "center", marginTop: space.tight }]}
+                            >
                               {t("app.sendCodeSent")}
                             </Text>
                           )}
@@ -485,7 +505,7 @@ function Root() {
                           >
                             {t("app.openWorkspace")}
                           </Button>
-                          <Text style={[s.small, { marginTop: 15, textAlign: "center" }]}>
+                          <Text style={[s.small, { marginTop: space.md, textAlign: "center" }]}>
                             {t("app.localWorkspaceHint", { url: API_URL })}
                           </Text>
                         </>
@@ -775,8 +795,8 @@ function WorkspaceShell({
                 <View
                   style={{
                     height: layout.topBarMobile,
-                    paddingTop: 4,
-                    marginHorizontal: 18,
+                    paddingTop: space.xxs,
+                    marginHorizontal: space.lg,
                   }}
                 >
                   <View style={{ position: "absolute", left: 0, top: 4 }}>
@@ -840,7 +860,7 @@ function WorkspaceShell({
                     height: layout.topBarDesktop,
                     flexDirection: "row",
                     alignItems: "center",
-                    paddingHorizontal: 38,
+                    paddingHorizontal: space.xxxl,
                     backgroundColor: colors.canvas,
                   }}
                 >
@@ -940,8 +960,8 @@ function WorkspaceShell({
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{
                       paddingHorizontal: desktop ? space.page : space.pageMobile,
-                      paddingTop: desktop ? 20 : 16,
-                      paddingBottom: desktop ? 48 : 30,
+                      paddingTop: desktop ? space.lg : space.md,
+                      paddingBottom: desktop ? space.section : space.xxl,
                     }}
                     keyboardShouldPersistTaps="handled"
                   >
@@ -970,7 +990,7 @@ function WorkspaceShell({
                   style={{
                     display: section === "chat" ? "flex" : "none",
                     flex: 1,
-                    paddingHorizontal: desktop ? space.page : 17,
+                    paddingHorizontal: desktop ? space.page : space.md,
                   }}
                 >
                   <AgentStatus />

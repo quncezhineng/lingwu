@@ -13,7 +13,7 @@ import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
 import { fetchSharedConversation, sharedPageUrl } from "./share-page-data";
 import { formatShareDay, type SharedConversation } from "./share-page-model";
-import { colors, radius } from "./theme";
+import { colors, grid, radius, space, textScale, typography } from "./theme";
 
 /**
  * 前端域名下的公开分享页（Web）。
@@ -155,60 +155,96 @@ export default function SharePageView({ id, broken = false }: { id: string; brok
   );
 }
 
+/**
+ * 分享页排版按 TDesign 4px 栅格 + 字号 +8 行高韵律收敛，
+ * 并与 `apps/server/src/share-routes.ts` 的服务端兜底页保持同一套间距与阅读列宽度。
+ * 所有颜色仍取自 `colors`，配色零改动。
+ */
 const styles = StyleSheet.create({
   canvas: { flex: 1, backgroundColor: colors.canvas },
   scroller: { flex: 1 },
   scrollContent: {
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 40,
-    paddingBottom: 56,
+    paddingHorizontal: space.xl,
+    paddingTop: space.section,
+    paddingBottom: space.hero,
   },
-  scrollContentCompact: { paddingHorizontal: 14, paddingTop: 24, paddingBottom: 40 },
-  // 与服务端分享页一致：阅读列上限 720，超出后居中留白。
-  page: { width: "100%", maxWidth: 720 },
-  brand: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 },
-  logo: { width: 22, height: 22, borderRadius: 6 },
+  scrollContentCompact: {
+    paddingHorizontal: space.md,
+    paddingTop: space.xl,
+    paddingBottom: space.xxxl,
+  },
+  // 与服务端分享页一致：阅读列上限 760，超出后居中留白。
+  page: { width: "100%", maxWidth: grid.readingMax },
+  brand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    marginBottom: space.md,
+  },
+  logo: { width: 22, height: 22, borderRadius: radius.default },
   brandName: { fontSize: 13, letterSpacing: 0.3, color: colors.muted },
   home: {
     marginLeft: "auto",
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderRadius: radius.full,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xxs,
+    borderRadius: radius.circle,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.paper,
   },
-  homeText: { fontSize: 13, color: colors.primaryStrong },
+  homeText: {
+    fontSize: 13,
+    lineHeight: textScale.bodyMedium.lineHeight,
+    color: colors.primaryStrong,
+  },
   card: {
     backgroundColor: colors.paper,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
-    paddingVertical: 22,
-    paddingHorizontal: 24,
+    borderRadius: radius.large,
+    paddingVertical: space.xl,
+    paddingHorizontal: space.xl,
   },
-  cardCompact: { paddingVertical: 18, paddingHorizontal: 16, borderRadius: 10 },
-  centerCard: { alignItems: "center", gap: 10 },
-  hint: { fontSize: 15, lineHeight: 25, color: colors.text },
+  cardCompact: {
+    paddingVertical: space.lg,
+    paddingHorizontal: space.md,
+    borderRadius: radius.medium,
+  },
+  centerCard: { alignItems: "center", gap: space.tight },
+  hint: { ...typography.body, color: colors.text },
   ask: {
     backgroundColor: colors.surfaceSoft,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 20,
+    borderRadius: radius.medium,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    marginBottom: space.xl,
   },
-  askLabel: { fontSize: 11, letterSpacing: 0.4, color: colors.muted, marginBottom: 5 },
-  askText: { fontSize: 15, lineHeight: 25, color: colors.text },
-  actions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  askLabel: {
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: colors.muted,
+    marginBottom: space.xxs,
+  },
+  askText: { ...typography.body, color: colors.text },
+  actions: { flexDirection: "row", gap: space.tight, marginTop: space.md },
   action: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: radius.full,
+    paddingHorizontal: space.md,
+    paddingVertical: space.compact,
+    borderRadius: radius.circle,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.paper,
   },
-  actionText: { fontSize: 13, color: colors.primaryStrong },
-  foot: { marginTop: 18, fontSize: 12, color: colors.muted, textAlign: "center" },
+  actionText: {
+    fontSize: 13,
+    lineHeight: textScale.bodyMedium.lineHeight,
+    color: colors.primaryStrong,
+  },
+  foot: {
+    marginTop: space.lg,
+    ...textScale.bodySmall,
+    color: colors.muted,
+    textAlign: "center",
+  },
 });

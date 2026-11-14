@@ -1144,9 +1144,9 @@ export function FilesScreen({
   const [contentWidth, setContentWidth] = useState(0);
   const insightColumns = contentWidth >= 840 ? 3 : contentWidth >= 560 ? 2 : 1;
   const insightCardWidth = insightColumns === 3 ? "31.8%" : insightColumns === 2 ? "48.5%" : "100%";
-  // 上传文件卡片：桌面双列、窄屏单列，与「分析生成」产物卡片同一套栅格逻辑。
-  const fileColumns = contentWidth >= 560 ? 2 : 1;
-  const fileCardWidth = fileColumns === 2 ? "48.5%" : "100%";
+  // 上传文件卡片：桌面三列、中等双列、窄屏单列，与「分析生成」产物卡片同一套栅格逻辑。
+  const fileColumns = contentWidth >= 840 ? 3 : contentWidth >= 560 ? 2 : 1;
+  const fileCardWidth = fileColumns === 3 ? "31.8%" : fileColumns === 2 ? "48.5%" : "100%";
 
   useEffect(() => {
     setSection(initialSection);
@@ -1670,7 +1670,7 @@ export function FilesScreen({
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        justifyContent: "flex-end",
+                        justifyContent: "flex-start",
                         gap: 6,
                       }}
                     >
