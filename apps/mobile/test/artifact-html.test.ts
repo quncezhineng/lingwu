@@ -68,10 +68,13 @@ test("非 Markdown 的多行文本仍用深色代码块展示", () => {
   assert.doesNotMatch(html, /<div class="markdown">/);
 });
 
-test("报告头不重复弹层标题，但保留读屏语义", () => {
-  const html = renderArtifactHtml(artifact({}));
-  assert.match(html, /<h1 class="sr-only">Test report<\/h1>/);
-  assert.doesNotMatch(html, /<h1>Test report<\/h1>/);
+test("导出用完整标题，App 内嵌时只保留读屏标题", () => {
+  const standalone = renderArtifactHtml(artifact({}));
+  assert.match(standalone, /<h1 class="report-title">Test report<\/h1>/);
+
+  const embedded = renderArtifactHtml(artifact({}), { standalone: false });
+  assert.match(embedded, /<h1 class="sr-only">Test report<\/h1>/);
+  assert.doesNotMatch(embedded, /<h1 class="report-title">/);
 });
 
 test("无结构的长摘要拆成可读段落，并给出要点速览", () => {
@@ -88,7 +91,7 @@ test("无结构的长摘要拆成可读段落，并给出要点速览", () => {
   assert.ok((html.match(/<p>/g) ?? []).length >= 2, "长摘要应拆成多个段落");
 });
 
-test("顶层标量收敛为关键指标卡，明细键值形成规范列表", () => {
+test("顶层标量收敛为关键指标卡，标量对象收成键值表", () => {
   const html = renderArtifactHtml(
     artifact({
       pb: 1.16,
@@ -102,8 +105,70 @@ test("顶层标量收敛为关键指标卡，明细键值形成规范列表", ()
   assert.match(html, /<div class="metric-value numeric">1\.16<\/div>/);
   assert.match(html, /class="kv"/);
   assert.doesNotMatch(html, /<h2>Pb<\/h2>/);
-  assert.ok(html.includes(tr("agent.artifactDetailsHeading")));
   assert.match(html, /class="disclaimer"/);
+});
+
+test("记录自身的技术字段不会冒充业务指标", () => {
+  const html = renderArtifactHtml(
+    artifact({
+      id: "6f1c2b9e-8a44-4d0e-9c3f-1f0a2b7d5e11",
+      user_id: "local-user",
+      kind: "research_report",
+      generated_at: "2026-11-13T08:00:00.000Z",
+      pb: 1.16,
+    }),
+  );
+  assert.doesNotMatch(html, /6f1c2b9e/);
+  assert.doesNotMatch(html, /local-user/);
+  assert.doesNotMatch(html, /class="metric-label">Id</);
+  assert.match(html, /<div class="metric-value numeric">1\.16<\/div>/);
+});
+
+test("嵌套的命名空间拆成独立章节，表格不会被压进键值列", () => {
+  const html = renderArtifactHtml(
+    artifact({
+      sections: {
+        peer_comparison: [
+          { name: "贵州茅台", pe: 22.4 },
+          { name: "五粮液", pe: 15.8 },
+        ],
+        risks: ["需求复苏不及预期。"],
+      },
+    }),
+  );
+  // 章节标题来自子键，父级 sections 不再单独成节
+  assert.ok(html.includes(tr("agent.artifactDetailsHeading")) === false);
+  assert.match(html, /class="typeset-scroll"/);
+  assert.match(html, /<ul class="bullet-list">/);
+  assert.doesNotMatch(html, /<dd><div class="typeset-scroll"/);
+});
+
+test("混合对象里的零散标量收成一行元信息，并格式化时间", () => {
+  const html = renderArtifactHtml(
+    artifact({
+      market_data: {
+        as_of: "2026-11-13T00:10:00.000Z",
+        indices: [{ symbol: "^IXIC", change: 0.42 }],
+      },
+    }),
+  );
+  assert.match(html, /class="meta-row"/);
+  assert.match(html, /<time datetime="2026-11-13T00:10:00\.000Z">/);
+  assert.match(html, /class="typeset-scroll"/);
+});
+
+test("章节数达到三个时给出本页目录", () => {
+  const html = renderArtifactHtml(
+    artifact({ news: [{ title: "一" }], risks: ["二"], valuation: { low: 1, high: 2 } }),
+  );
+  assert.match(html, /class="toc"/);
+  assert.ok(html.includes(tr("agent.artifactToc")));
+});
+
+test("正文里与产物同名的 H1 不再重复出现", () => {
+  const html = renderArtifactHtml(artifact({ content: "# Test report\n\n正文第一段。" }, ""));
+  assert.doesNotMatch(html, /<div class="markdown"><h1>Test report<\/h1>/);
+  assert.match(html, /<div class="markdown"><p>正文第一段。<\/p>/);
 });
 
 test("对象数组渲染为带表头、数值列右对齐的规范表格", () => {
@@ -117,5 +182,5 @@ test("对象数组渲染为带表头、数值列右对齐的规范表格", () =>
   );
   assert.match(html, /class="typeset-scroll"/);
   assert.match(html, /<th>Name<\/th>/);
-  assert.match(html, /<th class="numeric">Pe<\/th>/);
+  assert.match(html, /<th class="numeric">P\/E<\/th>/);
 });

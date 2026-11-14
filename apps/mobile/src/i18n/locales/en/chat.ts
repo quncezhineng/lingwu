@@ -94,7 +94,7 @@ const chat = {
   "chat.skillPickerEmptyDetail":
     "This agent has no skills yet. Install one from Skills & connections.",
   "chat.skillPickerSelected": "{count} skills selected",
-  "chat.skillPickerConfirm": "Apply ({count})",
+  "chat.skillPickerConfirm": "Confirm",
   "chat.skillPickerDetail": "View skill details",
   "chat.connectorPickerTool": "Choose connectors",
   "chat.connectorPickerTitle": "Choose connectors",
@@ -103,7 +103,7 @@ const chat = {
   "chat.connectorPickerConnected": "Connected",
   "chat.connectorPickerDisconnected": "Not connected",
   "chat.connectorPickerSelected": "{count} connectors selected",
-  "chat.connectorPickerConfirm": "Apply ({count})",
+  "chat.connectorPickerConfirm": "Confirm",
   "chat.connectorPickerEmptyTitle": "No connectors available",
   "chat.connectorPickerEmptyDetail":
     "Connect services such as Gmail or Calendar to use them in this conversation.",

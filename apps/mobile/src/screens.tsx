@@ -1144,6 +1144,9 @@ export function FilesScreen({
   const [contentWidth, setContentWidth] = useState(0);
   const insightColumns = contentWidth >= 840 ? 3 : contentWidth >= 560 ? 2 : 1;
   const insightCardWidth = insightColumns === 3 ? "31.8%" : insightColumns === 2 ? "48.5%" : "100%";
+  // 上传文件卡片：桌面双列、窄屏单列，与「分析生成」产物卡片同一套栅格逻辑。
+  const fileColumns = contentWidth >= 560 ? 2 : 1;
+  const fileCardWidth = fileColumns === 2 ? "48.5%" : "100%";
 
   useEffect(() => {
     setSection(initialSection);
@@ -1556,9 +1559,10 @@ export function FilesScreen({
           )}
 
           {visibleFiles.length > 0 && (
-            // 文件改为一张卡内的分行列表：共用描边、行间 1px 分隔，去掉表头与逐行卡片
-            <Card style={{ padding: 0, overflow: "hidden" }}>
-              {visibleFiles.map((file, index) => {
+            // 上传文件卡片：桌面双列、窄屏单列，每张文件是一张独立小卡（描边 + 圆角），
+            // 选中时整卡高亮，与「分析生成」产物卡片同一套栅格语汇。
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.sm }}>
+              {visibleFiles.map((file) => {
                 const kind = fileKind(file);
                 const extension = fileExtension(file);
                 const selected = selectedIds.has(file.id);
@@ -1583,14 +1587,14 @@ export function FilesScreen({
                   <View
                     key={file.id}
                     style={{
-                      flexDirection: compact ? "column" : "row",
-                      alignItems: compact ? "stretch" : "center",
-                      gap: compact ? space.xs : space.sm,
+                      width: fileCardWidth,
+                      gap: space.xs,
                       paddingHorizontal: 12,
                       paddingVertical: 12,
-                      borderTopWidth: index ? 1 : 0,
-                      borderTopColor: colors.line,
-                      backgroundColor: selected ? colors.sky : "transparent",
+                      borderWidth: 1,
+                      borderColor: selected ? colors.primary : colors.line,
+                      borderRadius: radius.card,
+                      backgroundColor: selected ? colors.sky : colors.paper,
                     }}
                   >
                     <View style={[s.row, { flex: 1, minWidth: 0, gap: 10 }]}>
@@ -1668,7 +1672,6 @@ export function FilesScreen({
                         alignItems: "center",
                         justifyContent: "flex-end",
                         gap: 6,
-                        marginLeft: compact ? 32 : 0,
                       }}
                     >
                       <IconButton
@@ -1689,7 +1692,7 @@ export function FilesScreen({
                   </View>
                 );
               })}
-            </Card>
+            </View>
           )}
 
           {/* 分析产物按智能体分组：同一张卡里先给智能体名，再列它产出的报告 */}

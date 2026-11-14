@@ -128,6 +128,8 @@ const agent = {
   "agent.artifactMoreMetrics": "More metrics",
   "agent.artifactSummaryHeading": "Summary",
   "agent.artifactDetailsHeading": "Details",
+  "agent.artifactToc": "Contents",
+  "agent.artifactAppendix": "Basis & limits",
   "agent.artifactHtmlAttachment":
     "This section is a full HTML page — export the HTML version to keep its layout.",
   "agent.artifactShare": "Share",
@@ -135,8 +137,6 @@ const agent = {
   "agent.artifactShareShared": "Share sheet opened.",
   "agent.artifactShareCopied": "Share link copied — ready to send.",
   "agent.artifactShareFailed": "Couldn’t create the share link. Try again.",
-  "agent.artifactSharePublicNote":
-    "Sharing creates a public link. Anyone with the link can read this report.",
   "agent.artifactExport": "Export",
   "agent.artifactExportHtml": "Export HTML",
   "agent.artifactExportMarkdown": "Export Markdown",

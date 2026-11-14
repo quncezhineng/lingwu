@@ -594,7 +594,7 @@ export function SkillPickerSheet({
         )}
         <PickerFooter
           summary={t("chat.skillPickerSelected", { count: selectedCount })}
-          confirmLabel={t("chat.skillPickerConfirm", { count: selectedCount })}
+          confirmLabel={t("chat.skillPickerConfirm")}
           onConfirm={onConfirm}
         />
       </View>
@@ -671,7 +671,7 @@ export function ConnectorPickerSheet({
         </View>
         <PickerFooter
           summary={t("chat.connectorPickerSelected", { count: selectedCount })}
-          confirmLabel={t("chat.connectorPickerConfirm", { count: selectedCount })}
+          confirmLabel={t("chat.connectorPickerConfirm")}
           onConfirm={onConfirm}
         />
       </View>

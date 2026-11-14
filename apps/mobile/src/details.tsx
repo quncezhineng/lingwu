@@ -1,7 +1,15 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Linking, Platform, Pressable, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 import {
   type ActionProposal,
   type Artifact,
@@ -21,7 +29,7 @@ import { DelegateSheet, GoalCard, NotificationsSheet, TaskDetail } from "./agent
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
 import { ArtifactActions } from "./artifact-actions";
-import { artifactHasHtmlPreview, renderArtifactHtml } from "./artifact-html";
+import { artifactHasHtmlPreview, formatStamp, renderArtifactHtml } from "./artifact-html";
 import BrowserConsole from "./BrowserConsole";
 import { browserAddress, browserSite } from "./browser-address";
 import { ComputerSheet } from "./computer";
@@ -48,7 +56,9 @@ import {
   FileText,
   Globe2,
   Languages,
+  Lightbulb,
   Mail as MailIcon,
+  MessageCircleQuestion,
   Monitor,
   Pencil,
   Plus,
@@ -1590,23 +1600,21 @@ function InsightDetail({ artifact }: { artifact: AgentArtifact }) {
 }
 /**
  * 研究产物详情：把 `AgentArtifact` 的标题/摘要/全部数据渲染成一张自包含
- * 的 HTML 网页。Web 端用 iframe(`srcDoc`) 展示、原生端用 WebView 展示，
- * 与「对话里只显示标题提示、点击弹出网页详情」的交互保持一致。
+ * 的 HTML 网页。Web 端用 iframe(`srcDoc`) 展示、原生端用 WebView 展示。
+ *
+ * 版式上把弹层当成「文档阅读器」：头部两行动作（收藏/讲浅/不同看法 与
+ * 分享/导出）固定，下面整块交给报告页面，滚动只发生在文档里，
+ * 不再出现「弹层滚动 + iframe 滚动」两层套在一起的情况。
  */
 function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
   const { prefillPrompt, close, notify } = useWorkspace();
   const { t } = useTranslation();
   const savedInsightIds = useSavedInsightIds();
   const [plainOpen, setPlainOpen] = useState(false);
-  const html = useMemo(() => renderArtifactHtml(artifact), [artifact]);
+  // 标题已经在弹层头部展示，文档内不再重复一次（导出时仍是完整标题版）。
+  const html = useMemo(() => renderArtifactHtml(artifact, { standalone: false }), [artifact]);
   const hasHtmlPreview = useMemo(() => artifactHasHtmlPreview(artifact), [artifact]);
-  // 三段与浅释只在 artifact.data 明确提供时展示，不用模板内容补造结论。
   const view = workbenchInsightView(artifact);
-  const sections = [
-    { label: t("ui.insightBasis"), value: view.basis },
-    { label: t("ui.insightLimits"), value: view.limits },
-    { label: t("ui.insightRevisit"), value: view.revisit },
-  ].filter((item) => !!item.value);
   const saved = savedInsightIds.includes(artifact.id);
 
   const explainSimply = () => {
@@ -1626,61 +1634,75 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
   return (
     <Sheet
       title={artifact.title}
-      subtitle={`${statusLabel(artifact.kind)} · ${dateLabel(artifact.createdAt)}`}
+      // 版头收到整个页面顶部：类型 Chip + 生成时间放在标题正下方，与正文阅读列对齐；
+      // 文档内部（standalone: false）不再重复渲染 report-head。
+      subtitle={
+        <View style={[s.row, { gap: 8 }]}>
+          <Chip>{statusLabel(artifact.kind)}</Chip>
+          <Text style={[s.muted, { fontSize: 12, lineHeight: 18 }]}>
+            {formatStamp(artifact.createdAt)}
+          </Text>
+        </View>
+      }
       onClose={close}
       fullscreen
+      // 整窗收窄：桌面端默认 1200 对 820 读列来说白边过大，收窄后贴得更紧。
+      fullscreenMaxWidth={1000}
+      scroll={false}
+      // 阅读列限宽：与文档内部 `.page`（max-width 880）对齐，标题、工具栏、正文
+      // 三条线在同一居中列上，避免「工具栏靠左、文档居中」的脱节感。
+      contentMaxWidth={880}
     >
-      <View style={[s.row, { flexWrap: "wrap", gap: 8, marginBottom: 16 }]}>
-        <Button
-          size="sm"
-          variant="outline"
-          icon={Star}
-          onPress={() => {
-            toggleSavedInsight(artifact.id);
-            notify(t(saved ? "workbench.insightUnsavedNotice" : "workbench.insightSavedNotice"));
-          }}
-        >
-          {t(saved ? "ui.unsaveInsight" : "ui.saveInsight")}
-        </Button>
-        <Button size="sm" variant="ghost" onPress={explainSimply}>
-          {t(plainOpen ? "ui.showLess" : "ui.insightSimplify")}
-        </Button>
-        <Button size="sm" variant="ghost" onPress={disagree}>
-          {t("ui.insightDisagree")}
-        </Button>
-      </View>
-      {/* 报告的动作另起一行：分享（公开链接）与导出（HTML / Markdown）不与阅读动作混排。 */}
-      <View style={{ gap: 6, marginBottom: 16 }}>
-        <ArtifactActions artifact={artifact} variant="full" />
-        <Text style={[s.small, { color: colors.faint }]}>{t("agent.artifactSharePublicNote")}</Text>
-      </View>
-      {plainOpen && view.plain && (
-        <View
-          style={{
-            gap: 5,
-            marginBottom: 16,
-            padding: 13,
-            borderWidth: 1,
-            borderColor: colors.line,
-            borderRadius: 8,
-            backgroundColor: colors.surfaceSoft,
-          }}
-        >
-          <Text style={s.label}>{t("ui.insightSimplify")}</Text>
-          <Text style={s.muted}>{view.plain}</Text>
+      {/* 头部动作区与「讲浅一点」摘要收在同一 880 阅读列，与报告正文对齐；
+          报告本身铺满整宽，让滚动条落在整体页面（弹窗）的最右侧。 */}
+      <View style={{ flex: 1, minHeight: 0, gap: 12 }}>
+        <View style={{ width: "100%", maxWidth: 880, marginHorizontal: "auto", gap: 10 }}>
+          <View style={[s.row, { flexWrap: "wrap", gap: 8 }]}>
+            <Button
+              size="sm"
+              variant="outline"
+              icon={Star}
+              onPress={() => {
+                toggleSavedInsight(artifact.id);
+                notify(
+                  t(saved ? "workbench.insightUnsavedNotice" : "workbench.insightSavedNotice"),
+                );
+              }}
+            >
+              {t(saved ? "ui.unsaveInsight" : "ui.saveInsight")}
+            </Button>
+            <Button size="sm" variant="outline" icon={Lightbulb} onPress={explainSimply}>
+              {t(plainOpen ? "ui.showLess" : "ui.insightSimplify")}
+            </Button>
+            <Button size="sm" variant="outline" icon={MessageCircleQuestion} onPress={disagree}>
+              {t("ui.insightDisagree")}
+            </Button>
+          </View>
+          {/* 投递动作另起一行：分享（公开链接）与导出（HTML / Markdown）不与阅读动作混排。 */}
+          <View style={[s.row, { flexWrap: "wrap", gap: 8 }]}>
+            <ArtifactActions artifact={artifact} variant="full" />
+          </View>
+          {plainOpen && view.plain && (
+            <ScrollView style={{ maxHeight: 168, flexGrow: 0 }}>
+              <View
+                style={{
+                  gap: 5,
+                  padding: 13,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  borderRadius: 8,
+                  backgroundColor: colors.surfaceSoft,
+                }}
+              >
+                <Text style={s.label}>{t("ui.insightSimplify")}</Text>
+                <Text style={s.muted}>{view.plain}</Text>
+              </View>
+            </ScrollView>
+          )}
         </View>
-      )}
-      {sections.length > 0 && (
-        <View style={{ gap: 12, marginBottom: 16 }}>
-          {sections.map((item) => (
-            <View key={item.label} style={{ gap: 3 }}>
-              <Text style={s.label}>{item.label}</Text>
-              <Text style={s.muted}>{item.value}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-      <HtmlPreview html={html} title={artifact.title} interactive={hasHtmlPreview} />
+        {/* 报告铺满整宽：内部 `.page` 自身 880 居中，滚动条出现在弹窗最右侧。 */}
+        <HtmlPreview html={html} title={artifact.title} interactive={hasHtmlPreview} />
+      </View>
     </Sheet>
   );
 }

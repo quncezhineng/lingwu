@@ -523,11 +523,15 @@ export function Sheet({
   fullscreen,
   dismissOnBackdrop = true,
   botLayout = false,
+  scroll = true,
+  contentMaxWidth,
+  fullscreenMaxWidth,
 }: {
   title: string;
   /** 标题左侧装饰元素（如品牌 Logo），展示于标题文字之前。 */
   titleIcon?: ReactNode;
-  subtitle?: string;
+  /** 标题下方的副标题：普通字符串按既有样式渲染；传 ReactNode 可自定义（如版头 Chip + 时间）。 */
+  subtitle?: string | ReactNode;
   /** 标题栏右侧操作（如「一键已读」），排在关闭按钮之前。 */
   headerAction?: ReactNode;
   children: ReactNode;
@@ -545,6 +549,19 @@ export function Sheet({
   dismissOnBackdrop?: boolean;
   /** Bot workspace spacing; uses a bottom sheet only on compact screens. */
   botLayout?: boolean;
+  /**
+   * 内容区是否自带滚动。默认 `true`；渲染整页文档（如研究报告的 iframe / WebView）
+   * 时传 `false`，由文档自己滚动，避免「外层滚动 + 内层滚动」两层套在一起。
+   */
+  scroll?: boolean;
+  /**
+   * 阅读列限宽：把标题栏与正文都收敛到同一条居中的列上（如报告详情 820，
+   * 与文档内部 `.page` 限宽一致），关闭按钮改浮右上角。不传则保持原样。
+   */
+  contentMaxWidth?: number;
+  /** 全屏浮层（`fullscreen`，桌面端）的弹窗宽度。默认 1200；传入更小值可收窄整窗，
+   *  让报告的阅读列与弹窗边缘之间的白边更小（如报告详情 1000）。 */
+  fullscreenMaxWidth?: number;
 }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -623,7 +640,7 @@ export function Sheet({
             },
             fullscreen &&
               !compact && {
-                maxWidth: 1200,
+                maxWidth: fullscreenMaxWidth ?? 1200,
                 height: "100%",
               },
             edgeToEdge && {
@@ -668,6 +685,8 @@ export function Sheet({
                 borderBottomColor: semantic.border,
                 flexShrink: 0,
               },
+              // 限宽阅读列：标题与正文在同一居中列上，关闭按钮浮到右上角。
+              contentMaxWidth ? { position: "relative" } : null,
               mobileBotLayout && {
                 paddingTop: 11,
                 paddingBottom: 16,
@@ -677,7 +696,21 @@ export function Sheet({
               },
             ]}
           >
-            <View style={{ flex: 1, gap: 4 }}>
+            <View
+              style={[
+                { flex: 1, gap: 4 },
+                contentMaxWidth
+                  ? {
+                      flex: undefined,
+                      width: "100%",
+                      maxWidth: contentMaxWidth,
+                      marginHorizontal: "auto",
+                      // 移动端整屏时标题可能抵到右上角关闭按钮，右侧预留按钮宽度。
+                      paddingRight: 56,
+                    }
+                  : undefined,
+              ]}
+            >
               <View style={s.row}>
                 {!!titleIcon && <View style={{ marginRight: 10 }}>{titleIcon}</View>}
                 <Text
@@ -700,30 +733,64 @@ export function Sheet({
                   {title}
                 </Text>
               </View>
-              {!!subtitle && (
-                <Text style={[s.muted, { fontSize: 12, lineHeight: 18 }]}>{subtitle}</Text>
-              )}
+              {!!subtitle &&
+                (typeof subtitle === "string" ? (
+                  <Text style={[s.muted, { fontSize: 12, lineHeight: 18 }]}>{subtitle}</Text>
+                ) : (
+                  subtitle
+                ))}
             </View>
-            {!!headerAction && <View style={{ marginRight: 8 }}>{headerAction}</View>}
-            <IconButton icon={X} label={t("ui.closeDetails")} onPress={dismiss} size={32} />
+            {contentMaxWidth ? (
+              <View
+                style={{
+                  position: "absolute",
+                  right: space.md,
+                  top: space.md,
+                  zIndex: 2,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                {headerAction}
+                <IconButton icon={X} label={t("ui.closeDetails")} onPress={dismiss} size={32} />
+              </View>
+            ) : (
+              <>
+                {!!headerAction && <View style={{ marginRight: 8 }}>{headerAction}</View>}
+                <IconButton icon={X} label={t("ui.closeDetails")} onPress={dismiss} size={32} />
+              </>
+            )}
           </View>
-          <ScrollView
-            testID="sheet-scroll-content"
-            keyboardShouldPersistTaps="handled"
-            style={[{ flexShrink: 1, minHeight: 0 }, (fullscreen || bottomSheet) && { flex: 1 }]}
-            contentContainerStyle={
-              fullscreen
-                ? { flexGrow: 1, padding: space.md }
-                : bottomSheet
-                  ? {
-                      paddingHorizontal: mobileBotLayout ? space.lg : space.md,
-                      paddingBottom: Math.max(insets.bottom, 16) + 16,
-                    }
-                  : { padding: space.md }
-            }
-          >
-            {children}
-          </ScrollView>
+          {scroll ? (
+            <ScrollView
+              testID="sheet-scroll-content"
+              keyboardShouldPersistTaps="handled"
+              style={[{ flexShrink: 1, minHeight: 0 }, (fullscreen || bottomSheet) && { flex: 1 }]}
+              contentContainerStyle={
+                fullscreen
+                  ? { flexGrow: 1, padding: space.md }
+                  : bottomSheet
+                    ? {
+                        paddingHorizontal: mobileBotLayout ? space.lg : space.md,
+                        paddingBottom: Math.max(insets.bottom, 16) + 16,
+                      }
+                    : { padding: space.md }
+              }
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            <View
+              testID="sheet-fixed-content"
+              style={[
+                { flex: 1, minHeight: 0, padding: space.md },
+                compact && fullscreen && { paddingBottom: Math.max(insets.bottom, 10) },
+              ]}
+            >
+              {children}
+            </View>
+          )}
         </AnimatedPressable>
       </Pressable>
     </ModalOverlay>

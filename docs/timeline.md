@@ -5,6 +5,125 @@
 
 ## 变更记录
 
+### 2026-11-14 · 界面：智能体对话选择弹层的确认按钮改为「确认」
+
+**背景**
+
+智能体对话里的「选择技能」与「选择连接器」两个弹层，底部确认按钮文案是「应用（N）」，与「已选择 N 个…」汇总行语义重复，用户要求统一改为「确认」。
+
+**处理**
+
+- [i18n zh-Hans chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts) 与 [en chat.ts](../apps/mobile/src/i18n/locales/en/chat.ts)：`chat.skillPickerConfirm`、`chat.connectorPickerConfirm` 由「应用（{count}）」/「Apply ({count})」改为「确认」/「Confirm」，去掉计数占位——计数信息已由旁边的「已选择 N 个…」汇总行承担。
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx)：两处 `confirmLabel` 调用移除已无用的 `{ count: selectedCount }` 参数，汇总行 `summary` 保持不变。
+
+**验证**
+
+- `pnpm typecheck`（tsc 两处）、`pnpm format`（biome check，575 文件）均通过。
+
+### 2026-11-14 · 界面：资料库上传文件卡片改为双列布局
+
+**背景**
+
+资料库「文件」区的上传文件此前是单列列表：所有文件共用一张卡片，靠行间 1px 分隔线排布，与「分析生成」产物的双列卡片栅格不协调，用户反馈希望上传资料卡片也改成双列。
+
+**处理**
+
+- [screens.tsx](../apps/mobile/src/screens.tsx)（`FilesScreen`）：文件列表由「一张大卡内分割行」改为「栅格小卡」——外层 `flexDirection: row + flexWrap: wrap + gap`，每张文件是一张独立小卡（1px 描边 + 卡片圆角），选中时整卡高亮蓝描边与底色；复用 `contentWidth` 实测宽度决定列数：≥560px 双列（48.5% 宽），窄屏单列（100% 宽）。
+- 卡片内部改为纵向排布（顶部：勾选 + 类型角标 + 文件名/元信息；底部：下载 + 投入分析），双列下不再挤压单行布局，资料密集时文件名/元信息保留单行省略。
+
+**验证**
+
+- `pnpm typecheck`（tsc 两处）、`pnpm format`（biome check，575 文件）均通过。
+
+### 2026-11-14 · 界面：报告详情版头（报告/生成时间）移至弹窗标题下方
+
+**背景**
+
+报告详情弹窗里，文档内容区顶部仍渲染着一行版头（「报告」类型 Chip + 生成时间），而弹窗标题下方也已显示「报告 · 11月11日」摘要信息，两者信息重复且位置脱节（弹窗顶部 vs 文档内容区顶部）。
+
+**处理**
+
+- [ui.tsx](../apps/mobile/src/ui.tsx)（`Sheet` 组件）：`subtitle` 类型由 `string` 扩展为 `string | ReactNode`，普通字符串沿用既有样式渲染，传 ReactNode 时可自定义标题下方的版头行。
+- [details.tsx](../apps/mobile/src/details.tsx)（`ArtifactDetail`）：`Sheet` 的 `subtitle` 改为「类型 Chip + 完整生成时间」的组合——`<Chip>{statusLabel(artifact.kind)}</Chip>` 加 `formatStamp(artifact.createdAt)`（如「2026/11/11 21:12」），与正文阅读列对齐。
+- [artifact-html.ts](../apps/mobile/src/artifact-html.ts)：`formatStamp` 增加 `export` 供浮层复用；`standalone: true`（导出/分享）仍渲染完整版头，`standalone: false`（App 内详情）不再重复渲染 `report-head`，仅当摘要本身就是一句元信息（如「报告已保存」）时降级为正文前一行小字，避免信息丢失。
+
+**验证**
+
+- `pnpm typecheck`（tsc 两处）、`pnpm format`（biome check，575 文件）均通过。
+- Chip 保持默认灰底样式，不额外引入新颜色（用户仅要求调整位置）。
+
+### 2026-11-14 · 界面：报告详情弹窗宽度收窄、阅读列加宽
+
+**背景**
+
+上一轮把报告铺满弹窗整宽后，1200px 弹窗与 820px 阅读列之间仍有约每侧 190px 的白边，用户反馈「左右两侧白边太大、内容宽度很小」。
+
+**处理**
+
+- [ui.tsx](../apps/mobile/src/ui.tsx)（`Sheet` 组件）：新增可选属性 `fullscreenMaxWidth?: number`，`fullscreen` 桌面端弹窗宽度由固定 1200 改为 `fullscreenMaxWidth ?? 1200`；不传时行为与原先完全一致，不影响笔记、个股、导入等其他全屏弹层。
+- [details.tsx](../apps/mobile/src/details.tsx)（`ArtifactDetail`）：`Sheet` 传入 `fullscreenMaxWidth={1000}` 收窄整窗；同时把标题、操作按钮的居中阅读列从 820 加宽到 880，与正文学号一致。
+- [artifact-html.ts](../apps/mobile/src/artifact-html.ts)：报告正文 `.page` 限宽从 820px 放宽到 880px，移动端断点与打印样式不受影响，导出 HTML 版式同步保持一致。
+
+**验证**
+
+- `pnpm typecheck`（tsc 两处）、`pnpm format`（biome check，575 文件）均通过。
+
+### 2026-11-14 · 界面：报告详情滚动条移至整体页面最右侧
+
+**背景**
+
+上一轮把报告详情（标题、工具栏、正文）统一收进 820 居中列后，报告 iframe 也被收窄到 820，其内部滚动条紧贴正文列右侧，与弹窗右缘之间留出大片空白，视觉上不协调。
+
+**处理**
+
+- [details.tsx](../apps/mobile/src/details.tsx)（`ArtifactDetail`）：把报告 `<HtmlPreview>` 从 820 居中列中移出，改为铺满弹窗内容区整宽；标题栏与 7 个操作按钮（收藏/讲浅一点/我有不同看法 + 分享/导出 HTML/Markdown）仍保持在 820 阅读列上、与报告正文左右对齐。iframe 内部 `.page` 自身 `max-width: 820; margin: 0 auto` 居中，正文版式不变，滚动条因此落在整体页面（弹窗）最右侧。
+
+**验证**
+
+- `pnpm typecheck`、`pnpm format`（biome check，575 文件）均通过。
+
+### 2026-11-14 · 界面：报告详情页布局重新设计——标题、工具栏与正文对齐到同一阅读列
+
+**背景**
+
+桌面端 1200px 的全屏报告详情里，顶部标题与 7 个操作按钮都贴着弹窗最左侧，而报告正文（内部 `.page` 限宽 820px）却在中间居中，视觉上「工具栏靠左、文档居中」脱节。
+
+**处理**
+
+- [ui.tsx](../apps/mobile/src/ui.tsx)（`Sheet` 组件）：新增可选属性 `contentMaxWidth?: number`。
+  - 传入时，标题栏与正文收敛到同一条居中的限宽列上（宽度、左右边距与正文一致）；关闭按钮改为绝对定位浮在右上角（`position: relative` 容器 + 右上角浮动行，`zIndex` 保证盖在标题之上）；
+  - 标题文字右侧预留 56px，避免移动端整屏时标题顶到右上角关闭按钮；
+  - 不传该属性时布局与原先完全一致，不影响其他弹层。
+- [details.tsx](../apps/mobile/src/details.tsx)（`ArtifactDetail`）：`Sheet` 传入 `contentMaxWidth={820}`（与报告 `.page` 限宽一致）；内容区整体收进 820 居中列（`width: 100% + maxWidth: 820 + marginHorizontal: auto`），收藏/讲浅一点/我有不同看法 + 分享/导出 HTML/Markdown 等 7 个按钮与报告正文左右对齐。
+
+**验证**
+
+- `pnpm typecheck`、`pnpm format`（biome check，575 文件）均通过。
+
+### 2026-11-13 · 界面：报告详情移除「分享会生成公开链接…」提示文字
+
+**处理**
+
+- [details.tsx](../apps/mobile/src/details.tsx)（`ArtifactDetail`）：删除分享/导出动作行右侧的「分享会生成公开链接，拿到链接的人都能阅读这份报告。」提示（`agent.artifactSharePublicNote`）；同时清理随之不再使用的 `roomy` 判断与 `useWindowDimensions` import。
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)、[en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：删除 `agent.artifactSharePublicNote` 翻译键。
+
+**验证**
+
+- `pnpm typecheck`、`pnpm format`（biome check）均通过。
+
+### 2026-11-13 · 界面：报告详情「讲浅一点 / 我有不同看法」按钮加边框与图标
+
+**处理**
+
+- [details.tsx](../apps/mobile/src/details.tsx)（`ArtifactDetail` 文档阅读器头部动作区）：
+  - 「讲浅一点」由 ghost 改为 outline（带边框），并加 `Lightbulb` 图标；
+  - 「我有不同看法」由 ghost 改为 outline（带边框），并加 `MessageCircleQuestion` 图标；
+  - 与「收藏」按钮（outline + Star）视觉保持一致。
+
+**验证**
+
+- `pnpm typecheck`、`pnpm format`（biome check）均通过。
+
 ### 2026-11-13 · 功能：对话回复操作栏新增「导出为 Markdown」
 
 **背景**

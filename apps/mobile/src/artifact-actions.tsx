@@ -104,7 +104,7 @@ export function ArtifactActions({
     <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
       <Button
         size="sm"
-        variant="outline"
+        variant={full ? "ghost" : "outline"}
         icon={full ? Link2 : Share2}
         busy={busy === "share"}
         onPress={() => void share()}
@@ -113,7 +113,7 @@ export function ArtifactActions({
       </Button>
       <Button
         size="sm"
-        variant="outline"
+        variant={full ? "ghost" : "outline"}
         icon={ArrowDownToLine}
         busy={busy === "html"}
         onPress={() => void save("html")}
