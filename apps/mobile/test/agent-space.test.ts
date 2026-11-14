@@ -9,8 +9,12 @@ import {
   createCustomSkill,
   createSystemAgent,
   DEFAULT_PREFERENCES,
+  applySkillEdits,
   detachSkillFromAgent,
+  draftAgentSpace,
   normalizeAgentSpace,
+  setCatalogSkillInstalled,
+  setLibrarySkillRef,
   onboardingPreferenceContext,
   onboardingSummary,
   parsePreferenceFocus,
@@ -289,6 +293,51 @@ test("installed catalog skills are per Agent, deduped and idempotent on reload",
   assert.deepEqual(state.agents.find((agent) => agent.id === "asset-agent")?.installedSkills, []);
   // 安装关系随 Agent 空间一起持久化，重复读取后保持完全一致。
   assert.deepEqual(normalizeAgentSpace(JSON.parse(JSON.stringify(state)), MAIN_THREAD), state);
+});
+
+test("a browser draft cannot be the source of an installed skill", () => {
+  const installed = setCatalogSkillInstalled(
+    normalizeAgentSpace({ onboardingDone: true }, MAIN_THREAD),
+    SYSTEM_AGENT_ID,
+    "earnings-analysis",
+    true,
+  );
+  const linked = setLibrarySkillRef(
+    {
+      ...installed,
+      skillLibrary: [
+        {
+          id: "lib-1",
+          name: "现金流",
+          purpose: "核对现金",
+          instructions: "先看经营现金流。",
+          outputFormat: "",
+          enabled: true,
+          version: 1,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    },
+    SYSTEM_AGENT_ID,
+    "lib-1",
+    true,
+  );
+  const agent = linked.agents.find((item) => item.id === SYSTEM_AGENT_ID);
+  assert.deepEqual(agent?.installedSkills, ["earnings-analysis"]);
+  assert.deepEqual(agent?.skillRefs, ["lib-1"]);
+  assert.deepEqual(agent?.customSkills, []);
+  const draft = draftAgentSpace(linked);
+  const cached = draft.agents.find((item) => item.id === SYSTEM_AGENT_ID);
+  assert.deepEqual(cached?.installedSkills, []);
+  assert.deepEqual(cached?.skillRefs, []);
+  const restored = applySkillEdits(draft, [
+    { kind: "catalog", agentId: SYSTEM_AGENT_ID, skillId: "earnings-analysis", installed: false },
+  ]);
+  assert.deepEqual(
+    restored.agents.find((item) => item.id === SYSTEM_AGENT_ID)?.installedSkills,
+    [],
+  );
 });
 
 test("onboarding summary keeps global preferences readable in either locale", () => {

@@ -20,15 +20,19 @@ import {
   agentSpaceCanPersist,
   agentSpaceRemoteSettled,
   agentSpaceStorageKey,
+  applySkillEdits,
+  collapseSkillEdits,
   createAgentFromTemplate,
   createCustomSkill,
   DEFAULT_PREFERENCES,
-  detachSkillFromAgent,
+  draftAgentSpace,
   normalizeAgentSpace,
   resolveRemoteAgentSpace,
+  type SkillEdit,
   type SelectionLike,
   SYSTEM_AGENT_ID,
 } from "./agent-space-model";
+import { useTranslation } from "./i18n";
 import { readStorage, writeStorage } from "./i18n/storage";
 import { useLingWuThread } from "./threads";
 import { useWorkspace } from "./workspace";
@@ -89,11 +93,14 @@ const AgentSpaceContext = createContext<AgentSpaceContextValue | null>(null);
 
 function loadState(storageKey: string, mainThreadId: string) {
   const raw = readStorage(storageKey);
-  if (!raw) return normalizeAgentSpace(undefined, mainThreadId);
+  // The cache can draft an agent before the server answers. Installed skills are
+  // not part of that draft: the sidebar reads them only from the server record.
+  const normalize = (value: unknown) => draftAgentSpace(normalizeAgentSpace(value, mainThreadId));
+  if (!raw) return normalize(undefined);
   try {
-    return normalizeAgentSpace(JSON.parse(raw), mainThreadId);
+    return normalize(JSON.parse(raw));
   } catch {
-    return normalizeAgentSpace(undefined, mainThreadId);
+    return normalize(undefined);
   }
 }
 
@@ -105,7 +112,8 @@ export function AgentSpaceProvider({
   /** Stable authenticated-session identity; unlike profile data it cannot lag behind login. */
   accountScope?: string;
 }) {
-  const { api, workspace } = useWorkspace();
+  const { api, notify, workspace } = useWorkspace();
+  const { t } = useTranslation();
   const { mainId } = useLingWuThread();
   const storageKey =
     agentSpaceStorageKey(accountScope ?? workspace.profile.email) ??
@@ -115,6 +123,12 @@ export function AgentSpaceProvider({
   const [remoteLoad, setRemoteLoad] = useState<AgentSpaceRemoteLoad>();
   const remoteRequest = useRef(0);
   const previousStorageKey = useRef(storageKey);
+  const stateRef = useRef(state);
+  const pendingSkills = useRef<SkillEdit[]>([]);
+  const putChain = useRef(Promise.resolve());
+  const commitGeneration = useRef(0);
+  const persistEpoch = useRef(0);
+  stateRef.current = state;
 
   // The server is the source of truth for the default thread id. Existing local
   // Agent data is normalized rather than discarded when that id becomes available.
@@ -136,6 +150,47 @@ export function AgentSpaceProvider({
     writeStorage(storageKey, JSON.stringify(state));
   }, [state, stateStorageKey, storageKey]);
 
+  // One writer at a time, always in the order the edits were made, so an older
+  // snapshot cannot land after a newer install or uninstall.
+  const enqueuePut = useCallback(
+    (next: AgentSpaceState) => {
+      const epoch = persistEpoch.current;
+      const run = putChain.current.then(async () => {
+        if (epoch !== persistEpoch.current) return undefined;
+        try {
+          await api.request("/api/agent-space", next, "PUT");
+        } catch (error) {
+          // Drop snapshots already queued behind this failure. They still carry
+          // the install that the server rejected, and a later read puts the
+          // server record back on screen.
+          persistEpoch.current += 1;
+          throw error;
+        }
+      });
+      putChain.current = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      return run;
+    },
+    [api],
+  );
+
+  const restoreServerSkills = useCallback(
+    async (generation: number) => {
+      try {
+        const remote = await api.request<AgentSpaceState | null>("/api/agent-space");
+        if (generation !== commitGeneration.current) return;
+        const resolved = resolveRemoteAgentSpace(remote, mainId);
+        stateRef.current = resolved;
+        setState(resolved);
+      } catch {
+        // The next successful read replaces this draft. It is not an install fact.
+      }
+    },
+    [api, mainId],
+  );
+
   // Prefer the account's server copy so changing from mobile to web keeps the
   // same Agents. Writes stay disabled until this exact request succeeds, so a
   // slow or failed new-account load cannot upload stale cached Agents.
@@ -148,24 +203,49 @@ export function AgentSpaceProvider({
         if (request !== remoteRequest.current) return;
         // A successful null is authoritative for a first-time account. Do not
         // import a stale local cache from another account into a new workspace.
-        setState(resolveRemoteAgentSpace(remote, mainId));
+        const base = resolveRemoteAgentSpace(remote, mainId);
+        const edits = pendingSkills.current;
+        pendingSkills.current = [];
+        const next = edits.length ? applySkillEdits(base, edits) : base;
+        stateRef.current = next;
+        setState(next);
         setRemoteLoad({ storageKey, request, writable: true });
+        if (!edits.length) return;
+        const generation = ++commitGeneration.current;
+        void enqueuePut(next).catch((error: unknown) => {
+          console.error(
+            "agent-space save failed",
+            error instanceof Error ? error.message : "save failed",
+          );
+          if (generation !== commitGeneration.current) return;
+          notify(t("agent.skillSaveFailed"));
+          stateRef.current = base;
+          setState(base);
+        });
       })
       .catch(() => {
         if (request !== remoteRequest.current) return;
         // Keep the local workspace usable offline, but never PUT over a server
-        // state that has not been read successfully.
+        // state that has not been read successfully. Cached installs stay hidden.
         setRemoteLoad({ storageKey, request, writable: false });
       });
-  }, [api, mainId, storageKey]);
+  }, [api, enqueuePut, mainId, notify, storageKey, t]);
 
   useEffect(() => {
     if (!agentSpaceCanPersist(remoteLoad, storageKey, remoteRequest.current)) return;
+    const epoch = persistEpoch.current;
     const timer = setTimeout(() => {
-      void api.request("/api/agent-space", state, "PUT").catch(() => undefined);
+      if (epoch !== persistEpoch.current) return;
+      const snapshot = stateRef.current;
+      void enqueuePut(snapshot).catch((error: unknown) => {
+        console.error(
+          "agent-space save failed",
+          error instanceof Error ? error.message : "save failed",
+        );
+      });
     }, 250);
     return () => clearTimeout(timer);
-  }, [api, remoteLoad, state, storageKey]);
+  }, [enqueuePut, remoteLoad, state, storageKey]);
 
   const current = useMemo(
     () =>
@@ -362,75 +442,67 @@ export function AgentSpaceProvider({
     }));
   }, []);
 
-  // 只摘掉该 Agent 的副本：账户级技能库（「我的技能」）的原件一字不动。
-  const deleteSkill = useCallback<AgentSpaceContextValue["deleteSkill"]>((agentId, skillId) => {
-    setState((value) => detachSkillFromAgent(value, agentId, skillId));
-  }, []);
+  // The visible install is a draft until this PUT lands. A failure puts the
+  // server record back, which is what refresh and use_skill also read.
+  const commitSpace = useCallback(
+    (next: AgentSpaceState) => {
+      if (next === stateRef.current) return;
+      const generation = ++commitGeneration.current;
+      stateRef.current = next;
+      setState(next);
+      void enqueuePut(next).catch((error: unknown) => {
+        console.error(
+          "agent-space save failed",
+          error instanceof Error ? error.message : "save failed",
+        );
+        if (generation !== commitGeneration.current) return;
+        notify(t("agent.skillSaveFailed"));
+        void restoreServerSkills(generation);
+      });
+    },
+    [enqueuePut, notify, restoreServerSkills, t],
+  );
+
+  const saveSkillEdit = useCallback(
+    (edit: SkillEdit) => {
+      if (!agentSpaceCanPersist(remoteLoad, storageKey, remoteRequest.current)) {
+        pendingSkills.current = collapseSkillEdits([...pendingSkills.current, edit]);
+        const drafted = applySkillEdits(stateRef.current, [edit]);
+        stateRef.current = drafted;
+        setState(drafted);
+        return;
+      }
+      commitSpace(applySkillEdits(stateRef.current, [edit]));
+    },
+    [commitSpace, remoteLoad, storageKey],
+  );
+
+  // 只摘掉该 Agent 的引用和旧副本：账户级技能库（「我的技能」）的原件一字不动。
+  const deleteSkill = useCallback<AgentSpaceContextValue["deleteSkill"]>(
+    (agentId, skillId) => {
+      const id = skillId.trim();
+      if (!id) return;
+      saveSkillEdit({ kind: "ref", agentId, skillId: id, linked: false });
+    },
+    [saveSkillEdit],
+  );
 
   const setSkillRef = useCallback<AgentSpaceContextValue["setSkillRef"]>(
     (agentId, skillId, linked) => {
       const id = skillId.trim();
       if (!id) return;
-      setState((value) => {
-        const target = value.agents.find((agent) => agent.id === agentId);
-        if (!target) return value;
-        const librarySkill = value.skillLibrary.find((skill) => skill.id === id);
-        const refs = new Set(target.skillRefs);
-        if (linked) refs.add(id);
-        else refs.delete(id);
-        const customSkills = librarySkill
-          ? target.customSkills.filter(
-              (skill) =>
-                skill.id !== id &&
-                [skill.name, skill.purpose, skill.instructions, skill.outputFormat].join(
-                  "\u0000",
-                ) !==
-                  [
-                    librarySkill.name,
-                    librarySkill.purpose,
-                    librarySkill.instructions,
-                    librarySkill.outputFormat,
-                  ].join("\u0000"),
-            )
-          : target.customSkills.filter((skill) => skill.id !== id);
-        if (
-          refs.size === target.skillRefs.length &&
-          [...refs].every((item) => target.skillRefs.includes(item)) &&
-          customSkills.length === target.customSkills.length
-        ) {
-          return value;
-        }
-        return {
-          ...value,
-          agents: value.agents.map((agent) =>
-            agent.id === agentId ? { ...agent, skillRefs: [...refs], customSkills } : agent,
-          ),
-        };
-      });
+      saveSkillEdit({ kind: "ref", agentId, skillId: id, linked });
     },
-    [],
+    [saveSkillEdit],
   );
 
   const setSkillInstalled = useCallback<AgentSpaceContextValue["setSkillInstalled"]>(
     (agentId, skillId, installed) => {
       const id = skillId.trim();
       if (!id) return;
-      setState((value) => {
-        const target = value.agents.find((agent) => agent.id === agentId);
-        if (!target || target.installedSkills.includes(id) === installed) return value;
-        return {
-          ...value,
-          agents: value.agents.map((agent) => {
-            if (agent.id !== agentId) return agent;
-            const next = installed
-              ? [...agent.installedSkills, id]
-              : agent.installedSkills.filter((candidate) => candidate !== id);
-            return { ...agent, installedSkills: next };
-          }),
-        };
-      });
+      saveSkillEdit({ kind: "catalog", agentId, skillId: id, installed });
     },
-    [],
+    [saveSkillEdit],
   );
 
   const selection = useMemo<SelectionLike>(

@@ -5,6 +5,7 @@ import {
   findReferencedFile,
   markFileMentions,
   promptWithAttachments,
+  promptWithSkills,
 } from "../src/chat-content.ts";
 
 test("attachment metadata is hidden from the user bubble and returned as chips", () => {
@@ -17,6 +18,19 @@ test("attachment metadata is hidden from the user bubble and returned as chips",
       { name: "data.csv", id: "file-2" },
     ],
   });
+});
+
+test("a selected skill line stays out of the bubble and survives beside attachments", () => {
+  const content = promptWithSkills(
+    promptWithAttachments("Compare these filings", [{ id: "file-2", name: "data.csv" }]),
+    [{ id: "earnings-analysis", name: "财报分析" }],
+  );
+  assert.match(content, /Selected skills: 财报分析 \(skill ID: earnings-analysis\)/);
+  assert.deepEqual(displayUserMessage(content), {
+    text: "Compare these filings",
+    attachments: [{ name: "data.csv", id: "file-2" }],
+  });
+  assert.equal(promptWithSkills("Question", []), "Question");
 });
 
 test("ordinary user text is returned unchanged", () => {

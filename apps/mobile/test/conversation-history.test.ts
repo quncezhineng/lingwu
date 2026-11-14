@@ -143,6 +143,31 @@ test("persisted history is normalized before it is sent back to the runtime", ()
   ]);
 });
 
+test("tool results replayed after a later user message are not sent back", () => {
+  const history = [
+    { id: "user-1", role: "user", content: "Look this up" },
+    {
+      id: "assistant-1",
+      role: "assistant",
+      toolCalls: [
+        {
+          id: "call-1",
+          type: "function",
+          function: { name: "use_connection", arguments: "{}" },
+        },
+      ],
+    },
+    { id: "tool-1", role: "tool", toolCallId: "call-1", content: "connected" },
+    { id: "user-2", role: "user", content: "Thanks" },
+    { id: "tool-late", role: "tool", toolCallId: "call-1", content: "connected again" },
+  ] as unknown as Message[];
+
+  assert.deepEqual(
+    normalizeThreadMessages(history).map((message) => message.id),
+    ["user-1", "assistant-1", "tool-1", "user-2"],
+  );
+});
+
 test("canonical history is returned unchanged", () => {
   const history = [
     {

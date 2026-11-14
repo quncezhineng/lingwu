@@ -5,6 +5,8 @@ import {
   loadBuiltinSkills,
   parseSkillMarkdown,
   readInstalledSkill,
+  selectedSkillsFromRun,
+  skillGuidanceForThread,
   skillPrompt,
 } from "../apps/server/src/engine/bot-skills.ts";
 
@@ -67,4 +69,88 @@ test("installed skills are summarized, and use_skill returns only those bodies",
   assert.match("body" in found && found.body ? found.body : "", /营业收入/);
   const missing = await readInstalledSkill(db, "owner", "thread-a", "not-installed");
   assert.deepEqual(missing, { error: "That skill is not installed on this agent." });
+  const byName = await readInstalledSkill(db, "owner", "thread-a", "财报分析");
+  assert.equal("id" in byName && byName.id, "earnings-analysis");
+});
+
+test("a platform thread still sees the only agent's installed skills", () => {
+  const builtin = parseSkillMarkdown(
+    "earnings-analysis",
+    "---\nname_zh: 财报分析\ndescription_zh: 看业绩。\n---\n先看营收。",
+  );
+  loadBuiltinSkills().set(builtin.id, builtin);
+  const view = installedSkillViews(
+    { agents: [{ threadId: "thread-a", installedSkills: ["earnings-analysis"] }] },
+    "local",
+  );
+  assert.equal(view.bodies.has("earnings-analysis"), true);
+});
+
+test("an unknown thread on a multi-agent space uses the system agent only", () => {
+  const earnings = parseSkillMarkdown(
+    "earnings-analysis",
+    "---\nname_zh: 财报分析\ndescription_zh: 看业绩。\n---\n先看营收。",
+  );
+  const notes = parseSkillMarkdown("notes-skill", "---\nname_zh: 笔记\n---\n记下来。");
+  const builtins = loadBuiltinSkills();
+  builtins.set(earnings.id, earnings);
+  builtins.set(notes.id, notes);
+  const view = installedSkillViews(
+    {
+      agents: [
+        { id: "system-agent", threadId: "main", installedSkills: ["earnings-analysis"] },
+        { id: "other", threadId: "side", installedSkills: ["notes-skill"] },
+      ],
+    },
+    "platform-thread",
+  );
+  assert.deepEqual(
+    view.summaries.map((skill) => skill.id),
+    ["earnings-analysis"],
+  );
+});
+
+test("a skill that is only selected in the browser is not installed", async () => {
+  const builtin = parseSkillMarkdown(
+    "earnings-analysis",
+    "---\nname_zh: 财报分析\ndescription_zh: 看业绩。\n---\n先看营收。",
+  );
+  loadBuiltinSkills().set(builtin.id, builtin);
+  const space = {
+    skillLibrary: [
+      {
+        id: "lib-1",
+        name: "现金流",
+        purpose: "核对利润和现金",
+        instructions: "先提取营业收入。",
+        outputFormat: "",
+      },
+    ],
+    agents: [
+      {
+        id: "system-agent",
+        threadId: "main",
+        installedSkills: [] as string[],
+        skillRefs: [] as string[],
+        customSkills: [],
+      },
+    ],
+  };
+  const db = { get: async <T>() => space as T };
+  const selected = selectedSkillsFromRun({
+    context: [
+      { value: JSON.stringify({ skills: [{ id: "earnings-analysis", name: "财报分析" }] }) },
+    ],
+    messages: [
+      { role: "user", content: "看一下\n\nSelected skills: 财报分析 (skill ID: earnings-analysis)" },
+    ],
+  });
+  assert.deepEqual(selected, [{ id: "earnings-analysis", name: "财报分析" }]);
+  assert.deepEqual(await readInstalledSkill(db, "owner", "main", "earnings-analysis"), {
+    error: "That skill is not installed on this agent.",
+  });
+  assert.deepEqual(await readInstalledSkill(db, "owner", "main", "财报分析"), {
+    error: "That skill is not installed on this agent.",
+  });
+  assert.equal(await skillGuidanceForThread(db, "owner", "main"), "");
 });

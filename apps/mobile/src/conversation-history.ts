@@ -149,5 +149,42 @@ export function normalizeThreadMessages(messages: readonly Message[]): Message[]
     };
     return withoutToolCalls as Message;
   });
-  return changed ? normalized : (messages as Message[]);
+  return dropMisplacedToolResults(changed ? normalized : messages);
+}
+
+/**
+ * A tool result has to sit with the assistant call that produced it. Results that
+ * were replayed after a later user message make the model reject the whole turn.
+ */
+function dropMisplacedToolResults(messages: readonly Message[]): Message[] {
+  let active = new Set<string>();
+  let changed = false;
+  const kept: Message[] = [];
+  for (const message of messages) {
+    if (message.role === "tool") {
+      const id =
+        "toolCallId" in message && typeof message.toolCallId === "string" ? message.toolCallId : "";
+      if (id && active.has(id)) {
+        kept.push(message);
+        continue;
+      }
+      changed = true;
+      continue;
+    }
+    if (message.role === "assistant") {
+      const calls =
+        "toolCalls" in message && Array.isArray(message.toolCalls) ? message.toolCalls : [];
+      active = new Set(
+        calls
+          .map((call) =>
+            call && typeof call === "object" && "id" in call && typeof call.id === "string"
+              ? call.id
+              : "",
+          )
+          .filter((id) => id.length > 0),
+      );
+    } else active = new Set();
+    kept.push(message);
+  }
+  return changed ? kept : (messages as Message[]);
 }

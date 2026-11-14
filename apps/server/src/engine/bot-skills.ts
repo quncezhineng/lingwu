@@ -17,6 +17,7 @@ type StoredSkill = {
 };
 
 type StoredAgent = {
+  id?: string;
   threadId: string;
   installedSkills?: string[];
   skillRefs?: string[];
@@ -88,12 +89,86 @@ function customBody(skill: StoredSkill) {
     .slice(0, BODY_LIMIT);
 }
 
+export type SelectedSkill = { id: string; name?: string };
+
+const SKILL_LINE = /\n\nSelected skills:\s*([^\n]*)/;
+const SKILL_ENTRY = /(.+?)\s+\(skill ID:\s*([^)]+)\)(?:\s*,\s*|$)/g;
+
+function skillKey(value: string) {
+  return value.trim().toLowerCase().replace(/[\s_]+/g, "-");
+}
+
+function messageText(content: unknown) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (part && typeof part === "object" && "text" in part && typeof part.text === "string")
+        return part.text;
+      return "";
+    })
+    .join("");
+}
+
+/** Skills the composer attached to this run, from agent context or the user message. */
+export function selectedSkillsFromRun(input: {
+  context?: readonly { value?: unknown }[];
+  messages?: readonly { role?: string; content?: unknown }[];
+}): SelectedSkill[] {
+  const found: SelectedSkill[] = [];
+  const add = (id: string, name?: string) => {
+    const clean = id.trim();
+    if (!clean || found.some((item) => item.id === clean)) return;
+    found.push({ id: clean, name: name?.trim() || undefined });
+  };
+  for (const entry of input.context ?? []) {
+    let parsed: unknown = entry.value;
+    if (typeof parsed === "string") {
+      const trimmed = parsed.trim();
+      if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) continue;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        continue;
+      }
+    }
+    if (!parsed || typeof parsed !== "object") continue;
+    const skills = (parsed as { skills?: unknown }).skills;
+    if (!Array.isArray(skills)) continue;
+    for (const skill of skills) {
+      if (!skill || typeof skill !== "object") continue;
+      const id = "id" in skill && typeof skill.id === "string" ? skill.id : "";
+      const name = "name" in skill && typeof skill.name === "string" ? skill.name : undefined;
+      add(id, name);
+    }
+  }
+  const latest = [...(input.messages ?? [])].reverse().find((message) => message.role === "user");
+  const line = SKILL_LINE.exec(messageText(latest?.content))?.[1] ?? "";
+  SKILL_ENTRY.lastIndex = 0;
+  for (const match of line.matchAll(SKILL_ENTRY)) add(match[2] ?? "", match[1] ?? "");
+  return found;
+}
+
+/**
+ * The chat thread is the agent's own thread. A platform thread id that has not
+ * been written back yet still belongs to the system agent, or to the only agent.
+ */
+function agentForThread(space: SkillSpace | null | undefined, threadId: string | null | undefined) {
+  const agents = space?.agents ?? [];
+  const id = threadId?.trim();
+  if (id) {
+    const match = agents.find((item) => item.threadId === id);
+    if (match) return match;
+  }
+  return agents.find((item) => item.id === "system-agent") ?? (agents.length === 1 ? agents[0] : undefined);
+}
+
 export function installedSkillViews(
   space: SkillSpace | null | undefined,
   threadId: string | null | undefined,
 ) {
-  const id = threadId?.trim();
-  const agent = id ? space?.agents?.find((item) => item.threadId === id) : undefined;
+  const agent = agentForThread(space, threadId);
   const library = new Map((space?.skillLibrary ?? []).map((skill) => [skill.id, skill]));
   const builtins = loadBuiltinSkills();
   const summaries: SkillSummary[] = [];
@@ -132,6 +207,32 @@ export function skillPrompt(summaries: readonly SkillSummary[]) {
   );
 }
 
+type ResolvedSkill = { id: string; name: string; body: string };
+
+function matchSkill(skills: ReadonlyMap<string, ResolvedSkill>, requested: string) {
+  const trimmed = requested.trim();
+  if (!trimmed) return undefined;
+  const direct = skills.get(trimmed);
+  if (direct) return direct;
+  const key = skillKey(trimmed);
+  for (const skill of skills.values()) {
+    if (skillKey(skill.id) === key || skillKey(skill.name) === key) return skill;
+  }
+  return undefined;
+}
+
+/** use_skill reads the server agent record only: catalog ids and library references. */
+function installedBodies(space: SkillSpace | null | undefined, threadId: string | null | undefined) {
+  const views = installedSkillViews(space, threadId);
+  const catalog = new Map<string, ResolvedSkill>();
+  for (const summary of views.summaries) {
+    const body = views.bodies.get(summary.id);
+    if (!body) continue;
+    catalog.set(summary.id, { id: summary.id, name: summary.name, body: body.body });
+  }
+  return catalog;
+}
+
 export async function skillGuidanceForThread(
   db: { get: <T>(owner: string, kind: string, id: string) => Promise<T | null> },
   owner: string,
@@ -148,7 +249,7 @@ export async function readInstalledSkill(
   skillId: string,
 ) {
   const space = await db.get<SkillSpace>(owner, "agent-settings", "space");
-  const skill = installedSkillViews(space, threadId).bodies.get(skillId.trim());
+  const skill = matchSkill(installedBodies(space, threadId), skillId);
   if (!skill) return { error: "That skill is not installed on this agent." };
-  return { id: skillId.trim(), name: skill.name, body: skill.body };
+  return { id: skill.id, name: skill.name, body: skill.body };
 }

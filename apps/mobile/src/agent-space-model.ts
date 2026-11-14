@@ -588,6 +588,113 @@ export function createCustomSkill(
 }
 
 /**
+ * Installation lives on the server. A browser cache may draft the rest of the
+ * agent, but it must not present catalog skills or library references as installed.
+ */
+export function draftAgentSpace(state: AgentSpaceState): AgentSpaceState {
+  return {
+    ...state,
+    agents: state.agents.map((agent) => ({
+      ...agent,
+      installedSkills: [],
+      skillRefs: [],
+      customSkills: [],
+    })),
+  };
+}
+
+/** Install or remove a catalog skill on one agent. The id is stored, not a copy of the file. */
+export function setCatalogSkillInstalled(
+  state: AgentSpaceState,
+  agentId: string,
+  skillId: string,
+  installed: boolean,
+): AgentSpaceState {
+  const id = skillId.trim();
+  if (!id) return state;
+  const target = state.agents.find((agent) => agent.id === agentId);
+  if (!target || target.installedSkills.includes(id) === installed) return state;
+  return {
+    ...state,
+    agents: state.agents.map((agent) => {
+      if (agent.id !== agentId) return agent;
+      const installedSkills = installed
+        ? [...agent.installedSkills, id].slice(0, 60)
+        : agent.installedSkills.filter((candidate) => candidate !== id);
+      return { ...agent, installedSkills };
+    }),
+  };
+}
+
+/** Link or unlink a library skill by id. Matching leftover copies are removed, not kept as the install. */
+export function setLibrarySkillRef(
+  state: AgentSpaceState,
+  agentId: string,
+  skillId: string,
+  linked: boolean,
+): AgentSpaceState {
+  const id = skillId.trim();
+  if (!id) return state;
+  const target = state.agents.find((agent) => agent.id === agentId);
+  if (!target) return state;
+  const librarySkill = state.skillLibrary.find((skill) => skill.id === id);
+  const refs = new Set(target.skillRefs);
+  if (linked) refs.add(id);
+  else refs.delete(id);
+  const customSkills = librarySkill
+    ? target.customSkills.filter(
+        (skill) =>
+          skill.id !== id &&
+          [skill.name, skill.purpose, skill.instructions, skill.outputFormat].join("\u0000") !==
+            [librarySkill.name, librarySkill.purpose, librarySkill.instructions, librarySkill.outputFormat].join(
+              "\u0000",
+            ),
+      )
+    : target.customSkills.filter((skill) => skill.id !== id);
+  if (
+    refs.size === target.skillRefs.length &&
+    [...refs].every((item) => target.skillRefs.includes(item)) &&
+    customSkills.length === target.customSkills.length
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    agents: state.agents.map((agent) =>
+      agent.id === agentId
+        ? { ...agent, skillRefs: [...refs].slice(0, 60), customSkills }
+        : agent,
+    ),
+  };
+}
+
+export type SkillEdit =
+  | { kind: "catalog"; agentId: string; skillId: string; installed: boolean }
+  | { kind: "ref"; agentId: string; skillId: string; linked: boolean };
+
+/** The latest edit for each agent and skill wins. */
+export function collapseSkillEdits(edits: readonly SkillEdit[]): SkillEdit[] {
+  const kept: SkillEdit[] = [];
+  for (const edit of edits) {
+    const index = kept.findIndex(
+      (item) => item.kind === edit.kind && item.agentId === edit.agentId && item.skillId === edit.skillId,
+    );
+    if (index >= 0) kept.splice(index, 1);
+    kept.push(edit);
+  }
+  return kept;
+}
+
+export function applySkillEdits(state: AgentSpaceState, edits: readonly SkillEdit[]): AgentSpaceState {
+  return edits.reduce((current, edit) => {
+    if (edit.kind === "catalog") {
+      return setCatalogSkillInstalled(current, edit.agentId, edit.skillId, edit.installed);
+    }
+    return setLibrarySkillRef(current, edit.agentId, edit.skillId, edit.linked);
+  }, state);
+}
+
+/**
  * 把某个 Agent 上的自建技能副本摘掉，**完全不碰账户级技能库**。
  *
  * 语义就是 Agent 详情技能卡片的「移除」：这个 Agent 不再具备该能力，

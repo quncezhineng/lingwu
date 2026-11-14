@@ -57,7 +57,12 @@ import {
   SkillPickerSheet,
   skillDisplayName,
 } from "./capability-picker";
-import { displayUserMessage, promptWithAttachments } from "./chat-content";
+import {
+  displayUserMessage,
+  promptWithAttachments,
+  promptWithSkills,
+  withoutSelectedSkills,
+} from "./chat-content";
 import { ComposerDock, ComposerMatte } from "./composer-dock";
 import { BrowserThreadCard } from "./computer";
 import { ConversationHeader, type ConversationHeaderState } from "./conversation-header";
@@ -504,9 +509,23 @@ function reportDeliveries(
   return byMessage;
 }
 
+function skillToolFailed(result: unknown) {
+  let value = result;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return false;
+    }
+  }
+  return Boolean(value && typeof value === "object" && "error" in value && value.error);
+}
+
+/** A skill lookup is not a task. Success stays on the tool step; a miss is one line. */
 function UseSkillCard({ result, loading }: { result: unknown; loading: boolean }) {
   const { t } = useTranslation();
-  return <ServerToolCard name={t("tools.toolStepUseSkill")} result={result} loading={loading} />;
+  if (loading || !skillToolFailed(result)) return null;
+  return <Text style={s.muted}>{t("chat.skillUnavailable")}</Text>;
 }
 
 function ServerToolCard({
@@ -578,7 +597,7 @@ function ServerToolCard({
 }
 /** 从第一条用户消息生成对话标题：去掉附件说明、压缩空白，最多保留 24 个字符。 */
 function titleFrom(text: string): string {
-  const plain = text.split("\n\nAttached documents:")[0].replace(/\s+/g, " ").trim();
+  const plain = withoutSelectedSkills(text).split("\n\nAttached documents:")[0].replace(/\s+/g, " ").trim();
   if (!plain) return "";
   return plain.length > 24 ? `${plain.slice(0, 24)}…` : plain;
 }
@@ -1159,8 +1178,12 @@ export function ChatScreen({
     const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
       prompt.attachmentIds?.includes(artifact.id),
     );
-    enqueue(promptWithAttachments(prompt.text, files, analysis));
-  }, [active, prompt, isReady, loaded, enqueue, claimPrompt, w.files, agentWorkspace]);
+    const skills = (prompt.skillIds ?? [])
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .map((id) => ({ id, name: skillDisplayName(id, heldSkills) }));
+    enqueue(promptWithSkills(promptWithAttachments(prompt.text, files, analysis), skills));
+  }, [active, prompt, isReady, loaded, enqueue, claimPrompt, w.files, agentWorkspace, heldSkills]);
   useEffect(() => {
     const subscription = copilotkit.subscribe({
       onError: (event) => {
@@ -1232,9 +1255,10 @@ export function ChatScreen({
     const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
       attachments.includes(artifact.id),
     );
-    enqueue(promptWithAttachments(text, files, analysis));
+    enqueue(promptWithSkills(promptWithAttachments(text, files, analysis), selectedSkills));
     composerRef.current?.clear();
     setAttachments([]);
+    setSelectedSkillIds([]);
     setPicking(false);
   }
   const messages = loaded ? visibleHistoryWindow(agent.messages || [], firstHistoryId) : [];

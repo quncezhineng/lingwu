@@ -740,6 +740,8 @@ const agent = {
   "agent.skillShareBlockedToast":
     "This copy can't be removed — the skill must stay in at least one Agent.",
   "agent.skillInstalledToast": "“{title}” added to {agent}.",
+  "agent.skillSaveFailed":
+    "The skill was not saved on the server. The installed list was restored from the server.",
   "agent.skillUninstalledToast": "“{title}” removed from {agent}.",
   "agent.skillDetachedToast": "“{title}” removed from {agent}. It's still in My Skills.",
   "agent.onYourComputer": "On your computer",

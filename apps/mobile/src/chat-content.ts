@@ -13,6 +13,24 @@ export interface DisplayUserMessage {
 }
 
 const ATTACHMENT_MARKER = /\n\nAttached documents:\s*/;
+
+/** Drop the composer skill line before the bubble or title is shown. */
+export function withoutSelectedSkills(content: string): string {
+  return content.replace(/\n\nSelected skills:\s*[^\n]*/g, "").trimEnd();
+}
+
+/** Append the skill ids the server uses to load methods the person attached. */
+export function promptWithSkills(
+  text: string,
+  skills: readonly { id: string; name: string }[],
+): string {
+  const entries = skills
+    .map((skill) => ({ id: skill.id.trim(), name: (skill.name || skill.id).trim() }))
+    .filter((skill) => skill.id);
+  if (!entries.length) return text;
+  const line = entries.map((skill) => `${skill.name} (skill ID: ${skill.id})`).join(", ");
+  return `${text.replace(/\s+$/g, "")}\n\nSelected skills: ${line}`;
+}
 const ATTACHMENT_ENTRY = /(.+?)\s+\(artifact ID:\s*([^)]+)\)(?:\s*,\s*|$)/g;
 const UNTOUCHED_MARKDOWN = /(```[\s\S]*?```|`[^`\n]*`|\[[^\]]*\]\([^)]*\)|<[^>]*>)/g;
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\/-]/g;
@@ -20,10 +38,11 @@ const REGEX_SPECIAL = /[.*+?^${}()|[\]\\/-]/g;
 /** The composer appends artifact ids after a blank line for the agent. Hide that
  *  transport detail from the bubble and expose the files as tappable chips. */
 export function displayUserMessage(content: string): DisplayUserMessage {
-  const marker = ATTACHMENT_MARKER.exec(content);
-  if (!marker) return { text: content, attachments: [] };
-  const text = content.slice(0, marker.index).trimEnd();
-  const segment = content.slice(marker.index + marker[0].length);
+  const visible = withoutSelectedSkills(content);
+  const marker = ATTACHMENT_MARKER.exec(visible);
+  if (!marker) return { text: visible, attachments: [] };
+  const text = visible.slice(0, marker.index).trimEnd();
+  const segment = visible.slice(marker.index + marker[0].length);
   const attachments: UserAttachment[] = [];
   for (const match of segment.matchAll(ATTACHMENT_ENTRY)) {
     const name = match[1]?.trim();

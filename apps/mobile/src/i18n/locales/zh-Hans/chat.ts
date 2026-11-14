@@ -13,6 +13,7 @@ const chat = {
   "chat.serverToolOpenWorkspace": "打开工作区即可查看已保存的结果。",
   "chat.taskCreationIncomplete": "这次任务未能创建。你可以在对话中继续说明需求。",
   "chat.serverToolIncomplete": "这次操作未完成。你可以回到对话继续。",
+  "chat.skillUnavailable": "这个技能还没有挂到当前智能体上。",
   "chat.serverToolView": "查看{name}",
   "chat.historyLoadError": "无法加载对话。你已保存的消息没有发生变化。{detail}",
   "chat.stopError": "无法停止回复：{detail}",

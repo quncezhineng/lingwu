@@ -659,6 +659,7 @@ const agent = {
   "agent.skillShareLocked": "已添加 · 不可移除",
   "agent.skillShareBlockedToast": "该副本不可移除，技能需至少保留在一个智能体中。",
   "agent.skillInstalledToast": "已将「{title}」添加到{agent}。",
+  "agent.skillSaveFailed": "技能没有写到服务器，安装状态已按服务器记录恢复。",
   "agent.skillUninstalledToast": "已将「{title}」从{agent}移除。",
   "agent.skillDetachedToast": "已将「{title}」从{agent}移除，技能仍保留在「我的技能」中。",
   "agent.onYourComputer": "在你的电脑上",

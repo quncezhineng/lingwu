@@ -641,7 +641,7 @@ export class ConversationAgent extends AbstractAgent {
       defineTool({
         name: "use_skill",
         description:
-          "Read the full method of one skill installed on this agent. Call it before following a skill. skillId comes from the installed-skill list.",
+          "Read the full method of one skill installed on this agent. Call it before following a skill. skillId is the id from the installed-skill list. A matching display name is accepted.",
         parameters: z.object({ skillId: z.string().trim().min(1).max(128) }),
         execute: async ({ skillId }) =>
           readInstalledSkill(this.service.db, this.owner, input.threadId, skillId),

@@ -15,6 +15,7 @@ const chat = {
     "This task was not created. You can continue describing what you need in the conversation.",
   "chat.serverToolIncomplete":
     "This operation was not completed. You can continue in the conversation.",
+  "chat.skillUnavailable": "This skill is not available on this agent.",
   "chat.serverToolView": "View {name}",
   "chat.historyLoadError":
     "Could not load conversation. Your saved messages have not been changed. {detail}",
