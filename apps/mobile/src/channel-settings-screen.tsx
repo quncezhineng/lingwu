@@ -1,5 +1,6 @@
 import { type ComponentType, useMemo, useState } from "react";
 import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import type { Artifact } from "../../../packages/domain/src";
 import type { AgentTask } from "../../../packages/domain/src/agent";
 import {
   CHANNEL_AVATARS,
@@ -10,20 +11,35 @@ import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import { AGENT_CAPABILITY_LABELS } from "./agent-space-model";
+import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
+import { CardGrid } from "./card-grid";
 import { useChannels } from "./channels";
+import { saveRemoteFile, shareRemoteFile } from "./file-export";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import { statusLabel } from "./i18n/translate";
-import { Brain, Clock3, Settings2, Terminal, Users } from "./icons";
+import {
+  ArrowDownToLine,
+  Brain,
+  Clock3,
+  FileText,
+  FolderOpen,
+  Heart,
+  Settings2,
+  Share2,
+  Terminal,
+  Users,
+} from "./icons";
+import { PreferencesScreen } from "./preferences-screen";
 import { StatusBadge, taskStatusTone } from "./status-badge";
 import { breakpoints, colors, radius, shadow, space, typography } from "./theme";
-import { Button, Field, HoverPressable, s } from "./ui";
+import { Button, Field, HoverPressable, IconButton, LinkRow, SectionHeading, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 频道详情页的左栏分区。 */
-type ChannelSettingsTab = "profile" | "instructions" | "skills" | "tasks";
+type ChannelSettingsTab = "profile" | "instructions" | "skills" | "files" | "tasks" | "memory";
 
 const TABS: ReadonlyArray<{
   id: ChannelSettingsTab;
@@ -33,7 +49,9 @@ const TABS: ReadonlyArray<{
   { id: "profile", icon: Settings2, labelKey: "channels.settingsProfile" },
   { id: "instructions", icon: Terminal, labelKey: "channels.settingsInstructions" },
   { id: "skills", icon: Brain, labelKey: "channels.settingsSkills" },
+  { id: "files", icon: FolderOpen, labelKey: "channels.settingsFiles" },
   { id: "tasks", icon: Clock3, labelKey: "channels.settingsTasks" },
+  { id: "memory", icon: Heart, labelKey: "channels.settingsMemory" },
 ];
 
 /**
@@ -97,8 +115,12 @@ export function ChannelSettingsScreen({ channel }: { channel: Channel }) {
         );
       case "skills":
         return <ChannelSkillsPanel channel={channel} />;
+      case "files":
+        return <ChannelFilesPanel channel={channel} />;
       case "tasks":
         return <ChannelTasksPanel channel={channel} />;
+      case "memory":
+        return <ChannelMemoryPanel channel={channel} />;
       default:
         return (
           <View style={{ gap: 2 }}>
@@ -481,6 +503,128 @@ function ChannelTasksPanel({ channel }: { channel: Channel }) {
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+/** 文件页：这个频道投研任务产出的文件与产物（与 Agent 详情「资料」页同一版式）。 */
+function ChannelFilesPanel({ channel }: { channel: Channel }) {
+  const { t } = useTranslation();
+  const { data } = useAgentWorkspace();
+  const { workspace, open, api, notify } = useWorkspace();
+  // 同一个资料库里可能连着点开多个文件，忙碌状态按 id 记录，避免互相挡住。
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  // 频道范围：投研顶层任务的 artifactIds 指向的文件，以及这些任务产出的产物。
+  const { files, artifacts } = useMemo(() => {
+    const tasks = (data?.tasks ?? []).filter(
+      (task) => typeof task.input?.channelId === "string" && task.input.channelId === channel.id,
+    );
+    const taskIds = new Set(tasks.map((task) => task.id));
+    const fileIds = new Set(tasks.flatMap((task) => task.artifactIds));
+    return {
+      files: workspace.files.filter((file) => fileIds.has(file.id)),
+      artifacts: (data?.artifacts ?? []).filter((artifact) => taskIds.has(artifact.taskId)),
+    };
+  }, [data?.tasks, data?.artifacts, workspace.files, channel.id]);
+
+  async function share(file: Artifact) {
+    if (busyId) return;
+    setBusyId(file.id);
+    try {
+      const result = await shareRemoteFile(api, file);
+      notify(t(result === "saved" ? "screens.filesShareSaved" : "screens.filesShared"));
+    } catch {
+      notify(t("screens.filesShareFailed"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function save(file: Artifact) {
+    if (busyId) return;
+    setBusyId(file.id);
+    try {
+      await saveRemoteFile(api, file);
+      notify(t("screens.filesExported", { name: file.name }));
+    } catch {
+      notify(t("screens.filesExportFailed"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (!files.length && !artifacts.length) {
+    return (
+      <View style={{ gap: 8, alignItems: "center", paddingVertical: 18 }}>
+        <FolderOpen size={28} color={colors.faint} />
+        <Text style={[s.muted, { textAlign: "center" }]}>{t("channels.filesEmpty")}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 12 }}>
+      {!!files.length && (
+        <>
+          <SectionHeading title={t("screens.libraryFiles")} count={files.length} />
+          <CardGrid
+            items={files}
+            minColumnWidth={300}
+            getKey={(file) => file.id}
+            render={(file) => (
+              <View style={[s.row, { gap: 2 }]}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <LinkRow
+                    icon={FileText}
+                    title={file.name}
+                    onPress={() => open({ type: "file", file })}
+                  />
+                </View>
+                <IconButton
+                  icon={Share2}
+                  label={t("screens.filesShare", { name: file.name })}
+                  size={32}
+                  onPress={() => void share(file)}
+                />
+                <IconButton
+                  icon={ArrowDownToLine}
+                  label={t("screens.filesDownload", { name: file.name })}
+                  size={32}
+                  onPress={() => void save(file)}
+                />
+              </View>
+            )}
+          />
+        </>
+      )}
+      {!!artifacts.length && (
+        <>
+          <SectionHeading title={t("agentSpace.artifacts")} count={artifacts.length} />
+          <CardGrid
+            items={artifacts}
+            minColumnWidth={300}
+            getKey={(artifact) => artifact.id}
+            render={(artifact) => <ArtifactCard artifact={artifact} />}
+          />
+        </>
+      )}
+    </View>
+  );
+}
+
+/**
+ * 记忆页：频道专属记忆。
+ *
+ * 记忆按 `agentId` 字段隔离，这里复用同一隔离口径、以频道 id 作为作用域键，
+ * 因此频道记忆既独立于各 Agent，又能在编排时被成员读到。
+ */
+function ChannelMemoryPanel({ channel }: { channel: Channel }) {
+  const { t } = useTranslation();
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={[s.muted, { lineHeight: 20 }]}>{t("channels.memoryHint")}</Text>
+      <PreferencesScreen embedded agentId={channel.id} emptyAdd={false} />
     </View>
   );
 }

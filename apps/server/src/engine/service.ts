@@ -1517,9 +1517,15 @@ export class AgentService {
         const signals = detectDealSignals(task.result);
         if (signals.length > 0) {
           const stage = signals[0]?.stage ?? "决策";
-          const agentId = task.threadId
-            ? ((await agentIdForThread(this.db, owner, task.threadId)) ?? "default")
-            : "default";
+          // 频道投研的结论沉淀到「频道记忆」——与频道详情页的记忆分区是同一份数据，
+          // 下一轮成员执行时会被当作共享上下文读回；其余任务沿用发起线程所属 Agent。
+          const channelId =
+            typeof task.input?.channelId === "string" ? task.input.channelId.trim() : "";
+          const agentId =
+            channelId ||
+            (task.threadId
+              ? ((await agentIdForThread(this.db, owner, task.threadId)) ?? "default")
+              : "default");
           await this.saveMemory(owner, {
             agentId,
             kind: "decision",
@@ -1641,6 +1647,10 @@ export class AgentService {
           .filter((slug): slug is string => typeof slug === "string" && slug.trim().length > 0)
           .map((slug) => slug.trim())
       : [];
+    // 频道 id 一并下传：记忆作用域要按「本频道共享记忆 + 成员私有记忆」解析（memory-scope.ts），
+    // 不下传的话成员只能看到账户级与自己的记忆，读不到频道共享上下文。
+    const channelId =
+      typeof parent?.input?.channelId === "string" ? parent.input.channelId.trim() : "";
     const connectorGuidance = channelConnectorSlugs.length
       ? `This task is part of a channel research run. The user selected these connectors for the run: ${channelConnectorSlugs.join(", ")}. Use use_connection with these slugs to fetch real data (omit the tool argument to list a connector's tools first) instead of inventing data.`
       : "";
@@ -1658,6 +1668,7 @@ export class AgentService {
         assignedAgent: node.agentTemplate,
         input: {
           orchestrationNodeId: node.id,
+          ...(channelId ? { channelId } : {}),
           ...(channelConnectorSlugs.length ? { channelConnectorSlugs } : {}),
         },
       },

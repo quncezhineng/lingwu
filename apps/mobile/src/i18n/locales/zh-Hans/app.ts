@@ -322,7 +322,8 @@ const app = {
   "preferences.toldOn": "你在 {date} 告诉我",
   "preferences.contextDetail": "这些记忆由当下智能体产生，分析时会作为参考。你可以随时编辑或删除。",
   "preferences.contextDetailGlobal":
-    "这里汇总了你的所有记忆卡片，涵盖所有智能体。你可以随时查看、编辑或删除。",
+    "这里汇总了你的所有记忆卡片，涵盖所有智能体与频道。你可以随时查看、编辑或删除。",
+  "preferences.scopeAccount": "账户级",
   "preferences.deleteConfirmDetail": "删除后，灵悟将不再参考这条记忆。",
   "preferences.emptyTitle": "还没有记忆",
   "preferences.emptyDetail": "可以先写下投资周期、可接受的回撤，或你最想持续弄懂的领域。",

@@ -7,7 +7,6 @@ import { from, mergeMap, Observable } from "rxjs";
 import { z } from "zod";
 import {
   type AgentIdentity,
-  type AgentMemory,
   type AgentMemoryV2,
   type AgentNotification,
   createTaskSchema,
@@ -33,6 +32,7 @@ import { searchDescription, searchInputSchema, searchInstructions } from "../sea
 import { agentIdentityGuidance } from "./agent-persona.ts";
 import { readInstalledSkill, skillGuidanceForThread } from "./bot-skills.ts";
 import { recallMemories } from "./memory-recall.ts";
+import { filterMemoriesForScope } from "./memory-scope.ts";
 import { reminderList } from "./reminder-list.ts";
 import type { AgentService } from "./service.ts";
 import { tanstackAgent } from "./tanstack-agent.ts";
@@ -627,13 +627,11 @@ export class ConversationAgent extends AbstractAgent {
           limit: z.number().int().min(1).max(20).default(10),
         }),
         execute: async ({ query, limit }) => {
-          const agentId =
-            (await agentIdForThread(this.service.db, this.owner, input.threadId)) ?? "default";
-          // 当前 Agent 的记忆（按 agentId 隔离；旧数据无 agentId 视为 "default"）。
-          const memories = await this.service.db.list<AgentMemory>(this.owner, "memories");
-          const mine = memories.filter(
-            (m) => (((m as AgentMemoryV2).agentId ?? "").trim() || "default") === agentId,
-          );
+          // 与执行侧（executeModelTask）同一口径：账户级共享 + 当前 Agent 私有。
+          // 对话线程不隶属任何频道，所以这里不带 channelId。
+          const agentId = await agentIdForThread(this.service.db, this.owner, input.threadId);
+          const memories = await this.service.db.list<AgentMemoryV2>(this.owner, "memories");
+          const mine = filterMemoriesForScope(memories, { agentId });
           // 关键词召回为兜底（本地、零成本）；语义召回由 service.memory 提供（M0 已接 Hindsight）。
           return { query, memories: recallMemories(mine, query, limit) };
         },

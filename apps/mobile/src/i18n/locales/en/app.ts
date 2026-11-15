@@ -355,7 +355,8 @@ const app = {
   "preferences.contextDetail":
     "These memories are created by the current assistant and used as reference during analysis. You can edit or remove them at any time.",
   "preferences.contextDetailGlobal":
-    "Your all memory cards live here, covering all assistants. You can view, edit, or remove them at any time.",
+    "Your memory cards live here, covering all assistants and channels. You can view, edit, or remove them at any time.",
+  "preferences.scopeAccount": "Account-wide",
   "preferences.deleteConfirmDetail": "LingWu will stop using this memory after deletion.",
   "preferences.emptyTitle": "No memories yet",
   "preferences.emptyDetail":

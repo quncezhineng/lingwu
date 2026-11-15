@@ -51,7 +51,8 @@ const channels = {
   "channels.nodeFailed": "Failed",
   "channels.nodeSkipped": "Skipped",
   "channels.resultLabel": "Final report",
-  "channels.instructionsContext": "Channel shared instructions (all members must follow): {instructions}\n",
+  "channels.instructionsContext":
+    "Channel shared instructions (all members must follow): {instructions}\n",
   "channels.instructionsHint":
     "Channel-level shared instructions, injected into every member Agent's context on each research run.",
   "channels.settingsProfile": "Profile",
@@ -60,6 +61,12 @@ const channels = {
   "channels.settingsInstructions": "Instructions",
   "channels.settingsSkills": "Skills",
   "channels.settingsTasks": "Tasks",
+  "channels.settingsFiles": "Files",
+  "channels.settingsMemory": "Memory",
+  "channels.filesEmpty":
+    "This channel has no files or reports yet. They will appear here after a research run.",
+  "channels.memoryHint":
+    "Channel-specific memories: only this channel's members read them as shared context during runs. Other channels cannot see them.",
   "channels.memberCount": "{count} members",
   "channels.skillsHint":
     "A channel's capabilities come from its member Agents; this shows the union of member skills (read-only).",

@@ -10,6 +10,7 @@ import {
 import { useAgentSpace } from "./agent-space";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
+import { useChannels } from "./channels";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {
   Activity,
@@ -377,8 +378,9 @@ export function PreferencesScreen({
   const memories = agentId
     ? (data?.memories ?? []).filter((m) => memoryAgentId(m) === agentId)
     : (data?.memories ?? []);
-  // 全局模式下按 Agent 聚合，作为可点击的分类筛选（每个分类带记忆条数）。
+  // 全局模式下按 Agent / 频道聚合，作为可点击的分类筛选（每个分类带记忆条数）。
   const { agents } = useAgentSpace();
+  const { channels } = useChannels();
   const byAgent = agentId
     ? null
     : (() => {
@@ -389,7 +391,12 @@ export function PreferencesScreen({
         }
         return [...counts.entries()].map(([id, count]) => ({
           id,
-          name: agents.find((a) => a.id === id)?.name ?? id,
+          // 归属可能指向 Agent，也可能是频道（频道记忆以频道 id 为作用域键），
+          // 都没有匹配则回退到「账户级」/原始 id，避免界面出现裸 uuid。
+          name:
+            agents.find((agent) => agent.id === id)?.name ??
+            channels.find((channel) => channel.id === id)?.name ??
+            (id === "default" ? t("preferences.scopeAccount") : id),
           count,
         }));
       })();

@@ -55,6 +55,11 @@ const channels = {
   "channels.settingsInstructions": "指令",
   "channels.settingsSkills": "技能",
   "channels.settingsTasks": "任务",
+  "channels.settingsFiles": "文件",
+  "channels.settingsMemory": "记忆",
+  "channels.filesEmpty": "这个频道还没有产出的文件或报告。发起一次投研后，成果会出现在这里。",
+  "channels.memoryHint":
+    "频道专属记忆：只有本频道的成员在执行时会读到它，作为共享上下文；其他频道读不到。",
   "channels.memberCount": "{count} 位成员",
   "channels.skillsHint": "频道的能力由成员智能体的技能决定，此处展示成员能力并集（只读）。",
   "channels.skillsEmpty": "成员尚未具备任何技能。",

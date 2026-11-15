@@ -16,6 +16,7 @@ import { connectionGuidance, invokeConnection } from "../connectors/service.ts";
 import { searchDescription, searchInputSchema, searchInstructions } from "../search.ts";
 import { agentIdentityGuidance } from "./agent-persona.ts";
 import { readInstalledSkill, skillGuidanceForThread } from "./bot-skills.ts";
+import { filterMemoriesForScope, memoryScopeForTask } from "./memory-scope.ts";
 import type { AgentService } from "./service.ts";
 import { tanstackAgent } from "./tanstack-agent.ts";
 import type { TaskContext } from "./worker.ts";
@@ -392,7 +393,14 @@ export async function executeModelTask(
     ),
   );
   const identity = await service.db.get<AgentIdentity>(owner, "agent-settings", "identity");
-  const memories = await service.db.list<{ text: string; source: string }>(owner, "memories");
+  // 记忆按「任务作用域」读取：账户级共享 + 执行 Agent 私有 + 任务所在频道共享。
+  // 顶层任务与编排子任务同一口径：成员只能读到自己的记忆与本频道上下文，
+  // 不跨 Agent、不跨频道串味（频道详情页看到的记忆，就是这里被注入的那份）。
+  const memoryScope = await memoryScopeForTask(service.db, owner, initial);
+  const memories = filterMemoriesForScope(
+    await service.db.list<{ text: string; source: string; agentId?: string }>(owner, "memories"),
+    memoryScope,
+  );
   // 子任务（有 orchestrationId）是编排 DAG 里的「专家执行者」，只负责完成派给自己的
   // 单一维度，绝不能再拆解或调用 submit_orchestration；只有顶层任务（编排者）才拆解 DAG。
   const isSubtask = Boolean(initial.orchestrationId);
