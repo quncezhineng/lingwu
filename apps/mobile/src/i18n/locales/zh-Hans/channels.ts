@@ -33,7 +33,7 @@ const channels = {
   "channels.roleUnset": "成员",
   "channels.noGoal": "未设置共同目标",
   "channels.researchPrompt":
-    "这是一个多 Agent 投研协作请求，必须由频道的专家成员分工完成，不要由单一智能体独自串行完成。频道成员（名称（角色）→ id）：\n{roster}\n频道目标：{description}。\n请立即调用 submit_orchestration 把下面这个问题拆解成多个子任务（DAG），并把每个节点的 agentTemplate 设为对应成员的 id（上面 → 后面的值，精确匹配，不要用泛化模板名），让这些专家并行或按依赖顺序协作。最后汇总成一份结构化研报：{topic}",
+    "这是一个多 Agent 投研协作请求，必须由频道的专家成员分工完成，不要由单一智能体独自串行完成。频道成员（名称（角色）→ id）：\n{roster}\n频道目标：{description}。{instructionsContext}请立即调用 submit_orchestration 把下面这个问题拆解成多个子任务（DAG），并把每个节点的 agentTemplate 设为对应成员的 id（上面 → 后面的值，精确匹配，不要用泛化模板名），让这些专家并行或按依赖顺序协作。最后汇总成一份结构化研报：{topic}",
   "channels.chatHint": "这里发的消息会共享给所有成员智能体。发送一个投研请求即可开始协作。",
   "channels.researchProgressTitle": "投研进行中",
   "channels.researchProgressDetail": "编排者正在协调频道成员协同研究，完成后会汇总成研报。",
@@ -47,6 +47,19 @@ const channels = {
   "channels.nodeFailed": "失败",
   "channels.nodeSkipped": "已跳过",
   "channels.resultLabel": "汇总研报",
+  "channels.instructionsContext": "频道共享指令（所有成员须遵守）：{instructions}\n",
+  "channels.instructionsHint": "频道级共享指令，会在每次投研时注入到所有成员智能体的上下文。",
+  "channels.settingsProfile": "资料",
+  "channels.settingsTitle": "频道详情",
+  "channels.openSettings": "频道详情",
+  "channels.settingsInstructions": "指令",
+  "channels.settingsSkills": "技能",
+  "channels.settingsTasks": "任务",
+  "channels.memberCount": "{count} 位成员",
+  "channels.skillsHint": "频道的能力由成员智能体的技能决定，此处展示成员能力并集（只读）。",
+  "channels.skillsEmpty": "成员尚未具备任何技能。",
+  "channels.tasksEmpty": "这个频道还没有投研任务。回到频道对话发起一次投研吧。",
+  "channels.instructionsEmpty": "尚未设置共享指令。",
 } satisfies Dictionary;
 
 export default channels;

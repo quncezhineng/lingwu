@@ -1632,7 +1632,20 @@ export class AgentService {
           .filter(Boolean)
           .join("\n")
       : "";
-    const prompt = personaGuidance ? `${personaGuidance}\n\nTask: ${node.prompt}` : node.prompt;
+    // 频道投研：顶层任务在 input 里带了频道选定的连接器 slug 清单。把它们下传给每个
+    // 成员子任务，既写进 prompt（让成员知道该用哪些连接器取真实数据），也写进 input
+    // （供 executeModelTask 在工具引导里强约束），保证「频道里选的连接器」真的被调用。
+    const parent = await this.db.get<AgentTask>(owner, "tasks", plan.parentTaskId);
+    const channelConnectorSlugs = Array.isArray(parent?.input?.channelConnectorSlugs)
+      ? (parent.input.channelConnectorSlugs as unknown[])
+          .filter((slug): slug is string => typeof slug === "string" && slug.trim().length > 0)
+          .map((slug) => slug.trim())
+      : [];
+    const connectorGuidance = channelConnectorSlugs.length
+      ? `This task is part of a channel research run. The user selected these connectors for the run: ${channelConnectorSlugs.join(", ")}. Use use_connection with these slugs to fetch real data (omit the tool argument to list a connector's tools first) instead of inventing data.`
+      : "";
+    const guidance = [personaGuidance, connectorGuidance].filter(Boolean).join("\n");
+    const prompt = guidance ? `${guidance}\n\nTask: ${node.prompt}` : node.prompt;
     const task = await this.createTask(
       owner,
       {
@@ -1643,7 +1656,10 @@ export class AgentService {
         parentTaskId: plan.parentTaskId,
         delegatedBy: plan.parentTaskId,
         assignedAgent: node.agentTemplate,
-        input: { orchestrationNodeId: node.id },
+        input: {
+          orchestrationNodeId: node.id,
+          ...(channelConnectorSlugs.length ? { channelConnectorSlugs } : {}),
+        },
       },
       `orchestration:${plan.id}:${node.id}`,
       false,

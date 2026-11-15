@@ -35,7 +35,7 @@ const channels = {
   "channels.roleUnset": "member",
   "channels.noGoal": "no shared goal set",
   "channels.researchPrompt":
-    "This is a multi-agent research collaboration request that MUST be divided among the channel's expert members — do NOT complete it yourself sequentially. Channel members (name (role) → id):\n{roster}\nChannel goal: {description}.\nImmediately call submit_orchestration to decompose the question below into a DAG of sub-tasks, setting each node's agentTemplate to the matching member's id (the value after → above, matched exactly — do not use a generic template name), and have these experts work in parallel or in dependency order. Then synthesize a structured report: {topic}",
+    "This is a multi-agent research collaboration request that MUST be divided among the channel's expert members — do NOT complete it yourself sequentially. Channel members (name (role) → id):\n{roster}\nChannel goal: {description}. {instructionsContext}Immediately call submit_orchestration to decompose the question below into a DAG of sub-tasks, setting each node's agentTemplate to the matching member's id (the value after → above, matched exactly — do not use a generic template name), and have these experts work in parallel or in dependency order. Then synthesize a structured report: {topic}",
   "channels.chatHint":
     "Messages here are shared with every member Agent. Send a research request to start the collaboration.",
   "channels.researchProgressTitle": "Research in progress",
@@ -51,6 +51,22 @@ const channels = {
   "channels.nodeFailed": "Failed",
   "channels.nodeSkipped": "Skipped",
   "channels.resultLabel": "Final report",
+  "channels.instructionsContext": "Channel shared instructions (all members must follow): {instructions}\n",
+  "channels.instructionsHint":
+    "Channel-level shared instructions, injected into every member Agent's context on each research run.",
+  "channels.settingsProfile": "Profile",
+  "channels.settingsTitle": "Channel details",
+  "channels.openSettings": "Channel details",
+  "channels.settingsInstructions": "Instructions",
+  "channels.settingsSkills": "Skills",
+  "channels.settingsTasks": "Tasks",
+  "channels.memberCount": "{count} members",
+  "channels.skillsHint":
+    "A channel's capabilities come from its member Agents; this shows the union of member skills (read-only).",
+  "channels.skillsEmpty": "Members have no skills yet.",
+  "channels.tasksEmpty":
+    "This channel has no research tasks yet. Go back to the channel chat and start one.",
+  "channels.instructionsEmpty": "No shared instructions set yet.",
 } satisfies Dictionary;
 
 export default channels;

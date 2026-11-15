@@ -20,6 +20,7 @@ export type Section =
   | "apps"
   | "settings"
   | "agent"
+  | "channel"
   | "channels"
   | "account";
 export interface Mail {

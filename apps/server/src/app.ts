@@ -482,6 +482,8 @@ export async function createApp(
       name: input.name,
       agentIds: input.agentIds,
       description: input.description,
+      avatar: input.avatar ?? "orb",
+      instructions: input.instructions ?? "",
       createdAt: now,
       updatedAt: now,
     };

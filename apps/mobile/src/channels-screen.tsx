@@ -337,6 +337,9 @@ function ChannelDetailSheet({ channel, onClose }: { channel: Channel; onClose: (
       topic,
       roster,
       description: channel.description || t("channels.noGoal"),
+      instructionsContext: channel.instructions
+        ? t("channels.instructionsContext", { instructions: channel.instructions })
+        : "",
     });
     setBusy(true);
     try {

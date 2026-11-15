@@ -1,17 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import type { Channel } from "../../../packages/domain/src/channel";
+import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition } from "./agent-space-model";
 import { useAgentWorkspace } from "./agent-workspace";
+import { type AppConnectorView, useAppConnectors } from "./app-connectors";
 import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
+import {
+  type ComposerSelection,
+  ComposerSelectionChips,
+  type ConnectorOption,
+  ConnectorPickerSheet,
+} from "./capability-picker";
+import { promptWithAttachments } from "./chat-content";
+import { ComposerAttachments, FilePickerSheet } from "./file-picker";
+import { pickAndUploadFile } from "./file-upload";
 import { useTranslation } from "./i18n";
-import { Sparkles, Users } from "./icons";
+import { Brain, FileText, FolderOpen, Globe2, Link2, Sparkles, Upload, Users } from "./icons";
 import { useOrchestrations } from "./orchestration";
 import { PromptComposer } from "./prompt-composer";
-import { colors, radius, s } from "./ui";
+import { colors, fonts, radius, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /**
@@ -26,17 +37,64 @@ type ChannelMessage =
   | { id: string; role: "user"; text: string; at: string }
   | { id: string; role: "member"; agentId: string; title: string; text: string; at: string };
 
-export function ChannelChatScreen({ channel }: { channel: Channel }) {
+/** 应用连接器分类 → 输入区选择弹层里的图标。 */
+function connectorIcon(category: AppConnectorView["category"]) {
+  switch (category) {
+    case "search":
+      return Globe2;
+    case "office":
+    case "documents":
+    case "files":
+      return FileText;
+    case "development":
+      return Link2;
+    default:
+      return Brain;
+  }
+}
+
+export function ChannelChatScreen({
+  channel,
+  contentTopInset = 15,
+}: {
+  channel: Channel;
+  /** 悬浮顶栏下的滚动起始内距，与 Agent 对话页同一取值。 */
+  contentTopInset?: number;
+}) {
   const { t } = useTranslation();
   const { agents } = useAgentSpace();
-  const { delegate } = useAgentWorkspace();
+  const { delegate, data: agentWorkspace } = useAgentWorkspace();
   const { plans } = useOrchestrations();
-  const { notify } = useWorkspace();
+  const { notify, api, refresh, workspace, navigate } = useWorkspace();
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
+  // 附件与连接器选择（与 Agent 对话页同一套能力选择）。
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [pickerSelection, setPickerSelection] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [connectorPickerOpen, setConnectorPickerOpen] = useState(false);
+  const [selectedConnectorIds, setSelectedConnectorIds] = useState<string[]>([]);
+
+  // 频道用「账户级应用连接器」（slug 与后端 use_connection 一致），而非旧版 connections。
+  const appConnectors = useAppConnectors(api);
+  const connectorChoices: ConnectorOption[] = useMemo(
+    () =>
+      appConnectors.items.map((item) => ({
+        id: item.slug,
+        name: item.name,
+        detail: item.summary,
+        connected: item.connected,
+        icon: connectorIcon(item.category),
+      })),
+    [appConnectors.items],
+  );
+  const selectedConnectors: ComposerSelection[] = connectorChoices
+    .filter((option) => selectedConnectorIds.includes(option.id))
+    .map((option) => ({ id: option.id, name: option.name }));
 
   const members = useMemo(
     () =>
@@ -86,6 +144,32 @@ export function ChannelChatScreen({ channel }: { channel: Channel }) {
     }
   }, [activePlan]);
 
+  async function uploadMaterial() {
+    if (uploading) return;
+    setUploading(true);
+    try {
+      const file = await pickAndUploadFile(api);
+      if (!file) return;
+      await refresh();
+      setAttachments((ids) => (ids.includes(file.id) ? ids : [...ids, file.id]));
+      setPickerSelection((ids) => (ids.includes(file.id) ? ids : [...ids, file.id]));
+      setPicking(false);
+      notify(t("chat.uploadMaterialDone", { name: file.name }));
+    } catch (e) {
+      notify(
+        t("chat.uploadMaterialFailed", {
+          detail: e instanceof Error ? e.message : String(e),
+        }),
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+  function openFilePicker() {
+    setPickerSelection(attachments);
+    setPicking(true);
+  }
+
   async function send() {
     const text = draft.trim();
     if (!text || busy) return;
@@ -102,10 +186,27 @@ export function ChannelChatScreen({ channel }: { channel: Channel }) {
     const roster = members
       .map((m) => `${m.name}（${m.role || t("channels.roleUnset")}）→ id:${m.id}`)
       .join("\n");
+    // 附件：把选中的文件/分析产物作为「附加文档」引用进投研请求。
+    const files = workspace.files.filter((f) => attachments.includes(f.id));
+    const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
+      attachments.includes(artifact.id),
+    );
+    // 连接器：把已选应用连接器（slug）注入投研请求，并随任务 input 下传给成员子任务，
+    // 由后端 createSubtask/executeModelTask 强约束成员用 use_connection 真正调用。
+    const connectorSlugs = selectedConnectors.map((c) => c.id);
+    const connectorLine = connectorSlugs.length
+      ? `\n\nSelected connectors: ${selectedConnectors
+          .map((c) => `${c.name} (slug: ${c.id})`)
+          .join(", ")}`
+      : "";
+    const topic = `${text}${connectorLine}`;
     const prompt = t("channels.researchPrompt", {
-      topic: text,
+      topic: promptWithAttachments(topic, files, analysis),
       roster,
       description: channel.description || t("channels.noGoal"),
+      instructionsContext: channel.instructions
+        ? t("channels.instructionsContext", { instructions: channel.instructions })
+        : "",
     });
     try {
       const task = await delegate(
@@ -113,12 +214,20 @@ export function ChannelChatScreen({ channel }: { channel: Channel }) {
           title: `${channel.name} · ${text.slice(0, 40)}`,
           prompt,
           kind: "agent",
-          input: { forceOrchestration: true, channelId: channel.id },
+          input: {
+            forceOrchestration: true,
+            channelId: channel.id,
+            ...(connectorSlugs.length ? { channelConnectorSlugs: connectorSlugs } : {}),
+          },
         },
         `channel-research:${channel.id}:${Date.now()}`,
       );
       setActiveTaskId(task.id);
       notify(t("channels.researchStarted"));
+      // 发送后清空附件与连接器选择，避免带到下一轮。
+      setAttachments([]);
+      setSelectedConnectorIds([]);
+      setPicking(false);
     } catch (e) {
       setBusy(false);
       setMessages((m) => [
@@ -138,27 +247,57 @@ export function ChannelChatScreen({ channel }: { channel: Channel }) {
   return (
     <View style={{ flex: 1, minHeight: 0 }}>
       <ScrollView
+        testID="channel-chat-viewport"
         ref={listRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ gap: 14, paddingHorizontal: 18, paddingVertical: 16 }}
+        style={{
+          flex: 1,
+          width: "100%",
+          maxWidth: agentLayout.columnMaxWidth,
+          alignSelf: "center",
+        }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          gap: 13,
+          paddingTop: contentTopInset,
+          paddingBottom: 20,
+          paddingHorizontal: 8,
+          flexGrow: 1,
+        }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
       >
-        {messages.length === 0 && (
-          <View style={{ alignItems: "center", gap: 12, paddingTop: 40 }}>
-            <View
+        {messages.length === 0 ? (
+          <View
+            style={{
+              flexGrow: 1,
+              flexShrink: 0,
+              justifyContent: "center",
+              paddingVertical: 28,
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <AgentOrb avatar={channel.avatar ?? "orb"} size={56} />
+            <Text
+              accessibilityLabel={t("channels.chatEmptyTitle")}
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: radius.full,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: colors.sky,
+                maxWidth: 560,
+                textAlign: "center",
+                color: colors.heading,
+                fontSize: 22,
+                lineHeight: 32,
+                fontWeight: "500",
+                letterSpacing: 0.2,
+                fontFamily: fonts.sans,
               }}
             >
-              <Users size={26} color={colors.primary} strokeWidth={1.7} />
-            </View>
-            <Text style={[s.heading, { textAlign: "center" }]}>{t("channels.chatEmptyTitle")}</Text>
-            <Text style={[s.muted, { textAlign: "center", maxWidth: 420 }]}>
+              {t("channels.chatEmptyTitle")}
+            </Text>
+            <Text
+              style={[
+                s.muted,
+                { textAlign: "center", maxWidth: 540, fontSize: 13, lineHeight: 22 },
+              ]}
+            >
               {t("channels.chatEmptyDetail")}
             </Text>
             {members.length > 0 && (
@@ -171,20 +310,20 @@ export function ChannelChatScreen({ channel }: { channel: Channel }) {
               </View>
             )}
           </View>
-        )}
-
-        {messages.map((msg) =>
-          msg.role === "user" ? (
-            <UserBubble key={msg.id} text={msg.text} />
-          ) : (
-            <MemberBubble
-              key={msg.id}
-              agentId={msg.agentId}
-              title={msg.title}
-              text={msg.text}
-              member={memberById.get(msg.agentId)}
-            />
-          ),
+        ) : (
+          messages.map((msg) =>
+            msg.role === "user" ? (
+              <UserBubble key={msg.id} text={msg.text} />
+            ) : (
+              <MemberBubble
+                key={msg.id}
+                agentId={msg.agentId}
+                title={msg.title}
+                text={msg.text}
+                member={memberById.get(msg.agentId)}
+              />
+            ),
+          )
         )}
 
         {busy && (
@@ -195,7 +334,15 @@ export function ChannelChatScreen({ channel }: { channel: Channel }) {
         )}
       </ScrollView>
 
-      <View style={{ paddingHorizontal: 18, paddingBottom: 12 }}>
+      <View
+        style={{
+          width: "100%",
+          maxWidth: agentLayout.columnMaxWidth,
+          alignSelf: "center",
+          paddingHorizontal: 8,
+          paddingBottom: 12,
+        }}
+      >
         <PromptComposer
           value={draft}
           onChangeText={setDraft}
@@ -203,26 +350,127 @@ export function ChannelChatScreen({ channel }: { channel: Channel }) {
           placeholder={t("channels.composerPlaceholder")}
           accessibilityLabel={t("channels.composerPlaceholder")}
           sendLabel={t("chat.sendMessage")}
+          stopLabel={t("chat.stopReply")}
           busy={busy}
+          inputMinHeight={38}
+          inputMaxHeight={104}
+          dense
+          inline
+          tools={[
+            {
+              key: "attach",
+              icon: Upload,
+              label: t("chat.uploadMaterial"),
+              active: uploading,
+              onPress: () => void uploadMaterial(),
+            },
+            {
+              key: "files",
+              icon: FolderOpen,
+              label: t("chat.filePickerTool"),
+              active: picking,
+              onPress: openFilePicker,
+            },
+            {
+              key: "connectors",
+              icon: Link2,
+              label: t("chat.connectorPickerTool"),
+              active: selectedConnectorIds.length > 0,
+              onPress: () => setConnectorPickerOpen(true),
+            },
+          ]}
+          attachments={
+            <>
+              <ComposerAttachments
+                files={workspace.files}
+                analysis={agentWorkspace?.artifacts ?? []}
+                selectedIds={attachments}
+                onRemove={(id) =>
+                  setAttachments((ids) => ids.filter((candidate) => candidate !== id))
+                }
+              />
+              <ComposerSelectionChips
+                items={selectedConnectors}
+                icon={Link2}
+                removeLabel={(name) => t("chat.removeConnector", { name })}
+                onRemove={(id) =>
+                  setSelectedConnectorIds((ids) => ids.filter((candidate) => candidate !== id))
+                }
+              />
+            </>
+          }
         />
       </View>
+
+      {picking && (
+        <FilePickerSheet
+          files={workspace.files}
+          analysis={agentWorkspace?.artifacts ?? []}
+          selectedIds={pickerSelection}
+          onToggle={(id) =>
+            setPickerSelection((ids) =>
+              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+            )
+          }
+          onConfirm={() => {
+            setAttachments(pickerSelection);
+            setPicking(false);
+          }}
+          onClose={() => setPicking(false)}
+          onUpload={uploadMaterial}
+          onBrowse={() => {
+            setPicking(false);
+            navigate("files");
+          }}
+        />
+      )}
+      {connectorPickerOpen && (
+        <ConnectorPickerSheet
+          options={connectorChoices}
+          selectedIds={selectedConnectorIds}
+          onToggle={(id) =>
+            setSelectedConnectorIds((ids) =>
+              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+            )
+          }
+          onConfirm={() => setConnectorPickerOpen(false)}
+          onClose={() => setConnectorPickerOpen(false)}
+          onManage={() => {
+            setConnectorPickerOpen(false);
+            navigate("connections");
+          }}
+          onConnect={() => {
+            setConnectorPickerOpen(false);
+            navigate("connections");
+          }}
+        />
+      )}
     </View>
   );
 }
 
 function UserBubble({ text }: { text: string }) {
   return (
-    <View style={{ alignItems: "flex-end" }}>
+    <View style={{ alignSelf: "flex-end", maxWidth: 560 }}>
       <View
         style={{
-          maxWidth: "82%",
           paddingHorizontal: 14,
-          paddingVertical: 10,
+          paddingVertical: 11,
           borderRadius: radius.card,
-          backgroundColor: colors.sky,
+          backgroundColor: colors.primary,
         }}
       >
-        <Text style={s.text}>{text}</Text>
+        <Text
+          selectable
+          style={{
+            color: colors.onPrimary,
+            fontFamily: fonts.sans,
+            fontSize: 16,
+            lineHeight: 24,
+          }}
+        >
+          {text}
+        </Text>
       </View>
     </View>
   );

@@ -37,6 +37,7 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
 import { ChannelChatScreen } from "./channel-chat";
+import { ChannelSettingsScreen } from "./channel-settings-screen";
 import { useChannels } from "./channels";
 import { ChatScreen, WorkspaceTools } from "./chat";
 import { ColumnResizeHandle } from "./column-resize-handle";
@@ -62,7 +63,6 @@ import {
   Search,
   Settings2,
   Trash2,
-  Users,
   X,
 } from "./icons";
 import { IosStack } from "./ios-stack";
@@ -100,6 +100,14 @@ import { type ComposerPrompt, type Detail, useWorkspace } from "./workspace";
 /** 行尾「更多」按钮的锚点：用窗口坐标把菜单贴在按钮下方，滚出边界也能正常展示。 */
 type AgentMenuAnchor = {
   agent: AgentDefinition;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type ChannelMenuAnchor = {
+  channel: Channel;
   x: number;
   y: number;
   width: number;
@@ -229,6 +237,62 @@ function AgentMenu({
               />
             </>
           )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/**
+ * 频道行的操作菜单：进入详情、删除频道。
+ * 与 AgentMenu 同款透明 Modal 承载，点空白处即关闭。
+ */
+function ChannelMenu({
+  anchor,
+  onClose,
+  onSettings,
+  onDelete,
+}: {
+  anchor: ChannelMenuAnchor;
+  onClose: () => void;
+  onSettings: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+  const { width, height } = useWindowDimensions();
+  const menuWidth = Math.min(160, width - 24);
+  const rows = 2;
+  const menuHeight = 10 + rows * 34 + 7;
+  const left = Math.max(12, Math.min(anchor.x + anchor.width - menuWidth, width - menuWidth - 12));
+  const below = anchor.y + anchor.height + 6;
+  const top = below + menuHeight > height - 12 ? Math.max(12, anchor.y - menuHeight - 6) : below;
+  return (
+    <Modal transparent visible animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("ui.closeDetails")}
+          onPress={onClose}
+          style={{ flex: 1 }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            top,
+            left,
+            width: menuWidth,
+            padding: 4,
+            gap: 1,
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: radius.card,
+            backgroundColor: colors.paper,
+            ...shadow.sheet,
+          }}
+        >
+          <AgentMenuRow icon={Settings2} label={t("channels.openSettings")} onPress={onSettings} />
+          <View style={{ height: 1, marginVertical: 3, backgroundColor: colors.line }} />
+          <AgentMenuRow danger icon={Trash2} label={t("channels.deleteTitle")} onPress={onDelete} />
         </View>
       </View>
     </Modal>
@@ -423,19 +487,41 @@ function ChannelListItem({
   active,
   detailed = false,
   onPress,
+  onOpenMenu,
 }: {
   channel: Channel;
   active: boolean;
   detailed?: boolean;
   onPress: () => void;
+  onOpenMenu: (anchor: ChannelMenuAnchor) => void;
 }) {
   const { t } = useTranslation();
   const { agents } = useAgentSpace();
   const [hovered, setHovered] = useState(false);
+  const moreRef = useRef<View>(null);
   const members = channel.agentIds
     .map((id) => agents.find((a) => a.id === id))
     .filter((m): m is NonNullable<typeof m> => Boolean(m));
   const preview = members.map((m) => m.name).join(" · ") || t("channels.emptyDetail");
+  const openMenu = () => {
+    moreRef.current?.measureInWindow((x, y, width, height) => {
+      onOpenMenu({ channel, x, y, width, height });
+    });
+  };
+  const avatarView = (size: number) => (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius.full,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: colors.sky,
+      }}
+    >
+      <AgentOrb avatar={channel.avatar} size={Math.round(size * 0.7)} />
+    </View>
+  );
 
   if (detailed) {
     return (
@@ -463,18 +549,7 @@ function ChannelListItem({
             gap: 12,
           }}
         >
-          <View
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: radius.full,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: colors.sky,
-            }}
-          >
-            <Users size={20} color={colors.primary} strokeWidth={1.7} />
-          </View>
+          {avatarView(44)}
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text numberOfLines={1} style={{ ...typography.agentName, color: colors.text }}>
               {channel.name}
@@ -486,6 +561,33 @@ function ChannelListItem({
               {preview}
             </Text>
           </View>
+        </Pressable>
+        <Pressable
+          ref={moreRef}
+          accessibilityRole="button"
+          accessibilityLabel={t("ui.moreActions")}
+          accessibilityHint={channel.name}
+          hitSlop={4}
+          pointerEvents={hovered ? "auto" : "none"}
+          onPress={openMenu}
+          style={({ pressed }) => ({
+            position: "absolute",
+            top: 10,
+            right: space.md,
+            width: 26,
+            height: 26,
+            borderRadius: radius.badge,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: hovered ? 1 : 0,
+            backgroundColor: pressed ? colors.overlay2 : "transparent",
+          })}
+        >
+          <MoreHorizontal
+            size={16}
+            strokeWidth={1.8}
+            color={active || hovered ? colors.muted : colors.faint}
+          />
         </Pressable>
       </View>
     );
@@ -520,18 +622,7 @@ function ChannelListItem({
           gap: 10,
         })}
       >
-        <View
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: radius.control,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: colors.sky,
-          }}
-        >
-          <Users size={16} color={colors.primary} strokeWidth={1.7} />
-        </View>
+        {avatarView(30)}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             numberOfLines={1}
@@ -545,6 +636,29 @@ function ChannelListItem({
             {channel.name}
           </Text>
         </View>
+      </Pressable>
+      <Pressable
+        ref={moreRef}
+        accessibilityRole="button"
+        accessibilityLabel={t("ui.moreActions")}
+        accessibilityHint={channel.name}
+        hitSlop={4}
+        onPress={openMenu}
+        style={({ pressed }) => ({
+          width: 26,
+          height: 26,
+          marginRight: 4,
+          borderRadius: radius.badge,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: pressed ? colors.overlay2 : "transparent",
+        })}
+      >
+        <MoreHorizontal
+          size={16}
+          strokeWidth={1.8}
+          color={active || hovered ? colors.muted : colors.faint}
+        />
       </Pressable>
     </View>
   );
@@ -854,8 +968,11 @@ function AgentRail({
   /** 待删除的 Agent：菜单里点删除后弹出确认弹窗，确认才真正移除。 */
   const [pendingDelete, setPendingDelete] = useState<AgentDefinition>();
   const [menuAnchor, setMenuAnchor] = useState<AgentMenuAnchor>();
+  const [channelMenuAnchor, setChannelMenuAnchor] = useState<ChannelMenuAnchor>();
+  /** 待删除的频道：频道菜单里点删除后弹出确认弹窗。 */
+  const [pendingDeleteChannel, setPendingDeleteChannel] = useState<Channel>();
   const { agents, current, selectAgent, deleteAgent, setAgentPinned } = useAgentSpace();
-  const { channels, currentChannelId, selectChannel } = useChannels();
+  const { channels, currentChannelId, selectChannel, deleteChannel } = useChannels();
   // 排序规则：系统内置默认 Agent 永远置顶 → 用户置顶的 → 其余（同组内保持创建顺序）。
   const orderedAgents = useMemo(
     () =>
@@ -913,6 +1030,12 @@ function AgentRail({
   const openAgentSettings = (agent: AgentDefinition) => {
     selectAgent(agent.id);
     navigate("agent");
+    onClose?.();
+  };
+  /** 进入某个频道的详情页：先选中频道，设置页才读得到它。 */
+  const openChannelSettings = (channel: Channel) => {
+    selectChannel(channel.id);
+    navigate("channel");
     onClose?.();
   };
   return (
@@ -1076,6 +1199,7 @@ function AgentRail({
               navigate("chat");
               onClose?.();
             }}
+            onOpenMenu={setChannelMenuAnchor}
           />
         ))}
         <Pressable
@@ -1309,6 +1433,54 @@ function AgentRail({
                   }}
                 >
                   {t("agentSpace.deleteConfirmAction")}
+                </Button>
+              </View>
+            </Pressable>
+          </Pressable>
+        </ModalOverlay>
+      )}
+      {channelMenuAnchor && (
+        <ChannelMenu
+          anchor={channelMenuAnchor}
+          onClose={() => setChannelMenuAnchor(undefined)}
+          onSettings={() => {
+            const target = channelMenuAnchor.channel;
+            setChannelMenuAnchor(undefined);
+            openChannelSettings(target);
+          }}
+          onDelete={() => {
+            setPendingDeleteChannel(channelMenuAnchor.channel);
+            setChannelMenuAnchor(undefined);
+          }}
+        />
+      )}
+      {/* 删除频道确认弹窗：智能体本身会保留。 */}
+      {pendingDeleteChannel && (
+        <ModalOverlay visible onRequestClose={() => setPendingDeleteChannel(undefined)}>
+          <Pressable onPress={() => setPendingDeleteChannel(undefined)} style={s.modalShade}>
+            <Pressable
+              accessibilityViewIsModal
+              onPress={(event) => event.stopPropagation()}
+              style={[s.card, { maxWidth: 360, width: "100%", padding: 22, gap: 10 }]}
+            >
+              <Text style={s.heading}>{t("channels.deleteTitle")}</Text>
+              <Text style={s.muted}>{t("channels.deleteConfirm")}</Text>
+              <View style={[s.row, { gap: 10, marginTop: 8 }]}>
+                <Button
+                  style={{ flex: 1, minHeight: 44 }}
+                  onPress={() => setPendingDeleteChannel(undefined)}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  danger
+                  style={{ flex: 1, minHeight: 44 }}
+                  onPress={() => {
+                    void deleteChannel(pendingDeleteChannel.id);
+                    setPendingDeleteChannel(undefined);
+                  }}
+                >
+                  {t("channels.deleteAction")}
                 </Button>
               </View>
             </Pressable>
@@ -1560,35 +1732,37 @@ function AgentHeader({
   const sectionTitle =
     section === "agent"
       ? t("agentSpace.agentDetails")
-      : section === "account"
-        ? t("app.titleAccount")
-        : section === "memories"
-          ? t("app.titleMemories")
-          : section === "files"
-            ? t("app.navFiles")
-            : section === "notes"
-              ? t("app.titleNotes")
-              : section === "watchlist" || section === "portfolio"
-                ? t("app.navWatchlist")
-                : section === "ideas"
-                  ? t("agentSpace.openIdeasPage")
-                  : section === "activity" || section === "goals"
-                    ? t("app.navActivity")
-                    : section === "mail"
-                      ? t("app.titleMail")
-                      : section === "calendar"
-                        ? t("app.titleCalendar")
-                        : section === "browser"
-                          ? t("app.titleBrowser")
-                          : section === "computer"
-                            ? t("threads.agentComputer")
-                            : section === "apps" || section === "connections"
-                              ? t("app.titleApps")
-                              : section === "settings"
-                                ? t("details.settingsTitle")
-                                : section === "channels"
-                                  ? t("app.navChannels")
-                                  : t("app.navChat");
+      : section === "channel"
+        ? t("channels.settingsTitle")
+        : section === "account"
+          ? t("app.titleAccount")
+          : section === "memories"
+            ? t("app.titleMemories")
+            : section === "files"
+              ? t("app.navFiles")
+              : section === "notes"
+                ? t("app.titleNotes")
+                : section === "watchlist" || section === "portfolio"
+                  ? t("app.navWatchlist")
+                  : section === "ideas"
+                    ? t("agentSpace.openIdeasPage")
+                    : section === "activity" || section === "goals"
+                      ? t("app.navActivity")
+                      : section === "mail"
+                        ? t("app.titleMail")
+                        : section === "calendar"
+                          ? t("app.titleCalendar")
+                          : section === "browser"
+                            ? t("app.titleBrowser")
+                            : section === "computer"
+                              ? t("threads.agentComputer")
+                              : section === "apps" || section === "connections"
+                                ? t("app.titleApps")
+                                : section === "settings"
+                                  ? t("details.settingsTitle")
+                                  : section === "channels"
+                                    ? t("app.navChannels")
+                                    : t("app.navChat");
   return (
     <View
       style={{
@@ -2061,8 +2235,14 @@ export function AgentProductShell({
     ? channels.find((channel) => channel.id === currentChannelId)
     : undefined;
   const chatPane = activeChannel ? (
-    <View style={{ flex: 1, minHeight: 0 }}>
-      <ChannelChatScreen channel={activeChannel} />
+    <View
+      style={{
+        flex: 1,
+        minHeight: 0,
+        paddingHorizontal: threeColumns ? 18 : desktop ? 24 : 17,
+      }}
+    >
+      <ChannelChatScreen channel={activeChannel} contentTopInset={floatingHeaderClearance()} />
     </View>
   ) : (
     <>
@@ -2125,6 +2305,8 @@ export function AgentProductShell({
         tabIntent={agentTabIntent}
         onTabIntentConsumed={() => setAgentTabIntent(null)}
       />
+    ) : section === "channel" && activeChannel ? (
+      <ChannelSettingsScreen channel={activeChannel} />
     ) : (
       <SecondarySection onOpen={openPanel} onSignOut={onSignOut} />
     );

@@ -9,6 +9,16 @@ import { z } from "zod";
  * 成员各自一个 thread，频道聚合展示）。
  */
 
+/** 频道群组头像：与 Agent 头像同一套 orb 配色，给频道一个视觉身份。 */
+export type ChannelAvatarId = "orb" | "bloom" | "moon" | "planet" | "cat";
+export const CHANNEL_AVATARS: readonly ChannelAvatarId[] = [
+  "orb",
+  "bloom",
+  "moon",
+  "planet",
+  "cat",
+];
+
 export interface Channel {
   id: string;
   name: string;
@@ -16,6 +26,10 @@ export interface Channel {
   agentIds: string[];
   /** 频道创建时可选的目标说明，供成员 Agent 作为共享上下文。 */
   description?: string;
+  /** 频道群组头像，默认 orb。 */
+  avatar?: ChannelAvatarId;
+  /** 频道级共享指令：每次编排投研时注入到所有成员 Agent 的上下文。 */
+  instructions?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -25,6 +39,8 @@ export const channelInputSchema = z.object({
   name: z.string().trim().min(1).max(60),
   agentIds: z.array(z.string().min(1).max(128)).min(2).max(10),
   description: z.string().trim().max(500).optional(),
+  avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]).optional(),
+  instructions: z.string().trim().max(4000).optional(),
 });
 export type ChannelInput = z.infer<typeof channelInputSchema>;
 
@@ -33,5 +49,7 @@ export const channelUpdateSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   agentIds: z.array(z.string().min(1).max(128)).min(2).max(10).optional(),
   description: z.string().trim().max(500).optional(),
+  avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]).optional(),
+  instructions: z.string().trim().max(4000).optional(),
 });
 export type ChannelUpdate = z.infer<typeof channelUpdateSchema>;
