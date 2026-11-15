@@ -1,6 +1,7 @@
 import type { Dictionary } from "../../types";
 import agent from "./agent";
 import app from "./app";
+import channels from "./channels";
 import chat from "./chat";
 import common from "./common";
 import computer from "./computer";
@@ -41,6 +42,7 @@ export const en = {
   ...computer,
   ...threads,
   ...tools,
+  ...channels,
 } satisfies Dictionary;
 
 /** 所有合法的文案 key，用于为 `t()` 提供编译期校验。 */

@@ -29,6 +29,7 @@ import {
 } from "./src/api";
 import { Text } from "./src/app-text";
 import { CapabilityHubScreen } from "./src/capability-hub";
+import { ChannelsProvider } from "./src/channels";
 import { ChatScreen, WorkspaceTools } from "./src/chat";
 import { ComputerDraftProvider } from "./src/computer-drafts";
 import { Details, SettingsScreen } from "./src/details";
@@ -37,6 +38,7 @@ import type { TranslationKey } from "./src/i18n/locales/en";
 import { clearStorage, readStorage, writeStorage } from "./src/i18n/storage";
 import { Bell, Menu, Search, Settings2 } from "./src/icons";
 import { goBack, navigateTo, ROOT_NAVIGATION, type SectionNavigation } from "./src/navigation";
+import { OrchestrationProvider } from "./src/orchestration";
 import { PageHeader } from "./src/page-header";
 import { PreferencesScreen } from "./src/preferences-screen";
 import { BrowserScreen, CalendarScreen, FilesScreen, MailScreen } from "./src/screens";
@@ -668,14 +670,18 @@ function WorkspaceApp({ token, onSignOut }: { token: string; onSignOut: () => vo
         <ComputerDraftProvider key={token}>
           <ThreadsProvider>
             <AgentSpaceProvider accountScope={token}>
-              <AgentProductShell
-                detail={detail}
-                toast={toast}
-                clearToast={() => setToast(undefined)}
-                error={error}
-                prompt={prompt}
-                onSignOut={signOut}
-              />
+              <ChannelsProvider>
+                <OrchestrationProvider>
+                  <AgentProductShell
+                    detail={detail}
+                    toast={toast}
+                    clearToast={() => setToast(undefined)}
+                    error={error}
+                    prompt={prompt}
+                    onSignOut={signOut}
+                  />
+                </OrchestrationProvider>
+              </ChannelsProvider>
             </AgentSpaceProvider>
           </ThreadsProvider>
         </ComputerDraftProvider>

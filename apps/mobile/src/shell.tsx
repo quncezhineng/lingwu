@@ -44,6 +44,7 @@ import {
   Search,
   Settings2,
   Trash2,
+  Users,
   X,
 } from "./icons";
 import { relativeDate } from "./relative-date";
@@ -60,6 +61,7 @@ export type NavItem = { id: Section; labelKey: TranslationKey; icon: IconCompone
 export const SECTION_NAV: NavItem[] = [
   { id: "today", labelKey: "app.navToday", icon: PanelsTopLeft },
   { id: "chat", labelKey: "app.navChat", icon: MessageCircle },
+  { id: "channels", labelKey: "app.navChannels", icon: Users },
   { id: "activity", labelKey: "app.navActivity", icon: ListChecks },
   { id: "ideas", labelKey: "app.navIdeas", icon: Lightbulb },
   { id: "files", labelKey: "app.navFiles", icon: FileText },

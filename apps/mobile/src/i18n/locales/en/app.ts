@@ -156,6 +156,7 @@ const app = {
   "app.navToday": "Workbench",
   "app.goHome": "Back to home",
   "app.navChat": "Chat",
+  "app.navChannels": "Channels",
   "app.navWatchlist": "Watchlist & portfolios",
   "app.navWatchlistShort": "Watchlist",
   "app.navActivity": "Tasks",

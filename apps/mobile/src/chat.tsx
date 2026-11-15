@@ -33,6 +33,7 @@ import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-ma
 import { z } from "zod";
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
+import type { OrchestrationNode } from "../../../packages/domain/src/orchestration";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { AgentSkillInspectSheet } from "./agent-sheets";
@@ -124,6 +125,8 @@ import { MessageActions } from "./message-actions";
 import { interpolateMessageTimes, messageTimeAt } from "./message-time";
 import { edgeFadeMask } from "./mobile-chrome";
 import { ModalBackdrop } from "./modal-overlay";
+import { useOrchestrations } from "./orchestration";
+import { OrchestrationNodeList, OrchestrationProgressCard } from "./orchestration-progress";
 import { PromptComposer } from "./prompt-composer";
 import { taskHasQuestion } from "./question-card";
 import { briefsForTasks, publishQueuedBriefs, queuedBrief } from "./queued-brief";
@@ -307,6 +310,14 @@ export function WorkspaceTools() {
     ),
   });
   useRenderTool({
+    name: "submit_orchestration",
+    description: "Display the multi-agent research DAG the orchestrator decomposed",
+    parameters: displayParameters,
+    render: ({ args, result, status }) => (
+      <OrchestrationStep args={args} result={result} status={status} />
+    ),
+  });
+  useRenderTool({
     name: "agent_status",
     description: "Display saved agent progress",
     parameters: displayParameters,
@@ -400,6 +411,66 @@ function DelegateTaskStep({
       <ServerToolCard name="Task" result={result} loading={status !== "complete"} />
     </ToolStep>
   );
+}
+
+/**
+ * 编排拆解卡片（M2）：编排者调用 submit_orchestration 后，展示拆出的 DAG。
+ * 优先用 planId 从轮询层取实时进度（节点状态 + 汇总研报）；取不到时退化为
+ * args.nodes 的静态拆解预览（提交瞬间的节点清单）。
+ */
+function OrchestrationStep({
+  args,
+  result,
+  status,
+}: {
+  args: Record<string, unknown>;
+  result: unknown;
+  status: ToolStepStatus;
+}) {
+  const { plans } = useOrchestrations();
+  const nodes = parseOrchestrationNodes(args);
+  const planId = readPlanId(result);
+  const livePlan = planId ? plans.find((plan) => plan.id === planId) : undefined;
+  return (
+    <ToolStep tool="submit_orchestration" args={args} result={result} status={status} defaultOpen>
+      {livePlan ? (
+        <OrchestrationProgressCard plan={livePlan} />
+      ) : nodes.length > 0 ? (
+        <OrchestrationNodeList nodes={nodes} />
+      ) : (
+        <ServerToolCard
+          name={planId ? `Orchestration ${planId}` : "Orchestration"}
+          result={result}
+          loading={status !== "complete"}
+        />
+      )}
+    </ToolStep>
+  );
+}
+
+/** 从 submit_orchestration 的 args 解析节点数组（容错）。 */
+function parseOrchestrationNodes(args: Record<string, unknown>) {
+  const nodes = args?.nodes;
+  if (!Array.isArray(nodes)) return [];
+  return nodes.filter(
+    (n): n is OrchestrationNode =>
+      !!n && typeof n === "object" && typeof (n as { title?: unknown }).title === "string",
+  );
+}
+
+/** 从 result 里读取 planId（可能被包装为字符串或直接是对象）。 */
+function readPlanId(result: unknown): string | undefined {
+  let value = result;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!value || typeof value !== "object") return undefined;
+  const id = (value as { planId?: unknown }).planId;
+  return typeof id === "string" ? id : undefined;
 }
 
 /** Reads the task id from a delegate_task result without treating malformed output as a task. */

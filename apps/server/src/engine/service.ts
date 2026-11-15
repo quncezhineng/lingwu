@@ -31,9 +31,15 @@ import type {
   ProposalInput,
 } from "../../../../packages/domain/src/index.ts";
 import { resolveMonitorCurrency } from "../../../../packages/domain/src/monitor-currency.ts";
+import type { OrchestrationPlan } from "../../../../packages/domain/src/orchestration.ts";
 import { MarketDataService } from "../../../../packages/integrations/src/market-data.ts";
 import type { ActionService } from "../actions.ts";
-import { agentIdForThread, agentModelForThread, type PersistedAgentSpace } from "../agent-space.ts";
+import {
+  agentIdForThread,
+  agentModelForThread,
+  type PersistedAgentSpace,
+  resolveAgentForAssignment,
+} from "../agent-space.ts";
 import type { BrowserService } from "../browser.ts";
 import { ComputerService } from "../computer.ts";
 import type { Config } from "../config.ts";
@@ -53,6 +59,7 @@ import { generateMarketBriefing } from "./market-briefing.ts";
 import { executeModelTask } from "./model.ts";
 import { readMonitoredPrice } from "./monitor-price.ts";
 import { NotesService } from "./notes.ts";
+import { OrchestratorService } from "./orchestrator.ts";
 import {
   countPageDiff,
   describePageDiff,
@@ -62,7 +69,7 @@ import {
 } from "./page-diff.ts";
 import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
-import { summarizeReport } from "./report-brief.ts";
+import { summarizeReport, synthesizeResearch } from "./report-brief.ts";
 import { generateResearchReport, researchSymbolSchema } from "./research.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
@@ -119,6 +126,8 @@ export class AgentService {
   readonly notes: NotesService;
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
+  /** 多 Agent 编排（M2）：拆解 DAG、依赖调度、汇总。 */
+  readonly orchestrator: OrchestratorService;
   /** 多 Agent 记忆引擎（Hindsight），未配置时降级为本地关键词召回。 */
   readonly memory: HindsightClient;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
@@ -148,7 +157,12 @@ export class AgentService {
       apiKey: config.hindsightApiKey,
     });
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
-      settled: (owner, task) => this.publishOutcome(owner, task),
+      settled: (owner, task) => this.onTaskSettled(owner, task),
+    });
+    this.orchestrator = new OrchestratorService(db, {
+      createSubtask: (owner, plan, node) => this.createSubtask(owner, plan, node),
+      finalize: (owner, plan) => this.finalizeOrchestration(owner, plan),
+      notifyFailed: (owner, plan, reason) => this.notifyOrchestrationFailed(owner, plan, reason),
     });
     // Daily briefing: enqueue one durable task per owner per UTC date. Opt-in via
     // BRIEFING_SCHEDULE_ENABLED so tests and manual demo runs never spawn tasks.
@@ -398,6 +412,14 @@ export class AgentService {
       leaseId: null,
       leaseUntil: null,
       artifactIds: [],
+      ...(input.orchestrationId
+        ? {
+            orchestrationId: input.orchestrationId,
+            parentTaskId: input.parentTaskId,
+            delegatedBy: input.delegatedBy,
+            assignedAgent: input.assignedAgent,
+          }
+        : {}),
     };
     await this.ensure(owner);
     await this.db.insertIfAbsent(owner, "tasks", task);
@@ -1479,6 +1501,9 @@ export class AgentService {
   }
   private async publishOutcome(owner: string, saved: AgentTask) {
     const task = await this.getTask(owner, saved.id);
+    // 编排子任务/父任务是中间产物：不逐条发通知，由父任务 finalize 后统一通知。
+    // 父任务停在 waiting_input 等待子任务时，也不发「需要输入」的误导通知。
+    if (task.orchestrationId) return;
     if (task.status === "succeeded") {
       await this.notify(
         owner,
@@ -1567,6 +1592,158 @@ export class AgentService {
         { status: "active", error: task.error },
         { status: "paused" },
       );
+  }
+
+  // ─── 多 Agent 编排（M2）───
+
+  /** 任务终态统一入口：先走原有 outcome 发布，再驱动编排依赖解锁。 */
+  private async onTaskSettled(owner: string, task: AgentTask): Promise<void> {
+    await this.publishOutcome(owner, task);
+    if (!task.orchestrationId) return;
+    const plan = await this.db.get<{ id: string; nodes: { id: string; taskId?: string }[] }>(
+      owner,
+      "orchestration_plans",
+      task.orchestrationId,
+    );
+    if (!plan) return;
+    const node = plan.nodes.find((n) => n.taskId === task.id);
+    if (!node) return;
+    await this.orchestrator
+      .onNodeSettled(owner, task.orchestrationId, node.id)
+      .catch((error) => backgroundFailure("orchestration onNodeSettled", error));
+  }
+
+  /** 把编排节点落成一个子任务（复用 createTask，带编排字段与幂等 key）。 */
+  private async createSubtask(
+    owner: string,
+    plan: { id: string; parentTaskId: string; nodes: { id: string }[] },
+    node: { id: string; agentTemplate: string; title: string; prompt: string },
+  ): Promise<string> {
+    // 按「执行方」解析具体成员 Agent：模板值匹配首个非系统 Agent，频道成员 id/threadId
+    // 精确匹配。命中后：子任务用该成员的 threadId（走其专属模型），并把其人设注入 prompt，
+    // 让子任务真正以该专家视角执行，而非统一用默认模型 + 全局身份。
+    const assigned = await resolveAgentForAssignment(this.db, owner, node.agentTemplate);
+    const personaGuidance = assigned
+      ? [
+          assigned.role ? `You are acting as: ${assigned.role}.` : "",
+          assigned.persona ? `Persona: ${assigned.persona}` : "",
+          assigned.instructions ? `Standing instructions: ${assigned.instructions}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "";
+    const prompt = personaGuidance ? `${personaGuidance}\n\nTask: ${node.prompt}` : node.prompt;
+    const task = await this.createTask(
+      owner,
+      {
+        kind: "agent",
+        title: node.title,
+        prompt,
+        orchestrationId: plan.id,
+        parentTaskId: plan.parentTaskId,
+        delegatedBy: plan.parentTaskId,
+        assignedAgent: node.agentTemplate,
+        input: { orchestrationNodeId: node.id },
+      },
+      `orchestration:${plan.id}:${node.id}`,
+      false,
+      assigned?.threadId,
+    );
+    return task.id;
+  }
+
+  /** 全部子任务终态后，汇总生成最终成果并聚合共享工作区产物。 */
+  private async finalizeOrchestration(
+    owner: string,
+    plan: OrchestrationPlan,
+  ): Promise<string | undefined> {
+    const sections: { title: string; body: string }[] = [];
+    const artifactIds: string[] = [];
+    for (const node of plan.nodes) {
+      if (node.status !== "succeeded") continue;
+      // 共享工作区产物：聚合每个成功子任务产出的 artifact。
+      for (const id of node.artifactIds ?? []) if (!artifactIds.includes(id)) artifactIds.push(id);
+      if (!node.taskId) continue;
+      const subtask = await this.db.get<AgentTask>(owner, "tasks", node.taskId);
+      const result = subtask?.result?.trim();
+      if (!result) continue;
+      sections.push({ title: node.title, body: result });
+    }
+    // 降级拼接：无模型或综合失败时回退。
+    const merged = sections.map((s) => `### ${s.title}\n\n${s.body}`).join("\n\n---\n\n");
+    if (!merged && artifactIds.length === 0) return undefined;
+
+    const parent = await this.db.get<AgentTask>(owner, "tasks", plan.parentTaskId);
+    if (!parent) return merged;
+
+    // 用汇总 Agent 综合各子任务产物，生成一篇完整研报；失败或无模型时降级为拼接文本。
+    let finalResult = merged;
+    try {
+      const model = await this.workspace.models.resolve(
+        owner,
+        await agentModelForThread(this.db, owner, parent.threadId),
+      );
+      if (model.configured && model.model && sections.length > 0) {
+        const synthesized = await synthesizeResearch({
+          model: model.model,
+          connection: model.connection,
+          title: parent.title,
+          sections,
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (synthesized) finalResult = synthesized;
+      }
+    } catch (error) {
+      backgroundFailure("synthesize orchestration result", error);
+    }
+
+    // 把子任务产物并入父任务 artifactIds，形成共享工作区的可追溯清单。
+    const mergedArtifactIds = [...new Set([...parent.artifactIds, ...artifactIds])];
+    await this.db.put(owner, "tasks", {
+      ...parent,
+      result: finalResult,
+      status: "succeeded",
+      artifactIds: mergedArtifactIds,
+      updatedAt: date(),
+    });
+    // 生成一份汇总产物，关联所有子任务产物，供对话内查看与下载。
+    if (mergedArtifactIds.length > 0) {
+      await this.artifact(
+        owner,
+        parent,
+        "research_report",
+        parent.title,
+        finalResult || "Multi-agent research completed",
+        { subtaskArtifactIds: artifactIds, sections: sections.length },
+        "orchestration-summary",
+      );
+    }
+    // 父任务经编排路径直接成功，不走 worker settled，需补发完成通知。
+    await this.notify(
+      owner,
+      parent.title,
+      "Multi-agent research complete",
+      parent.id,
+      `task-done:${parent.id}`,
+    );
+    return finalResult;
+  }
+
+  /** 编排失败时，只给父任务发一条失败通知（子任务已静默，避免逐条轰炸）。 */
+  private async notifyOrchestrationFailed(
+    owner: string,
+    plan: OrchestrationPlan,
+    reason: string,
+  ): Promise<void> {
+    const parent = await this.db.get<AgentTask>(owner, "tasks", plan.parentTaskId);
+    if (!parent) return;
+    await this.db.put(owner, "tasks", {
+      ...parent,
+      status: "failed",
+      error: reason,
+      updatedAt: date(),
+    });
+    await this.notify(owner, "Task needs attention", reason, parent.id, `task-error:${parent.id}`);
   }
   private async document(
     owner: string,

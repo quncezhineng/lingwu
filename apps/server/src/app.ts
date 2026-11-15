@@ -7,8 +7,12 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import {
+  type Channel,
   calendarRangeSchema,
+  channelInputSchema,
+  channelUpdateSchema,
   emailDraftSchema,
+  type OrchestrationPlan,
   proposalSchema,
 } from "../../../packages/domain/src/index.ts";
 import type { MarketDataService } from "../../../packages/integrations/src/market-data.ts";
@@ -462,6 +466,61 @@ export async function createApp(
     const state = agentSpaceSchema.parse(await c.req.json());
     await db.put(c.get("owner"), "agent-settings", { id: "space", ...state });
     return c.json({ ok: true });
+  });
+  // ─── 多 Agent 群聊频道（M2）───
+  app.get("/api/channels", async (c) => {
+    const owner = c.get("owner");
+    const channels = await db.list<Channel>(owner, "channels");
+    return c.json(channels);
+  });
+  app.post("/api/channels", async (c) => {
+    const owner = c.get("owner");
+    const input = channelInputSchema.parse(await c.req.json());
+    const now = new Date().toISOString();
+    const channel: Channel = {
+      id: randomUUID(),
+      name: input.name,
+      agentIds: input.agentIds,
+      description: input.description,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.put(owner, "channels", channel);
+    return c.json(channel, 201);
+  });
+  app.patch("/api/channels/:id", async (c) => {
+    const owner = c.get("owner");
+    const id = c.req.param("id");
+    const existing = await db.get<Channel>(owner, "channels", id);
+    if (!existing) throw new AppError("Channel not found", 404);
+    const patch = channelUpdateSchema.parse(await c.req.json());
+    const next: Channel = { ...existing, ...patch, updatedAt: new Date().toISOString() };
+    await db.put(owner, "channels", next);
+    return c.json(next);
+  });
+  app.delete("/api/channels/:id", async (c) => {
+    const owner = c.get("owner");
+    const id = c.req.param("id");
+    const existing = await db.get<Channel>(owner, "channels", id);
+    if (!existing) throw new AppError("Channel not found", 404);
+    await db.remove(owner, "channels", id);
+    return c.json({ ok: true });
+  });
+  /** 列出当前用户最近的编排计划（含节点状态与汇总结果），供前端呈现多 Agent 协作进度。 */
+  app.get("/api/orchestrations", async (c) => {
+    const owner = c.get("owner");
+    const plans = await db.list<OrchestrationPlan>(owner, "orchestration_plans");
+    // 按创建时间倒序，最近的在前。
+    plans.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return c.json(plans);
+  });
+  /** 查询单个编排计划的实时状态（节点 DAG + 汇总结果）。 */
+  app.get("/api/orchestrations/:id", async (c) => {
+    const owner = c.get("owner");
+    const id = c.req.param("id");
+    const plan = await db.get<OrchestrationPlan>(owner, "orchestration_plans", id);
+    if (!plan) throw new AppError("Orchestration not found", 404);
+    return c.json(plan);
   });
   /** Persist the user's marketplace install choice for a plugin, skill or connector. */
   app.put("/api/capabilities/:id", async (c) => {

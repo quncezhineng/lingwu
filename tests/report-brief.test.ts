@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
 import { createStore } from "../apps/server/src/db.ts";
-import { normalizeChatBrief } from "../apps/server/src/engine/report-brief.ts";
+import { normalizeChatBrief, synthesizeResearch } from "../apps/server/src/engine/report-brief.ts";
 import { type AgentArtifact, artifactChatBrief } from "../packages/domain/src/agent.ts";
 
 test("模型摘要去掉代码围栏，过短的结果不采用", () => {
@@ -14,6 +14,16 @@ test("模型摘要去掉代码围栏，过短的结果不采用", () => {
     "三季度利润下降来自销量，不是去年同期的基数。",
   );
   assert.throws(() => normalizeChatBrief("太短"));
+});
+
+test("综合研报在无片段时返回 null，不触发模型", async () => {
+  // sections 为空时应直接返回 null，调用方据此降级为拼接文本。
+  const result = await synthesizeResearch({
+    model: "openai/fixture",
+    title: "研究比亚迪",
+    sections: [],
+  });
+  assert.equal(result, null);
 });
 
 test("报告摘要只生成一次，并写回产物", async (t) => {

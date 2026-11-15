@@ -1,6 +1,7 @@
 import type { TranslationKey } from "../en";
 import agent from "./agent";
 import app from "./app";
+import channels from "./channels";
 import chat from "./chat";
 import common from "./common";
 import computer from "./computer";
@@ -42,6 +43,7 @@ export const zhHans = {
   ...computer,
   ...threads,
   ...tools,
+  ...channels,
 } satisfies Record<TranslationKey, string>;
 
 export default zhHans;

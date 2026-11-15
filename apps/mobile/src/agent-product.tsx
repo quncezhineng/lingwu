@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import type { Channel } from "../../../packages/domain/src/channel";
 import { AccountScreen } from "./account";
 import { AccountAvatar } from "./account-avatar";
 import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-header";
@@ -35,6 +36,8 @@ import { AgentWorkList } from "./agent-work-dialog";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
+import { ChannelChatScreen } from "./channel-chat";
+import { useChannels } from "./channels";
 import { ChatScreen, WorkspaceTools } from "./chat";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ComputerScreen } from "./computer";
@@ -59,6 +62,7 @@ import {
   Search,
   Settings2,
   Trash2,
+  Users,
   X,
 } from "./icons";
 import { IosStack } from "./ios-stack";
@@ -413,6 +417,139 @@ function AgentListItem({
   );
 }
 
+/** 频道列表项（M2）：与 Agent 列表项同级的群聊入口，用群组图标区分。 */
+function ChannelListItem({
+  channel,
+  active,
+  detailed = false,
+  onPress,
+}: {
+  channel: Channel;
+  active: boolean;
+  detailed?: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  const { agents } = useAgentSpace();
+  const [hovered, setHovered] = useState(false);
+  const members = channel.agentIds
+    .map((id) => agents.find((a) => a.id === id))
+    .filter((m): m is NonNullable<typeof m> => Boolean(m));
+  const preview = members.map((m) => m.name).join(" · ") || t("channels.emptyDetail");
+
+  if (detailed) {
+    return (
+      <View
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        style={{
+          borderRadius: radius.sheet,
+          backgroundColor: active ? colors.sky : hovered ? colors.overlay1 : "transparent",
+        }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={channel.name}
+          accessibilityState={{ selected: active }}
+          onPress={onPress}
+          style={{
+            minHeight: 68,
+            paddingVertical: 10,
+            paddingLeft: space.xs,
+            paddingRight: space.xl,
+            borderRadius: radius.sheet,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: radius.full,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: colors.sky,
+            }}
+          >
+            <Users size={20} color={colors.primary} strokeWidth={1.7} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text numberOfLines={1} style={{ ...typography.agentName, color: colors.text }}>
+              {channel.name}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{ flex: 1, fontSize: 13, lineHeight: 20, color: colors.muted }}
+            >
+              {preview}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+    );
+  }
+  return (
+    <View
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        borderRadius: radius.control,
+        backgroundColor: active ? colors.sky : hovered ? colors.overlay1 : "transparent",
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={channel.name}
+        accessibilityState={{ selected: active }}
+        onPress={onPress}
+        style={({ pressed }) => ({
+          flex: 1,
+          minWidth: 0,
+          minHeight: 44,
+          paddingLeft: 9,
+          paddingRight: 4,
+          paddingVertical: 5,
+          borderRadius: radius.control,
+          backgroundColor: pressed ? colors.overlay1 : "transparent",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+        })}
+      >
+        <View
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: radius.control,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.sky,
+          }}
+        >
+          <Users size={16} color={colors.primary} strokeWidth={1.7} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 13,
+              lineHeight: 17,
+              fontWeight: active ? "600" : "500",
+              color: active ? colors.primaryStrong : colors.text,
+            }}
+          >
+            {channel.name}
+          </Text>
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
 function AccountMenuRow({
   icon: Icon,
   title,
@@ -718,6 +855,7 @@ function AgentRail({
   const [pendingDelete, setPendingDelete] = useState<AgentDefinition>();
   const [menuAnchor, setMenuAnchor] = useState<AgentMenuAnchor>();
   const { agents, current, selectAgent, deleteAgent, setAgentPinned } = useAgentSpace();
+  const { channels, currentChannelId, selectChannel } = useChannels();
   // 排序规则：系统内置默认 Agent 永远置顶 → 用户置顶的 → 其余（同组内保持创建顺序）。
   const orderedAgents = useMemo(
     () =>
@@ -927,6 +1065,39 @@ function AgentRail({
             onOpenMenu={setMenuAnchor}
           />
         ))}
+        {channels.map((channel) => (
+          <ChannelListItem
+            key={channel.id}
+            channel={channel}
+            active={channel.id === currentChannelId}
+            detailed={!compact}
+            onPress={() => {
+              selectChannel(channel.id);
+              navigate("chat");
+              onClose?.();
+            }}
+          />
+        ))}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onOpen("create-channel")}
+          style={({ pressed }) => ({
+            minHeight: 40,
+            paddingLeft: compact ? 9 : space.xs,
+            paddingRight: compact ? 9 : space.sm,
+            borderRadius: radius.control,
+            backgroundColor: pressed ? colors.overlay1 : "transparent",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 2,
+          })}
+        >
+          <Plus size={16} color={colors.primaryStrong} />
+          <Text style={{ fontSize: 12, color: colors.primaryStrong, fontWeight: "500" }}>
+            {t("channels.create")}
+          </Text>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           onPress={() => onOpen("create")}
@@ -1365,16 +1536,21 @@ function AgentHeader({
 }) {
   const { t } = useTranslation();
   const { current } = useAgentSpace();
+  const { channels, currentChannelId } = useChannels();
   const { section, back } = useWorkspace();
   const { width } = useWindowDimensions();
   // 与页面正文同一条判定：< mobile 用窄边距，其余用桌面边距。
   const stacked = width < breakpoints.mobile;
+  const activeChannel = currentChannelId
+    ? channels.find((channel) => channel.id === currentChannelId)
+    : undefined;
   if (section === "chat")
     return (
       <AgentFloatingHeader
         name={current.name}
         role={current.role}
         avatar={current.avatar}
+        channelName={activeChannel?.name}
         persistentNavigation={persistentNavigation}
         onMenu={onMenu}
         onBack={onBack}
@@ -1410,7 +1586,9 @@ function AgentHeader({
                               ? t("app.titleApps")
                               : section === "settings"
                                 ? t("details.settingsTitle")
-                                : t("app.navChat");
+                                : section === "channels"
+                                  ? t("app.navChannels")
+                                  : t("app.navChat");
   return (
     <View
       style={{
@@ -1672,6 +1850,7 @@ export function AgentProductShell({
     needsOnboarding,
     markThreadUsed,
   } = useAgentSpace();
+  const { channels, currentChannelId } = useChannels();
   const [panelStack, setPanelStack] = useState<AgentPanel[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [appsSheet, setAppsSheet] = useState(false);
@@ -1878,7 +2057,14 @@ export function AgentProductShell({
     );
   }
 
-  const chatPane = (
+  const activeChannel = currentChannelId
+    ? channels.find((channel) => channel.id === currentChannelId)
+    : undefined;
+  const chatPane = activeChannel ? (
+    <View style={{ flex: 1, minHeight: 0 }}>
+      <ChannelChatScreen channel={activeChannel} />
+    </View>
+  ) : (
     <>
       <ErrorNotice error={error} />
       {mounted.map((agent) => {

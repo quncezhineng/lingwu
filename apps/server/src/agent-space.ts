@@ -172,3 +172,46 @@ export async function agentIdForThread(
   );
   return saved?.agents.find((agent) => agent.threadId === id)?.id;
 }
+
+/**
+ * 按「执行方标识」解析出一个具体 Agent（多 Agent 编排用）。
+ *
+ * `assignedAgent` 语义兼容两种来源：
+ *   - 模板枚举值（market/asset/research/...）：优先匹配第一个使用该模板的非系统 Agent；
+ *   - 具体 Agent 的 id 或 threadId（频道成员精确分配）：精确匹配。
+ *
+ * 返回该 Agent 的 threadId（决定子任务用哪个模型）与人设字段（role/persona/instructions），
+ * 供调用方把子任务真正路由到该成员 Agent。
+ */
+export async function resolveAgentForAssignment(
+  db: { get: <T>(owner: string, kind: string, id: string) => Promise<T | null> },
+  owner: string,
+  assignedAgent?: string | null,
+): Promise<
+  | {
+      threadId: string;
+      role?: string;
+      persona?: string;
+      instructions?: string;
+    }
+  | undefined
+> {
+  const target = assignedAgent?.trim();
+  if (!target) return undefined;
+  const saved = await db.get<PersistedAgentSpace & { id: string }>(
+    owner,
+    "agent-settings",
+    "space",
+  );
+  if (!saved) return undefined;
+  const byId = saved.agents.find(
+    (agent) => agent.id === target || agent.threadId === target || agent.template === target,
+  );
+  if (!byId) return undefined;
+  return {
+    threadId: byId.threadId,
+    role: byId.role,
+    persona: byId.persona,
+    instructions: byId.instructions,
+  };
+}

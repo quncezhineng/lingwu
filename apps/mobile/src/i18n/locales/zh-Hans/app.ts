@@ -139,6 +139,7 @@ const app = {
   "app.navToday": "工作台",
   "app.goHome": "返回首页",
   "app.navChat": "对话",
+  "app.navChannels": "频道",
   "app.navWatchlist": "自选与组合",
   "app.navWatchlistShort": "自选",
   "app.navActivity": "任务",

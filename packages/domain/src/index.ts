@@ -20,6 +20,7 @@ export type Section =
   | "apps"
   | "settings"
   | "agent"
+  | "channels"
   | "account";
 export interface Mail {
   id: string;
@@ -225,4 +226,14 @@ export interface ExecutionBackend {
   health(): Promise<{ available: boolean; detail: string }>;
 }
 
+export type { Channel, ChannelInput, ChannelUpdate } from "./channel.ts";
+export { channelInputSchema, channelUpdateSchema } from "./channel.ts";
 export type { ComputerCommand, ComputerDirectory, ComputerSnapshot } from "./computer.ts";
+export type {
+  OrchestrationNode,
+  OrchestrationNodeStatus,
+  OrchestrationPlan,
+  OrchestrationPlanInput,
+  OrchestrationPlanStatus,
+} from "./orchestration.ts";
+export { ORCHESTRATION_REQUIRED_MARKER } from "./orchestration.ts";

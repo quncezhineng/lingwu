@@ -48,4 +48,37 @@ export async function summarizeReport(input: {
   return normalizeChatBrief(text);
 }
 
+const SYNTHESIS_SYSTEM = [
+  "你是投研团队的负责人，要把多个专家智能体分别产出的研究片段综合成一篇完整、自洽的投资研究报告。",
+  "每个片段前会标注它负责的维度（如公司基本面、宏观环境、财务分析、估值、风险）。",
+  "整合时：保留各片段的量化数据与关键判断，消除重复，统一口径与语气，按「结论 → 公司/行业概况 → 财务与估值 → 风险 → 投资建议」组织成结构化的 Markdown 报告。",
+  "只使用片段里已经给出的事实、数字和判断，不杜撰片段没有的数据。若片段间有矛盾，如实指出分歧而不是强行统一。",
+  "用中文输出。",
+].join("");
+
+/** 把多个子任务的产出综合成一篇完整研报。无模型或输入为空时返回 null，由调用方降级。 */
+export async function synthesizeResearch(input: {
+  model: string;
+  connection?: ModelConnection;
+  title: string;
+  sections: { title: string; body: string }[];
+  signal?: AbortSignal;
+}): Promise<string | null> {
+  if (input.sections.length === 0) return null;
+  const prompt =
+    `研究主题：${input.title}\n\n以下是各专家智能体的研究片段：\n\n` +
+    input.sections
+      .map((section, i) => `【片段 ${i + 1} · ${section.title}】\n${section.body}`)
+      .join("\n\n---\n\n") +
+    `\n\n请综合以上片段，产出一篇完整的投资研究报告。`;
+  const text = await completeText({
+    model: input.model,
+    connection: input.connection,
+    system: SYNTHESIS_SYSTEM,
+    prompt,
+    signal: input.signal,
+  });
+  return text.trim() || null;
+}
+
 export { artifactChatBrief };

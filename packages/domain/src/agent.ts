@@ -51,6 +51,11 @@ export interface AgentTask {
   error?: string | null;
   question?: string;
   artifactIds: string[];
+  /** 编排上下文：归属哪个编排计划、由谁委派、派给哪个 Agent（多 Agent 编排 M2）。 */
+  orchestrationId?: string;
+  parentTaskId?: string;
+  delegatedBy?: string;
+  assignedAgent?: string;
 }
 export interface RunEvent {
   id: string;
@@ -237,6 +242,11 @@ export const createTaskSchema = z.object({
   goalId: z.string().optional(),
   milestoneId: z.string().min(1).max(200).optional(),
   input: z.record(z.string(), z.unknown()).default({}),
+  /** 多 Agent 编排：子任务归属。 */
+  orchestrationId: z.string().optional(),
+  parentTaskId: z.string().optional(),
+  delegatedBy: z.string().optional(),
+  assignedAgent: z.string().optional(),
 });
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export const monitorInputSchema = z

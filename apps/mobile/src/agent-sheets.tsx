@@ -18,6 +18,7 @@ import { Text } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
 import { CapabilityHubScreen, MySkillDetailSheet, SkillDetailSheet } from "./capability-hub";
 import { skillDisplayName } from "./capability-picker";
+import { CreateChannelSheet } from "./channels-screen";
 import type { TranslationKey } from "./i18n";
 import { useTranslation } from "./i18n";
 import {
@@ -50,6 +51,7 @@ import { useWorkspace } from "./workspace";
 export type AgentPanel =
   | "more"
   | "create"
+  | "create-channel"
   | "preferences"
   | "memory"
   | "watchlist"
@@ -146,6 +148,7 @@ function SheetSection({ children }: { children: React.ReactNode }) {
 
 export function AgentMoreContent({
   onPanel,
+  onOpenApps,
   onOpenAgentSkills,
   onInspectSkill,
   compact = true,
@@ -723,6 +726,8 @@ export function AgentSheets({
       </>
     );
   if (panel === "create") return <CreateAgentSheet onClose={onClose} onCreated={onClose} />;
+  if (panel === "create-channel")
+    return <CreateChannelSheet onClose={onClose} onCreated={onClose} />;
   if (panel === "preferences") return <PreferencesSheet onClose={onClose} />;
   if (panel === "memory")
     return (

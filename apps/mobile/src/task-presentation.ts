@@ -30,9 +30,13 @@ export function serverToolOutcome(
   return { state: "saved" as const, id, taskId };
 }
 
-/** 监控任务由「自动化」页代表，任务列表不再重复展示。 */
-export function listedWorkTasks<T extends { kind: string }>(tasks: readonly T[]): T[] {
-  return tasks.filter((task) => task.kind !== "monitor");
+/** 监控任务由「自动化」页代表，任务列表不再重复展示。
+ * 编排子任务（有 parentTaskId，属于某个多 Agent 编排 DAG）也由顶层任务代表，
+ * 不单独列出——否则专家子任务会零散地混在任务流里。 */
+export function listedWorkTasks<T extends { kind: string; parentTaskId?: string }>(
+  tasks: readonly T[],
+): T[] {
+  return tasks.filter((task) => task.kind !== "monitor" && !task.parentTaskId);
 }
 
 export function taskRequiresSetup(

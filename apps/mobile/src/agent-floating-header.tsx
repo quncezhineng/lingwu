@@ -5,7 +5,7 @@ import { AgentOrb } from "./agent-orb";
 import type { AgentAvatarId } from "./agent-space-model";
 import { Text } from "./app-text";
 import { useTranslation } from "./i18n";
-import { ChevronLeft, ChevronRight, Menu } from "./icons";
+import { ChevronLeft, ChevronRight, Menu, Users } from "./icons";
 import { MOBILE_CONTROL, mobileGlassStyle } from "./mobile-chrome";
 import { colors, elevation, radius, semantic, sizing, space } from "./theme";
 import { HoverPressable } from "./ui";
@@ -31,6 +31,7 @@ export function AgentFloatingHeader({
   name,
   role,
   avatar,
+  channelName,
   persistentNavigation,
   onMenu,
   onBack,
@@ -39,6 +40,8 @@ export function AgentFloatingHeader({
   name: string;
   role: string;
   avatar: AgentAvatarId;
+  /** 选中频道时显示频道名（群组身份），并覆盖 name/role/avatar。 */
+  channelName?: string;
   persistentNavigation: boolean;
   onMenu: () => void;
   /** 手机 bot 页：圆形返回，回到 bots 首页。 */
@@ -47,7 +50,9 @@ export function AgentFloatingHeader({
   onIdentity: () => void;
 }) {
   const { t } = useTranslation();
-  const label = role ? `${name} · ${role}` : name;
+  const isChannel = channelName != null;
+  const displayName = isChannel ? channelName : name;
+  const label = isChannel ? displayName : role ? `${name} · ${role}` : name;
   const [hovered, setHovered] = useState(false);
   return (
     <View
@@ -136,7 +141,22 @@ export function AgentFloatingHeader({
                 ...elevation.level1,
               })}
             >
-              <AgentOrb avatar={avatar} size={onBack ? 32 : 28} />
+              {isChannel ? (
+                <View
+                  style={{
+                    width: onBack ? 32 : 28,
+                    height: onBack ? 32 : 28,
+                    borderRadius: radius.full,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: colors.primary,
+                  }}
+                >
+                  <Users size={onBack ? 18 : 16} color={colors.onPrimary} />
+                </View>
+              ) : (
+                <AgentOrb avatar={avatar} size={onBack ? 32 : 28} />
+              )}
               <Text
                 numberOfLines={1}
                 style={{
