@@ -1,8 +1,13 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { findRepoPath, moduleDir } from "../repo-path.ts";
 
-const SKILLS_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../../../skills");
+/** Without this folder every catalog skill reads as "not installed". */
+export function findSkillsRoot(start = moduleDir(import.meta.url)) {
+  return findRepoPath("skills", start) ?? join(start, "../../../../skills");
+}
+
+const SKILLS_ROOT = findSkillsRoot();
 const SUMMARY_LIMIT = 180;
 const BODY_LIMIT = 16_000;
 

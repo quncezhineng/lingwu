@@ -39,7 +39,6 @@ test("resolveAgentForAssignment matches by template, id, and threadId", async ()
   const db = await createStore();
   try {
     await db.put("owner", "agent-settings", {
-      id: "space",
       ...space([
         {
           id: "researcher-1",
@@ -73,7 +72,7 @@ test("resolveAgentForAssignment matches by template, id, and threadId", async ()
 
     // 按 threadId 匹配。
     const byThreadId = await resolveAgentForAssignment(db, "owner", "thread-researcher");
-    assert.equal(byThreadId?.id === undefined, true);
+    assert.equal("id" in (byThreadId ?? {}), false);
     assert.equal(byThreadId?.threadId, "thread-researcher");
 
     // 未命中返回 undefined。

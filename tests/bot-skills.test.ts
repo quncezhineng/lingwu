@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
+  findSkillsRoot,
   installedSkillViews,
   loadBuiltinSkills,
   parseSkillMarkdown,
@@ -9,6 +13,42 @@ import {
   skillGuidanceForThread,
   skillPrompt,
 } from "../apps/server/src/engine/bot-skills.ts";
+import { findRepoPath } from "../apps/server/src/repo-path.ts";
+
+test("the built server finds the repo skills folder from dist", () => {
+  const repo = mkdtempSync(join(tmpdir(), "lingwu-skills-"));
+  try {
+    mkdirSync(join(repo, "skills", "earnings-analysis"), { recursive: true });
+    for (const engine of ["apps/server/src/engine", "dist/apps/server/src/engine"]) {
+      mkdirSync(join(repo, engine), { recursive: true });
+      assert.equal(findSkillsRoot(join(repo, engine)), join(repo, "skills"));
+    }
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("repository scripts resolve from source and from dist", () => {
+  const repo = mkdtempSync(join(tmpdir(), "lingwu-repo-"));
+  try {
+    mkdirSync(join(repo, "apps", "computer"), { recursive: true });
+    writeFileSync(join(repo, "apps", "computer", "files.py"), "");
+    for (const src of ["apps/server/src", "dist/apps/server/src"]) {
+      mkdirSync(join(repo, src), { recursive: true });
+      assert.equal(
+        findRepoPath("apps/computer/files.py", join(repo, src)),
+        join(repo, "apps", "computer", "files.py"),
+      );
+    }
+    assert.equal(findRepoPath("apps/computer/missing.py", join(repo, "apps")), undefined);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("the real catalog includes earnings-analysis", () => {
+  assert.ok(loadBuiltinSkills().has("earnings-analysis"));
+});
 
 test("a skill file splits into a short summary and the method", () => {
   const skill = parseSkillMarkdown(

@@ -10,6 +10,7 @@ import {
 } from "./computer.ts";
 import type { Config } from "./config.ts";
 import { AppError } from "./errors.ts";
+import { findRepoPath, moduleDir } from "./repo-path.ts";
 
 // The SDK is imported lazily so Docker-only installs never load it at runtime.
 const sdk = () => import("@e2b/desktop");
@@ -346,10 +347,11 @@ const sessionScript = [
 ].join("\n");
 
 let filesScript: Promise<string> | undefined;
-// Source runs from apps/server/src; the built server runs from the repository root.
 const loadFilesScript = () =>
-  (filesScript ??= readFile(new URL("../../computer/files.py", import.meta.url), "utf8").catch(() =>
-    readFile(resolve("apps/computer/files.py"), "utf8"),
+  (filesScript ??= readFile(
+    findRepoPath("apps/computer/files.py", moduleDir(import.meta.url)) ??
+      resolve("apps/computer/files.py"),
+    "utf8",
   ));
 
 // Runs each owner's computer in one E2B Desktop sandbox, matched by metadata.
