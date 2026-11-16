@@ -9,7 +9,7 @@ Your personal investment agent — with a browser, terminal, files, and work tha
 Ask for an outcome. Follow the plan, review actions, and come back to the result.
 Built with CopilotKit React Native for iOS, Android, and web.
 
-[Quick start](#quick-start) · [Demo](#demo) · [Features](#features) · [Architecture](#architecture) · [Docs](docs/README.md) · [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) · [个人投研智能体](#个人投研智能体) · [Demo](#demo) · [Features](#features) · [Architecture](#architecture) · [Wiki](docs/WIKI.md) · [Docs](docs/README.md) · [Contributing](CONTRIBUTING.md)
 
 [![CI](https://github.com/quncezhineng/lingwu/actions/workflows/ci.yml/badge.svg)](https://github.com/quncezhineng/lingwu/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -30,6 +30,47 @@ https://github.com/user-attachments/assets/0cc87de0-c3c1-4f24-b7df-e7d04bb946fd
 
 > **Alpha, for self-hosting and building on.** Open-ended reasoning, live Google accounts, and CopilotKit Rich Threads require their own configuration. See [what is verified](docs/VERIFICATION.md) and the [roadmap](ROADMAP.md).
 
+## 个人投研智能体
+
+**灵悟把“研究一只股票”从一次问答，变成一条可以被查看、继续和复用的工作流。**
+
+它不是只负责聊天的股票机器人，而是一名带着行情、浏览器、文件、任务队列和长期记忆工作的投研助理。你可以让它每天生成市场简报、研究一个标的、导入并分析持仓、在价格或公开页面发生变化时提醒你，也可以让多个专业 Agent 围绕一个复杂问题分工、互相等待依赖，最后汇总成一份完整报告。
+
+### 投研闭环
+
+| 环节 | 用户看到什么 | 系统在后台做什么 |
+| --- | --- | --- |
+| **观察** | 自选行情、涨跌幅、持仓市值 | 拉取 Yahoo/AKShare 行情，合并缓存，标记过期数据 |
+| **记忆** | 偏好、论点、分析、决策 | 按账户、Agent、频道隔离保存，并双写 Hindsight |
+| **分析** | 每日简报、单标的研究、组合风险 | 执行简报生成、研究任务和组合指标计算 |
+| **交付** | 对话卡片、研报、文件、分享链接 | 保存结构化产物，支持导出和网页打印 PDF |
+| **跟踪** | 价格提醒、网页监控、论点周检 | SQL 租约调度后台任务，去重通知并处理失败退避 |
+
+### 已经落地的投研能力
+
+| 能力 | 当前体验 |
+| --- | --- |
+| **每日市场简报** | 汇总标普 500、纳斯达克、道指、上证、深证与自选标的异动；支持定时、手动生成、补跑和失败重试 |
+| **观察列表** | 多列表管理；添加 A 股、港股、美股标的；批量行情摘要；日涨跌幅超过 2% 标记为异动 |
+| **深度研究** | 对单个标的生成行情、新闻、同业和启发式估值报告；产物可查看、分享、导出 |
+| **投资组合** | CSV 导入或手工录入；按币种计算成本、市值、浮动盈亏、配置和风险指标 |
+| **投资笔记与论点** | 记录买入/卖出理由、研究笔记和论点；每周生成幂等回检记录与提醒 |
+| **价格与网页监控** | 价格高于/低于、涨跌幅阈值；公开页面内容变化、文本出现、价格阈值 |
+| **多 Agent 协作** | 8 种专家模板；频道内 2–10 名 Agent；DAG 编排、依赖解锁、失败传播和汇总 |
+| **长期记忆** | 账户共享、Agent 私有、频道共享三档作用域；支持金融术语和投融资阶段字段 |
+| **可信交付** | 邮件/日历外部写入必须人工审核；分享链接；报告与文件可追溯 |
+
+### 重要的能力边界
+
+- 研究是**投研底稿**，不是完整卖方研报：当前不包含完整三大报表、一致预期和 DCF。
+- 论点周检会提示“待人工确认”，不会用模型伪造成立或不成立。
+- 组合按人民币、美元、港币分别汇总，不做未经确认的汇率折算。
+- 市场简报的“今日事件”尚未接入，空事件不代表今天没有事件。
+- 当前是应用内通知，设备推送、公告事件流和交易日历仍在规划中。
+- 产品不提供买卖建议、收益承诺或交易执行。
+
+完整的产品定义、工作流、数据模型、API 与实现边界见 **[个人投研智能体：产品与架构全景](docs/个人投研智能体.md)**，工程与部署问题见 **[项目 Wiki](docs/WIKI.md)**。
+
 ## Demo
 
 On iPhone, ask LingWu to find interesting stories on Hacker News and summarize CopilotKit. On desktop, ask it to check the school-trip email, open the message, and research exhibits at Monterey Bay Aquarium. The agent shows email and browser results inline. **Take control** opens that same browser session when you need it.
@@ -42,7 +83,9 @@ The [Jev aquarium-trip demo](docs/demos/jev-generative-ui.md) walks through a fi
 
 ## What it is
 
-LingWu is a personal-agent application with an agent computer, visible work, and rich results. It runs its own server, task worker, and browser worker. You can inspect and change the source under the MIT license.
+LingWu is a **personal investment research agent** built on a general-purpose agent runtime. It combines market data, portfolio tracking, research reports, long-term memory, durable jobs, persistent Chromium, and an optional Linux workspace in one application. It runs its own server, task worker, and browser worker; the source is inspectable and modifiable under the MIT license.
+
+The investment layer covers US, Hong Kong, and mainland China symbols, daily briefings, watchlists, CSV portfolios, risk metrics, price alerts, public-page watches, investment notes, and multi-agent research. The underlying agent runtime keeps the work visible: plans, missing-input requests, approvals, failures, receipts, and saved artifacts remain available after the app closes.
 
 The computer combines **persistent Chromium and an optional Linux workspace**. The agent can browse public pages, run commands in its own container, work with files, and move PDFs between the computer and the app. You can open its browser or terminal and continue the work. Graphical desktops and autonomous checkout remain future work.
 
@@ -54,14 +97,14 @@ The computer combines **persistent Chromium and an optional Linux workspace**. T
 | **Agent computer**   | Persistent browser profiles and takeover console; optional isolated Linux terminal, saved command receipts, editable workspace files, and PDF transfer.                                                                             |
 | **Activity**         | Durable task plans, progress, input requests, pause/resume/cancel/retry, approvals, and saved receipts. SQL leases recover interrupted work.                                                                                        |
 | **Ideas**            | Suggestions with source evidence; edit, accept, or dismiss. Sent replies and completed matching work are excluded.                                                                                                                  |
-| **Goals & Tracking** | Goals and milestones; recurring public-page checks for changes, text availability, or USD price thresholds, with deduplicated alerts and failure backoff.                                                                           |
+| **Goals & Tracking** | Goals and milestones; recurring public-page checks for changes, text availability, or CNY/HKD/USD price thresholds, with deduplicated alerts and failure backoff.                                                                  |
 | **Documents**        | Email attachment → PDF → requested form values → filled copy → reviewed reply → receipt. Native/web PDF viewing, paging, zoom, supported fields, and sharing.                                                                       |
 | **Finance**          | Import transaction CSV to create a spending summary with categories, transactions, and a savings-goal action.                                                                                                                       |
 | **Gmail & Calendar** | Google OAuth adapters, complete mail threads, drafts/attachments, calendar discovery, and reviewed event creation/update/deletion. Live credentials required.                                                                       |
 | **Personal context** | Editable name, tone, avatar, and memories. Background-update preferences and durable in-app notifications.                                                                                                                          |
 | **Rich Threads**     | CopilotKit Intelligence persistence in every mode, with a stable main conversation, side chats, renaming, archiving, restoring, and replay. A server-only project key is required.                                                  |
 
-The [feature inventory](docs/FEATURES.md) describes implemented capabilities and planned extensions. Health/bank/social connectors, device push, voice, generated executable tools, and automatic reservations/payments are on the [roadmap](ROADMAP.md).
+The investment capabilities above are the primary product surface. The [feature inventory](docs/FEATURES.md) describes the underlying general-agent capabilities and planned extensions; [personal investment agent](docs/个人投研智能体.md) is the authoritative status map for research, portfolio, monitoring, memory, and multi-agent workflows. Health/bank/social connectors, device push, voice, generated executable tools, and automatic reservations/payments are on the [roadmap](ROADMAP.md).
 
 ## Quick start
 
@@ -89,10 +132,15 @@ Open [localhost:8081](http://localhost:8081). The API runs at [localhost:8787/ap
 
 ### Try it
 
-1. In Chat, send **“Complete the permission slip”**. Open the task, supply fictional form values, inspect the saved PDF, and review the prepared reply. This writes only to the local mailbox.
-2. In **Goals → Track**, create a built-in availability watch, then change the built-in test page to trigger an alert.
-3. In **Menu → Delegate task → Finance**, use **Try example transactions** to create an interactive spending tracker.
-4. Start the [browser worker](#browser-worker) and configure a model, then ask **“Check out Hacker News for cool stuff”** or **“Summarize copilotkit.ai”**. Follow the browser inline and use **Take control** to open its session. For a model-free version of this flow, follow the [AI Mock demo setup](docs/DEMO.md#run-the-agent-browser-demo).
+1. Open **Watchlist** and add `AAPL`, `600519`, or `0700.HK`. Load the quote summary and open the symbol page.
+2. Generate today's **market briefing** and inspect the index table, watchlist movers, and partial-data notice.
+3. Ask **“Research AAPL”** and open the saved research-report artifact.
+4. Create a **portfolio**, import a small holdings CSV, and compare allocation, P&L, and risk across currency buckets.
+5. Create a **price alert** and use **Check now** to verify trigger and notification deduplication.
+6. Ask **“Complete the permission slip”** to inspect a durable document task, supply fictional form values, and review the prepared reply.
+7. Start the [browser worker](#browser-worker) and configure a model, then ask **“Check out Hacker News for cool stuff”** or **“Summarize copilotkit.ai”**. Follow the browser inline and use **Take control** to open its session.
+
+For a model-free version of the browser flow, follow the [AI Mock demo setup](docs/DEMO.md#run-the-agent-browser-demo).
 
 For iOS or Android, use `pnpm --dir apps/mobile ios` or `pnpm --dir apps/mobile android`. Xcode or Android tooling is required. The PDF reader needs an Expo development build; use [native setup](apps/mobile/README.md).
 

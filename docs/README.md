@@ -1,26 +1,126 @@
-# LingWu documentation
+# LingWu 文档中心
 
-## Watch LingWu
+LingWu（灵悟）是面向个人投资者的 AI 投研智能体。它把行情、研究、组合、监控、长期记忆与可追溯的执行过程放进同一条工作流：提出目标，查看计划，补充信息，审核动作，最后拿到可复核的成果。
 
-[iPhone demo · 38 seconds](../assets/demos/2026-09-16/mobile.mp4) · [Web demo · 42 seconds](../assets/demos/2026-09-16/web.mp4) · [Recording notes and reproduction](DEMO.md)
+> 第一次访问建议从 [项目 Wiki](WIKI.md) 开始；想深入理解产品定位、能力边界和技术架构，请阅读 [个人投研智能体](个人投研智能体.md)。
 
-The demos follow a request from chat to the agent's inline browser, then show how to take control of that session. The composer uses one control for sending and stopping a reply.
+---
 
-## Guides
+## 推荐阅读路径
 
-- [Quick start and architecture](../README.md)
-- [Native iOS / Android / web setup](../apps/mobile/README.md)
-- [Browser worker, API, persistence, and network boundary](../apps/worker/README.md)
-- [本地启用浏览器 Worker 无头浏览器指南](BROWSER-WORKER-本地启动指南.md)
-- [Linux computer, terminal, and workspace files](COMPUTER.md)
-- [CopilotKit Rich Threads](RICH-THREADS.md)
-- [Conversation streaming protocol and reliability](conversation-streaming.md)
-- [Interaction design and conversation behavior](EXPERIENCE.md)
-- [OpenBot integration contract](OPENBOT-INTEGRATION.md)
-- [Feature inventory](FEATURES.md)
-- [Localization and language switching](I18N.md)
-- [Verification and limitations](VERIFICATION.md)
-- [Demo reproduction](DEMO.md)
-- [Roadmap](../ROADMAP.md)
-- [Contributing](../CONTRIBUTING.md)
-- [Security](../SECURITY.md)
+### 5 分钟了解
+
+1. [项目 Wiki](WIKI.md)：项目定位、能力状态、快速开始与系统架构。
+2. [个人投研智能体](个人投研智能体.md)：产品闭环、工作流、数据模型与 API 地图。
+3. [功能清单](FEATURES.md)：Agent 基础能力与扩展边界。
+4. [路线图](../ROADMAP.md)：后续演进方向。
+
+### 本地运行与体验
+
+1. [项目 Wiki 的快速开始](WIKI.md#5-快速开始)。
+2. [浏览器 Worker 本地启动](BROWSER-WORKER-本地启动指南.md)。
+3. [Linux 计算机](COMPUTER.md)。
+4. [个人模型连接](USER-MODEL-CONNECTION.md)。
+5. [Rich Threads 配置](RICH-THREADS.md)。
+
+### 理解投研链路
+
+1. [个人投研智能体 PRD](PRD-LingWu-个人投研智能体.md)：需求与优先级。
+2. [市场数据源评估](市场数据源评估报告.md)：Yahoo、AKShare、Tushare 等选型。
+3. [行情缓存与降级](行情数据缓存与降级策略.md)：缓存、限流与故障降级。
+4. [定时任务与部署手册](O2-定时任务与部署手册.md)：简报调度与健康自检。
+5. [任务、目标与提醒](PRD-任务目标提醒.md)：目标轨道与提醒体系。
+
+### 理解 Agent 与记忆
+
+1. [多 Agent 编排与事件溯源](技术方案-多Agent编排与事件溯源.md)。
+2. [多 Agent 记忆系统 PRD](PRD-多Agent记忆系统.md)。
+3. [记忆系统技术架构](记忆系统技术架构.md)。
+4. [对话流式协议](conversation-streaming.md)。
+5. [交互设计](EXPERIENCE.md)。
+
+### 部署与运维
+
+1. [定时任务与部署手册](O2-定时任务与部署手册.md)。
+2. [验证与限制](VERIFICATION.md)。
+3. [遥测配置](TELEMETRY.md)。
+4. [国际化](I18N.md)。
+5. [安全策略](../SECURITY.md)。
+
+---
+
+## 文档导航
+
+### 产品与需求
+
+| 文档 | 内容 |
+| --- | --- |
+| [个人投研智能体](个人投研智能体.md) | 产品定义、能力矩阵、典型工作流、架构、数据模型、API |
+| [Wiki](WIKI.md) | 项目总览、快速开始、概念、配置、部署与 FAQ |
+| [个人投研智能体 PRD](PRD-LingWu-个人投研智能体.md) | P0/P1/P2 功能规划与验收标准 |
+| [从投研助手到盯盘的同事](PRD-产品优化-从投研助手到盯盘的同事.md) | 从聊天驱动转向事件驱动、注意力和交付物 |
+| [任务、目标与提醒](PRD-任务目标提醒.md) | 目标轨道、接下来、提醒关联 |
+| [多 Agent 记忆系统](PRD-多Agent记忆系统.md) | 投研术语化记忆与多 Agent 隔离 |
+| [OpenBot 对标](PRD-LingWu-openbot对标借鉴.md) | 外部架构参考与取舍 |
+| [功能清单](FEATURES.md) | 通用 Agent 能力与剩余扩展 |
+| [UI 规格](UI-SPEC-D1-D2-观察列表与市场简报.md) | 观察列表与市场简报界面 |
+
+### 架构与实现
+
+| 文档 | 内容 |
+| --- | --- |
+| [多 Agent 编排与事件溯源](技术方案-多Agent编排与事件溯源.md) | DAG 调度、子任务、事件流与投影 |
+| [记忆系统技术架构](记忆系统技术架构.md) | Hindsight、作用域、迁移与治理 |
+| [行情数据源评估](市场数据源评估报告.md) | 美股、A 股、港股数据源比较 |
+| [行情缓存与降级](行情数据缓存与降级策略.md) | 缓存、降级、限流、监控设计 |
+| [对话流式协议](conversation-streaming.md) | AG-UI/SSE 事件与可靠性 |
+| [Rich Threads](RICH-THREADS.md) | CopilotKit Intelligence 配置 |
+| [交互设计](EXPERIENCE.md) | 对话行为、卡片、反馈与边界 |
+| [OpenBot 集成契约](OPENBOT-INTEGRATION.md) | 适配器、身份与范围 |
+
+### 运行与部署
+
+| 文档 | 内容 |
+| --- | --- |
+| [浏览器 Worker 本地启动](BROWSER-WORKER-本地启动指南.md) | Chromium、环境变量、排障 |
+| [Linux 计算机](COMPUTER.md) | 容器、终端、文件、网络边界 |
+| [定时任务与部署手册](O2-定时任务与部署手册.md) | 简报调度、AKShare、PDF 自检、生产核对 |
+| [个人模型连接](USER-MODEL-CONNECTION.md) | Provider、密钥、账户隔离 |
+| [国际化](I18N.md) | 中英双语与文案约定 |
+| [遥测](TELEMETRY.md) | 运行时追踪与退出 |
+| [验证与限制](VERIFICATION.md) | 已验证能力、测试边界和残余风险 |
+| [演示复现](DEMO.md) | Demo 场景、模型配置与复现步骤 |
+
+### 项目记录
+
+- [变更时间线](timeline.md)
+- [P0 测试计划](test-plan-p0.md)
+- [重命名清单](RENAME-MANIFEST.md)
+- [贡献指南](../CONTRIBUTING.md)
+- [安全策略](../SECURITY.md)
+- [许可证](../LICENSE)
+
+---
+
+## 文档状态说明
+
+文档中可能出现以下状态标记：
+
+| 标记 | 含义 |
+| --- | --- |
+| **已实现** | 当前代码与界面提供该能力；部分能力仍需外部配置 |
+| **部分实现** | 主链路可用，但数据完整度、自动化程度或覆盖范围有限 |
+| **规划中** | 设计或路线图中的方向，不应视为当前承诺 |
+| **不做** | 根据产品边界明确排除 |
+
+投研产品涉及数据源、模型、账户权限与外部写入。文档会尽量区分“代码已支持”“本地已验证”“需要生产配置”和“未来计划”，不以路线图代替当前功能。
+
+---
+
+## 快速链接
+
+- [返回项目主页](../README.md)
+- [项目 Wiki](WIKI.md)
+- [个人投研智能体全景](个人投研智能体.md)
+- [路线图](../ROADMAP.md)
+- [贡献指南](../CONTRIBUTING.md)
