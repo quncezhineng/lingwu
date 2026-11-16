@@ -811,6 +811,7 @@ const agent = {
     "The agent reached the end of this run without confirming completion. Give it a follow-up instruction to continue.",
   "agentSpace.myAgents": "My Agents",
   "agentSpace.createAgent": "Create Agent",
+  "agentSpace.createEntry": "New",
   "agentSpace.account": "Personal account",
   "agentSpace.connectors": "Connections",
   "agentSpace.connectorsHint":

@@ -1,4 +1,4 @@
-import { type ComponentType, useMemo, useState } from "react";
+import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentTask } from "../../../packages/domain/src/agent";
@@ -38,8 +38,14 @@ import { breakpoints, colors, radius, shadow, space, typography } from "./theme"
 import { Button, Field, HoverPressable, IconButton, LinkRow, SectionHeading, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
-/** 频道详情页的左栏分区。 */
-type ChannelSettingsTab = "profile" | "instructions" | "skills" | "files" | "tasks" | "memory";
+/** 频道详情页的左栏分区（右侧栏可带分区意图直接跳进来）。 */
+export type ChannelSettingsTab =
+  | "profile"
+  | "instructions"
+  | "skills"
+  | "files"
+  | "tasks"
+  | "memory";
 
 const TABS: ReadonlyArray<{
   id: ChannelSettingsTab;
@@ -60,12 +66,26 @@ const TABS: ReadonlyArray<{
  * 左栏是功能分区，右栏渲染对应设置内容：资料（头像/昵称/目标/成员）、
  * 指令（频道级共享指令）、技能（成员能力并集，只读）、任务（频道投研历史）。
  */
-export function ChannelSettingsScreen({ channel }: { channel: Channel }) {
+export function ChannelSettingsScreen({
+  channel,
+  tabIntent,
+  onTabIntentConsumed,
+}: {
+  channel: Channel;
+  /** 从右侧栏 / 菜单跳进来时指定要打开的分区。 */
+  tabIntent?: ChannelSettingsTab | null;
+  onTabIntentConsumed?: () => void;
+}) {
   const { t } = useTranslation();
   const { updateChannel } = useChannels();
   const { notify } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
   const [tab, setTab] = useState<ChannelSettingsTab>("profile");
+  useEffect(() => {
+    if (!tabIntent) return;
+    setTab(tabIntent);
+    onTabIntentConsumed?.();
+  }, [tabIntent, onTabIntentConsumed]);
   const [width, setWidth] = useState(windowWidth);
   const stacked = width < breakpoints.mobile;
   const narrowViewport = windowWidth < breakpoints.mobile;
@@ -175,7 +195,7 @@ export function ChannelSettingsScreen({ channel }: { channel: Channel }) {
               disabled={!name.trim()}
               onPress={saveProfile}
             >
-              {t("agentSpace.savePersona")}
+              {t("channels.saveChannel")}
             </Button>
           </View>
         );

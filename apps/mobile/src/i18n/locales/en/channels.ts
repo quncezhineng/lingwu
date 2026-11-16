@@ -56,8 +56,9 @@ const channels = {
   "channels.instructionsHint":
     "Channel-level shared instructions, injected into every member Agent's context on each research run.",
   "channels.settingsProfile": "Profile",
+  "channels.saveChannel": "Save channel",
   "channels.settingsTitle": "Channel details",
-  "channels.openSettings": "Channel details",
+  "channels.openSettings": "Settings",
   "channels.settingsInstructions": "Instructions",
   "channels.settingsSkills": "Skills",
   "channels.settingsTasks": "Tasks",

@@ -728,6 +728,7 @@ const agent = {
     "智能体在本次运行结束时未确认完成。请给它一条后续指令以继续。",
   "agentSpace.myAgents": "我的 Agent",
   "agentSpace.createAgent": "创建 Agent",
+  "agentSpace.createEntry": "新建",
   "agentSpace.account": "个人账户",
   "agentSpace.connectors": "连接",
   "agentSpace.connectorsHint": "连接属于当前账号。这里只列出分配给这个智能体的连接。",

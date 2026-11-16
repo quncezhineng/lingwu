@@ -37,7 +37,8 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { CapabilityHubScreen } from "./capability-hub";
 import { ChannelChatScreen } from "./channel-chat";
-import { ChannelSettingsScreen } from "./channel-settings-screen";
+import { ChannelRail } from "./channel-rail";
+import { ChannelSettingsScreen, type ChannelSettingsTab } from "./channel-settings-screen";
 import { useChannels } from "./channels";
 import { ChatScreen, WorkspaceTools } from "./chat";
 import { ColumnResizeHandle } from "./column-resize-handle";
@@ -51,6 +52,7 @@ import {
   ArrowDown,
   ArrowUp,
   Bell,
+  Bot,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -58,6 +60,7 @@ import {
   Languages,
   Lightbulb,
   LogOut,
+  MessageCircle,
   MoreHorizontal,
   Plus,
   Search,
@@ -293,6 +296,72 @@ function ChannelMenu({
           <AgentMenuRow icon={Settings2} label={t("channels.openSettings")} onPress={onSettings} />
           <View style={{ height: 1, marginVertical: 3, backgroundColor: colors.line }} />
           <AgentMenuRow danger icon={Trash2} label={t("channels.deleteTitle")} onPress={onDelete} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/** 侧栏「新建」入口的锚点：用窗口坐标把选择菜单贴在按钮下方。 */
+type CreateEntryAnchor = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/**
+ * 侧栏底部的「新建」选择菜单：合并了「新建频道」和「创建 Agent」两个入口。
+ * 与 AgentMenu 同款透明 Modal 承载，点空白处即关闭。
+ */
+function CreateEntryMenu({
+  anchor,
+  onClose,
+  onCreateChannel,
+  onCreateAgent,
+}: {
+  anchor: CreateEntryAnchor;
+  onClose: () => void;
+  onCreateChannel: () => void;
+  onCreateAgent: () => void;
+}) {
+  const { t } = useTranslation();
+  const { width } = useWindowDimensions();
+  const menuWidth = Math.min(180, width - 24);
+  const left = Math.max(12, Math.min(anchor.x + anchor.width - menuWidth, width - menuWidth - 12));
+  // 永远贴在「新建」按钮的正下方，不做上方翻转。
+  const top = anchor.y + anchor.height + 6;
+  return (
+    <Modal transparent visible animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("ui.closeDetails")}
+          onPress={onClose}
+          style={{ flex: 1 }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            top,
+            left,
+            width: menuWidth,
+            padding: 4,
+            gap: 1,
+            borderWidth: 1,
+            borderColor: colors.line,
+            borderRadius: radius.card,
+            backgroundColor: colors.paper,
+            ...shadow.sheet,
+          }}
+        >
+          <AgentMenuRow
+            icon={MessageCircle}
+            label={t("channels.create")}
+            onPress={onCreateChannel}
+          />
+          <View style={{ height: 1, marginVertical: 3, backgroundColor: colors.line }} />
+          <AgentMenuRow icon={Bot} label={t("agentSpace.createAgent")} onPress={onCreateAgent} />
         </View>
       </View>
     </Modal>
@@ -969,6 +1038,9 @@ function AgentRail({
   const [pendingDelete, setPendingDelete] = useState<AgentDefinition>();
   const [menuAnchor, setMenuAnchor] = useState<AgentMenuAnchor>();
   const [channelMenuAnchor, setChannelMenuAnchor] = useState<ChannelMenuAnchor>();
+  /** 侧栏底部「新建」按钮的选择菜单锚点。 */
+  const [createEntryAnchor, setCreateEntryAnchor] = useState<CreateEntryAnchor>();
+  const createEntryRef = useRef<View>(null);
   /** 待删除的频道：频道菜单里点删除后弹出确认弹窗。 */
   const [pendingDeleteChannel, setPendingDeleteChannel] = useState<Channel>();
   const { agents, current, selectAgent, deleteAgent, setAgentPinned } = useAgentSpace();
@@ -1022,12 +1094,15 @@ function AgentRail({
   const unreadNotifications = unreadCount(agentData?.notifications);
   const accountNickname = workspace.profile.name.trim() || t("agentSpace.account");
   const choose = (agent: AgentDefinition) => {
+    // 频道与 Agent 的对话互斥：选 Agent 必须退出频道，否则正文还停在群聊。
+    selectChannel(null);
     selectAgent(agent.id);
     navigate("chat");
     onClose?.();
   };
   /** 进入某个 Agent 的设置页：先切换 current，设置页才读得到它。 */
   const openAgentSettings = (agent: AgentDefinition) => {
+    selectChannel(null);
     selectAgent(agent.id);
     navigate("agent");
     onClose?.();
@@ -1171,11 +1246,12 @@ function AgentRail({
             ))}
           </View>
         )}
+        {/* 频道与 Agent 的对话互斥，左侧栏也只高亮当前真正打开的那一个。 */}
         {restAgents.map((agent) => (
           <AgentListItem
             key={agent.id}
             agent={agent}
-            active={agent.id === current.id}
+            active={agent.id === current.id && !currentChannelId}
             detailed={!compact}
             preview={previews[agent.id]?.text}
             unread={botHasUnread(
@@ -1203,8 +1279,14 @@ function AgentRail({
           />
         ))}
         <Pressable
+          ref={createEntryRef}
           accessibilityRole="button"
-          onPress={() => onOpen("create-channel")}
+          accessibilityLabel={t("agentSpace.createEntry")}
+          onPress={() =>
+            createEntryRef.current?.measureInWindow((x, y, width, height) => {
+              setCreateEntryAnchor({ x, y, width, height });
+            })
+          }
           style={({ pressed }) => ({
             minHeight: 40,
             paddingLeft: compact ? 9 : space.xs,
@@ -1219,27 +1301,7 @@ function AgentRail({
         >
           <Plus size={16} color={colors.primaryStrong} />
           <Text style={{ fontSize: 12, color: colors.primaryStrong, fontWeight: "500" }}>
-            {t("channels.create")}
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onOpen("create")}
-          style={({ pressed }) => ({
-            minHeight: 40,
-            paddingLeft: compact ? 9 : space.xs,
-            paddingRight: compact ? 9 : space.sm,
-            borderRadius: radius.control,
-            backgroundColor: pressed ? colors.overlay1 : "transparent",
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginTop: 2,
-          })}
-        >
-          <Plus size={16} color={colors.primaryStrong} />
-          <Text style={{ fontSize: 12, color: colors.primaryStrong, fontWeight: "500" }}>
-            {t("agentSpace.createAgent")}
+            {t("agentSpace.createEntry")}
           </Text>
         </Pressable>
       </ScrollView>
@@ -1454,6 +1516,20 @@ function AgentRail({
           }}
         />
       )}
+      {createEntryAnchor && (
+        <CreateEntryMenu
+          anchor={createEntryAnchor}
+          onClose={() => setCreateEntryAnchor(undefined)}
+          onCreateChannel={() => {
+            setCreateEntryAnchor(undefined);
+            onOpen("create-channel");
+          }}
+          onCreateAgent={() => {
+            setCreateEntryAnchor(undefined);
+            onOpen("create");
+          }}
+        />
+      )}
       {/* 删除频道确认弹窗：智能体本身会保留。 */}
       {pendingDeleteChannel && (
         <ModalOverlay visible onRequestClose={() => setPendingDeleteChannel(undefined)}>
@@ -1588,12 +1664,15 @@ function CapabilityRail({
   onOpen,
   onCollapse,
   onOpenAgentSkills,
+  onOpenChannelSettings,
   onNavigateAway,
   page = false,
 }: {
   onOpen: (panel: AgentPanel) => void;
   onCollapse?: () => void;
   onOpenAgentSkills: () => void;
+  /** 频道模式下点头像 / 分区：带分区意图进频道设置。 */
+  onOpenChannelSettings: (tab: ChannelSettingsTab) => void;
   /** 从全屏页跳走之前先把它收起来。 */
   onNavigateAway?: () => void;
   /** 手机全屏页：去掉左描边，关闭交给页眉的返回。 */
@@ -1601,12 +1680,26 @@ function CapabilityRail({
 }) {
   const { t } = useTranslation();
   const { navigate } = useWorkspace();
+  const { channels, currentChannelId } = useChannels();
   const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
   const leave = () => onNavigateAway?.();
   const editAgent = () => {
     leave();
     navigate("agent");
   };
+  // 选中频道时右侧栏切换为频道详情；与 Agent 共用一个位置，身份/任务/能力都来自频道。
+  const activeChannel = currentChannelId
+    ? channels.find((channel) => channel.id === currentChannelId)
+    : undefined;
+  if (activeChannel)
+    return (
+      <ChannelRail
+        channel={activeChannel}
+        onOpenSettings={onOpenChannelSettings}
+        onCollapse={onCollapse}
+        page={page}
+      />
+    );
   return (
     <>
       <View
@@ -2024,7 +2117,7 @@ export function AgentProductShell({
     needsOnboarding,
     markThreadUsed,
   } = useAgentSpace();
-  const { channels, currentChannelId } = useChannels();
+  const { channels, currentChannelId, selectChannel } = useChannels();
   const [panelStack, setPanelStack] = useState<AgentPanel[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [appsSheet, setAppsSheet] = useState(false);
@@ -2044,6 +2137,8 @@ export function AgentProductShell({
   // 「解锁更多的能力」跳转到 Agent 详情时携带的分区意图：让详情页直接定位到「技能」。
   // 需要在页面可能已挂载的情况下响应，因此交给 AgentSettingsScreen 用 effect 消费后清除。
   const [agentTabIntent, setAgentTabIntent] = useState<AgentSettingsTab | null>(null);
+  // 频道右侧栏 / 菜单跳进频道详情时指定分区，交给 ChannelSettingsScreen 用 effect 消费。
+  const [channelTabIntent, setChannelTabIntent] = useState<ChannelSettingsTab | null>(null);
   const [mountedIds, setMountedIds] = useState<string[]>([current.id]);
 
   useEffect(() => {
@@ -2213,6 +2308,16 @@ export function AgentProductShell({
     setAgentTabIntent("skills");
     navigate("agent");
   }, [navigate]);
+  // 右侧栏点头像 / 分区：带着分区意图进频道设置（频道此时已选中）。
+  const openChannelSettingsTab = useCallback(
+    (tab: ChannelSettingsTab) => {
+      setDrawer(null);
+      setSidePage(false);
+      setChannelTabIntent(tab);
+      navigate("channel");
+    },
+    [navigate],
+  );
 
   // Account initialization is a separate screen: no navigation, chat or task controls
   // mount until the first Agent is ready. Wait for saved progress before choosing a screen.
@@ -2306,7 +2411,11 @@ export function AgentProductShell({
         onTabIntentConsumed={() => setAgentTabIntent(null)}
       />
     ) : section === "channel" && activeChannel ? (
-      <ChannelSettingsScreen channel={activeChannel} />
+      <ChannelSettingsScreen
+        channel={activeChannel}
+        tabIntent={channelTabIntent}
+        onTabIntentConsumed={() => setChannelTabIntent(null)}
+      />
     ) : (
       <SecondarySection onOpen={openPanel} onSignOut={onSignOut} />
     );
@@ -2362,6 +2471,7 @@ export function AgentProductShell({
                     node: (
                       <MobileBotsHome
                         onOpenBot={(agent) => {
+                          selectChannel(null);
                           selectAgent(agent.id);
                           setBotOpen(true);
                         }}
@@ -2416,6 +2526,7 @@ export function AgentProductShell({
                                   onOpen={openPanel}
                                   onNavigateAway={() => setSidePage(false)}
                                   onOpenAgentSkills={openAgentSkills}
+                                  onOpenChannelSettings={openChannelSettingsTab}
                                 />
                               </SafeAreaView>
                             </View>
@@ -2456,6 +2567,7 @@ export function AgentProductShell({
                   onOpen={openPanel}
                   onCollapse={toggleRail}
                   onOpenAgentSkills={openAgentSkills}
+                  onOpenChannelSettings={openChannelSettingsTab}
                 />
               </View>
             </>
@@ -2524,6 +2636,7 @@ export function AgentProductShell({
                 onOpen={openPanel}
                 onNavigateAway={() => setSidePage(false)}
                 onOpenAgentSkills={openAgentSkills}
+                onOpenChannelSettings={openChannelSettingsTab}
               />
             </SafeAreaView>
           </View>
