@@ -367,13 +367,13 @@ function CreateEntryMenu({
             ...shadow.sheet,
           }}
         >
+          <AgentMenuRow icon={Bot} label={t("agentSpace.createAgent")} onPress={onCreateAgent} />
+          <View style={{ height: 1, marginVertical: 3, backgroundColor: colors.line }} />
           <AgentMenuRow
             icon={MessageCircle}
             label={t("channels.create")}
             onPress={onCreateChannel}
           />
-          <View style={{ height: 1, marginVertical: 3, backgroundColor: colors.line }} />
-          <AgentMenuRow icon={Bot} label={t("agentSpace.createAgent")} onPress={onCreateAgent} />
         </View>
       </View>
     </Modal>
