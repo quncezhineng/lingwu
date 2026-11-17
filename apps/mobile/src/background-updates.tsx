@@ -36,7 +36,7 @@ export function BackgroundUpdates() {
       <Text style={s.text}>{resultSummary(update.body)}</Text>
       <View style={[s.row, { gap: 8, flexWrap: "wrap" }]}>
         <Button small icon={ArrowRight} busy={busy} onPress={() => void openNotification(update)}>
-          {t("tools.viewTask")}
+          {t("agent.viewAutomation")}
         </Button>
         {updates.length > 1 && (
           <Button small onPress={() => open({ type: "notifications" })}>

@@ -11,7 +11,7 @@ import { BotInstructionsPage } from "./bot-pages/instructions";
 import { BotLibraryPage } from "./bot-pages/library";
 import { BotSkillsPage } from "./bot-pages/skills";
 import { type TranslationKey, useTranslation } from "./i18n";
-import { Brain, Clock3, Cpu, FolderOpen, Heart, Settings2, Terminal } from "./icons";
+import { Brain, Cpu, FolderOpen, Heart, ListChecks, Settings2, Terminal } from "./icons";
 import { ModelSelector } from "./model-selector";
 import { breakpoints, colors, radius, shadow, space, typography } from "./theme";
 import { HoverPressable, s } from "./ui";
@@ -33,10 +33,12 @@ const TABS: ReadonlyArray<{
   labelKey: TranslationKey;
 }> = [
   { id: "profile", icon: Settings2, labelKey: "agentSpace.persona" },
+  // 「任务」（history）紧跟职责与人设，放在指令之前：任务比全局指令更高频。
+  // 图标与右侧栏「任务与自动化」一致，都是 ListChecks（勾选清单）。
+  { id: "history", icon: ListChecks, labelKey: "agentSpace.analysisHistory" },
   { id: "instructions", icon: Terminal, labelKey: "agentSpace.instructions" },
   { id: "skills", icon: Brain, labelKey: "agentSpace.skills" },
   { id: "resources", icon: FolderOpen, labelKey: "agentSpace.library" },
-  { id: "history", icon: Clock3, labelKey: "agentSpace.analysisHistory" },
   { id: "goals", icon: Heart, labelKey: "agent.memory" },
   { id: "model", icon: Cpu, labelKey: "modelSettings.model" },
 ];

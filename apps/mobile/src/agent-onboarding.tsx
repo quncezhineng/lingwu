@@ -361,7 +361,9 @@ export function AgentOnboarding() {
                     },
                   ]}
                 />
-                <Text style={[s.small, { color: colors.faint }]}>{t("agentSpace.avatar")}</Text>
+                <Text style={[s.small, { color: colors.faint }]}>
+                  {t("agentSpace.agentAvatar")}
+                </Text>
                 <View
                   style={{
                     flexDirection: "row",
@@ -373,7 +375,7 @@ export function AgentOnboarding() {
                     <Pressable
                       key={item}
                       accessibilityRole="radio"
-                      accessibilityLabel={`${t("agentSpace.avatar")} ${item}`}
+                      accessibilityLabel={`${t("agentSpace.agentAvatar")} ${item}`}
                       accessibilityState={{ checked: avatar === item }}
                       onPress={() => setAvatar(item)}
                       style={{

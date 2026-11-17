@@ -14,6 +14,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -34,7 +35,7 @@ import { z } from "zod";
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import type { OrchestrationNode } from "../../../packages/domain/src/orchestration";
-import { agentLayout } from "./agent-layout";
+import { conversationColumnStyle, messageColumnStyle } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { AgentSkillInspectSheet } from "./agent-sheets";
 import { useAgentSpace } from "./agent-space";
@@ -46,11 +47,13 @@ import {
 } from "./agent-space-model";
 import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
+import { useAppConnectors } from "./app-connectors";
 import { Text, type TextInput } from "./app-text";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { BrowserRunContext, BrowserToolCard } from "./browser-tool-card";
 import {
+  allConnectorOptions,
   type ComposerSelection,
   ComposerSelectionChips,
   ConnectorPickerSheet,
@@ -157,18 +160,6 @@ import { UserMessageMeta } from "./user-message-meta";
 import { type ComposerPrompt, useWorkspace } from "./workspace";
 
 const displayParameters = z.record(z.string(), z.unknown());
-
-/** 对话标题与输入区等宽居中，消息列稍窄，左右各留出 5px。 */
-const conversationColumnStyle = {
-  width: "100%",
-  maxWidth: agentLayout.columnMaxWidth,
-  alignSelf: "center",
-} as const;
-
-const messageColumnStyle = {
-  ...conversationColumnStyle,
-  maxWidth: agentLayout.messageMaxWidth,
-} as const;
 
 // 用户消息气泡（品牌色底、反白文字）上的 Markdown 渲染：标题/加粗/链接跟随 onPrimary 白色系，
 // 行内代码与代码块保留浅蓝底做区隔，保证品牌底色气泡内的可读性。
@@ -833,7 +824,13 @@ export function ChatScreen({
   const [selectedConnectorIds, setSelectedConnectorIds] = useState<string[]>([]);
   const { current: currentAgent, skillLibrary } = useAgentSpace();
   const heldSkills = heldCustomSkills(currentAgent, skillLibrary);
-  const connectorChoices = connectorOptions(w);
+  // 连接器候选：内置连接器（智能体电脑 / Google 系 / OpenBot）+ 账户级应用连接器，
+  // 让弹层里列出「技能与连接」页的全部连接器，而不只是智能体电脑。
+  const appConnectors = useAppConnectors(api);
+  const connectorChoices = useMemo(
+    () => allConnectorOptions(connectorOptions(w), appConnectors.items),
+    [w, appConnectors.items],
+  );
   const selectedSkills: ComposerSelection[] = selectedSkillIds.map((id) => ({
     id,
     name: skillDisplayName(id, heldSkills),

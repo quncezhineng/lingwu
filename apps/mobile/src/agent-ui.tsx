@@ -22,11 +22,13 @@ import type {
 } from "../../../packages/domain/src/agent";
 import { goalsEnabled } from "../../../packages/domain/src/features";
 import { resolveMonitorCurrency } from "../../../packages/domain/src/monitor-currency";
+import { useAgentSpace } from "./agent-space";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
 import { CardGrid } from "./card-grid";
+import { useChannels } from "./channels";
 import { fileTypeName } from "./file-kind";
 import { activeLocaleTag, type TranslationFn, type TranslationKey, useTranslation } from "./i18n";
 import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
@@ -102,6 +104,7 @@ import {
   Empty,
   ErrorNotice,
   Field,
+  HoverPressable,
   LinkRow,
   SectionHeading,
   Sheet,
@@ -477,18 +480,86 @@ function matchesTaskFilter(task: AgentTask, filter: TaskFilter) {
   }
 }
 
+/**
+ * 判断一条任务属于哪个 Agent / 频道。
+ *
+ * 任务的归属信息散在几个字段里，按可靠性排序：
+ *   1. `input.channelId` —— 频道投研任务的显式标记；
+ *   2. `threadId` 精确等于某个 Agent 的 threadId —— 对话里委派的任务；
+ *   3. `threadId` 以 `${channelId}:` 开头 —— 频道对话给成员线程生成的 id；
+ *   4. `assignedAgent` —— 多 Agent 编排时的执行方（可能是 id / threadId / 模板名）。
+ * 都对不上就归到空串，界面上显示为「其它」，避免任务在选择分类后消失。
+ */
+function taskOwnerId(
+  task: AgentTask,
+  agents: readonly { id: string; threadId: string; template?: string }[],
+  channels: readonly { id: string }[],
+): string {
+  const channelId = typeof task.input?.channelId === "string" ? task.input.channelId : "";
+  if (channelId && channels.some((channel) => channel.id === channelId)) return channelId;
+  const threadId = task.threadId ?? "";
+  if (threadId) {
+    // 对话线程 id 一般就是 Agent 的 threadId；历史数据里也有直接存 Agent id 的。
+    const byThread = agents.find((agent) => agent.threadId === threadId || agent.id === threadId);
+    if (byThread) return byThread.id;
+    const byThreadChannel = channels.find((channel) => threadId.startsWith(`${channel.id}:`));
+    if (byThreadChannel) return byThreadChannel.id;
+  }
+  // 编排子任务、独立入口任务把执行方写在 input / assignedAgent 上，兜底再查一遍。
+  const declared = [task.assignedAgent, task.input?.agentId, task.input?.agent]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean);
+  for (const value of declared) {
+    const byDeclared = agents.find(
+      (agent) => agent.id === value || agent.threadId === value || agent.template === value,
+    );
+    if (byDeclared) return byDeclared.id;
+  }
+  return "";
+}
+
 export function AgentActivityScreen() {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
+  const { agents } = useAgentSpace();
+  const { channels } = useChannels();
   const [filter, setFilter] = useState<TaskFilter>("all");
+  // 归属分类（Agent / 频道）：与「记忆」页同一套交互——点 chip 只看这一类，再点一次回到全部。
+  const [owner, setOwner] = useState<string | null>(null);
   // 任务页只列一次性工作。监控任务由「自动化」页的规则代表。
   const all = listedWorkTasks(data?.tasks ?? []).sort((a, b) =>
     b.updatedAt.localeCompare(a.updatedAt),
   );
+  /** id → 分类名。Agent 用自己的 id，频道用频道 id，空串是「其它」。 */
+  const ownerName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const agent of agents) map.set(agent.id, agent.name);
+    for (const channel of channels) map.set(channel.id, channel.name);
+    map.set("", t("agent.taskScopeOther"));
+    return map;
+  }, [agents, channels, t]);
+  // 分类集合按任务实际归属聚合，带上条数；顺序先 Agent 后频道，最后才是「其它」。
+  const owners = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const task of all) {
+      const id = taskOwnerId(task, agents, channels);
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    const order = [...agents.map((agent) => agent.id), ...channels.map((c) => c.id), ""];
+    return order
+      .filter((id) => (counts.get(id) ?? 0) > 0)
+      .map((id) => ({ id, name: ownerName.get(id) ?? id, count: counts.get(id) ?? 0 }));
+  }, [all, agents, channels, ownerName]);
+  // 选中的分类可能因为任务被删除而消失，自动退回「全部」，避免停在空列表上。
+  const activeOwner = owner !== null && owners.some((entry) => entry.id === owner) ? owner : null;
+  const scoped =
+    activeOwner === null
+      ? all
+      : all.filter((task) => taskOwnerId(task, agents, channels) === activeOwner);
   const counts = Object.fromEntries(
-    TASK_FILTERS.map(({ id }) => [id, all.filter((task) => matchesTaskFilter(task, id)).length]),
+    TASK_FILTERS.map(({ id }) => [id, scoped.filter((task) => matchesTaskFilter(task, id)).length]),
   ) as Record<TaskFilter, number>;
-  const tasks = all.filter((task) => matchesTaskFilter(task, filter));
+  const tasks = scoped.filter((task) => matchesTaskFilter(task, filter));
   return (
     <View style={{ gap: 10 }}>
       <AgentStatus />
@@ -537,10 +608,54 @@ export function AgentActivityScreen() {
           </Pressable>
         ))}
       </View>
+      {/*
+       * 归属分类是状态筛选的子分类：先按状态看整体，再按 Agent / 频道缩小范围。
+       * 不带「全部」这一格 —— 不选任何归属时本来就已经是全部任务，再放一个「全部」
+       * 只是重复；要退出筛选再点一次已选中那颗 chip 即可。
+       */}
+      {owners.length > 1 && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {owners.map((entry) => {
+            const active = activeOwner === entry.id;
+            return (
+              <Pressable
+                key={entry.id || "account"}
+                accessibilityRole="button"
+                accessibilityLabel={`${entry.name} · ${entry.count}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => setOwner(active ? null : entry.id)}
+                style={({ pressed }) => [
+                  s.card,
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 7,
+                    paddingHorizontal: 11,
+                    paddingVertical: 7,
+                    borderColor: active ? colors.primary : colors.line,
+                    backgroundColor: active ? colors.sky : pressed ? colors.surface : colors.paper,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    s.small,
+                    { fontWeight: "600", color: active ? colors.primary : colors.text },
+                  ]}
+                >
+                  {entry.name}
+                </Text>
+                <Text style={[s.small, { color: colors.muted }]}>{entry.count}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
       <CardGrid
         items={tasks}
-        // 任务卡按双列网格展示：单栏下限放宽到 320，窄屏仍自动退化为单列。
-        minColumnWidth={320}
+        // 任务卡走三列网格：单栏下限 280，容器不够宽时自动降为 2 列 / 单列。
+        minColumnWidth={280}
+        maxColumns={3}
         getKey={(task) => task.id}
         render={(task) => <TaskCard task={task} stacked />}
       />
@@ -3241,15 +3356,26 @@ export function NotificationsSheet({ embedded = false }: { embedded?: boolean } 
             </View>
             <View style={{ gap: 10 }}>
               {group.notifications.map((item) => (
-                <Card
+                <HoverPressable
                   key={item.id}
-                  style={{
+                  accessibilityRole="button"
+                  accessibilityLabel={runtimeLabel(item.title)}
+                  onPress={() => void openNotification(item)}
+                  style={({ pressed, hovered }) => ({
                     gap: 6,
                     padding: 14,
+                    borderRadius: radius.medium,
+                    borderWidth: 1,
                     // 未读通知用品牌浅蓝色底提示，已读回到白底。
-                    backgroundColor: item.read ? colors.paper : colors.sky,
+                    backgroundColor: item.read
+                      ? pressed || hovered
+                        ? colors.surfaceRaised
+                        : colors.paper
+                      : pressed || hovered
+                        ? colors.skyStrong
+                        : colors.sky,
                     borderColor: item.read ? colors.line : colors.lineStrong,
-                  }}
+                  })}
                 >
                   <View style={[s.between, { gap: 10 }]}>
                     <Text numberOfLines={2} style={s.heading}>
@@ -3258,21 +3384,22 @@ export function NotificationsSheet({ embedded = false }: { embedded?: boolean } 
                     {!item.read && <Chip>{t("agent.newChip")}</Chip>}
                   </View>
                   {!!item.body.trim() && (
+                    // 先对完整正文做固定文案本地化（runtimeLabel 需整句精确匹配），再截断成摘录，
+                    // 避免截断加 … 后匹配失败退回英文。
                     <Text numberOfLines={2} style={s.small}>
-                      {runtimeLabel(notificationExcerpt(item.body))}
+                      {notificationExcerpt(runtimeLabel(item.body))}
                     </Text>
                   )}
                   <View style={[s.between, { gap: 10 }]}>
                     <Text style={[s.small, s.metric]}>{stamp(item.createdAt)}</Text>
-                    <Button small onPress={() => void openNotification(item)}>
-                      {item.taskId
-                        ? t("agent.viewTask")
-                        : item.read
-                          ? t("agent.read")
-                          : t("agent.markRead")}
-                    </Button>
+                    {/* 按钮拦截点击冒泡，避免与整卡点击重复触发；进入同一查看详情弹窗。 */}
+                    <Pressable onPress={(event) => event.stopPropagation()}>
+                      <Button small onPress={() => void openNotification(item)}>
+                        {t("agent.viewDetails")}
+                      </Button>
+                    </Pressable>
                   </View>
-                </Card>
+                </HoverPressable>
               ))}
             </View>
           </View>

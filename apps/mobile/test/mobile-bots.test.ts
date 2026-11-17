@@ -4,6 +4,7 @@ import {
   botHasUnread,
   botMatchesQuery,
   latestBotPreview,
+  latestReplyPreview,
   orderBotsByActivity,
   rubberBandOffset,
 } from "../src/mobile-bots.ts";
@@ -57,4 +58,27 @@ test("search matches the name, role, or preview and activity sorts newest first"
     }).map((bot) => bot.id),
     ["new", "old", "quiet"],
   );
+});
+
+test("the rail preview shows the latest reply only, without markdown noise", () => {
+  const messages = [
+    { role: "user", content: "先看看黄金", createdAt: "2026-11-11T08:00:00.000Z" },
+    {
+      role: "assistant",
+      content: [{ type: "text", text: "## 先说结论\n\n**伦敦金** 还在回调" }],
+      createdAt: "2026-11-11T09:00:00.000Z",
+    },
+    { role: "user", content: "那白银呢", createdAt: "2026-11-11T10:00:00.000Z" },
+  ];
+  assert.deepEqual(latestReplyPreview(messages), {
+    text: "先说结论 伦敦金 还在回调",
+    at: "2026-11-11T09:00:00.000Z",
+  });
+  // 只有自己说话、或最后一条回复是空壳，都算「还没有消息」。
+  assert.equal(latestReplyPreview([{ role: "user", content: "在吗" }]), null);
+  assert.equal(latestReplyPreview([{ role: "assistant", content: "   " }]), null);
+  // 频道里成员（member）的发言才算回复。
+  assert.deepEqual(latestReplyPreview([{ role: "member", content: "我先起个头" }], ["member"]), {
+    text: "我先起个头",
+  });
 });

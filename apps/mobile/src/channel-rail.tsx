@@ -1,20 +1,36 @@
 import { useMemo, useState } from "react";
 import { ScrollView, useWindowDimensions, View } from "react-native";
-import type { Channel } from "../../../packages/domain/src/channel";
+import { type Channel, normalizeChannelAvatar } from "../../../packages/domain/src/channel";
 import { AgentOrb } from "./agent-orb";
-import { PanelButton } from "./agent-sheets";
+import { type AgentPanel, WorkspacePanelButtons } from "./agent-sheets";
 import { useAgentSpace } from "./agent-space";
 import { AGENT_CAPABILITY_LABELS } from "./agent-space-model";
+import { RAIL_WORK_PREVIEW_LIMIT, RailWorkGroups } from "./agent-work-dialog";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
+import { railWorkItems } from "./automation-task-rail";
 import type { ChannelSettingsTab } from "./channel-settings-screen";
 import { useTranslation } from "./i18n";
-import { statusLabel } from "./i18n/translate";
-import { Brain, FolderOpen, Heart, Settings2, Terminal, Users, X } from "./icons";
-import { StatusBadge, taskStatusTone } from "./status-badge";
+import { Brain, Settings2, X } from "./icons";
 import { breakpoints, colors, fonts, radius, semantic, typography } from "./theme";
 import { Button, HoverPressable, s } from "./ui";
-import { useWorkspace } from "./workspace";
+
+/**
+ * 频道右侧栏是否渲染「技能 / 能力」卡片区。
+ *
+ * 需求是隐藏而不是删除：区块 JSX、`skills` 数据与进设置页的跳转都留在原处，
+ * 只是不参与渲染；需要恢复时改回 true 即可。显式标注 boolean，
+ * 避免 TS 把条件收窄成常量后报不可达代码。
+ */
+const CHANNEL_RAIL_CAPABILITIES_VISIBLE: boolean = false;
+
+/**
+ * 频道右侧栏底部「设置」入口是否渲染。
+ *
+ * 需求是隐藏而不是删除：JSX 与 `onOpenSettings("profile")` 都留在原处，
+ * 只是不参与渲染；需要恢复时改回 true 即可。
+ */
+const CHANNEL_RAIL_SETTINGS_ENTRY_VISIBLE: boolean = false;
 
 /**
  * 频道的右侧详情栏：与 Agent 的 CapabilityRail 同构。
@@ -25,18 +41,23 @@ import { useWorkspace } from "./workspace";
 export function ChannelRail({
   channel,
   onOpenSettings,
+  onOpenPanel,
   onCollapse,
   page = false,
 }: {
   channel: Channel;
   onOpenSettings: (tab: ChannelSettingsTab) => void;
+  /**
+   * 工作区四项（市场简报 / 自选与组合 / 资料 / 记忆）都是全局资源，
+   * 直接复用 Agent 右侧栏的弹层，由外层面板栈负责打开。
+   */
+  onOpenPanel: (panel: AgentPanel) => void;
   onCollapse?: () => void;
   /** 窄屏全屏页：去掉左描边，关闭交给页眉返回。 */
   page?: boolean;
 }) {
   const { t, locale } = useTranslation();
   const { width } = useWindowDimensions();
-  const { open } = useWorkspace();
   const { agents } = useAgentSpace();
   const { data } = useAgentWorkspace();
   const [hovered, setHovered] = useState(false);
@@ -56,15 +77,18 @@ export function ChannelRail({
   }, [members]);
   const tasks = useMemo(
     () =>
-      (data?.tasks ?? [])
-        .filter(
-          (task) =>
-            typeof task.input?.channelId === "string" && task.input.channelId === channel.id,
-        )
-        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-        .slice(0, 3),
+      (data?.tasks ?? []).filter(
+        (task) => typeof task.input?.channelId === "string" && task.input.channelId === channel.id,
+      ),
     [data?.tasks, channel.id],
   );
+  /** 频道的自动化：挂在这个频道任务上的监控，与 Agent 侧栏口径一致。 */
+  const monitors = useMemo(() => {
+    const taskIds = new Set(tasks.map((task) => task.id));
+    return (data?.monitors ?? []).filter((monitor) => taskIds.has(monitor.taskId));
+  }, [data?.monitors, tasks]);
+  // 与 Agent 侧栏同一套数据整形：只留运行中的自动化与可见任务，按时间倒序。
+  const work = useMemo(() => railWorkItems(tasks, monitors), [monitors, tasks]);
 
   const skillLabel = (id: string) => {
     const label = AGENT_CAPABILITY_LABELS[id];
@@ -131,7 +155,11 @@ export function ChannelRail({
               onHoverOut={() => setHovered(false)}
               style={({ pressed }) => ({ borderRadius: radius.full, opacity: pressed ? 0.88 : 1 })}
             >
-              <AgentOrb avatar={channel.avatar ?? "orb"} size={72} editing={hovered} />
+              <AgentOrb
+                avatar={normalizeChannelAvatar(channel.avatar)}
+                size={72}
+                editing={hovered}
+              />
             </HoverPressable>
             {hovered && (
               <View
@@ -184,57 +212,19 @@ export function ChannelRail({
           {t("agentSpace.delegatedWork")}
         </Text>
         <View testID="channel-rail-tasks" style={{ marginTop: 10 }}>
-          {tasks.length ? (
-            tasks.map((task) => (
-              <HoverPressable
-                key={task.id}
-                accessibilityRole="button"
-                accessibilityLabel={task.title}
-                onPress={() => open({ type: "task", taskId: task.id })}
-                style={({ pressed, hovered: taskHovered }) => ({
-                  minHeight: 56,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  paddingHorizontal: 8,
-                  borderRadius: radius.card,
-                  backgroundColor: pressed
-                    ? colors.overlay2
-                    : taskHovered
-                      ? colors.overlay1
-                      : "transparent",
-                })}
-              >
-                <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-                  <Text
-                    numberOfLines={1}
-                    style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
-                  >
-                    {task.title}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: colors.faint }}>
-                    {new Date(task.updatedAt).toLocaleString(
-                      locale === "zh-Hans" ? "zh-CN" : "en-US",
-                      {
-                        month: "numeric",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      },
-                    )}
-                  </Text>
-                </View>
-                <StatusBadge tone={taskStatusTone(task.status)} label={statusLabel(task.status)} />
-              </HoverPressable>
-            ))
-          ) : (
-            <Text style={[s.muted, { paddingHorizontal: 8 }]}>{t("channels.tasksEmpty")}</Text>
-          )}
+          {/* 与 Agent 侧栏共用同一份渲染：按天分组 + 图标行，不再单独显示时间与状态徽标。 */}
+          <RailWorkGroups
+            items={work}
+            limit={RAIL_WORK_PREVIEW_LIMIT}
+            emptyText={t("channels.tasksEmpty")}
+          />
         </View>
         <View style={{ marginTop: 12 }}>
           <Button
             variant="outline"
             style={{ alignSelf: "stretch" }}
+            // 与 Agent 侧栏一致：不是全局任务中心，而是本频道的完整任务列表
+            // （频道详情 →「任务」分区）。
             onPress={() => onOpenSettings("tasks")}
           >
             {t("agentSpace.moreDelegated")}
@@ -254,45 +244,18 @@ export function ChannelRail({
         >
           {t("agentSpace.more")}
         </Text>
-        <View style={{ gap: 6 }}>
-          <PanelButton
-            compact={false}
-            icon={FolderOpen}
-            title={t("app.navFiles")}
-            detail={t("app.destFilesDetail")}
-            onPress={() => onOpenSettings("files")}
-          />
-          <PanelButton
-            compact={false}
-            icon={Heart}
-            title={t("app.navPreferences")}
-            detail={t("details.settingsPreferencesDetail")}
-            onPress={() => onOpenSettings("memory")}
-          />
-          <PanelButton
-            compact={false}
-            icon={Brain}
-            title={t("channels.settingsSkills")}
-            detail={t("channels.skillsHint")}
-            onPress={() => onOpenSettings("skills")}
-          />
-          <PanelButton
-            compact={false}
-            icon={Users}
-            title={t("channels.membersLabel")}
-            detail={members.map((member) => member.name).join(" · ")}
-            onPress={() => onOpenSettings("profile")}
-          />
-          <PanelButton
-            compact={false}
-            icon={Terminal}
-            title={t("channels.settingsInstructions")}
-            detail={t("channels.instructionsHint")}
-            onPress={() => onOpenSettings("instructions")}
-          />
-        </View>
+        {/*
+         * 工作区与 Agent 右侧栏保持一致：市场简报 / 自选与组合 / 资料 / 记忆，
+         * 四项都是全局（账户级）资源，因此共用 WorkspacePanelButtons 这一份实现。
+         * 频道专属的「技能 / 成员 / 指令」收进底部「设置」入口里，不再占这里的位置。
+         */}
+        <WorkspacePanelButtons onPanel={onOpenPanel} compact={false} />
 
-        {!!skills.length && (
+        {/*
+         * 频道能力区（成员技能并集）按需求隐藏：只控制渲染，数据查询与跳转逻辑保留，
+         * 把 CHANNEL_RAIL_CAPABILITIES_VISIBLE 改回 true 即可恢复。
+         */}
+        {CHANNEL_RAIL_CAPABILITIES_VISIBLE && !!skills.length && (
           <>
             <Text
               style={{
@@ -332,26 +295,33 @@ export function ChannelRail({
             </View>
           </>
         )}
-        <HoverPressable
-          accessibilityRole="button"
-          onPress={() => onOpenSettings("profile")}
-          style={({ pressed }) => ({
-            minHeight: 43,
-            marginTop: 10,
-            borderWidth: 1,
-            borderStyle: "dashed",
-            borderColor: colors.lineStrong,
-            borderRadius: radius.card,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            backgroundColor: pressed ? colors.overlay1 : "transparent",
-          })}
-        >
-          <Settings2 size={16} color={colors.muted} />
-          <Text style={[s.small, { color: colors.muted }]}>{t("channels.openSettings")}</Text>
-        </HoverPressable>
+        {/*
+         * 底部「设置」入口按需求隐藏：只控制渲染，跳转逻辑保留。
+         * 频道设置仍可从左侧栏频道行的「…」菜单、或点频道头像进入，
+         * 恢复时把 CHANNEL_RAIL_SETTINGS_ENTRY_VISIBLE 改回 true 即可。
+         */}
+        {CHANNEL_RAIL_SETTINGS_ENTRY_VISIBLE && (
+          <HoverPressable
+            accessibilityRole="button"
+            onPress={() => onOpenSettings("profile")}
+            style={({ pressed }) => ({
+              minHeight: 43,
+              marginTop: 10,
+              borderWidth: 1,
+              borderStyle: "dashed",
+              borderColor: colors.lineStrong,
+              borderRadius: radius.card,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              backgroundColor: pressed ? colors.overlay1 : "transparent",
+            })}
+          >
+            <Settings2 size={16} color={colors.muted} />
+            <Text style={[s.small, { color: colors.muted }]}>{t("channels.openSettings")}</Text>
+          </HoverPressable>
+        )}
       </ScrollView>
     </View>
   );

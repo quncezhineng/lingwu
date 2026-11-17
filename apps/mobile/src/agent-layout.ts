@@ -21,3 +21,21 @@ export const agentLayout = {
    */
   pageMaxWidth: 1184,
 } as const;
+
+/**
+ * 对话页的内容列：标题、输入框等「整列」元素共用这一条宽度。
+ *
+ * 因为智能体对话页与频道对话页必须是同一个设计宽度，这两条列样式
+ * 由 `agent-layout` 统一导出，两个页面都从这里取，避免各写一份数值后走偏。
+ */
+export const conversationColumnStyle = {
+  width: "100%",
+  maxWidth: agentLayout.columnMaxWidth,
+  alignSelf: "center",
+} as const;
+
+/** 消息列比内容列稍窄，左右各留出 8px，气泡不贴到输入框的边缘线上。 */
+export const messageColumnStyle = {
+  ...conversationColumnStyle,
+  maxWidth: agentLayout.messageMaxWidth,
+} as const;

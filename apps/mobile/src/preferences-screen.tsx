@@ -305,12 +305,15 @@ function MemoryEditorSheet({
 export function PreferencesScreen({
   embedded = false,
   agentId,
+  channel = false,
   canAdd = true,
   emptyAdd = true,
 }: {
   embedded?: boolean;
   /** 传入时只展示该 Agent 专属记忆（多 Agent 隔离）；不传则展示账户级全部记忆。 */
   agentId?: string;
+  /** 传入表示当前为频道记忆页，简介使用频道专属文案；Agent 记忆页保持原文案不变。 */
+  channel?: boolean;
   /** 设为 false 隐藏右上角「添加记忆」主按钮；编辑 / 删除已有记忆不受影响。默认展示。 */
   canAdd?: boolean;
   /** 设为 false 隐藏空态里的「添加记忆」按钮，避免与右上角主按钮重复。默认展示。 */
@@ -426,10 +429,16 @@ export function PreferencesScreen({
       >
         <View style={{ flex: 1, gap: 7 }}>
           {/* 嵌入浮层时只保留简介，标题由浮层提供，避免重复。
-              传入 agentId 为 Agent 专属记忆页，未传则为账户级全局记忆页，简介区分两种场景。 */}
+              传入 agentId 为专属记忆页；简介区分三种场景：频道（channel）、Agent、账户级全局。 */}
           {embedded ? (
             <Text style={[s.small, { lineHeight: 20 }]}>
-              {t(agentId ? "preferences.contextDetail" : "preferences.contextDetailGlobal")}
+              {t(
+                channel
+                  ? "preferences.contextDetailChannel"
+                  : agentId
+                    ? "preferences.contextDetail"
+                    : "preferences.contextDetailGlobal",
+              )}
             </Text>
           ) : (
             <>

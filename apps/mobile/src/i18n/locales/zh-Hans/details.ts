@@ -9,7 +9,7 @@ const details = {
   "details.settingsSubtitle": "调整模型、工作区与账号设置。",
   "details.settingsModelHeading": "模型",
   "details.settingsWorkspaceHeading": "工作区",
-  "details.settingsPreferencesDetail": "查看、修正或遗忘灵悟记住的信息。",
+  "details.settingsPreferencesDetail": "查看、修正或遗忘记忆",
   "details.settingsAppsDetail": "插件、技能与连接器。",
   "details.settingsAccountTitle": "账号与数据",
   "details.settingsAccountDetail": "查看个人信息、登录方式与账号状态。",

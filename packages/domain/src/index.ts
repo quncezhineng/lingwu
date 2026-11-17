@@ -229,15 +229,20 @@ export interface ExecutionBackend {
 
 export type {
   Channel,
+  ChannelAvatarId,
   ChannelInput,
   ChannelMessage,
   ChannelMessageInput,
   ChannelUpdate,
 } from "./channel.ts";
 export {
+  CHANNEL_AVATARS,
   channelInputSchema,
   channelMessageInputSchema,
   channelUpdateSchema,
+  DEFAULT_CHANNEL_AVATAR,
+  isChannelAvatarId,
+  normalizeChannelAvatar,
 } from "./channel.ts";
 export type { ComputerCommand, ComputerDirectory, ComputerSnapshot } from "./computer.ts";
 export type {

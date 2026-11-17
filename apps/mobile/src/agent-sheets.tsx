@@ -28,6 +28,7 @@ import {
   FolderOpen,
   Globe2,
   Heart,
+  ListChecks,
   type MessageCircle,
   Newspaper,
   Plus,
@@ -146,12 +147,69 @@ function SheetSection({ children }: { children: React.ReactNode }) {
   return <View style={{ gap: 4, marginBottom: 16 }}>{children}</View>;
 }
 
+/**
+ * 「工作区」入口：市场简报 / 自选与组合 / 任务与自动化 / 资料 / 记忆。
+ *
+ * 这几项都是全局（账户级）资源，与当前 Agent 或频道无关，因此抽成共享组件：
+ * Agent 右侧栏与频道右侧栏渲染同一份，两边的顺序、图标、文案天然不会走偏。
+ */
+export function WorkspacePanelButtons({
+  onPanel,
+  compact = true,
+}: {
+  onPanel: (panel: AgentPanel) => void;
+  compact?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <SheetSection>
+      <PanelButton
+        compact={compact}
+        icon={Newspaper}
+        title={t("agentSpace.marketBrief")}
+        detail={t("agentSpace.marketBriefDetail")}
+        onPress={() => onPanel("brief")}
+      />
+      <PanelButton
+        compact={compact}
+        icon={Star}
+        title={t("agentSpace.watchlistAndPortfolio")}
+        detail={t("agentSpace.watchlistDetail")}
+        onPress={() => onPanel("watchlist")}
+      />
+      {/* 全局任务入口：与「任务与自动化」分区里那个「更多」同一目的地（tasks 面板）。 */}
+      <PanelButton
+        compact={compact}
+        icon={ListChecks}
+        title={t("agentSpace.addTask")}
+        detail={t("agentSpace.tasksDetail")}
+        onPress={() => onPanel("tasks")}
+      />
+      <PanelButton
+        compact={compact}
+        icon={FolderOpen}
+        title={t("app.navFiles")}
+        detail={t("app.destFilesDetail")}
+        onPress={() => onPanel("files")}
+      />
+      <PanelButton
+        compact={compact}
+        icon={Heart}
+        title={t("app.navPreferences")}
+        detail={t("details.settingsPreferencesDetail")}
+        onPress={() => onPanel("memory")}
+      />
+    </SheetSection>
+  );
+}
+
 export function AgentMoreContent({
   onPanel,
   onOpenApps,
   onOpenAgentSkills,
   onInspectSkill,
   compact = true,
+  showCapabilities = true,
 }: {
   onPanel: (panel: AgentPanel) => void;
   /** 应用与能力是独立页面，不走浮层：由调用方负责跳转。 */
@@ -161,6 +219,12 @@ export function AgentMoreContent({
   /** 点击能力卡片展示该技能的只读详情，由调用方作为兄弟节点挂载弹层，避免嵌套 Modal。 */
   onInspectSkill?: (skillId: string) => void;
   compact?: boolean;
+  /**
+   * 是否渲染「{name} 的技能」这一块（标题 + 技能卡 + 底部「添加技能」）。
+   * 右侧栏不需要展示智能体技能，由调用方传 false 隐藏；技能数据与跳转逻辑保留，
+   * 只是不渲染，需要恢复时把调用处的 false 去掉即可。
+   */
+  showCapabilities?: boolean;
 }) {
   const { t, locale } = useTranslation();
   const { current, skillLibrary } = useAgentSpace();
@@ -173,38 +237,11 @@ export function AgentMoreContent({
     .slice(0, 4);
   return (
     <View style={{ gap: 6 }}>
-      <SheetSection>
-        <PanelButton
-          compact={compact}
-          icon={Newspaper}
-          title={t("agentSpace.marketBrief")}
-          detail={t("agentSpace.marketBriefDetail")}
-          onPress={() => onPanel("brief")}
-        />
-        <PanelButton
-          compact={compact}
-          icon={Star}
-          title={t("agentSpace.watchlistAndPortfolio")}
-          detail={t("agentSpace.watchlistDetail")}
-          onPress={() => onPanel("watchlist")}
-        />
-        <PanelButton
-          compact={compact}
-          icon={FolderOpen}
-          title={t("app.navFiles")}
-          detail={t("app.destFilesDetail")}
-          onPress={() => onPanel("files")}
-        />
-        <PanelButton
-          compact={compact}
-          icon={Heart}
-          title={t("app.navPreferences")}
-          detail={t("details.settingsPreferencesDetail")}
-          onPress={() => onPanel("memory")}
-        />
-      </SheetSection>
+      {/* 工作区四项与频道右侧栏共用同一组件，保证两边内容一致。 */}
+      <WorkspacePanelButtons onPanel={onPanel} compact={compact} />
 
-      {!!capabilities.length && (
+      {/* 智能体技能区：由 showCapabilities 控制显隐，代码与数据保留。 */}
+      {showCapabilities && !!capabilities.length && (
         <Text
           style={{
             marginTop: 16,
@@ -218,7 +255,7 @@ export function AgentMoreContent({
           {t("agentSpace.agentCapabilities", { name: current.name })}
         </Text>
       )}
-      {!!capabilities.length && (
+      {showCapabilities && !!capabilities.length && (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {capabilities.map((capability) => {
             // 展示名优先查固定标签表（兼容历史系统能力 id），否则按技能目录 / 自建技能取名。
@@ -256,28 +293,31 @@ export function AgentMoreContent({
           })}
         </View>
       )}
-      <Pressable
-        accessibilityRole="button"
-        onPress={onOpenAgentSkills}
-        style={({ pressed }) => ({
-          minHeight: 43,
-          marginTop: 8,
-          borderWidth: 1,
-          borderStyle: "dashed",
-          borderColor: colors.lineStrong,
-          borderRadius: 12,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 9,
-          backgroundColor: pressed ? colors.overlay1 : "transparent",
-        })}
-      >
-        <Plus size={17} color={colors.faint} />
-        <Text style={{ fontSize: 13, color: colors.faint }}>
-          {t("agentSpace.unlockMoreFeatures")}
-        </Text>
-      </Pressable>
+      {/* 底部「添加技能」入口同属技能区，随 showCapabilities 一起隐藏。 */}
+      {showCapabilities && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenAgentSkills}
+          style={({ pressed }) => ({
+            minHeight: 43,
+            marginTop: 8,
+            borderWidth: 1,
+            borderStyle: "dashed",
+            borderColor: colors.lineStrong,
+            borderRadius: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 9,
+            backgroundColor: pressed ? colors.overlay1 : "transparent",
+          })}
+        >
+          <Plus size={17} color={colors.faint} />
+          <Text style={{ fontSize: 13, color: colors.faint }}>
+            {t("agentSpace.unlockMoreFeatures")}
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -434,7 +474,7 @@ function CreateAgentSheet({ onClose, onCreated }: { onClose: () => void; onCreat
         multiline
       />
       <Text style={[s.small, { color: colors.faint, marginBottom: 8 }]}>
-        {t("agentSpace.avatar")}
+        {t("agentSpace.agentAvatar")}
       </Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
         {(["orb", "bloom", "moon", "planet", "cat"] as AgentAvatarId[]).map((item) => (

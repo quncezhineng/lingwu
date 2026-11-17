@@ -10,7 +10,8 @@ import { Bell, ListChecks } from "./icons";
 import { colors, fonts, radius } from "./theme";
 import { useWorkspace } from "./workspace";
 
-const PREVIEW_LIMIT = 4;
+/** Agent 与频道侧栏的「任务」都只展示最近四条，完整列表走任务中心。 */
+export const RAIL_WORK_PREVIEW_LIMIT = 4;
 
 function useRailWork() {
   const { current } = useAgentSpace();
@@ -30,10 +31,24 @@ function useRailWork() {
 
 /** 侧栏只展示最近四条。完整列表走任务中心弹层。 */
 export function AgentWorkList() {
-  return <WorkGroups items={useRailWork()} limit={PREVIEW_LIMIT} />;
+  return <RailWorkGroups items={useRailWork()} limit={RAIL_WORK_PREVIEW_LIMIT} />;
 }
 
-function WorkGroups({ items, limit }: { items: RailWorkItem[]; limit?: number }) {
+/**
+ * 侧栏「任务」列表的通用渲染：按本地日历日分组（今天 / 昨天 / 日期），
+ * 每行一个类型图标 + 单行标题。Agent 侧栏与频道侧栏共用这一份，
+ * 差别只在数据来源（见 `AgentWorkList` 与 `ChannelRail`）。
+ */
+export function RailWorkGroups({
+  items,
+  limit,
+  emptyText,
+}: {
+  items: RailWorkItem[];
+  limit?: number;
+  /** 空态文案：频道侧栏用频道专属提示，Agent 侧栏用默认文案。 */
+  emptyText?: string;
+}) {
   const { t } = useTranslation();
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const groups = groupRailWork(items, { limit, locale: activeLocaleTag(), timeZone });
@@ -48,7 +63,7 @@ function WorkGroups({ items, limit }: { items: RailWorkItem[]; limit?: number })
           color: colors.muted,
         }}
       >
-        {t("agentSpace.noTasks")}
+        {emptyText ?? t("agentSpace.noTasks")}
       </Text>
     );
   }

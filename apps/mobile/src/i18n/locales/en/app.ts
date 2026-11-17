@@ -354,6 +354,10 @@ const app = {
   "preferences.toldOn": "You told me on {date}",
   "preferences.contextDetail":
     "These memories are created by the current assistant and used as reference during analysis. You can edit or remove them at any time.",
+  // Channel memory page intro: channel memories are created collectively by its members
+  // and serve as shared context; the agent-scoped page keeps preferences.contextDetail above.
+  "preferences.contextDetailChannel":
+    "These memories belong to this channel, created collectively by its member assistants and used as shared reference during analysis. You can edit or remove them at any time.",
   "preferences.contextDetailGlobal":
     "Your memory cards live here, covering all assistants and channels. You can view, edit, or remove them at any time.",
   "preferences.scopeAccount": "Account-wide",

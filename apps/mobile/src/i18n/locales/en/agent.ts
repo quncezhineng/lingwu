@@ -11,6 +11,7 @@ const agent = {
   "agent.reviewRequested": "Review requested",
   "agent.inputNeeded": "Your input is needed",
   "agent.filterAll": "All",
+  "agent.taskScopeOther": "Account",
   "agent.filterInProgress": "In progress",
   "agent.filterWaiting": "Needs you",
   "agent.filterFinished": "Finished",
@@ -367,6 +368,7 @@ const agent = {
     "Pick 3-5 comparable peers for a target company, compare revenue growth, margins and valuation multiples, and locate where the target sits in the industry.",
   "agent.started": "Started",
   "agent.viewTask": "View task",
+  "agent.viewAutomation": "View automation",
   "agent.viewIdeaLabel": "View idea: {title}",
   "agent.whatShouldLingWuDo": "What should LingWu research for you?",
   "agent.startThis": "Start this",
@@ -794,6 +796,12 @@ const agent = {
   "agent.run.event.approvedActionCompleted": "Approved action completed",
   "agent.run.event.taskNeedsAttention": "Task needs attention",
   "agent.run.event.modelTimedOut": "Model run timed out after five minutes",
+  // Browser worker error messages (browser.ts)
+  "agent.run.event.browserNotConfigured":
+    "Browser worker is not configured. Start it using the setup guide.",
+  "agent.run.event.browserUnavailable":
+    "Browser worker is unavailable. Check that its container is running.",
+  "agent.run.event.browserRequestFailed": "Browser request failed",
   "agent.run.event.workCompleted": "Work completed",
   "agent.run.event.analyzingTransactions": "Analyzing the imported transactions",
   "agent.run.event.foundDocument": "Found the document",
@@ -843,11 +851,12 @@ const agent = {
   "agentSpace.insightsDetail": "Conclusions and sources across Agents",
   "agentSpace.watchlist": "My watchlist",
   "agentSpace.watchlistAndPortfolio": "Watchlists & portfolios",
-  "agentSpace.watchlistDetail": "Watchlists, holdings and portfolios across Agents",
+  "agentSpace.watchlistDetail": "Watchlists, holdings and portfolios",
+  "agentSpace.addTask": "Tasks & automations",
   "agentSpace.watchlistPageDescription":
     "Manage watchlists, holdings and portfolios in one workspace shared by every Agent.",
-  "agentSpace.tasks": "Tasks",
-  "agentSpace.tasksDetail": "Task progress, results and automations across Agents",
+  "agentSpace.tasks": "Tasks & automations",
+  "agentSpace.tasksDetail": "Task progress, results and automations",
   "agentSpace.agentLearned": "What {name} can do",
   "agentSpace.agentCapabilities": "{name}'s skills",
   "agentSpace.taskHistory": "Task history",
@@ -887,7 +896,7 @@ const agent = {
     "Enter instructions to preview how the Markdown will render.",
   "agentSpace.saveInstructions": "Save instructions",
   "agentSpace.analysisHistory": "Tasks",
-  "agentSpace.delegatedWork": "Automations and tasks",
+  "agentSpace.delegatedWork": "Tasks",
   "agentSpace.delegatedWorkHint":
     "Active automations, plus queued, running, succeeded and failed tasks.",
   "agentSpace.workDateToday": "Today",
@@ -919,7 +928,9 @@ const agent = {
   "agentSpace.templateCustomDetail": "Define its name, persona and skills",
   "agentSpace.customizeTitle": "Meet your new Agent",
   "agentSpace.createAction": "Create {name}",
-  "agentSpace.avatar": "Choose an Agent avatar",
+  "agentSpace.avatar": "Choose a channel avatar",
+  // Agent scenario (profile/create/onboarding) heading; channel scenario keeps agentSpace.avatar above.
+  "agentSpace.agentAvatar": "Choose an Agent avatar",
   "agentSpace.skillCenter": "Skills",
   "agentSpace.libraryEmpty":
     "No resources yet. Files and analysis produced by this Agent's tasks will appear here.",

@@ -9,9 +9,9 @@
  * 运行：node --env-file=.env --import tsx tests/manual-e2e-orchestration-flow.ts
  */
 import "../apps/server/src/config.ts";
+import { createApp } from "../apps/server/src/app.ts";
 import { readConfig } from "../apps/server/src/config.ts";
 import { createStore } from "../apps/server/src/db.ts";
-import { createApp } from "../apps/server/src/app.ts";
 import type { AgentTask } from "../packages/domain/src/agent.ts";
 
 const OWNER = "e2e-orchestration";
@@ -102,11 +102,15 @@ async function main() {
     console.log("\n=== 验证结果 ===");
 
     // 检查 1：模型是否调用了 submit_orchestration（生成了编排计划）。
-    const plans = await db.scan<{ id: string; status: string; nodes: { id: string; status: string }[] }>(
-      "orchestration_plans",
-    );
+    const plans = await db.scan<{
+      id: string;
+      status: string;
+      nodes: { id: string; status: string }[];
+    }>("orchestration_plans");
     const check1 = plans.length > 0;
-    console.log(`  ${check1 ? "✅" : "❌"} submit_orchestration 被触发（编排计划 ${plans.length} 个）`);
+    console.log(
+      `  ${check1 ? "✅" : "❌"} submit_orchestration 被触发（编排计划 ${plans.length} 个）`,
+    );
 
     // 检查 2：DAG 是否拆解出多个节点（>1 个专家子任务）。
     const nodeCount = plans.reduce((sum, p) => sum + p.value.nodes.length, 0);
@@ -117,7 +121,9 @@ async function main() {
     const allTasks = await db.scan<AgentTask>("tasks");
     const subtasks = allTasks.filter((t) => t.value.orchestrationId);
     const check3 = subtasks.length > 0;
-    console.log(`  ${check3 ? "✅" : "❌"} 生成了子任务（${subtasks.length} 个，含 orchestrationId）`);
+    console.log(
+      `  ${check3 ? "✅" : "❌"} 生成了子任务（${subtasks.length} 个，含 orchestrationId）`,
+    );
 
     // 检查 4：顶层任务是否进入终态，且有结果或明确失败原因。
     const top = await db.get<AgentTask>(OWNER, "tasks", parent.id);

@@ -164,6 +164,25 @@ export const statusColors = {
   stepDone: "#8499B8",
 } as const;
 
+/**
+ * 频道「叠加头像」分层色（频道 = 多成员 Agent 群组，头像与 Agent 单符号形象区分）。
+ *
+ * 每个模板 = 浅色底 + 深/浅两层主色（`mid` 为第三个叠层的强调色），
+ * 渲染由 `agent-orb` 消费，只用于群组头像识别，不参与品牌操作层级。
+ */
+export const avatarStacks = {
+  /** 叠圆：双圆交叠（首选蓝）。 */
+  "stack-circles": { background: "#EAF1FF", deep: "#245FC4", light: "#3A83F7", mid: "#7FA8F2" },
+  /** 叠卡：双卡交叠（青绿）。 */
+  "stack-cards": { background: "#EAF4F1", deep: "#217D62", light: "#3E9C86", mid: "#7FBCA8" },
+  /** 叠点：三圆交叠（紫）。 */
+  "stack-dots": { background: "#F1EEF8", deep: "#7B61A8", light: "#A79BCB", mid: "#8F7FBE" },
+  /** 叠环：双环交叠（琥珀）。 */
+  "stack-rings": { background: "#FBF3E9", deep: "#B8862E", light: "#DEB36A", mid: "#C9922E" },
+  /** 叠菱：双菱（旋转方块）交叠（蓝灰）。 */
+  "stack-gems": { background: "#F0F2F8", deep: "#59648A", light: "#8A96B8", mid: "#6E7CA6" },
+} as const;
+
 /** The shared typeface is the watchlist's existing serif stack on every surface. */
 const applicationFont = Platform.select({
   web: webFontFamily,

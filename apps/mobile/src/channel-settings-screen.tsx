@@ -1,41 +1,58 @@
-import { type ComponentType, useEffect, useMemo, useState } from "react";
+import { type ComponentType, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import type { Artifact } from "../../../packages/domain/src";
-import type { AgentTask } from "../../../packages/domain/src/agent";
 import {
   CHANNEL_AVATARS,
   type Channel,
   type ChannelAvatarId,
+  normalizeChannelAvatar,
 } from "../../../packages/domain/src/channel";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
-import { AGENT_CAPABILITY_LABELS } from "./agent-space-model";
-import { ArtifactCard } from "./agent-ui";
+import type { AgentSkill } from "./agent-space-model";
+import { ArtifactCard, TaskCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
-import { Text, TextInput } from "./app-text";
+import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
+import { MySkillDetailSheet, SkillDetailSheet } from "./capability-hub";
 import { CardGrid } from "./card-grid";
 import { useChannels } from "./channels";
 import { saveRemoteFile, shareRemoteFile } from "./file-export";
-import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
-import { statusLabel } from "./i18n/translate";
+import { type TranslationKey, useTranslation } from "./i18n";
 import {
   ArrowDownToLine,
+  ArrowLeft,
   Brain,
-  Clock3,
+  CircleMinus,
   FileText,
   FolderOpen,
   Heart,
+  ListChecks,
+  Plus,
   Settings2,
   Share2,
   Terminal,
   Users,
 } from "./icons";
+import { InstructionsEditor } from "./instructions-editor";
+import { ModalOverlay } from "./modal-overlay";
 import { PreferencesScreen } from "./preferences-screen";
-import { StatusBadge, taskStatusTone } from "./status-badge";
+import { type SkillCatalogEntry, skillCatalog } from "./skill-catalog";
+import { SkillLibraryPanel, SkillRemoveButton } from "./skill-library-panel";
 import { breakpoints, colors, radius, shadow, space, typography } from "./theme";
-import { Button, Field, HoverPressable, IconButton, LinkRow, SectionHeading, s } from "./ui";
+import {
+  Button,
+  CheckRow,
+  ErrorNotice,
+  Field,
+  HoverPressable,
+  IconButton,
+  LinkRow,
+  SectionHeading,
+  Sheet,
+  s,
+} from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 频道详情页的左栏分区（右侧栏可带分区意图直接跳进来）。 */
@@ -53,10 +70,12 @@ const TABS: ReadonlyArray<{
   labelKey: TranslationKey;
 }> = [
   { id: "profile", icon: Settings2, labelKey: "channels.settingsProfile" },
+  // 「任务」紧跟基本信息，放在指令之前，与 Agent 详情页的分区顺序保持一致。
+  // 图标与右侧栏「任务与自动化」一致，都是 ListChecks（勾选清单）。
+  { id: "tasks", icon: ListChecks, labelKey: "channels.settingsTasks" },
   { id: "instructions", icon: Terminal, labelKey: "channels.settingsInstructions" },
   { id: "skills", icon: Brain, labelKey: "channels.settingsSkills" },
   { id: "files", icon: FolderOpen, labelKey: "channels.settingsFiles" },
-  { id: "tasks", icon: Clock3, labelKey: "channels.settingsTasks" },
   { id: "memory", icon: Heart, labelKey: "channels.settingsMemory" },
 ];
 
@@ -64,7 +83,7 @@ const TABS: ReadonlyArray<{
  * 频道详情页：与 Agent 详情页同级的独立设置页。
  *
  * 左栏是功能分区，右栏渲染对应设置内容：资料（头像/昵称/目标/成员）、
- * 指令（频道级共享指令）、技能（成员能力并集，只读）、任务（频道投研历史）。
+ * 指令（频道级共享指令）、技能（频道自己的技能，成员共享）、任务（频道投研历史）。
  */
 export function ChannelSettingsScreen({
   channel,
@@ -77,7 +96,7 @@ export function ChannelSettingsScreen({
   onTabIntentConsumed?: () => void;
 }) {
   const { t } = useTranslation();
-  const { updateChannel } = useChannels();
+  const { updateChannel, deleteChannel } = useChannels();
   const { notify } = useWorkspace();
   const { width: windowWidth } = useWindowDimensions();
   const [tab, setTab] = useState<ChannelSettingsTab>("profile");
@@ -92,11 +111,13 @@ export function ChannelSettingsScreen({
   const active = TABS.find((item) => item.id === tab) ?? TABS[0];
 
   // 资料页的本地编辑态：头像、昵称、研究目标。
-  const [avatar, setAvatar] = useState<ChannelAvatarId>(channel.avatar ?? "orb");
+  const [avatar, setAvatar] = useState<ChannelAvatarId>(normalizeChannelAvatar(channel.avatar));
   const [name, setName] = useState(channel.name);
   const [description, setDescription] = useState(channel.description ?? "");
   // 指令页的本地编辑态。
   const [instructions, setInstructions] = useState(channel.instructions ?? "");
+  // 删除频道二次确认：不可恢复，需用户显式确认。
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const saveProfile = () => {
     void updateChannel(channel.id, {
@@ -117,20 +138,13 @@ export function ChannelSettingsScreen({
         return (
           <View style={{ gap: space.sm }}>
             <Text style={[s.muted, { lineHeight: 21 }]}>{t("channels.instructionsHint")}</Text>
-            <TextInput
-              accessibilityLabel={t("channels.settingsInstructions")}
+            {/* 与 Agent 详情「指令」页同一套编辑器：可编辑、Markdown 预览、保存。 */}
+            <InstructionsEditor
               value={instructions}
-              onChangeText={setInstructions}
-              placeholder={t("agentSpace.instructionsPlaceholder")}
-              placeholderTextColor={colors.faint}
-              maxLength={4000}
-              multiline
-              textAlignVertical="top"
-              style={[s.input, { minHeight: 300, fontSize: 15, lineHeight: 23, padding: 14 }]}
+              onChange={setInstructions}
+              accessibilityLabel={t("channels.settingsInstructions")}
+              onSave={saveInstructions}
             />
-            <Button primary onPress={saveInstructions}>
-              {t("agentSpace.saveInstructions")}
-            </Button>
           </View>
         );
       case "skills":
@@ -189,14 +203,19 @@ export function ChannelSettingsScreen({
             <View style={{ marginTop: space.sm }}>
               <ChannelMembersPanel channel={channel} />
             </View>
-            <Button
-              primary
-              style={{ marginTop: space.md }}
-              disabled={!name.trim()}
-              onPress={saveProfile}
-            >
-              {t("channels.saveChannel")}
-            </Button>
+            {/* 双列等宽：左「保存频道信息」，右「删除频道」（danger 色区分）。 */}
+            <View style={[s.row, { gap: 10, marginTop: space.md, alignItems: "stretch" }]}>
+              <View style={{ flex: 1 }}>
+                <Button primary disabled={!name.trim()} onPress={saveProfile}>
+                  {t("channels.saveChannel")}
+                </Button>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button danger onPress={() => setConfirmDelete(true)}>
+                  {t("channels.deleteTitle")}
+                </Button>
+              </View>
+            </View>
           </View>
         );
     }
@@ -279,7 +298,7 @@ export function ChannelSettingsScreen({
                 ...shadow.card,
               }}
             >
-              <AgentOrb avatar={channel.avatar ?? "orb"} size={38} />
+              <AgentOrb avatar={normalizeChannelAvatar(channel.avatar)} size={38} />
               <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                 <Text numberOfLines={1} style={[s.text, { fontSize: 13, fontWeight: "600" }]}>
                   {channel.name}
@@ -356,14 +375,53 @@ export function ChannelSettingsScreen({
           </View>
         </ScrollView>
       </View>
+
+      {/* 删除频道确认弹窗：智能体本身会保留，但频道不可恢复。 */}
+      {confirmDelete && (
+        <ModalOverlay visible onRequestClose={() => setConfirmDelete(false)}>
+          <Pressable onPress={() => setConfirmDelete(false)} style={s.modalShade}>
+            <Pressable
+              accessibilityViewIsModal
+              onPress={(event) => event.stopPropagation()}
+              style={[s.card, { maxWidth: 360, width: "100%", padding: 22, gap: 10 }]}
+            >
+              <Text style={s.heading}>{t("channels.deleteTitle")}</Text>
+              <Text style={s.muted}>{t("channels.deleteConfirm")}</Text>
+              <View style={[s.row, { gap: 10, marginTop: 8 }]}>
+                <Button style={{ flex: 1, minHeight: 44 }} onPress={() => setConfirmDelete(false)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  danger
+                  style={{ flex: 1, minHeight: 44 }}
+                  onPress={() => {
+                    void deleteChannel(channel.id);
+                    setConfirmDelete(false);
+                  }}
+                >
+                  {t("channels.deleteAction")}
+                </Button>
+              </View>
+            </Pressable>
+          </Pressable>
+        </ModalOverlay>
+      )}
     </View>
   );
 }
 
-/** 资料页的成员列表：频道成员 Agent 的头像 + 名称 + 角色。 */
+/** 资料页的成员列表：频道成员 Agent 的头像 + 名称 + 角色，支持再次添加成员。 */
 function ChannelMembersPanel({ channel }: { channel: Channel }) {
   const { t } = useTranslation();
   const { agents } = useAgentSpace();
+  const { updateChannel } = useChannels();
+  const { notify } = useWorkspace();
+  const [adding, setAdding] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
   const members = useMemo(
     () =>
       channel.agentIds
@@ -371,9 +429,79 @@ function ChannelMembersPanel({ channel }: { channel: Channel }) {
         .filter((m): m is NonNullable<typeof m> => Boolean(m)),
     [agents, channel.agentIds],
   );
+
+  // 候选：尚未加入频道的智能体；频道上限 10 人，已满则不再提供可选项。
+  const MAX_MEMBERS = 10;
+  const remaining = Math.max(0, MAX_MEMBERS - channel.agentIds.length);
+  const candidates = useMemo(
+    () => (remaining > 0 ? agents.filter((a) => !channel.agentIds.includes(a.id)) : []),
+    [agents, channel.agentIds, remaining],
+  );
+
+  const openAdd = () => {
+    setSelectedIds([]);
+    setError("");
+    setAdding(true);
+  };
+  const toggle = (id: string) =>
+    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
+  async function submit() {
+    setError("");
+    if (!selectedIds.length) return;
+    // 并发 + 上限双保险：合并后不得超过 10 人。
+    const merged = [...new Set([...channel.agentIds, ...selectedIds])];
+    if (merged.length > MAX_MEMBERS) {
+      setError(t("channels.addMembersLimit"));
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateChannel(channel.id, { agentIds: merged });
+      notify(t("channels.addMembersSuccess"));
+      setAdding(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 至少保留 2 位成员（与后端 channelUpdateSchema 的 min(2) 一致）。
+  const atMinimum = channel.agentIds.length <= 2;
+  const canRemove = (member: { id: string }) => !atMinimum && channel.agentIds.includes(member.id);
+
+  async function confirmRemove() {
+    if (!removing) return;
+    // 下限双保险：并发场景下再次校验，避免删到只剩 1 人。
+    if (channel.agentIds.length <= 2) {
+      setError(t("channels.removeMemberMin"));
+      setRemoving(null);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await updateChannel(channel.id, {
+        agentIds: channel.agentIds.filter((id) => id !== removing.id),
+      });
+      notify(t("channels.removeMemberSuccess"));
+      setRemoving(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <View style={{ gap: 8 }}>
-      <Text style={[s.heading, { fontSize: 14 }]}>{t("channels.membersLabel")}</Text>
+      <View style={[s.row, { justifyContent: "space-between", alignItems: "center" }]}>
+        <Text style={[s.heading, { fontSize: 14 }]}>{t("channels.membersLabel")}</Text>
+        <Button small icon={Plus} onPress={openAdd}>
+          {t("channels.addMembers")}
+        </Button>
+      </View>
       {members.map((member) => (
         <View key={member.id} style={[s.row, { gap: 10, alignItems: "center" }]}>
           <AgentOrb avatar={member.avatar} size={30} />
@@ -381,92 +509,281 @@ function ChannelMembersPanel({ channel }: { channel: Channel }) {
             <Text style={[s.text, { fontWeight: "600" }]}>{member.name}</Text>
             <Text style={[s.small, { color: colors.faint }]}>{member.role}</Text>
           </View>
+          <Button
+            small
+            danger
+            icon={CircleMinus}
+            disabled={!canRemove(member)}
+            onPress={() => setRemoving({ id: member.id, name: member.name })}
+          >
+            {t("channels.removeMember")}
+          </Button>
         </View>
       ))}
-    </View>
-  );
-}
+      {atMinimum && (
+        <Text style={[s.small, { color: colors.faint }]}>{t("channels.removeMemberMin")}</Text>
+      )}
 
-/** 技能页：成员能力并集（只读）。频道的能力由其成员 Agent 的能力决定。 */
-function ChannelSkillsPanel({ channel }: { channel: Channel }) {
-  const { t, locale } = useTranslation();
-  const { agents } = useAgentSpace();
-  const zh = locale === "zh-Hans";
-  const members = useMemo(
-    () =>
-      channel.agentIds
-        .map((id) => agents.find((a) => a.id === id))
-        .filter((m): m is NonNullable<typeof m> => Boolean(m)),
-    [agents, channel.agentIds],
-  );
-  // 并集：收集所有成员的技能，记录「哪个成员具备哪项技能」。
-  const bySkill = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const member of members) {
-      for (const skill of member.skills) {
-        const holders = map.get(skill) ?? new Set<string>();
-        holders.add(member.name);
-        map.set(skill, holders);
-      }
-    }
-    return map;
-  }, [members]);
-  const entries = [...bySkill.entries()].sort(([a], [b]) => a.localeCompare(b));
-  return (
-    <View style={{ gap: 8 }}>
-      <Text style={[s.muted, { lineHeight: 20 }]}>{t("channels.skillsHint")}</Text>
-      {entries.length ? (
-        <View style={{ gap: 6 }}>
-          {entries.map(([skill, holders]) => {
-            const label = AGENT_CAPABILITY_LABELS[skill];
-            return (
-              <View
-                key={skill}
-                style={[
-                  s.row,
-                  {
-                    gap: 10,
-                    minHeight: 40,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderWidth: 1,
-                    borderColor: colors.line,
-                    borderRadius: radius.field,
-                    backgroundColor: colors.paper,
-                  },
-                ]}
-              >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]}>
-                    {label ? (zh ? label.zh : label.en) : skill}
-                  </Text>
-                  <Text numberOfLines={1} style={[s.small, { color: colors.faint }]}>
-                    {[...holders].join(" · ")}
-                  </Text>
-                </View>
+      {adding && (
+        <Sheet title={t("channels.addMembersTitle")} onClose={() => setAdding(false)}>
+          <View style={{ gap: 12 }}>
+            <Text style={[s.small, { color: colors.faint }]}>{t("channels.addMembersHint")}</Text>
+            {candidates.length ? (
+              <View style={{ gap: 2 }}>
+                {candidates.map((agent) => (
+                  <View key={agent.id} style={[s.row, { gap: 10, alignItems: "center" }]}>
+                    <AgentOrb avatar={agent.avatar} size={28} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <CheckRow
+                        label={`${agent.name}${agent.role ? ` · ${agent.role}` : ""}`}
+                        checked={selectedIds.includes(agent.id)}
+                        onPress={() => toggle(agent.id)}
+                      />
+                    </View>
+                  </View>
+                ))}
               </View>
-            );
-          })}
-        </View>
-      ) : (
-        <Text style={[s.muted, { paddingVertical: 18 }]}>{t("channels.skillsEmpty")}</Text>
+            ) : (
+              <Text style={s.muted}>{t("channels.addMembersNoCandidates")}</Text>
+            )}
+            <ErrorNotice error={error} />
+            <Button
+              primary
+              busy={busy}
+              disabled={!selectedIds.length}
+              onPress={() => void submit()}
+            >
+              {t("channels.addMembers")}
+            </Button>
+          </View>
+        </Sheet>
+      )}
+
+      {removing && (
+        <ModalOverlay visible onRequestClose={() => setRemoving(null)}>
+          <Pressable onPress={() => setRemoving(null)} style={s.modalShade}>
+            <Pressable
+              accessibilityViewIsModal
+              onPress={(event) => event.stopPropagation()}
+              style={[s.card, { maxWidth: 360, width: "100%", padding: 22, gap: 10 }]}
+            >
+              <Text style={s.heading}>{t("channels.removeMember")}</Text>
+              <Text style={s.muted}>
+                {t("channels.removeMemberConfirm", { name: removing.name })}
+              </Text>
+              <ErrorNotice error={error} />
+              <View style={[s.row, { gap: 10, marginTop: 8 }]}>
+                <Button style={{ flex: 1, minHeight: 44 }} onPress={() => setRemoving(null)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  danger
+                  busy={busy}
+                  style={{ flex: 1, minHeight: 44 }}
+                  onPress={() => void confirmRemove()}
+                >
+                  {t("channels.removeMember")}
+                </Button>
+              </View>
+            </Pressable>
+          </Pressable>
+        </ModalOverlay>
       )}
     </View>
   );
 }
 
-function taskTime(task: AgentTask) {
-  return new Date(task.updatedAt).toLocaleTimeString(activeLocaleTag(), {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+/**
+ * 技能页：**这个频道自己的技能**，与成员智能体各自的能力互相独立。
+ *
+ * 版式与 Agent 详情「技能」页完全一致（右上角「+ 添加技能」+ 自适应卡片网格 +
+ * 卡片内「移除」），区别只在归属：技能挂在频道上，添加后对全体成员共享
+ * （频道群聊编排时注入到每位成员的提示词），移除也只从频道摘掉。
+ */
+function ChannelSkillsPanel({ channel }: { channel: Channel }) {
+  const { t, locale } = useTranslation();
+  const { skillLibrary } = useAgentSpace();
+  const { updateChannel } = useChannels();
+  const { notify } = useWorkspace();
+  /** 技能库视图：点「+ 添加技能」切进来挑选，挑完退回已挂列表。 */
+  const [adding, setAdding] = useState(false);
+  const [viewingCatalog, setViewingCatalog] = useState<SkillCatalogEntry>();
+  const [viewingCustom, setViewingCustom] = useState<AgentSkill>();
+  const zh = locale === "zh-Hans";
+
+  // 频道技能全部读自己的两个字段：目录 id 列表 + 账户技能库引用，不看成员 Agent。
+  const installedIds = channel.installedSkills ?? [];
+  const sharedRefIds = channel.skillRefs ?? [];
+  const catalogSkills = installedIds
+    .map((id) => skillCatalog.find((skill) => skill.id === id))
+    .filter((skill): skill is (typeof skillCatalog)[number] => Boolean(skill));
+  const sharedCustomSkills = sharedRefIds
+    .map((id) => skillLibrary.find((skill) => skill.id === id))
+    .filter((skill): skill is AgentSkill => Boolean(skill));
+
+  /** 写回频道技能：目录技能进 `installedSkills`，自建技能进 `skillRefs`。 */
+  const writeSkills = (patch: { installedSkills?: string[]; skillRefs?: string[] }) => {
+    void updateChannel(channel.id, patch);
+  };
+  const toast = (title: string, installed: boolean) =>
+    notify(
+      t(installed ? "agent.skillInstalledToast" : "agent.skillUninstalledToast", {
+        title,
+        agent: channel.name,
+      }),
+    );
+
+  const toggleCatalog = (skill: SkillCatalogEntry, installed: boolean) => {
+    writeSkills({
+      installedSkills: installed
+        ? [...new Set([...installedIds, skill.id])]
+        : installedIds.filter((id) => id !== skill.id),
+    });
+    toast(zh ? skill.titleZh : skill.titleEn, installed);
+  };
+  const toggleCustom = (skill: AgentSkill, installed: boolean) => {
+    writeSkills({
+      skillRefs: installed
+        ? [...new Set([...sharedRefIds, skill.id])]
+        : sharedRefIds.filter((id) => id !== skill.id),
+    });
+    toast(skill.name, installed);
+  };
+
+  /** 卡片上的「移除」：只把技能从这个频道摘掉，Agent 自己的技能与技能库原件都不动。 */
+  const removeCatalog = (skill: SkillCatalogEntry) => {
+    setViewingCatalog(undefined);
+    toggleCatalog(skill, false);
+  };
+  const removeCustom = (skill: AgentSkill) => {
+    setViewingCustom(undefined);
+    toggleCustom(skill, false);
+  };
+
+  const cards: { key: string; node: ReactNode }[] = [
+    ...sharedCustomSkills.map((skill) => ({
+      key: `custom:${skill.id}`,
+      node: (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={skill.name}
+          onPress={() => setViewingCustom(skill)}
+          style={({ pressed }) => ({
+            flex: 1,
+            padding: 14,
+            borderRadius: 15,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: pressed ? colors.surface : colors.paper,
+            gap: 7,
+          })}
+        >
+          <View style={s.between}>
+            <Text style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>{skill.name}</Text>
+            <SkillRemoveButton skillName={skill.name} onRemove={() => removeCustom(skill)} />
+          </View>
+          <Text style={s.small}>{skill.purpose || t("agentSpace.skillInstructions")}</Text>
+        </Pressable>
+      ),
+    })),
+    ...catalogSkills.map((skill) => {
+      const title = zh ? skill.titleZh : skill.titleEn;
+      return {
+        key: `catalog:${skill.id}`,
+        node: (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            onPress={() => setViewingCatalog(skill)}
+            style={({ pressed }) => ({
+              flex: 1,
+              padding: 14,
+              borderRadius: 15,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: pressed ? colors.surface : colors.paper,
+              gap: 7,
+            })}
+          >
+            <View style={s.between}>
+              <Text numberOfLines={1} style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>
+                {title}
+              </Text>
+              <SkillRemoveButton skillName={title} onRemove={() => removeCatalog(skill)} />
+            </View>
+            <Text numberOfLines={2} style={s.small}>
+              {zh ? skill.descriptionZh : skill.descriptionEn}
+            </Text>
+          </Pressable>
+        ),
+      };
+    }),
+  ];
+
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={[s.muted, { lineHeight: 20 }]}>{t("channels.skillsHint")}</Text>
+      {adding ? (
+        <View style={{ gap: 10 }}>
+          {/* 技能库视图：挑完点「返回」回到已挂列表。 */}
+          <View style={{ alignItems: "flex-end" }}>
+            <Button small icon={ArrowLeft} onPress={() => setAdding(false)}>
+              {t("common.back")}
+            </Button>
+          </View>
+          <SkillLibraryPanel
+            installedCatalogIds={installedIds}
+            isCustomInstalled={(skill) => sharedRefIds.includes(skill.id)}
+            onToggleCatalog={toggleCatalog}
+            onToggleCustom={toggleCustom}
+            onViewCatalogDetail={setViewingCatalog}
+            onViewCustomDetail={setViewingCustom}
+          />
+        </View>
+      ) : (
+        <>
+          {/* 右对齐的「+ 添加技能」：与 Agent 详情技能页同一位置、同一按钮。 */}
+          <View style={{ alignItems: "flex-end", marginBottom: 5 }}>
+            <Button small icon={Plus} onPress={() => setAdding(true)}>
+              {t("agentSpace.addSkill")}
+            </Button>
+          </View>
+          {cards.length ? (
+            <CardGrid
+              items={cards}
+              minColumnWidth={300}
+              getKey={(card) => card.key}
+              render={(card) => card.node}
+            />
+          ) : (
+            <Text style={[s.muted, { paddingVertical: 18 }]}>{t("channels.skillsEmpty")}</Text>
+          )}
+        </>
+      )}
+      {/* 详情弹层：频道里的技能不提供「安装到某个智能体」，因此只读展示说明。 */}
+      {viewingCatalog && (
+        <SkillDetailSheet skill={viewingCatalog} onClose={() => setViewingCatalog(undefined)} />
+      )}
+      {viewingCustom && (
+        <MySkillDetailSheet
+          title={viewingCustom.name}
+          skill={viewingCustom}
+          onClose={() => setViewingCustom(undefined)}
+        />
+      )}
+    </View>
+  );
 }
 
-/** 任务页：这个频道的投研任务历史（input.channelId 关联）。 */
+/**
+ * 任务页：这个频道的投研任务历史（input.channelId 关联）。
+ *
+ * 版式与 Agent 详情「任务」页完全一致：同样的自适应卡片网格 + 同一张任务卡，
+ * 双列时卡片切纵向版式，状态、时间、目标链接都由 `TaskCard` 统一呈现。
+ */
 function ChannelTasksPanel({ channel }: { channel: Channel }) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
-  const { open } = useWorkspace();
   const tasks = useMemo(() => {
     const all = data?.tasks ?? [];
     return all
@@ -485,45 +802,13 @@ function ChannelTasksPanel({ channel }: { channel: Channel }) {
     );
   }
   return (
-    <View style={{ gap: 4 }}>
-      {tasks.map((task) => {
-        const tone = taskStatusTone(task.status);
-        return (
-          <Pressable
-            key={task.id}
-            accessibilityRole="button"
-            accessibilityLabel={task.title}
-            onPress={() => open({ type: "task", taskId: task.id })}
-            style={({ pressed }) => ({
-              minHeight: 60,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10,
-              paddingVertical: 10,
-              borderTopWidth: 1,
-              borderTopColor: colors.line,
-              backgroundColor: pressed ? colors.overlay1 : "transparent",
-            })}
-          >
-            <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
-              <Text
-                numberOfLines={1}
-                style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
-              >
-                {task.title}
-              </Text>
-              <View style={s.between}>
-                <Text style={{ fontSize: 11, color: colors.muted }}>
-                  {task.plan.find((step) => step.status === "running")?.title || ""}
-                </Text>
-                <Text style={{ fontSize: 10, color: colors.faint }}>{taskTime(task)}</Text>
-              </View>
-            </View>
-            <StatusBadge tone={tone} label={statusLabel(task.status)} />
-          </Pressable>
-        );
-      })}
-    </View>
+    <CardGrid
+      items={tasks}
+      // 与 Agent 详情「任务」页同一档：正文列约 690px，280 的下限才能稳定排成双列。
+      minColumnWidth={280}
+      getKey={(task) => task.id}
+      render={(task, _index, { columns }) => <TaskCard task={task} compact stacked={columns > 1} />}
+    />
   );
 }
 
@@ -640,11 +925,11 @@ function ChannelFilesPanel({ channel }: { channel: Channel }) {
  * 因此频道记忆既独立于各 Agent，又能在编排时被成员读到。
  */
 function ChannelMemoryPanel({ channel }: { channel: Channel }) {
-  const { t } = useTranslation();
   return (
     <View style={{ gap: 8 }}>
-      <Text style={[s.muted, { lineHeight: 20 }]}>{t("channels.memoryHint")}</Text>
-      <PreferencesScreen embedded agentId={channel.id} emptyAdd={false} />
+      {/* channel 标记让简介使用频道专属文案（"这些记忆属于当前频道…"），
+          Agent 详情页的记忆简介不受影响。 */}
+      <PreferencesScreen embedded channel agentId={channel.id} emptyAdd={false} />
     </View>
   );
 }

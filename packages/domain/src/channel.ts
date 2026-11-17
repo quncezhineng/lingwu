@@ -9,15 +9,38 @@ import { z } from "zod";
  * 成员各自一个 thread，频道聚合展示）。
  */
 
-/** 频道群组头像：与 Agent 头像同一套 orb 配色，给频道一个视觉身份。 */
-export type ChannelAvatarId = "orb" | "bloom" | "moon" | "planet" | "cat";
+/**
+ * 频道群组头像：多个图像交叠的「群组感」形象（频道 = 多位成员 Agent 的组合），
+ * 与 Agent 的单符号头像（orb/bloom/moon/planet/cat）刻意区分。
+ * 注意：旧数据可能存有 Agent 时代的 avatar 值，读取端需做兜底映射。
+ */
+export type ChannelAvatarId =
+  | "stack-circles"
+  | "stack-cards"
+  | "stack-dots"
+  | "stack-rings"
+  | "stack-gems";
 export const CHANNEL_AVATARS: readonly ChannelAvatarId[] = [
-  "orb",
-  "bloom",
-  "moon",
-  "planet",
-  "cat",
+  "stack-circles",
+  "stack-cards",
+  "stack-dots",
+  "stack-rings",
+  "stack-gems",
 ];
+/** 频道新头像的默认值（历史数据兜底也落到它）。 */
+export const DEFAULT_CHANNEL_AVATAR: ChannelAvatarId = "stack-circles";
+
+/** 校验某值是否为合法的频道头像 id（历史 Agent 时代旧值返回 false）。 */
+export function isChannelAvatarId(value: unknown): value is ChannelAvatarId {
+  return typeof value === "string" && (CHANNEL_AVATARS as readonly string[]).includes(value);
+}
+
+/** 频道头像读取兜底：缺失 / 非法 / 历史旧值统一落到默认叠加头像。 */
+export function normalizeChannelAvatar(
+  value: ChannelAvatarId | string | null | undefined,
+): ChannelAvatarId {
+  return isChannelAvatarId(value) ? value : DEFAULT_CHANNEL_AVATAR;
+}
 
 export interface Channel {
   id: string;
@@ -30,6 +53,15 @@ export interface Channel {
   avatar?: ChannelAvatarId;
   /** 频道级共享指令：每次编排投研时注入到所有成员 Agent 的上下文。 */
   instructions?: string;
+  /**
+   * 频道自己的技能（内置目录 id）：与成员 Agent 各自的技能互相独立，
+   * 频道里添加后对全体成员生效。
+   */
+  installedSkills?: string[];
+  /** 频道自己的自建技能引用（账户技能库 id），同样成员共享。 */
+  skillRefs?: string[];
+  /** 是否置顶：只影响左侧栏展示顺序，置顶的频道排在前面。 */
+  pinned?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,8 +71,13 @@ export const channelInputSchema = z.object({
   name: z.string().trim().min(1).max(60),
   agentIds: z.array(z.string().min(1).max(128)).min(2).max(10),
   description: z.string().trim().max(500).optional(),
-  avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]).optional(),
+  avatar: z
+    .enum(["stack-circles", "stack-cards", "stack-dots", "stack-rings", "stack-gems"])
+    .optional(),
   instructions: z.string().trim().max(4000).optional(),
+  installedSkills: z.array(z.string().min(1).max(128)).max(200).optional(),
+  skillRefs: z.array(z.string().min(1).max(128)).max(200).optional(),
+  pinned: z.boolean().optional(),
 });
 export type ChannelInput = z.infer<typeof channelInputSchema>;
 
@@ -49,8 +86,13 @@ export const channelUpdateSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   agentIds: z.array(z.string().min(1).max(128)).min(2).max(10).optional(),
   description: z.string().trim().max(500).optional(),
-  avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]).optional(),
+  avatar: z
+    .enum(["stack-circles", "stack-cards", "stack-dots", "stack-rings", "stack-gems"])
+    .optional(),
   instructions: z.string().trim().max(4000).optional(),
+  installedSkills: z.array(z.string().min(1).max(128)).max(200).optional(),
+  skillRefs: z.array(z.string().min(1).max(128)).max(200).optional(),
+  pinned: z.boolean().optional(),
 });
 export type ChannelUpdate = z.infer<typeof channelUpdateSchema>;
 
@@ -72,11 +114,14 @@ export interface ChannelMessage {
   attachmentIds?: string[];
   /** user 消息：本轮选定的应用连接器 slug。 */
   connectorSlugs?: string[];
+  /** user 消息：本轮选定的频道技能 id（频道共享，成员 use_skill 可读到）。 */
+  skillIds?: string[];
 }
 
 export const channelMessageInputSchema = z.object({
   text: z.string().trim().min(1).max(20_000),
   attachmentIds: z.array(z.string().min(1)).max(30).optional(),
   connectorSlugs: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  skillIds: z.array(z.string().trim().min(1).max(128)).max(60).optional(),
 });
 export type ChannelMessageInput = z.infer<typeof channelMessageInputSchema>;

@@ -9,7 +9,7 @@ const details = {
   "details.settingsSubtitle": "Configure your model, workspace and account.",
   "details.settingsModelHeading": "Model",
   "details.settingsWorkspaceHeading": "Workspace",
-  "details.settingsPreferencesDetail": "Review, correct or forget what LingWu remembers.",
+  "details.settingsPreferencesDetail": "Review, correct or forget memories",
   "details.settingsAppsDetail": "Plugins, skills and connectors.",
   "details.settingsAccountTitle": "Account & data",
   "details.settingsAccountDetail":

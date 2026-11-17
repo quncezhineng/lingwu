@@ -18,6 +18,8 @@ export interface ChannelChatRequest {
   text: string;
   attachmentIds?: string[];
   connectorSlugs?: string[];
+  /** 本轮选定的频道技能 id：服务端注入成员提示词，成员可用 use_skill 读取方法。 */
+  skillIds?: string[];
 }
 
 export interface ChannelChatStream {

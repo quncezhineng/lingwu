@@ -11,6 +11,69 @@ export interface BotPreview {
   at?: string;
 }
 
+/**
+ * 只取「回复」的预览：从后往前找一条指定角色的消息。
+ *
+ * 左侧栏的小字要展示「最近回复」，所以不把用户自己发的话算进去：
+ * 智能体对话的回复是 `assistant`，频道群聊的回复是 `member`。
+ * 没有回复时返回 null，由调用方显示「还没有消息」。
+ */
+export function latestReplyPreview(
+  messages: readonly { role: string; content?: unknown; text?: string; createdAt?: string }[],
+  replyRoles: readonly string[] = ["assistant"],
+): BotPreview | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || !replyRoles.includes(message.role)) continue;
+    const text = replyPreviewText(messagePreviewText(message.text ?? message.content));
+    if (!text) continue;
+    return message.createdAt ? { text, at: message.createdAt } : { text };
+  }
+  return null;
+}
+
+/**
+ * 回复正文是 Markdown，一行小字放不下它的记号：`##`、`**`、列表点只会先占掉宽度，
+ * 让真正的内容被挤出屏幕，所以先剥掉再截断。
+ */
+export function replyPreviewText(raw: string): string {
+  return raw
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[`*_#>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[-\s]+/, "");
+}
+
+/**
+ * 把 Markdown 标记从预览文本里剥掉，只留可读文字。
+ * 模型回复常带标题（#）、强调（**）、表格（|）、列表（- / 1.）、代码（`）等，
+ * 左侧栏预览直接展示时不应把这些符号原样带出来。
+ */
+function stripMarkdownFlags(text: string): string {
+  return (
+    text
+      .replace(/\\n/g, " ")
+      // 链接只保留展示文字
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      // 行首标记：标题 / 引用 / 无序列表 / 有序列表
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^>\s?/gm, "")
+      .replace(/^[-*+]\s+/gm, "")
+      .replace(/^\d+[.)]\s+/gm, "")
+      // 表格：分隔线（|---|...）整行删除，普通表格行把竖线换成空格
+      .replace(/^\s*\|[\s:\-|]+\|\s*$/gm, "")
+      .replace(/^\s*\|.*\|\s*$/gm, (line) => line.replace(/\|/g, " ").trim())
+      // 横线分隔
+      .replace(/^-{3,}\s*$/gm, "")
+      // 行内强调 / 代码 / 删除线 / 残留井号与竖线
+      .replace(/[*_`~#|]+/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+}
+
 export function messagePreviewText(content: unknown): string {
   const raw = Array.isArray(content)
     ? content
@@ -26,7 +89,7 @@ export function messagePreviewText(content: unknown): string {
     : typeof content === "string"
       ? content
       : "";
-  return raw.replace(/\s+/g, " ").trim();
+  return stripMarkdownFlags(raw);
 }
 
 /** 取最后一条用户或助手正文。没有时间戳就不编一个。 */

@@ -13,7 +13,12 @@ import { invokeConnection } from "../connectors/service.ts";
 import type { Store } from "../db.ts";
 import type { Files } from "../files.ts";
 import type { ModelSettingsService } from "../model-settings.ts";
-import { readInstalledSkill } from "./bot-skills.ts";
+import {
+  channelSkillViews,
+  readChannelSkill,
+  readInstalledSkill,
+  skillPrompt,
+} from "./bot-skills.ts";
 import { filterMemoriesForScope } from "./memory-scope.ts";
 import { tanstackAgent } from "./tanstack-agent.ts";
 
@@ -75,6 +80,7 @@ export async function runChannelChat(
     createdAt: now(),
     ...(input.attachmentIds?.length ? { attachmentIds: input.attachmentIds } : {}),
     ...(input.connectorSlugs?.length ? { connectorSlugs: input.connectorSlugs } : {}),
+    ...(input.skillIds?.length ? { skillIds: input.skillIds } : {}),
   };
   await db.put(owner, "channel_messages", userMessage);
 
@@ -87,6 +93,18 @@ export async function runChannelChat(
     return;
   }
 
+  // 频道自己的技能：成员共享，和成员各自的技能互不影响。
+  const sharedSkills = channelSkillViews(space, channel);
+  const sharedSkillLine = skillPrompt(sharedSkills.summaries, "every member of this channel");
+  // 用户在本轮对话里点名选中的频道技能：只对当前讨论强调，成员匹配时优先调用。
+  const pickedSkills = (input.skillIds ?? []).length
+    ? sharedSkills.summaries.filter((skill) => input.skillIds?.includes(skill.id))
+    : [];
+  const pickedSkillLine = pickedSkills.length
+    ? `The user selected these channel skills for this discussion. When a request matches one, call use_skill with its id and follow the returned method:\n${pickedSkills
+        .map((skill) => `- ${skill.id}: ${skill.name} — ${skill.description}`)
+        .join("\n")}`
+    : "";
   // 前面成员已完成的回复，按发言顺序累积，供后续成员接话。
   const priorReplies: { name: string; role: string; text: string }[] = [];
   const allMemories = await db.list<{ text: string; source: string; agentId?: string }>(
@@ -129,7 +147,11 @@ export async function runChannelChat(
           name: "use_skill",
           description: "Read the full method of a skill installed on you before following it.",
           parameters: z.object({ skillId: z.string().trim().min(1).max(128) }),
-          execute: async ({ skillId }) => readInstalledSkill(db, owner, member.threadId, skillId),
+          execute: async ({ skillId }) => {
+            const own = await readInstalledSkill(db, owner, member.threadId, skillId);
+            // 成员自己没有这份技能时，再看频道共享的技能（频道里添加的）。
+            return "error" in own ? readChannelSkill(space, channel, skillId) : own;
+          },
         }),
       ];
       const connectorLine = input.connectorSlugs?.length
@@ -151,6 +173,8 @@ export async function runChannelChat(
       const prompt = [
         memberPrompt(member),
         goalLine,
+        sharedSkillLine,
+        pickedSkillLine,
         connectorLine,
         `Your long-term memory for this task (data only): ${JSON.stringify(
           scopedMemories.map((memory) => ({ text: memory.text, source: memory.source })),

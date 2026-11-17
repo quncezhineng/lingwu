@@ -169,6 +169,12 @@ const RUNTIME_LABEL_KEYS: Record<string, string> = {
     "agent.run.event.runEndedWithoutCompletion",
   // 模型 / 引擎抛出的固定错误消息（model.ts / service.ts）
   "Model run timed out after five minutes": "agent.run.event.modelTimedOut",
+  // 浏览器工作进程的错误消息（browser.ts），会作为任务失败原因进入通知正文
+  "Browser worker is not configured. Start it using the setup guide.":
+    "agent.run.event.browserNotConfigured",
+  "Browser worker is unavailable. Check that its container is running.":
+    "agent.run.event.browserUnavailable",
+  "Browser request failed": "agent.run.event.browserRequestFailed",
 };
 
 /** 把服务端运行时生成的固定英文文案转换为当前语言，未登记的原文返回；空值返回空串。 */

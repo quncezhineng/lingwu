@@ -2,6 +2,7 @@ import { type ReactNode, useState } from "react";
 import { Platform, Pressable, type TextStyle, View } from "react-native";
 import type { Workspace } from "../../../packages/domain/src";
 import type { AgentSkill } from "./agent-space-model";
+import type { AppConnectorView } from "./app-connectors";
 import { Text, TextInput } from "./app-text";
 import { getActiveLocale, useTranslation } from "./i18n";
 import { tr } from "./i18n/translate";
@@ -45,13 +46,9 @@ export type ConnectorOption = {
 };
 
 /**
- * 暂不对外开放的连接器：Gmail / Google Calendar / OpenBot。
- * 只从可选列表里隐藏，连接与 OAuth 实现保留；需要恢复时清空这个集合即可。
- */
-const HIDDEN_CONNECTOR_IDS = new Set<string>(["gmail", "calendar", "openbot"]);
-
-/**
- * 当前工作区可选的连接器。状态取自服务端快照，未连接的连接器在选择弹层里不可勾选，
+ * 工作区内置的连接器（不来自账户级「应用连接器」目录）。
+ *
+ * 状态取自服务端快照，未连接的连接器在选择弹层里显示为不可勾选并给出「去连接」，
  * 保证带进对话的始终是真正可用的能力。
  */
 export function connectorOptions(workspace: Workspace): ConnectorOption[] {
@@ -64,6 +61,13 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
     (connection) => connection.id === "browser" && connection.status === "connected",
   );
   const options: ConnectorOption[] = [
+    {
+      id: "browser",
+      name: tr("threads.agentComputer"),
+      detail: tr("agent.hubBrowserDetail"),
+      connected: browserConnected,
+      icon: Globe2,
+    },
     {
       id: "gmail",
       name: "Gmail",
@@ -79,13 +83,6 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
       icon: CalendarDays,
     },
     {
-      id: "browser",
-      name: tr("threads.agentComputer"),
-      detail: tr("agent.hubBrowserDetail"),
-      connected: browserConnected,
-      icon: Globe2,
-    },
-    {
       id: "openbot",
       name: "OpenBot",
       detail: tr("agent.hubOpenBotDetail"),
@@ -93,7 +90,63 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
       icon: Sparkles,
     },
   ];
-  return options.filter((option) => !HIDDEN_CONNECTOR_IDS.has(option.id));
+  return options;
+}
+
+/** 应用连接器分类 → 选择弹层里的图标（与「技能与连接」页同一套视觉分档）。 */
+export function appConnectorIcon(category: AppConnectorView["category"]): IconComponent {
+  switch (category) {
+    case "search":
+      return Globe2;
+    case "office":
+    case "documents":
+    case "files":
+      return FileText;
+    case "development":
+      return Link2;
+    default:
+      return Brain;
+  }
+}
+
+/**
+ * 账户级「应用连接器」（技能与连接页那一套）→ 选择弹层选项。
+ *
+ * 这些连接器用 slug 标识，与后端 `use_connection` 的入参一致，
+ * 所以智能体对话与频道对话共用同一份转换。
+ */
+export function appConnectorOptions(items: readonly AppConnectorView[]): ConnectorOption[] {
+  return items.map((item) => ({
+    id: item.slug,
+    name: item.name,
+    detail: item.summary,
+    connected: item.connected,
+    icon: appConnectorIcon(item.category),
+  }));
+}
+
+/**
+ * 选择弹层里的完整连接器列表：内置连接器（智能体电脑 / Google 系 / OpenBot）
+ * 在前，账户级应用连接器在后，按 id 去重。
+ *
+ * 已连接排在各自分组的靠前位置，让「现在就能用」的能力一眼可见。
+ */
+export function allConnectorOptions(
+  builtin: readonly ConnectorOption[],
+  appConnectors: readonly AppConnectorView[],
+): ConnectorOption[] {
+  const merged: ConnectorOption[] = [];
+  const seen = new Set<string>();
+  for (const option of [...builtin, ...appConnectorOptions(appConnectors)]) {
+    if (seen.has(option.id)) continue;
+    seen.add(option.id);
+    merged.push(option);
+  }
+  const rank = (option: ConnectorOption) => (option.connected ? 0 : 1);
+  return [
+    ...merged.filter((option) => rank(option) === 0),
+    ...merged.filter((option) => rank(option) === 1),
+  ];
 }
 
 /** 技能展示名：先找 Agent 自定义技能，再找技能目录，最后回退到 id。 */
@@ -472,9 +525,10 @@ function OptionCard({
 }
 
 /**
- * 技能选择弹层：把 Agent 的自定义技能与技能目录合并成一个可搜索的多选列表，
+ * 技能选择弹层：把持有的自定义技能与技能目录合并成一个可搜索的多选列表，
  * 勾选即时写入对话选择，关闭或点「应用」收起弹层。
  * 每张卡片另有详情按钮，通过 onInspectSkill 交给调用方挂载只读详情弹层，避免嵌套 Modal。
+ * Agent 对话直接使用；频道对话传入频道专属标题/分区文案（title/subtitle/mineHeading/emptyDetail）。
  */
 export function SkillPickerSheet({
   customSkills,
@@ -484,9 +538,13 @@ export function SkillPickerSheet({
   onConfirm,
   onClose,
   onInspectSkill,
+  title,
+  subtitle,
+  mineHeading,
+  emptyDetail,
 }: {
   customSkills: readonly AgentSkill[];
-  /** 这个 Agent 已装的内置技能。传入后列表只含已装技能。 */
+  /** 已装的内置（目录）技能。传入后目录列表只含已装技能。 */
   installedCatalogIds?: readonly string[];
   selectedIds: readonly string[];
   onToggle: (id: string) => void;
@@ -494,6 +552,11 @@ export function SkillPickerSheet({
   onClose: () => void;
   /** 点卡片上的详情按钮：由调用方作为兄弟节点挂载技能详情弹层。 */
   onInspectSkill?: (id: string) => void;
+  /** 覆盖弹层标题等文案（频道对话场景用频道专属文案）；不传用 Agent 默认文案。 */
+  title?: string;
+  subtitle?: string;
+  mineHeading?: string;
+  emptyDetail?: string;
 }) {
   const { t, locale } = useTranslation();
   const [query, setQuery] = useState("");
@@ -515,8 +578,8 @@ export function SkillPickerSheet({
 
   return (
     <Sheet
-      title={t("chat.skillPickerTitle")}
-      subtitle={t("chat.skillPickerSubtitle")}
+      title={title ?? t("chat.skillPickerTitle")}
+      subtitle={subtitle ?? t("chat.skillPickerSubtitle")}
       onClose={onClose}
     >
       <View style={{ gap: 14 }}>
@@ -527,7 +590,10 @@ export function SkillPickerSheet({
         />
         {custom.length > 0 && (
           <View style={{ gap: 8 }}>
-            <SectionHeading title={t("chat.skillPickerMineHeading")} count={custom.length} />
+            <SectionHeading
+              title={mineHeading ?? t("chat.skillPickerMineHeading")}
+              count={custom.length}
+            />
             <OptionGrid>
               {(cellWidth) =>
                 custom.map((skill) => {
@@ -586,7 +652,7 @@ export function SkillPickerSheet({
           <Empty
             icon={Brain}
             title={t("chat.skillPickerEmptyTitle")}
-            detail={t("chat.skillPickerEmptyDetail")}
+            detail={emptyDetail ?? t("chat.skillPickerEmptyDetail")}
           />
         )}
         <PickerFooter

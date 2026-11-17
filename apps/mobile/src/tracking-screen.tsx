@@ -33,6 +33,15 @@ import { Button, Card, Chip, Empty, HoverPressable, SectionHeading, Sheet, s } f
 import { type PriceReminderIntent, useWorkspace } from "./workspace";
 
 type TrackingFilter = "all" | "goal" | "reminder";
+
+/**
+ * 自动化 / 提醒卡片走三列网格。
+ *
+ * 单栏下限 280：容器不足时 CardGrid 自己按实测宽度降成 2 列或 1 列，
+ * 所以窄屏、右侧栏里的窄容器不需要另外写一套。
+ */
+const CARD_GRID_MIN = 280;
+const CARD_GRID_MAX = 3 as const;
 type ComposerStep =
   | { kind: "picker" }
   | { kind: "goalCategories" }
@@ -601,7 +610,8 @@ export function TrackingScreen({
             </Text>
             <CardGrid
               items={track.reminders}
-              minColumnWidth={340}
+              minColumnWidth={CARD_GRID_MIN}
+              maxColumns={CARD_GRID_MAX}
               getKey={(item) => item.id}
               render={(item) => (
                 <TrackingRow
@@ -618,7 +628,8 @@ export function TrackingScreen({
             <SectionHeading title={t("agent.standaloneRemindersHeading")} />
             <CardGrid
               items={orderedStandalone}
-              minColumnWidth={340}
+              minColumnWidth={CARD_GRID_MIN}
+              maxColumns={CARD_GRID_MAX}
               getKey={(item) => item.id}
               render={(item) => (
                 <TrackingRow
@@ -660,7 +671,8 @@ export function TrackingScreen({
             </Text>
             <CardGrid
               items={track.reminders}
-              minColumnWidth={340}
+              minColumnWidth={CARD_GRID_MIN}
+              maxColumns={CARD_GRID_MAX}
               getKey={(item) => item.id}
               render={(item) => (
                 <TrackingRow
@@ -720,7 +732,8 @@ export function TrackingScreen({
       {!showGoals ? (
         <CardGrid
           items={orderedReminders}
-          minColumnWidth={340}
+          minColumnWidth={CARD_GRID_MIN}
+          maxColumns={CARD_GRID_MAX}
           getKey={(item) => item.id}
           trailing={<NewAutomationCard onPress={startNew} />}
           render={(item) => (
@@ -815,7 +828,8 @@ export function TrackingScreen({
               />
               <CardGrid
                 items={orderedStandalone}
-                minColumnWidth={340}
+                minColumnWidth={CARD_GRID_MIN}
+                maxColumns={CARD_GRID_MAX}
                 getKey={(item) => item.id}
                 render={(item) => (
                   <TrackingRow

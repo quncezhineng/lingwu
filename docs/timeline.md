@@ -5,6 +5,423 @@
 
 ## 变更记录
 
+### 2026-11-17 · 功能：频道对话输入框新增「频道技能」选择（与 Agent 对话技能选择同组件）
+
+**背景**
+
+频道对话页输入框左侧弹出小窗口只有「上传资料 / 从我的资料选择 / 连接器选择」，希望像 Agent 对话页那样可以从弹出小窗口里选择技能。
+
+**处理**
+
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：输入区 `PromptComposer.tools` 在「连接器」前新增「频道技能」按钮（Brain 图标）；点击弹出 `SkillPickerSheet`，只列出**频道自己添加的技能**（目录技能 `channel.installedSkills` + 自建引用 `channel.skillRefs`，与频道详情「技能」分区同一读取口径）；选中后以 chip 显示在输入区、可移除；发送时把 `skillIds` 一起发给服务端，发送后清空。新增 `ChannelSkillInspectSheet`（频道技能只读详情：自建 → MySkillDetailSheet；目录 → SkillDetailSheet）。切换频道时清空技能选择。
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx#L474-L507)：`SkillPickerSheet` 增加可选文案 props（`title`/`subtitle`/`mineHeading`/`emptyDetail`），Agent 对话不传保持原样，频道对话传入频道专属文案。
+- [i18n/locales/zh-Hans/chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts#L92-L97) 与 [en/chat.ts](../apps/mobile/src/i18n/locales/en/chat.ts#L100-L107)：新增 `chat.channelSkillPicker*` 文案（频道技能 / 选择频道技能 / 只显示这个频道已添加的技能…）。
+- [packages/domain/src/channel.ts](../packages/domain/src/channel.ts#L117-L126)：`ChannelMessage` 与 `channelMessageInputSchema` 增加 `skillIds?`（上限 60 个）。
+- [channel-chat-stream.ts](../apps/mobile/src/channel-chat-stream.ts#L17-L23)：`ChannelChatRequest` 增加 `skillIds?`。
+- [server/src/engine/channel-chat.ts](../apps/server/src/engine/channel-chat.ts#L78)：用户消息落库保留 `skillIds`；成员提示词在共享技能行后新增 `pickedSkillLine`——把用户本轮点名的频道技能（来自 `channelSkillViews` 摘要）注入，命中的技能用 `use_skill` 读取方法，其他共享技能逻辑不变。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新频道对话页确认：输入框左侧弹出小窗口出现「频道技能」；选择后 chip 显示、发送后该轮回复会优先使用所选技能（成员可 `use_skill`）；Agent 对话页技能选择文案与行为不受影响。
+
+### 2026-11-17 · 界面：频道详情「记忆」页简介改为频道专属文案（Agent 详情页不变）
+
+**背景**
+
+频道详情→记忆页顶部显示的简介「这些记忆由当下智能体产生，分析时会作为参考。你可以随时编辑或删除。」沿用了 Agent 专属记忆页的文案，与频道场景（多成员共享记忆）不完全吻合。需要为频道单独写简介，同时 Agent 详情页的记忆标题与简介保持原样。
+
+**处理**
+
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx#L305-L321)：`PreferencesScreen` 新增可选 prop `channel`（默认 false）。简介文案按场景三选一：`channel` → `preferences.contextDetailChannel`，仅 `agentId` → `preferences.contextDetail`（Agent 原样），两者皆无 → `preferences.contextDetailGlobal`。
+- [channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx#L809-L817)：`ChannelMemoryPanel` 传入 `channel` 标记。
+- [zh-Hans/app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts#L326-L327) 与 [en/app.ts](../apps/mobile/src/i18n/locales/en/app.ts#L359-L360)：新增 `preferences.contextDetailChannel`（这些记忆属于当前频道，由频道成员共同产生…）。
+- Agent 详情页记忆（[goals-memory.tsx](../apps/mobile/src/bot-pages/goals-memory.tsx#L23)）未传 `channel`，仍使用原文案，未改动。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新频道详情→记忆页确认：顶部简介变为「这些记忆属于当前频道，由频道成员共同产生…」；Agent 详情记忆页简介保持「这些记忆由当下智能体产生…」不变。
+
+### 2026-11-17 · 界面：删除频道详情「记忆」页顶部的说明文字
+
+**背景**
+
+频道详情→记忆页顶部有一段说明「频道专属记忆：只有本频道的成员在执行时会读到它，作为共享上下文；其他频道读不到。」，希望删除。
+
+**处理**
+
+- [channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx#L853-L859)：`ChannelMemoryPanel` 移除顶部说明 `<Text>`，同时去掉不再使用的 `useTranslation`/`t`。
+- [zh-Hans/channels.ts](../apps/mobile/src/i18n/locales/zh-Hans/channels.ts) 与 [en/channels.ts](../apps/mobile/src/i18n/locales/en/channels.ts)：删除 `channels.memoryHint` key（中英文同步清理）。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新频道详情→记忆页确认：顶部说明文字不再显示，记忆列表直接呈现。
+
+### 2026-11-17 · 界面：Agent 场景头像选择标题改为「选择 Agent 的形象」（频道场景不变）
+
+**背景**
+
+「选择频道形象」标题在 Agent 详情页、创建 Agent 表单、新用户引导页也出现，其中 Agent 场景应显示「选择 Agent 的形象」，只有频道详情页才应显示「选择频道形象」，需要区分上下文。
+
+**处理**
+
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts#L840-L842) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts#L929-L931)：新增 key `agentSpace.agentAvatar`（选择 Agent 的形象 / Choose an Agent avatar），`agentSpace.avatar`（选择频道形象）保留给频道场景。
+- Agent 场景三处改用新 key：[bot-pages/edit.tsx](../apps/mobile/src/bot-pages/edit.tsx#L100)（Agent 详情 Profile 分区）、[agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx#L477)（创建 Agent 表单）、[agent-onboarding.tsx](../apps/mobile/src/agent-onboarding.tsx#L364-L365)（首启引导，含 [L378](../apps/mobile/src/agent-onboarding.tsx#L378) 的无障碍标签）。
+- [channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx#L170)（频道详情页）保持 `agentSpace.avatar`（选择频道形象）不变。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 Agent 详情页确认显示「选择 Agent 的形象」；频道详情页仍为「选择频道形象」。
+
+### 2026-11-17 · 界面：详情页「任务」分区图标改为与右侧栏「任务与自动化」一致的勾选清单
+
+**背景**
+
+智能体详情页与频道详情页左栏的「任务」分区使用时钟图标（Clock3），而右侧栏「任务与自动化」入口使用勾选清单图标（ListChecks），两者语义相同但图标不统一。
+
+**处理**
+
+- [agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx#L38)：智能体详情「任务」（history）分区图标改为 `ListChecks`。
+- [channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx#L73)：频道详情「任务」分区图标改为 `ListChecks`。
+- 未改动的 `Clock3` 使用处（模板卡片、盘前简报提醒等）与任务入口无关，保持原样。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新智能体/频道详情页确认：「任务」分区图标由时钟变为与右侧栏「任务与自动化」一致的勾选清单。
+
+### 2026-11-17 · 界面：频道对话页回复正文在卡片内水平居中
+
+**背景**
+
+频道对话页的智能体回复卡片使用左右不对称的内边距（左 56 / 右 14），可见内容整体偏右，希望向左移一点、在卡片内水平居中。
+
+**处理**
+
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx#L634-L645)：回复内容容器的 `paddingLeft: 56`、`paddingRight: 14` 改为左右相等的 `paddingLeft: 35`、`paddingRight: 35`（两者之和不变，内容宽度不变），正文在卡片内水平居中。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新频道对话页确认：回复正文在卡片内左右等距居中。
+
+### 2026-11-17 · 界面：左侧栏频道数目改半角括号、最近回复预览剥离 Markdown 符号
+
+**背景**
+
+左侧栏频道标题右侧的智能体数目显示为全角括号「（ 3 ）」，希望改为半角「(3)」；同时频道/智能体列表第二行的「最近回复」直接展示模型回复原文，会把 `##`、`**`、表格 `|` 等 Markdown 记号原样带出，希望只显示纯文字。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx#L629) 与 [agent-product.tsx](../apps/mobile/src/agent-product.tsx#L709-L711)：频道列表项（详细布局 + 紧凑布局两处）的成员数展示由 ``（ ${members.length} ）`` 改为 `(${members.length})`。
+- [mobile-bots.ts](../apps/mobile/src/mobile-bots.ts#L49-L75)：`messagePreviewText` 前置新增 `stripMarkdownFlags` 清洗——去除标题（#）、引用（>）、无序/有序列表行首符号、表格分隔线与表格竖线、横线分隔、行内强调/代码/删除线符号，压缩空白。`latestReplyPreview` 链路为 `replyPreviewText(messagePreviewText(...))`，表格与列表在 `messagePreviewText` 阶段即被清理。
+- 改动同时作用于智能体列表与频道列表的预览（两者复用同一预览函数）。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新左侧栏确认：频道标题右侧显示半角「(3)」；第二行的「最近回复」不再出现 `##`、`**`、`|` 等 Markdown 记号。
+
+### 2026-11-17 · 通知：修复卡片正文中英文混显（先截断后翻译导致的本地化失效）
+
+**背景**
+
+通知页面在中文界面下，部分卡片正文仍显示完整英文（如「The agent reached the end of this run without confirming completion…」）。该正文是服务端写入的固定英文文案（[model.ts](../apps/server/src/engine/model.ts#L490)），已有 i18n 映射（[translate.ts](../apps/mobile/src/i18n/translate.ts#L168-L169) → `agent.run.event.runEndedWithoutCompletion`），但渲染顺序错误导致本地化失效。
+
+**处理**
+
+- 根因：`runtimeLabel(notificationExcerpt(item.body))` 先截断（超 110 字符加 `…`）再翻译，`runtimeLabel` 需要整句精确匹配，截断后的字符串匹配不到映射 key，退化为返回原文英文。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx#L3386-L3392)：通知卡片正文改为 `notificationExcerpt(runtimeLabel(item.body))` —— 先对完整正文做固定文案本地化，再截断成摘要。依赖界面语言自动切换（中文界面显示中文、英文界面显示英文），无需新增手动语言切换入口。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新并打开通知抽屉确认：含服务端固定英文文案的卡片正文在中文界面显示中文。
+
+### 2026-11-17 · 通知：自动化文案与整卡可点击，按钮统一为「查看详情」
+
+**背景**
+
+通知抽屉中自动化相关通知的文案与交互需要与普通任务通知区分：标题「监控需要关注」改为「自动化需要关注」；通知卡片整块可点击，点击后按通知类型直接进入对应查看弹窗（查看任务 / 查看自动化）。此后进一步将右下角按钮文案（原「查看自动化」/「查看任务」/「已读/标为已读」）统一为「查看详情」，以简化交互入口。
+
+**处理**
+
+- [agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts#L727)：`agent.run.event.watchNeedsAttention` 由「监控需要关注」改为「自动化需要关注」。
+- 按钮文案统一使用既有 key `agent.viewDetails`（查看详情 / View details）：[zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts#L370) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts#L412)，无需新增 i18n key。
+- [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx#L3357-L3402)：通知卡片由纯 `Card` 改为整卡 `HoverPressable` 可点击（含按压/悬停底色反馈），点击直接调用 `openNotification(item)` 进入对应弹窗；右下角按钮统一显示 `t("agent.viewDetails")`，外包 `Pressable` 拦截冒泡，避免与整卡点击重复触发。
+- 由于按钮不再按通知类型区分文案，移除了此前用于判断自动化通知的 `monitorByTask` useMemo 与 `isAutomation` 变量，简化 `NotificationsSheet` 状态。
+- 两种通知共用 `{ type: "task" }` 路由进入 `TaskDetail`，组件内部按 `task.kind === "monitor"` 自动以自动化样式呈现，无需新增独立路由。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新并打开通知抽屉确认：自动化通知标题为「自动化需要关注」、所有卡片右下角按钮统一显示「查看详情」；点击卡片空白区域与点击按钮均直接进入对应查看弹窗。
+
+### 2026-11-17 · 界面：左侧栏智能体/频道列表名称下方不再显示内容预览
+
+**背景**
+
+左侧栏智能体列表与频道列表的名称下方各有一行内容预览（智能体显示最近消息或「还没有消息」，频道显示成员名拼接），用户希望名称下方不显示任何内容。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：
+  - `AgentListItem` / `ChannelListItem` 的 detailed 布局删除名称下方的预览行。
+  - 移除 `AgentListItem` 的 `preview` prop 及三处调用点传参。
+  - 移除 `ChannelListItem` 未再使用的 `preview`（成员名拼接）计算。
+  - 清理不再被消费的 `previews` 状态、拉取线程历史的 effect，以及 `BotPreview`/`latestBotPreview`/`ThreadHistoryPage`/`threadHistoryPagePath` 等 import。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 确认左侧栏智能体与频道列表的名称下方不再显示预览内容。
+
+### 2026-11-17 · 界面：左侧栏智能体列表只显示名字，去掉「· 职责」后缀
+
+**背景**
+
+侧栏智能体列表项标题显示「名字 · 职责」（如「小悟 · 投研助理」「资产 Agent · 组合观察员」），用户希望只显示智能体/频道名字。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：`AgentListItem` 的 `label` 不再拼接 `agent.role`，仅用 `agent.name`。频道 rail 列表本就只渲染 `channel.name`，无需改动。顶部悬浮头（`AgentFloatingHeader`）保持「名字 · 职责」不变。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 确认侧栏智能体列表只显示名字。
+
+### 2026-11-17 · 界面：移除智能体列表右侧的「新通知」蓝色圆点
+
+**背景**
+
+电脑侧栏智能体列表（detailed 布局）每项右侧，在有未读通知时显示一个 8×8 的蓝色圆点。用户希望该列表不显示蓝色标点。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：
+  - `AgentListItem` detailed 分支移除 `unread && !hovered` 的蓝色圆点渲染。
+  - 删除 `AgentListItem` 的 `unread` prop 及其三处调用点传参，并移除不再使用的 `botHasUnread` 导入（顶部通知计数仍用 `agentData` / `unreadCount`，未受影响）。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 确认电脑侧栏智能体列表不再显示蓝色小圆点（即使有待处理通知）。
+
+### 2026-11-17 · 修复：通知中的浏览器工作进程错误按界面语言显示中英文
+
+**背景**
+
+通知区块里任务失败原因是服务端 `browser.ts` 抛出的英文固定文案（如「Browser worker is not configured. Start it using the setup guide.」），即使界面已切换为中文仍显示英文。这类文案是服务端持久化的固定字符串，前端语言包无法直接覆盖，需要登记到「服务端运行时文案 -> i18n key」映射表里按当前语言转换。
+
+**处理**
+
+- [translate.ts](../apps/mobile/src/i18n/translate.ts)：`RUNTIME_LABEL_KEYS` 映射表新增 3 条浏览器工作进程错误文案，对应 3 个新 i18n key：
+  - 「Browser worker is not configured. Start it using the setup guide.」→ `agent.run.event.browserNotConfigured`
+  - 「Browser worker is unavailable. Check that its container is running.」→ `agent.run.event.browserUnavailable`
+  - 「Browser request failed」→ `agent.run.event.browserRequestFailed`
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：补全上述 key 的中英文文案。通知正文本就经过 `runtimeLabel()` 渲染，登记后自动按当前语言显示。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081`（中文界面）再次触发浏览器任务失败，确认通知里的错误原因显示为「浏览器工作进程尚未配置。请按设置指南启动它。」，英文界面则仍显示英文原文。
+
+### 2026-11-17 · 调整：Agent 右侧栏「更多」改进入当前 Agent 设置详情的「任务」分区
+
+**背景**
+
+在 Agent 模式下右侧栏「委派与任务」区底部点击「更多」，当前行为是打开全局「任务与自动化」面板（`TaskHubScreen`）。用户期望该按钮进入当前 Agent 设置详情里的「任务」分区（即左栏 `history` 分区，渲染 `BotHistoryPage`），与「解锁更多的能力」进「技能」分区的思路一致，而不是跳到全局任务中心。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：
+  - 新增 `openAgentTasks` 回调（仿 `openAgentSkills`）：收起浮层/抽屉后 `setAgentTabIntent("history")` 并 `navigate("agent")`，由 `AgentSettingsScreen` 用 effect 消费定位到「任务」分区。
+  - `CapabilityRail` 新增 `onOpenAgentTasks` prop；Agent rail「委派与任务」区底部「更多」按钮的 `onPress` 由 `onOpen("tasks")` 改为 `leave()` + `onOpenAgentTasks()`（先收起手机全屏页再导航，与「技能」入口一致）。
+  - 三处 `CapabilityRail` 调用点（手机全屏、桌面右侧栏、胶囊抽屉）均传入 `onOpenAgentTasks={openAgentTasks}`。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081`，在 Agent 模式下点击右侧栏「更多」，确认进入的是当前 Agent 设置详情的「任务」页面，而非全局「任务与自动化」面板。
+- 频道 rail 的「更多」保持上一轮行为（打开全局任务面板），本次未改动。
+
+### 2026-11-17 · 界面：「任务与自动化」工作区入口简介改为描述页面内容
+
+**背景**
+
+工作区面板里「任务与自动化」入口的简介是动作引导语「进入全局任务与自动化」，与同列表其他入口（市场简报「市场概览与资料时点」、领悟卡「汇总各 Agent 的结论与来源」等）用名词短语描述页面内容的风格不一致，用户希望简介更契合标题所进入的页面。
+
+**处理**
+
+- [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)：「任务与自动化」入口按钮的 `detail` 由 `agentSpace.addTaskDetail` 改为 `agentSpace.tasksDetail`（「跨 Agent 查看任务、进度与自动化」），与全局任务面板内容一致。
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：删除不再使用的 `agentSpace.addTaskDetail` 键。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081`，打开右侧栏工作区面板确认「任务与自动化」入口简介已显示为「跨 Agent 查看任务、进度与自动化」。
+
+### 2026-11-17 · 修复：频道右侧栏「更多」按钮跳转目标改为全局任务面板
+
+**背景**
+
+在智能体页面弹出的右侧栏中点击「更多」时，若右侧栏处于频道选中态（频道 rail），该按钮原先只带分区意图进入频道设置页的「任务」分区，而非 Agent rail 那样打开全局「任务中心」。用户期望两个 rail 的「更多」行为一致，都打开全局任务面板。
+
+**处理**
+
+- [channel-rail.tsx](../apps/mobile/src/channel-rail.tsx)：频道 rail「委派与任务」区底部「更多」按钮的 `onPress` 由 `onOpenSettings("tasks")`（进频道设置的任务分区）改为 `onOpenPanel("tasks")`（与 Agent rail 一致，经 panel 栈打开全局 `TaskHubScreen`）。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081`，选中频道使右侧栏显示频道 rail，点击「更多」确认打开的是全局任务面板而非频道设置的任务分区。
+
+### 2026-11-17 · 界面：「委派与任务」区标题由「任务与自动化」改回「任务」
+
+**背景**
+
+上一轮把任务面板标题统一为「任务与自动化」后，侧栏与频道栏「委派与任务」分区标题（15px 衬线加粗）用词仍保持一致较长，用户希望该分区标题用「任务」即可。
+
+**处理**
+
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agentSpace.delegatedWork` 由「任务与自动化」改为「任务」。
+- [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agentSpace.delegatedWork` 由 "Automations and tasks" 改为 "Tasks"。该键作用于 [channel-rail.tsx](../apps/mobile/src/channel-rail.tsx) 与 [agent-product.tsx](../apps/mobile/src/agent-product.tsx) 的「委派与任务」区标题，一处修改全部生效。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 在侧栏/频道栏确认「委派与任务」分区标题已显示为「任务」。
+
+### 2026-11-17 · 界面：任务面板标题改为「任务与自动化」
+
+**背景**
+
+用户打开任务与自动化面板时，标题显示为「任务」，与右侧栏入口「任务与自动化」用词不一致，希望统一为「任务与自动化」。
+
+**处理**
+
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agentSpace.tasks` 由「任务」改为「任务与自动化」。
+- [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agentSpace.tasks` 由 "Tasks" 改为 "Tasks & automations"。该键同时作用于任务面板 Sheet 标题（[agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx)）与兜底入口按钮（[agent-product.tsx](../apps/mobile/src/agent-product.tsx)），一处修改全部生效。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 打开「任务与自动化」面板确认标题已改为「任务与自动化」。
+
+### 2026-11-17 · 界面：左侧栏系统智能体 logo 略缩小与自建智能体对齐
+
+**背景**
+
+左侧栏里系统内置智能体（小悟，蓝色 orb 头像是实心蓝底带光晕）与下方自建智能体（默认 moon/planet 等浅色系头像）同为 44px，但实心蓝色 + 光晕视觉重量偏重，用户感觉系统智能体 logo 显示得偏大一点，希望缩小。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：`AgentListItem` 中系统智能体（`agent.system`）的头像尺寸由 44 调小到 40（紧凑抽屉列表由 30 调小到 28），非系统智能体保持不变。蓝色 orb 的阴影随 `size` 等比缩小，视觉上与下方浅色 logo 观感一致。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 在左侧栏确认：系统内置智能体 logo 比自建智能体略小一号、观感协调。
+
+### 2026-11-17 · 界面：频道回复底部操作栏左移贴齐卡片左侧框线
+
+**背景**
+
+频道对话页每条成员回复卡片下方新增的操作栏（喜欢/不喜欢、导出/复制 Markdown、分享为图片/链接、时间）承接了原 56px 正文缩进，整栏偏右悬在卡片中下方。用户希望它左移，刚好与回复内容区块的左侧框线（整列左缘）对齐。
+
+**处理**
+
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：`MemberBubble` 中操作栏外层容器去掉 `style={{ paddingLeft: 56 }}`，改为无缩进的 `<View>`。回复卡片本身已撑满整列（左缘即整列左缘 x=0），`MessageActions`（[message-actions.tsx](../apps/mobile/src/message-actions.tsx)）内部无额外左偏移，因此「喜欢」按钮自此从回复卡片左侧框线开始起排，时间显示也一并贴左。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 在频道对话页确认：回复底部操作栏（喜欢/不喜欢/导出/复制/分享/时间）整栏左缘与回复卡片左侧框线对齐，不再有 56px 缩进。
+
+### 2026-11-17 · 界面：频道对话页输入框圆角遮挡过渡
+
+**背景**
+
+输入框悬浮在页面底部后，内容向下滚动经过输入框背后时，内容的直角边会直接戳进输入框的大圆角里，遮挡线生硬、不协调。用户希望内容区块被遮挡处的边缘也有圆角，与输入框圆角一致。
+
+**处理**
+
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：在 `ComposerDock` 内、输入框胶囊背后加一层**圆角过渡垫层**——canvas 底色、`borderRadius: radius.full`（999，与输入框同款）、左右各外扩 8px、`pointerEvents="none"`。内容滚过输入框背后时，其直角边缘被这层大圆角"收住"，露出的遮挡线是圆弧，与输入框圆角完全一致；外扩的 8px 同时盖住输入框两侧圆弧与内容直边交界处的缝隙。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 刷新频道对话页，滚动消息经过悬浮输入框背后确认：内容被遮挡处呈圆弧过渡、与输入框圆角一致，不再有硬切直角。
+
+### 2026-11-17 · 界面：频道对话页输入框固定悬浮在页面底部，滚动不遮挡内容
+
+**背景**
+
+频道对话页的输入框原先在文档流里（消息列表下方固定占位）。用户希望输入框固定悬浮在整个页面底部之上，且悬浮后不要出现大面积灰色垫层随着内容滚动遮挡上方消息。
+
+**处理**
+
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：①引入 `ComposerDock`（[composer-dock.tsx](../apps/mobile/src/composer-dock.tsx)），输入框由文档流改为绝对定位悬浮（`position: absolute; bottom: 0`），不再占用文档流高度，加载/滚动时始终钉在页面底部；②新增 `composerDockHeight` 实时测量 + `onComposerHeightChange` 防抖（<8px 忽略，避免输入法/光标抖动让消息列表跳动）与 Android `keyboardDidShow/Hide` 监听（iOS 由 KeyboardAvoidingView 的 padding 行为接管），输入框多行增高或键盘弹出时自动位移；③消息列表 `paddingBottom` 由固定 20 改为 `contentBottomInset = composerDockHeight + 20`，按输入框实时高度预留滚动站位，最后一条消息可完整滚到输入框上方；④刻意不引入 `ComposerMatte` 大块灰色垫层（该组件覆盖 40%→底部半屏），输入框白色圆角卡片自带不透明背景即可悬浮，滚动时内容仅在滚到最底部时被输入框卡片自身盖住，不会出现灰色块遮挡上方内容。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 在频道对话页确认：输入框固定悬浮在页面底部（页面滚动、切换频道时不动），输入多行内容时输入框增高且最后一条消息随之让位，内容滚动到输入框上方不被灰色背景遮挡。
+
+### 2026-11-17 · 界面：频道回复底部功能栏（与智能体对话页一致）
+
+**背景**
+
+频道群聊页的成员回复卡片下方原本没有操作栏，无法像智能体对话页那样点赞、复制/导出 Markdown、分享。用户希望把智能体对话页回复底部的全部功能直接移过来：喜欢/不喜欢、复制为 Markdown、导出为 Markdown、分享为图片、分享为链接、时间显示。
+
+**处理**
+
+- [message-actions.tsx](../apps/mobile/src/message-actions.tsx)：复用。该组件（点赞互斥/复制/导出/分享图片/分享链接 + 回复时间）本身与页面无关，智能体对话页与频道页共用同一份实现，无需改动。
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：①`MemberBubble` 新增 `prompt`（该条回复对应的用户提问）、`at`（回复时间毫秒）、`onNotify`、`onPublishShare` 四个 props；②组件内部在回复卡片下方挂载 `MessageActions`（左缩进 56px 与卡片正文对齐），流式输出中不显示时间（`at=0`），其余时间段复用卡片 `createdAt`；③渲染循环用单次前向遍历维护 `promptByMessageId` 映射（最近一条用户消息即该条回复的提问），`onPublishShare` 接 `publishShare(api, …)` 与智能体对话页一致。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 在频道对话页确认：每条成员回复卡片下方出现与智能体对话页一致的操作栏（喜欢/不喜欢、导出/复制 Markdown、分享图片/链接、回复时间），流式输出时时间隐藏，分享图片/链接内容带对该回复的用户提问上下文。
+
+### 2026-11-17 · 界面：频道回复区块宽度与输入对话框对齐
+
+**背景**
+
+频道群聊页的成员回复卡片原为内容自适应（`alignSelf: "flex-start"` + `maxWidth: "100%"`），且消息列比输入框窄 8px（952 vs 968）。用户希望回复区块更宽，与下方输入对话框宽度保持一致。
+
+**处理**
+
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：①消息列样式由共用的 `messageColumnStyle`（952px，保留给智能体对话页）改为 `conversationColumnStyle`（968px），与输入框同一列宽；②成员回复卡片由 `alignSelf: "flex-start"` 改为占满整列——头像改为绝对定位悬浮在卡片左上方（不占行内宽度），名字/标题/卡片内容统一左缩进 42px 避开头像，卡片真正撑满 968px，与下方输入框左右边缘完全一致。智能体对话页（[chat.tsx](../apps/mobile/src/chat.tsx)）仍用 `messageColumnStyle`，不受影响。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- 请刷新 `localhost:8081` 在频道对话页确认：成员回复卡片自左边缘起与输入框同宽对齐，头像浮在卡片左上方；智能体对话页消息列保持原样。
+
+### 2026-11-17 · 界面：频道头像一个新「叠加」系列，与 Agent 单符号头像区分
+
+**背景**
+
+频道详情（设置）里的头像选择器原先与 Agent 共用同一套 5 个头像（orb/bloom/moon/planet/cat）。用户希望频道头像体现「多位成员组合」的群组感：多块图形交叠（叠加风），且与 Agent 的 5 个单符号模板明显区分。
+
+**处理**
+
+- [channel.ts](../packages/domain/src/channel.ts)：`ChannelAvatarId` 重定义为 5 个新值 `stack-circles / stack-cards / stack-dots / stack-rings / stack-gems`，`CHANNEL_AVATARS` 同步；`channelInputSchema` / `channelUpdateSchema` 的 avatar 枚举同步；新增 `DEFAULT_CHANNEL_AVATAR`（默认叠圆）与读取兜底 `isChannelAvatarId` / `normalizeChannelAvatar`（缺失/非法/历史旧值统一落到默认叠圆），并在 [index.ts](../packages/domain/src/index.ts) barrel 导出。
+- [theme.ts](../apps/mobile/src/theme.ts)：新增 `avatarStacks` 分组令牌（5 套 浅底/深/浅/强调 三层色），作为新头像配色的唯一来源。
+- [agent-orb.tsx](../apps/mobile/src/agent-orb.tsx)：`AgentOrb` 扩展接受 `ChannelAvatarId`，新增 `ChannelStack` 叠加渲染分支 —— 叠圆（双圆+点缀）、叠卡（双卡错位微旋）、叠点（三圆簇）、叠环（双环+环心）、叠菱（双旋转方块），全部按 `size` 等比缩放并支持悬停编辑铅笔；Agent 的 5 个头像渲染保持不变。
+- 频道各展示点（[channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx)、[channel-rail.tsx](../apps/mobile/src/channel-rail.tsx)、[channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)、[agent-product.tsx](../apps/mobile/src/agent-product.tsx)）改用 `normalizeChannelAvatar(channel.avatar)` 兜底；[app.ts](../apps/server/src/app.ts) 创建频道的默认头像同步为 `DEFAULT_CHANNEL_AVATAR`。
+
+**验证**
+
+- `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
+- i18n 16 项与 channel-chat 2 项测试全绿。Agent 侧 `avatar:"orb"` 等旧值不受影响（`AgentAvatarId` 未改）。
+- 请刷新 `localhost:8081` 在「频道详情 → 选择头像」确认：新 5 个叠加头像可选、与 Agent 创建页的 5 个单符号模板明显区分；历史频道头像自动显示为默认叠圆。
+
 ### 2026-11-16 · 文档：重写 Wiki（docs/WIKI.md），同步当前投研智能体定位
 
 **背景**

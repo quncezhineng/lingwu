@@ -97,7 +97,7 @@ function PersonaEditor({
         <AgentOrb avatar={avatar} size={62} />
       </View>
       <Text style={[s.small, { color: colors.faint, marginBottom: 8 }]}>
-        {t("agentSpace.avatar")}
+        {t("agentSpace.agentAvatar")}
       </Text>
       <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
         {(["orb", "bloom", "moon", "planet", "cat"] as AgentAvatarId[]).map((item) => (

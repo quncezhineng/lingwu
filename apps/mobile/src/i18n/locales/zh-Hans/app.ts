@@ -321,6 +321,10 @@ const app = {
   "preferences.count": "{count} 条记忆",
   "preferences.toldOn": "你在 {date} 告诉我",
   "preferences.contextDetail": "这些记忆由当下智能体产生，分析时会作为参考。你可以随时编辑或删除。",
+  // 频道记忆页简介：频道记忆由各成员共同产生，作为频道共享上下文；
+  // Agent 专属记忆页仍使用上面的 preferences.contextDetail，两者文案区分。
+  "preferences.contextDetailChannel":
+    "这些记忆属于当前频道，由频道成员共同产生，分析时会作为共享参考。你可以随时编辑或删除。",
   "preferences.contextDetailGlobal":
     "这里汇总了你的所有记忆卡片，涵盖所有智能体与频道。你可以随时查看、编辑或删除。",
   "preferences.scopeAccount": "账户级",

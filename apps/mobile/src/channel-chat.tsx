@@ -1,28 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
-import type { Channel, ChannelMessage } from "../../../packages/domain/src/channel";
-import { agentLayout } from "./agent-layout";
+import { Keyboard, Platform, ScrollView, View } from "react-native";
+import {
+  type Channel,
+  type ChannelMessage,
+  normalizeChannelAvatar,
+} from "../../../packages/domain/src/channel";
+import { conversationColumnStyle } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition } from "./agent-space-model";
 import { useAgentWorkspace } from "./agent-workspace";
-import { type AppConnectorView, useAppConnectors } from "./app-connectors";
+import { useAppConnectors } from "./app-connectors";
 import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
+import { MySkillDetailSheet, SkillDetailSheet } from "./capability-hub";
 import {
+  appConnectorOptions,
   type ComposerSelection,
   ComposerSelectionChips,
   type ConnectorOption,
   ConnectorPickerSheet,
+  SkillPickerSheet,
+  skillDisplayName,
 } from "./capability-picker";
 import { type ChannelChatStream, streamChannelChat } from "./channel-chat-stream";
 import { promptWithAttachments } from "./chat-content";
+import { ComposerDock } from "./composer-dock";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { useTranslation } from "./i18n";
-import { Brain, FileText, FolderOpen, Globe2, Link2, Sparkles, Upload, Users } from "./icons";
+import { Brain, FolderOpen, Link2, Sparkles, Upload, Users } from "./icons";
+import { MessageActions } from "./message-actions";
 import { PromptComposer } from "./prompt-composer";
+import { publishShare } from "./share-page";
+import { skillCatalog } from "./skill-catalog";
 import { colors, fonts, radius, s } from "./ui";
+import { UserMessageMeta } from "./user-message-meta";
 import { useWorkspace } from "./workspace";
 
 /**
@@ -33,22 +46,6 @@ import { useWorkspace } from "./workspace";
  * 消息落库，刷新后回看；用户消息保留附件与连接器选择。
  */
 
-/** 应用连接器分类 → 输入区选择弹层里的图标。 */
-function connectorIcon(category: AppConnectorView["category"]) {
-  switch (category) {
-    case "search":
-      return Globe2;
-    case "office":
-    case "documents":
-    case "files":
-      return FileText;
-    case "development":
-      return Link2;
-    default:
-      return Brain;
-  }
-}
-
 export function ChannelChatScreen({
   channel,
   contentTopInset = 15,
@@ -58,7 +55,7 @@ export function ChannelChatScreen({
   contentTopInset?: number;
 }) {
   const { t } = useTranslation();
-  const { agents } = useAgentSpace();
+  const { agents, skillLibrary } = useAgentSpace();
   const { data: agentWorkspace } = useAgentWorkspace();
   const { notify, api, refresh, workspace, navigate } = useWorkspace();
   const [draft, setDraft] = useState("");
@@ -68,6 +65,19 @@ export function ChannelChatScreen({
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
   const streamRef = useRef<ChannelChatStream | null>(null);
+  // 悬浮输入框：输入框绝对定位悬浮在页面底部，不占用文档流；消息列表用它实时测量出的
+  // 高度做底部内距（contentBottomInset）预留滚动站位，滚动时不会被输入框遮挡。
+  // 刻意不做大面积灰色垫层：输入框白色圆角卡片自带不透明背景，悬浮时即可盖住滚到最下面的内容。
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
+  const [composerDockHeight, setComposerDockHeight] = useState(70);
+  const measuredDockHeight = useRef(70);
+  const contentBottomInset = composerDockHeight + 20;
+  const onComposerHeightChange = useCallback((height: number) => {
+    // 输入法与光标会带来 1px 级抖动；差值小于 8px 不动滚动占位，避免消息列表来回跳。
+    if (Math.abs(height - measuredDockHeight.current) < 8) return;
+    measuredDockHeight.current = height;
+    setComposerDockHeight(height);
+  }, []);
   // 附件与连接器选择（与 Agent 对话页同一套能力选择）。
   const [attachments, setAttachments] = useState<string[]>([]);
   const [picking, setPicking] = useState(false);
@@ -75,23 +85,36 @@ export function ChannelChatScreen({
   const [uploading, setUploading] = useState(false);
   const [connectorPickerOpen, setConnectorPickerOpen] = useState(false);
   const [selectedConnectorIds, setSelectedConnectorIds] = useState<string[]>([]);
+  // 频道技能选择（与 Agent 对话的技能选择同组件）：勾选后进入本轮讨论上下文。
+  const [skillPickerOpen, setSkillPickerOpen] = useState(false);
+  /** 技能选择弹层里正在查看的技能详情：作为兄弟节点挂载，避免与选择弹层嵌套 Modal。 */
+  const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
 
   // 频道用「账户级应用连接器」（slug 与后端 use_connection 一致），而非旧版 connections。
   const appConnectors = useAppConnectors(api);
   const connectorChoices: ConnectorOption[] = useMemo(
-    () =>
-      appConnectors.items.map((item) => ({
-        id: item.slug,
-        name: item.name,
-        detail: item.summary,
-        connected: item.connected,
-        icon: connectorIcon(item.category),
-      })),
+    () => appConnectorOptions(appConnectors.items),
     [appConnectors.items],
   );
   const selectedConnectors: ComposerSelection[] = connectorChoices
     .filter((option) => selectedConnectorIds.includes(option.id))
     .map((option) => ({ id: option.id, name: option.name }));
+
+  // 频道共享技能：目录技能（channel.installedSkills）+ 账户技能库引用（channel.skillRefs）。
+  // 与频道详情「技能」分区同一读取口径，只列频道自己添加的技能，不混入成员各自的能力。
+  const channelInstalledSkills = channel.installedSkills ?? [];
+  const channelCustomSkills = useMemo(
+    () =>
+      (channel.skillRefs ?? [])
+        .map((id) => skillLibrary.find((skill) => skill.id === id))
+        .filter((skill): skill is NonNullable<typeof skill> => Boolean(skill)),
+    [channel.skillRefs, skillLibrary],
+  );
+  const selectedSkills: ComposerSelection[] = selectedSkillIds.map((id) => ({
+    id,
+    name: skillDisplayName(id, channelCustomSkills),
+  }));
 
   const members = useMemo(
     () =>
@@ -102,6 +125,18 @@ export function ChannelChatScreen({
   );
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
 
+  // 每条成员回复对应的用户提问：分享为图片 / 链接时一并带上，让分享内容自带上下文。
+  // 单次前向遍历维护「最近一条用户消息」，避免在渲染循环里反复切数组。
+  const promptByMessageId = useMemo(() => {
+    const map = new Map<string, string>();
+    let lastPrompt = "";
+    for (const message of messages) {
+      if (message.role === "user") lastPrompt = message.text;
+      map.set(message.id, lastPrompt);
+    }
+    return map;
+  }, [messages]);
+
   // 打开频道先加载历史消息（用户提问 + 成员回复）。切换频道时先清空，避免串味。
   useEffect(() => {
     let alive = true;
@@ -109,6 +144,9 @@ export function ChannelChatScreen({
     setMessages([]);
     setAttachments([]);
     setSelectedConnectorIds([]);
+    setSelectedSkillIds([]);
+    setSkillPickerOpen(false);
+    setInspectSkillId(null);
     setBusy(false);
     streamRef.current?.close();
     streamRef.current = null;
@@ -129,6 +167,23 @@ export function ChannelChatScreen({
       streamRef.current = null;
     };
   }, [api, channel.id]);
+
+  // Android 键盘从底部顶起悬浮输入框；iOS 由 ComposerDock 内部的
+  // KeyboardAvoidingView（behavior=padding）接管，这里只处理 Android 的额外上推。
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const onShow = (e: { endCoordinates: { height: number } }) => {
+      const bottomNavHeight = 74;
+      setKeyboardPadding(Math.max(0, e.endCoordinates.height - bottomNavHeight));
+    };
+    const onHide = () => setKeyboardPadding(0);
+    const showSub = Keyboard.addListener("keyboardDidShow", onShow);
+    const hideSub = Keyboard.addListener("keyboardDidHide", onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   async function uploadMaterial() {
     if (uploading) return;
@@ -175,6 +230,7 @@ export function ChannelChatScreen({
           text: withAttachments,
           attachmentIds: attachments.length ? attachments : undefined,
           connectorSlugs: selectedConnectorIds.length ? selectedConnectorIds : undefined,
+          skillIds: selectedSkillIds.length ? selectedSkillIds : undefined,
         },
         {
           onEvent: (event, data) => {
@@ -232,6 +288,7 @@ export function ChannelChatScreen({
       // 发送后清空附件与连接器选择，避免带到下一轮。
       setAttachments([]);
       setSelectedConnectorIds([]);
+      setSelectedSkillIds([]);
       setPicking(false);
     } catch (e) {
       setBusy(false);
@@ -249,6 +306,7 @@ export function ChannelChatScreen({
     members.length,
     notify,
     selectedConnectorIds,
+    selectedSkillIds,
     t,
     workspace.files,
   ]);
@@ -265,18 +323,15 @@ export function ChannelChatScreen({
       <ScrollView
         testID="channel-chat-viewport"
         ref={listRef}
-        style={{
-          flex: 1,
-          width: "100%",
-          maxWidth: agentLayout.columnMaxWidth,
-          alignSelf: "center",
-        }}
+        // 消息列与输入框共用 conversationColumnStyle：回复区块宽度与输入对话框完全一致。
+        style={[conversationColumnStyle, { flex: 1 }]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           gap: 13,
           paddingTop: contentTopInset,
-          paddingBottom: 20,
-          paddingHorizontal: 8,
+          // 输入框悬浮后不再占用文档流，这里用实时测量的输入框高度给它留出站位，
+          // 最后一条消息可以完整滚到输入框上方，滚动时内容不会被遮挡。
+          paddingBottom: contentBottomInset,
           flexGrow: 1,
         }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
@@ -292,7 +347,7 @@ export function ChannelChatScreen({
               gap: 14,
             }}
           >
-            <AgentOrb avatar={channel.avatar ?? "orb"} size={56} />
+            <AgentOrb avatar={normalizeChannelAvatar(channel.avatar)} size={56} />
             <Text
               accessibilityLabel={t("channels.chatEmptyTitle")}
               style={{
@@ -329,7 +384,12 @@ export function ChannelChatScreen({
         ) : (
           messages.map((msg) =>
             msg.role === "user" ? (
-              <UserBubble key={msg.id} text={msg.text} />
+              <UserBubble
+                key={msg.id}
+                text={msg.text}
+                at={Date.parse(msg.createdAt)}
+                onNotify={notify}
+              />
             ) : (
               <MemberBubble
                 key={msg.id}
@@ -338,6 +398,10 @@ export function ChannelChatScreen({
                 text={msg.text}
                 streaming={streamingId === msg.agentId && msg.id.startsWith("live:")}
                 member={memberById.get(msg.agentId ?? "")}
+                prompt={promptByMessageId.get(msg.id) ?? ""}
+                at={Date.parse(msg.createdAt)}
+                onNotify={notify}
+                onPublishShare={(input) => publishShare(api, input)}
               />
             ),
           )
@@ -351,16 +415,30 @@ export function ChannelChatScreen({
         )}
       </ScrollView>
 
-      <View
-        style={{
-          width: "100%",
-          maxWidth: agentLayout.columnMaxWidth,
-          alignSelf: "center",
-          paddingHorizontal: 8,
-          paddingBottom: 12,
-        }}
+      {/* 输入框悬浮在页面底部：ComposerDock 绝对定位、不再占用文档流；
+          消息列表的 contentBottomInset 已实时给它留出滚动站位。 */}
+      <ComposerDock
+        floating
+        keyboardPadding={keyboardPadding}
+        onHeightChange={onComposerHeightChange}
       >
+        {/* 圆角过渡垫层：与悬浮输入框同款全圆角、左右各外扩 8px 的底色底托。
+            内容向下滚动经过输入框背后时，它的直角边缘会被这层大圆角"收住"，
+            露出的遮挡线是一段圆弧，与输入框圆角完全一致，不再出现硬切的白边直角。 */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: -5,
+            right: -5,
+            top: -0,
+            bottom: -20,
+            backgroundColor: colors.canvas,
+            borderRadius: radius.full,
+          }}
+        />
         <PromptComposer
+          style={conversationColumnStyle}
           value={draft}
           onChangeText={setDraft}
           onSubmit={busy ? stop : send}
@@ -389,6 +467,14 @@ export function ChannelChatScreen({
               onPress: openFilePicker,
             },
             {
+              // 频道技能：勾选频道共享技能进入本轮讨论，与 Agent 对话的技能选择同组件。
+              key: "skills",
+              icon: Brain,
+              label: t("chat.channelSkillPickerTool"),
+              active: selectedSkillIds.length > 0,
+              onPress: () => setSkillPickerOpen(true),
+            },
+            {
               key: "connectors",
               icon: Link2,
               label: t("chat.connectorPickerTool"),
@@ -398,6 +484,14 @@ export function ChannelChatScreen({
           ]}
           attachments={
             <>
+              <ComposerSelectionChips
+                items={selectedSkills}
+                icon={Brain}
+                removeLabel={(name) => t("chat.removeSkill", { name })}
+                onRemove={(id) =>
+                  setSelectedSkillIds((ids) => ids.filter((candidate) => candidate !== id))
+                }
+              />
               <ComposerAttachments
                 files={workspace.files}
                 analysis={agentWorkspace?.artifacts ?? []}
@@ -417,7 +511,7 @@ export function ChannelChatScreen({
             </>
           }
         />
-      </View>
+      </ComposerDock>
 
       {picking && (
         <FilePickerSheet
@@ -440,6 +534,40 @@ export function ChannelChatScreen({
             navigate("files");
           }}
         />
+      )}
+      {skillPickerOpen && (
+        <>
+          <SkillPickerSheet
+            // 只列频道共享技能：目录技能（channel.installedSkills）+ 频道自建的账户技能库引用。
+            customSkills={channelCustomSkills}
+            installedCatalogIds={channelInstalledSkills}
+            selectedIds={selectedSkillIds}
+            onToggle={(id) =>
+              setSelectedSkillIds((ids) =>
+                ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+              )
+            }
+            onInspectSkill={setInspectSkillId}
+            title={t("chat.channelSkillPickerTitle")}
+            subtitle={t("chat.channelSkillPickerSubtitle")}
+            mineHeading={t("chat.channelSkillPickerMineHeading")}
+            emptyDetail={t("chat.channelSkillPickerEmptyDetail")}
+            onConfirm={() => {
+              setSkillPickerOpen(false);
+              setInspectSkillId(null);
+            }}
+            onClose={() => {
+              setSkillPickerOpen(false);
+              setInspectSkillId(null);
+            }}
+          />
+          {inspectSkillId && (
+            <ChannelSkillInspectSheet
+              skillId={inspectSkillId}
+              onClose={() => setInspectSkillId(null)}
+            />
+          )}
+        </>
       )}
       {connectorPickerOpen && (
         <ConnectorPickerSheet
@@ -466,7 +594,31 @@ export function ChannelChatScreen({
   );
 }
 
-function UserBubble({ text }: { text: string }) {
+/**
+ * 频道技能只读详情：频道自建（技能库引用）→ MySkillDetailSheet；
+ * 频道已装的目录技能 → SkillDetailSheet（只读）；都查不到（系统能力）返回 null。
+ */
+function ChannelSkillInspectSheet({ skillId, onClose }: { skillId: string; onClose: () => void }) {
+  const { skillLibrary } = useAgentSpace();
+  const custom = skillLibrary.find((skill) => skill.id === skillId);
+  if (custom) {
+    return <MySkillDetailSheet title={custom.name} skill={custom} onClose={onClose} />;
+  }
+  const entry = skillCatalog.find((skill) => skill.id === skillId);
+  if (!entry) return null;
+  return <SkillDetailSheet skill={entry} onClose={onClose} />;
+}
+
+function UserBubble({
+  text,
+  at,
+  onNotify,
+}: {
+  text: string;
+  /** 发送时间（毫秒）。拿不到时间时这一行只留复制按钮。 */
+  at: number;
+  onNotify: (message: string) => void;
+}) {
   return (
     <View style={{ alignSelf: "flex-end", maxWidth: 560 }}>
       <View
@@ -489,6 +641,8 @@ function UserBubble({ text }: { text: string }) {
           {text}
         </Text>
       </View>
+      {/* 与智能体对话页一致：提问气泡右下角显示发送时间 + 复制。 */}
+      {!!text && <UserMessageMeta text={text} at={at} onNotify={onNotify} />}
     </View>
   );
 }
@@ -499,16 +653,27 @@ function MemberBubble({
   text,
   streaming,
   member,
+  prompt,
+  at,
+  onNotify,
+  onPublishShare,
 }: {
   agentId: string;
   title: string;
   text: string;
   streaming: boolean;
   member?: AgentDefinition;
+  /** 该条回复对应的用户提问；有值时一并出现在分享的图片与网页里。 */
+  prompt: string;
+  /** 回复时间（毫秒）。非数字时该字段无效，操作栏不显示时间。 */
+  at: number;
+  onNotify: (message: string) => void;
+  onPublishShare: (input: { question: string; answer: string }) => Promise<string>;
 }) {
   return (
-    <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
-      <View style={{ marginTop: 2 }}>
+    <View style={{ position: "relative", width: "100%" }}>
+      {/* 头像悬浮在消息卡片左上方、不占行内宽度，回复卡片才能撑满整列与下方输入框同宽 */}
+      <View style={{ position: "absolute", top: 2, left: 0, zIndex: 1 }}>
         {member ? (
           <AgentOrb avatar={member.avatar} size={32} />
         ) : (
@@ -526,8 +691,9 @@ function MemberBubble({
           </View>
         )}
       </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <View style={{ width: "100%", gap: 4 }}>
+        {/* 名字、标题与卡片内容统一左缩进，避开左侧悬浮头像 */}
+        <View style={{ paddingLeft: 42, flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>
             {member?.name ?? agentId}
           </Text>
@@ -535,12 +701,15 @@ function MemberBubble({
             <Text style={[s.small, { color: colors.faint }]}>{member.role}</Text>
           ) : null}
         </View>
-        {title ? <Text style={[s.small, { color: colors.primaryStrong }]}>{title}</Text> : null}
+        <View style={{ paddingLeft: 42 }}>
+          {title ? <Text style={[s.small, { color: colors.primaryStrong }]}>{title}</Text> : null}
+        </View>
         <View
           style={{
-            alignSelf: "flex-start",
-            maxWidth: "100%",
-            paddingHorizontal: 14,
+            alignSelf: "stretch",
+            // 左右 padding 相等（56+14 的一半），回复正文在卡片内水平居中。
+            paddingLeft: 35,
+            paddingRight: 35,
             paddingVertical: 10,
             borderRadius: radius.card,
             borderWidth: 1,
@@ -549,6 +718,18 @@ function MemberBubble({
           }}
         >
           <AssistantResponse content={text} streaming={streaming} />
+        </View>
+        {/* 回复底部功能栏：喜欢/不喜欢、复制与导出 Markdown、分享为图片/链接、时间显示，
+            与智能体对话页回复底部同一套交互。整栏左移贴齐回复卡片的左侧框线（整列左缘），
+            不再保留 56px 缩进。 */}
+        <View>
+          <MessageActions
+            markdown={text}
+            prompt={prompt}
+            at={streaming ? 0 : at}
+            onNotify={onNotify}
+            onPublishShare={onPublishShare}
+          />
         </View>
       </View>
     </View>

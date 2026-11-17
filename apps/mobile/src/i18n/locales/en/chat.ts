@@ -93,10 +93,18 @@ const chat = {
   "chat.skillPickerMore": "{count} more skills. Type a keyword to keep searching.",
   "chat.skillPickerEmptyTitle": "No matching skills",
   "chat.skillPickerEmptyDetail":
-    "This agent has no skills yet. Install one from Skills & connections.",
+    "This agent has no skills yet. Add one from the agent's Skills tab.",
   "chat.skillPickerSelected": "{count} skills selected",
   "chat.skillPickerConfirm": "Confirm",
   "chat.skillPickerDetail": "View skill details",
+  // —— Channel skill picker: same sheet as agent, copy adapted to the channel scenario.
+  "chat.channelSkillPickerTool": "Choose skills",
+  "chat.channelSkillPickerTitle": "Choose skills",
+  "chat.channelSkillPickerSubtitle":
+    "Only skills added to this channel are listed. Members will read a selected skill's method.",
+  "chat.channelSkillPickerMineHeading": "Channel skills",
+  "chat.channelSkillPickerEmptyDetail":
+    "This channel has no skills yet. Add one from the channel's Skills tab.",
   "chat.connectorPickerTool": "Choose connectors",
   "chat.connectorPickerTitle": "Choose connectors",
   "chat.connectorPickerSubtitle":

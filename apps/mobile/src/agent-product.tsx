@@ -10,7 +10,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import type { Channel } from "../../../packages/domain/src/channel";
+import {
+  type Channel,
+  type ChannelMessage,
+  normalizeChannelAvatar,
+} from "../../../packages/domain/src/channel";
 import { AccountScreen } from "./account";
 import { AccountAvatar } from "./account-avatar";
 import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-header";
@@ -69,7 +73,7 @@ import {
   X,
 } from "./icons";
 import { IosStack } from "./ios-stack";
-import { type BotPreview, botHasUnread, latestBotPreview } from "./mobile-bots";
+import { type BotPreview, latestReplyPreview } from "./mobile-bots";
 import { MobileBotsHome } from "./mobile-bots-home";
 import { ModalOverlay } from "./modal-overlay";
 import { unreadCount } from "./notification-actions";
@@ -247,24 +251,26 @@ function AgentMenu({
 }
 
 /**
- * 频道行的操作菜单：进入详情、删除频道。
+ * 频道行的操作菜单：置顶 / 取消置顶、进入详情、删除频道。
  * 与 AgentMenu 同款透明 Modal 承载，点空白处即关闭。
  */
 function ChannelMenu({
   anchor,
   onClose,
+  onTogglePin,
   onSettings,
   onDelete,
 }: {
   anchor: ChannelMenuAnchor;
   onClose: () => void;
+  onTogglePin: () => void;
   onSettings: () => void;
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
   const { width, height } = useWindowDimensions();
   const menuWidth = Math.min(160, width - 24);
-  const rows = 2;
+  const rows = 3;
   const menuHeight = 10 + rows * 34 + 7;
   const left = Math.max(12, Math.min(anchor.x + anchor.width - menuWidth, width - menuWidth - 12));
   const below = anchor.y + anchor.height + 6;
@@ -293,6 +299,11 @@ function ChannelMenu({
             ...shadow.sheet,
           }}
         >
+          <AgentMenuRow
+            icon={anchor.channel.pinned ? ArrowDown : ArrowUp}
+            label={anchor.channel.pinned ? t("channels.unpinChannel") : t("channels.pinChannel")}
+            onPress={onTogglePin}
+          />
           <AgentMenuRow icon={Settings2} label={t("channels.openSettings")} onPress={onSettings} />
           <View style={{ height: 1, marginVertical: 3, backgroundColor: colors.line }} />
           <AgentMenuRow danger icon={Trash2} label={t("channels.deleteTitle")} onPress={onDelete} />
@@ -372,15 +383,14 @@ function AgentListItem({
   agent,
   active,
   preview,
-  unread = false,
   detailed = false,
   onPress,
   onOpenMenu,
 }: {
   agent: AgentDefinition;
   active: boolean;
+  /** 最近一条回复的内容（没有回复时为空），列表第二行小字展示。 */
   preview?: string;
-  unread?: boolean;
   /** 电脑侧栏用手机首页的两行样式。抽屉里的紧凑列表保持单行。 */
   detailed?: boolean;
   onPress: () => void;
@@ -394,7 +404,8 @@ function AgentListItem({
       onOpenMenu({ agent, x, y, width, height });
     });
   };
-  const label = agent.role ? `${agent.name} · ${agent.role}` : agent.name;
+  // 左侧栏列表只显示智能体/频道名字，不再拼接职责后缀。
+  const label = agent.name;
   if (detailed) {
     return (
       <View
@@ -421,30 +432,16 @@ function AgentListItem({
             gap: 12,
           }}
         >
-          <AgentOrb avatar={agent.avatar} size={44} />
+          {/* 系统内置智能体（蓝色 orb + 光晕）视觉偏重，略缩小一号与下方自建智能体的浅色 logo 观感一致 */}
+          <AgentOrb avatar={agent.avatar} size={agent.system ? 40 : 44} />
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text numberOfLines={1} style={{ ...typography.agentName, color: colors.text }}>
               {label}
             </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text
-                numberOfLines={1}
-                style={{ flex: 1, fontSize: 13, lineHeight: 20, color: colors.muted }}
-              >
-                {preview || t("agentSpace.noBotMessages")}
-              </Text>
-              {unread && !hovered && (
-                <View
-                  accessibilityLabel={t("agentSpace.newNotifications")}
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: radius.full,
-                    backgroundColor: colors.primary,
-                  }}
-                />
-              )}
-            </View>
+            {/* 第二行小字：最近一条回复的开头；还没回复过就显示「还没有消息」。 */}
+            <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 20, color: colors.muted }}>
+              {preview || t("agentSpace.noBotMessages")}
+            </Text>
           </View>
         </Pressable>
         <Pressable
@@ -508,7 +505,7 @@ function AgentListItem({
           gap: 10,
         })}
       >
-        <AgentOrb avatar={agent.avatar} size={30} />
+        <AgentOrb avatar={agent.avatar} size={agent.system ? 28 : 30} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             numberOfLines={1}
@@ -554,12 +551,15 @@ function AgentListItem({
 function ChannelListItem({
   channel,
   active,
+  preview,
   detailed = false,
   onPress,
   onOpenMenu,
 }: {
   channel: Channel;
   active: boolean;
+  /** 频道里最近一条成员回复的内容（没有回复时为空）。 */
+  preview?: string;
   detailed?: boolean;
   onPress: () => void;
   onOpenMenu: (anchor: ChannelMenuAnchor) => void;
@@ -571,7 +571,6 @@ function ChannelListItem({
   const members = channel.agentIds
     .map((id) => agents.find((a) => a.id === id))
     .filter((m): m is NonNullable<typeof m> => Boolean(m));
-  const preview = members.map((m) => m.name).join(" · ") || t("channels.emptyDetail");
   const openMenu = () => {
     moreRef.current?.measureInWindow((x, y, width, height) => {
       onOpenMenu({ channel, x, y, width, height });
@@ -588,7 +587,7 @@ function ChannelListItem({
         backgroundColor: colors.sky,
       }}
     >
-      <AgentOrb avatar={channel.avatar} size={Math.round(size * 0.7)} />
+      <AgentOrb avatar={normalizeChannelAvatar(channel.avatar)} size={Math.round(size * 0.7)} />
     </View>
   );
 
@@ -627,13 +626,13 @@ function ChannelListItem({
               >
                 {channel.name}
               </Text>
-              <Text style={{ fontSize: 12, color: colors.faint }}>{`（ ${members.length} ）`}</Text>
+              <Text
+                style={{ fontSize: 14, color: colors.faint, marginLeft: 6 }}
+              >{`(${members.length})`}</Text>
             </View>
-            <Text
-              numberOfLines={1}
-              style={{ flex: 1, fontSize: 13, lineHeight: 20, color: colors.muted }}
-            >
-              {preview}
+            {/* 与 Agent 行一致：第二行显示最近一条成员回复，没有回复时提示「还没有消息」。 */}
+            <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 20, color: colors.muted }}>
+              {preview || t("agentSpace.noBotMessages")}
             </Text>
           </View>
         </Pressable>
@@ -709,8 +708,8 @@ function ChannelListItem({
             }}
           >
             {channel.name}
-            <Text style={{ fontSize: 11, color: colors.faint, fontWeight: "400" }}>
-              {`（ ${members.length} ）`}
+            <Text style={{ fontSize: 12, color: colors.faint, fontWeight: "400", marginLeft: 6 }}>
+              {`(${members.length})`}
             </Text>
           </Text>
         </View>
@@ -1053,7 +1052,7 @@ function AgentRail({
   /** 待删除的频道：频道菜单里点删除后弹出确认弹窗。 */
   const [pendingDeleteChannel, setPendingDeleteChannel] = useState<Channel>();
   const { agents, current, selectAgent, deleteAgent, setAgentPinned } = useAgentSpace();
-  const { channels, currentChannelId, selectChannel, deleteChannel } = useChannels();
+  const { channels, currentChannelId, selectChannel, deleteChannel, updateChannel } = useChannels();
   // 排序规则：系统内置默认 Agent 永远置顶 → 用户置顶的 → 其余（同组内保持创建顺序）。
   const orderedAgents = useMemo(
     () =>
@@ -1065,20 +1064,37 @@ function AgentRail({
       }),
     [agents],
   );
-  // 列表分块：置顶区（系统默认 + 用户置顶）用底色区分于普通区。
-  const { pinnedAgents, restAgents } = useMemo(() => {
+  // 列表分块：系统智能体独占最顶部；置顶 Agent 与置顶频道一起构成「置顶区」，
+  // 排在自然列表最前面，但永远不会盖过系统智能体。
+  const { systemAgents, pinnedAgents, restAgents } = useMemo(() => {
+    const system: AgentDefinition[] = [];
     const pinned: AgentDefinition[] = [];
     const rest: AgentDefinition[] = [];
     for (const agent of orderedAgents) {
-      (agent.system || agent.pinned ? pinned : rest).push(agent);
+      if (agent.system) system.push(agent);
+      else if (agent.pinned) pinned.push(agent);
+      else rest.push(agent);
     }
-    return { pinnedAgents: pinned, restAgents: rest };
+    return { systemAgents: system, pinnedAgents: pinned, restAgents: rest };
   }, [orderedAgents]);
+  // 频道分块：置顶频道进入顶部置顶区，与置顶 Agent 并列；其余频道留在自然列表。
+  const { pinnedChannels, restChannels } = useMemo(() => {
+    const pinned: Channel[] = [];
+    const rest: Channel[] = [];
+    for (const channel of channels) {
+      (channel.pinned ? pinned : rest).push(channel);
+    }
+    return { pinnedChannels: pinned, restChannels: rest };
+  }, [channels]);
   const { navigate, open, workspace, api } = useWorkspace();
+  const { data: agentData } = useAgentWorkspace();
+  // 列表第二行的小字：Agent 取最近一条助手回复，频道取最近一条成员回复。
+  // 切换会话时重新拉一次，回到列表就能看到刚聊完的那条回复。
   const [previews, setPreviews] = useState<Record<string, BotPreview | null>>({});
+  const [channelPreviews, setChannelPreviews] = useState<Record<string, BotPreview | null>>({});
   const agentKey = agents.map((agent) => agent.id).join("|");
+  const channelKey = channels.map((channel) => channel.id).join("|");
   useEffect(() => {
-    if (compact) return;
     let alive = true;
     for (const agent of agents) {
       void api
@@ -1087,9 +1103,10 @@ function AgentRail({
           if (!alive) return;
           setPreviews((current) => ({
             ...current,
-            [agent.id]: latestBotPreview(page.messages),
+            [agent.id]: latestReplyPreview(page.messages),
           }));
         })
+        // 还没有对话的 Agent 会 404，按「没有回复」处理。
         .catch(() => {
           if (!alive) return;
           setPreviews((current) => ({ ...current, [agent.id]: null }));
@@ -1098,8 +1115,29 @@ function AgentRail({
     return () => {
       alive = false;
     };
-  }, [api, agentKey, compact]);
-  const { data: agentData } = useAgentWorkspace();
+  }, [api, agentKey, current.id]);
+  useEffect(() => {
+    let alive = true;
+    for (const channel of channels) {
+      void api
+        .request<ChannelMessage[]>(`/api/channels/${encodeURIComponent(channel.id)}/messages`)
+        .then((messages) => {
+          if (!alive) return;
+          // 频道里只有成员（member）发言算「回复」，用户自己的话不算。
+          setChannelPreviews((current) => ({
+            ...current,
+            [channel.id]: latestReplyPreview(messages, ["member"]),
+          }));
+        })
+        .catch(() => {
+          if (!alive) return;
+          setChannelPreviews((current) => ({ ...current, [channel.id]: null }));
+        });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [api, channelKey, currentChannelId]);
   const unreadNotifications = unreadCount(agentData?.notifications);
   const accountNickname = workspace.profile.name.trim() || t("agentSpace.account");
   const choose = (agent: AgentDefinition) => {
@@ -1122,6 +1160,22 @@ function AgentRail({
     navigate("channel");
     onClose?.();
   };
+  /** 频道行：置顶区与普通区复用同一渲染，避免出现三份重复代码。 */
+  const renderChannel = (channel: Channel) => (
+    <ChannelListItem
+      key={channel.id}
+      channel={channel}
+      active={channel.id === currentChannelId}
+      preview={channelPreviews[channel.id]?.text}
+      detailed={!compact}
+      onPress={() => {
+        selectChannel(channel.id);
+        navigate("chat");
+        onClose?.();
+      }}
+      onOpenMenu={setChannelMenuAnchor}
+    />
+  );
   return (
     <View
       style={{
@@ -1223,7 +1277,20 @@ function AgentRail({
         contentContainerStyle={{ gap: 4, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        {pinnedAgents.length > 0 && (
+        {/* 系统智能体永远在最顶部，不参与置顶，也不会被置顶项盖过。 */}
+        {systemAgents.map((agent) => (
+          <AgentListItem
+            key={agent.id}
+            agent={agent}
+            active={agent.id === current.id && !currentChannelId}
+            preview={previews[agent.id]?.text}
+            detailed={!compact}
+            onPress={() => choose(agent)}
+            onOpenMenu={setMenuAnchor}
+          />
+        ))}
+        {/* 置顶区：置顶 Agent + 置顶频道，排在自然列表最上面（系统智能体之后）。 */}
+        {(pinnedAgents.length > 0 || pinnedChannels.length > 0) && (
           <View
             style={{
               gap: 2,
@@ -1240,19 +1307,14 @@ function AgentRail({
               <AgentListItem
                 key={agent.id}
                 agent={agent}
-                active={agent.id === current.id}
-                detailed={!compact}
+                active={agent.id === current.id && !currentChannelId}
                 preview={previews[agent.id]?.text}
-                unread={botHasUnread(
-                  agent.threadId,
-                  agent.system,
-                  agentData?.tasks ?? [],
-                  agentData?.notifications ?? [],
-                )}
+                detailed={!compact}
                 onPress={() => choose(agent)}
                 onOpenMenu={setMenuAnchor}
               />
             ))}
+            {pinnedChannels.map(renderChannel)}
           </View>
         )}
         {/* 频道与 Agent 的对话互斥，左侧栏也只高亮当前真正打开的那一个。 */}
@@ -1261,32 +1323,13 @@ function AgentRail({
             key={agent.id}
             agent={agent}
             active={agent.id === current.id && !currentChannelId}
-            detailed={!compact}
             preview={previews[agent.id]?.text}
-            unread={botHasUnread(
-              agent.threadId,
-              agent.system,
-              agentData?.tasks ?? [],
-              agentData?.notifications ?? [],
-            )}
+            detailed={!compact}
             onPress={() => choose(agent)}
             onOpenMenu={setMenuAnchor}
           />
         ))}
-        {channels.map((channel) => (
-          <ChannelListItem
-            key={channel.id}
-            channel={channel}
-            active={channel.id === currentChannelId}
-            detailed={!compact}
-            onPress={() => {
-              selectChannel(channel.id);
-              navigate("chat");
-              onClose?.();
-            }}
-            onOpenMenu={setChannelMenuAnchor}
-          />
-        ))}
+        {restChannels.map(renderChannel)}
         <Pressable
           ref={createEntryRef}
           accessibilityRole="button"
@@ -1514,6 +1557,11 @@ function AgentRail({
         <ChannelMenu
           anchor={channelMenuAnchor}
           onClose={() => setChannelMenuAnchor(undefined)}
+          onTogglePin={() => {
+            const target = channelMenuAnchor.channel;
+            setChannelMenuAnchor(undefined);
+            void updateChannel(target.id, { pinned: !target.pinned });
+          }}
           onSettings={() => {
             const target = channelMenuAnchor.channel;
             setChannelMenuAnchor(undefined);
@@ -1673,6 +1721,7 @@ function CapabilityRail({
   onOpen,
   onCollapse,
   onOpenAgentSkills,
+  onOpenAgentTasks,
   onOpenChannelSettings,
   onNavigateAway,
   page = false,
@@ -1680,6 +1729,8 @@ function CapabilityRail({
   onOpen: (panel: AgentPanel) => void;
   onCollapse?: () => void;
   onOpenAgentSkills: () => void;
+  /** 右侧栏「更多」：进入当前 Agent 详情的「任务」分区，而非全局任务面板。 */
+  onOpenAgentTasks: () => void;
   /** 频道模式下点头像 / 分区：带分区意图进频道设置。 */
   onOpenChannelSettings: (tab: ChannelSettingsTab) => void;
   /** 从全屏页跳走之前先把它收起来。 */
@@ -1705,6 +1756,7 @@ function CapabilityRail({
       <ChannelRail
         channel={activeChannel}
         onOpenSettings={onOpenChannelSettings}
+        onOpenPanel={onOpen}
         onCollapse={onCollapse}
         page={page}
       />
@@ -1751,7 +1803,10 @@ function CapabilityRail({
             <Button
               variant="outline"
               style={{ alignSelf: "stretch" }}
-              onPress={() => onOpen("tasks")}
+              onPress={() => {
+                leave();
+                onOpenAgentTasks();
+              }}
             >
               {t("agentSpace.moreDelegated")}
             </Button>
@@ -1769,9 +1824,12 @@ function CapabilityRail({
           >
             {t("agentSpace.more")}
           </Text>
+          {/* 右侧栏不展示「{name} 的技能」区块：传 showCapabilities={false} 隐藏渲染，
+              技能数据、详情弹层与跳转逻辑都保留，需要恢复时删掉该 prop 即可。 */}
           <AgentMoreContent
             onPanel={onOpen}
             compact={false}
+            showCapabilities={false}
             onInspectSkill={setInspectSkillId}
             onOpenApps={() => {
               leave();
@@ -2317,6 +2375,14 @@ export function AgentProductShell({
     setAgentTabIntent("skills");
     navigate("agent");
   }, [navigate]);
+  // 右侧栏「更多」：进入当前 Agent 详情设置的「任务」分区（渲染 BotHistoryPage），
+  // 而不是打开全局任务与自动化面板。
+  const openAgentTasks = useCallback(() => {
+    setDrawer(null);
+    setPanelStack([]);
+    setAgentTabIntent("history");
+    navigate("agent");
+  }, [navigate]);
   // 右侧栏点头像 / 分区：带着分区意图进频道设置（频道此时已选中）。
   const openChannelSettingsTab = useCallback(
     (tab: ChannelSettingsTab) => {
@@ -2535,6 +2601,7 @@ export function AgentProductShell({
                                   onOpen={openPanel}
                                   onNavigateAway={() => setSidePage(false)}
                                   onOpenAgentSkills={openAgentSkills}
+                                  onOpenAgentTasks={openAgentTasks}
                                   onOpenChannelSettings={openChannelSettingsTab}
                                 />
                               </SafeAreaView>
@@ -2576,6 +2643,7 @@ export function AgentProductShell({
                   onOpen={openPanel}
                   onCollapse={toggleRail}
                   onOpenAgentSkills={openAgentSkills}
+                  onOpenAgentTasks={openAgentTasks}
                   onOpenChannelSettings={openChannelSettingsTab}
                 />
               </View>
@@ -2645,6 +2713,7 @@ export function AgentProductShell({
                 onOpen={openPanel}
                 onNavigateAway={() => setSidePage(false)}
                 onOpenAgentSkills={openAgentSkills}
+                onOpenAgentTasks={openAgentTasks}
                 onOpenChannelSettings={openChannelSettingsTab}
               />
             </SafeAreaView>
