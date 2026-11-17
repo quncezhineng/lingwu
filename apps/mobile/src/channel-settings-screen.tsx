@@ -15,6 +15,7 @@ import { ArtifactCard, TaskCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
+import { BotInlineBack } from "./bot-pages/shared";
 import { MySkillDetailSheet, SkillDetailSheet } from "./capability-hub";
 import { CardGrid } from "./card-grid";
 import { useChannels } from "./channels";
@@ -22,7 +23,6 @@ import { saveRemoteFile, shareRemoteFile } from "./file-export";
 import { type TranslationKey, useTranslation } from "./i18n";
 import {
   ArrowDownToLine,
-  ArrowLeft,
   Brain,
   CircleMinus,
   FileText,
@@ -720,47 +720,53 @@ function ChannelSkillsPanel({ channel }: { channel: Channel }) {
     }),
   ];
 
+  // 添加技能视图：与 Agent 详情「技能 → 添加技能」同一版式——
+  // 左上角 `‹ 返回` 切回已挂列表，下面直接铺技能库（提示 / 搜索 / 双列格子）。
+  if (adding)
+    return (
+      <View style={{ gap: 2 }}>
+        <BotInlineBack label={t("common.back")} onPress={() => setAdding(false)} />
+        <SkillLibraryPanel
+          installedCatalogIds={installedIds}
+          isCustomInstalled={(skill) => sharedRefIds.includes(skill.id)}
+          onToggleCatalog={toggleCatalog}
+          onToggleCustom={toggleCustom}
+          onViewCatalogDetail={setViewingCatalog}
+          onViewCustomDetail={setViewingCustom}
+        />
+        {/* 详情弹层：频道里的技能不提供「安装到某个智能体」，因此只读展示说明。 */}
+        {viewingCatalog && (
+          <SkillDetailSheet skill={viewingCatalog} onClose={() => setViewingCatalog(undefined)} />
+        )}
+        {viewingCustom && (
+          <MySkillDetailSheet
+            title={viewingCustom.name}
+            skill={viewingCustom}
+            onClose={() => setViewingCustom(undefined)}
+          />
+        )}
+      </View>
+    );
+
   return (
     <View style={{ gap: 8 }}>
       <Text style={[s.muted, { lineHeight: 20 }]}>{t("channels.skillsHint")}</Text>
-      {adding ? (
-        <View style={{ gap: 10 }}>
-          {/* 技能库视图：挑完点「返回」回到已挂列表。 */}
-          <View style={{ alignItems: "flex-end" }}>
-            <Button small icon={ArrowLeft} onPress={() => setAdding(false)}>
-              {t("common.back")}
-            </Button>
-          </View>
-          <SkillLibraryPanel
-            installedCatalogIds={installedIds}
-            isCustomInstalled={(skill) => sharedRefIds.includes(skill.id)}
-            onToggleCatalog={toggleCatalog}
-            onToggleCustom={toggleCustom}
-            onViewCatalogDetail={setViewingCatalog}
-            onViewCustomDetail={setViewingCustom}
-          />
-        </View>
+      {/* 右对齐的「+ 添加技能」：与 Agent 详情技能页同一位置、同一按钮。 */}
+      <View style={{ alignItems: "flex-end", marginBottom: 5 }}>
+        <Button small icon={Plus} onPress={() => setAdding(true)}>
+          {t("agentSpace.addSkill")}
+        </Button>
+      </View>
+      {cards.length ? (
+        <CardGrid
+          items={cards}
+          minColumnWidth={300}
+          getKey={(card) => card.key}
+          render={(card) => card.node}
+        />
       ) : (
-        <>
-          {/* 右对齐的「+ 添加技能」：与 Agent 详情技能页同一位置、同一按钮。 */}
-          <View style={{ alignItems: "flex-end", marginBottom: 5 }}>
-            <Button small icon={Plus} onPress={() => setAdding(true)}>
-              {t("agentSpace.addSkill")}
-            </Button>
-          </View>
-          {cards.length ? (
-            <CardGrid
-              items={cards}
-              minColumnWidth={300}
-              getKey={(card) => card.key}
-              render={(card) => card.node}
-            />
-          ) : (
-            <Text style={[s.muted, { paddingVertical: 18 }]}>{t("channels.skillsEmpty")}</Text>
-          )}
-        </>
+        <Text style={[s.muted, { paddingVertical: 18 }]}>{t("channels.skillsEmpty")}</Text>
       )}
-      {/* 详情弹层：频道里的技能不提供「安装到某个智能体」，因此只读展示说明。 */}
       {viewingCatalog && (
         <SkillDetailSheet skill={viewingCatalog} onClose={() => setViewingCatalog(undefined)} />
       )}

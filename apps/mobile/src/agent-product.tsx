@@ -339,7 +339,8 @@ function CreateEntryMenu({
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const menuWidth = Math.min(180, width - 24);
-  const left = Math.max(12, Math.min(anchor.x + anchor.width - menuWidth, width - menuWidth - 12));
+  // 「新建」按钮横向占满整个侧栏，菜单对齐按钮左边缘，正好落在「+ 新建」文字下方靠左。
+  const left = Math.max(12, Math.min(anchor.x, width - menuWidth - 12));
   // 永远贴在「新建」按钮的正下方，不做上方翻转。
   const top = anchor.y + anchor.height + 6;
   return (
@@ -1340,19 +1341,19 @@ function AgentRail({
             })
           }
           style={({ pressed }) => ({
-            minHeight: 40,
+            minHeight: 44,
             paddingLeft: compact ? 9 : space.xs,
             paddingRight: compact ? 9 : space.sm,
             borderRadius: radius.control,
             backgroundColor: pressed ? colors.overlay1 : "transparent",
             flexDirection: "row",
             alignItems: "center",
-            gap: 8,
+            gap: 9,
             marginTop: 2,
           })}
         >
-          <Plus size={16} color={colors.primaryStrong} />
-          <Text style={{ fontSize: 12, color: colors.primaryStrong, fontWeight: "500" }}>
+          <Plus size={18} strokeWidth={2} color={colors.primaryStrong} />
+          <Text style={{ fontSize: 14, color: colors.primaryStrong, fontWeight: "500" }}>
             {t("agentSpace.createEntry")}
           </Text>
         </Pressable>

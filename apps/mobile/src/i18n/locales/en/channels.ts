@@ -4,7 +4,7 @@ import type { Dictionary } from "../../types";
 const channels = {
   "channels.heading": "Channels",
   "channels.create": "New channel",
-  "channels.createConfirm": "Create channel",
+  "channels.createConfirm": "New channel",
   "channels.loading": "Loading channels…",
   "channels.emptyTitle": "No channels yet",
   "channels.emptyDetail": "Create a channel to bring several Agents together for joint research.",
@@ -82,7 +82,7 @@ const channels = {
     "This channel has no files or reports yet. They will appear here after a research run.",
   "channels.memberCount": "{count} members",
   "channels.skillsHint":
-    "Skills owned by this channel, independent of each member Agent's own skills. Skills added here are shared by every member and injected into each member's context during a run.",
+    "Channel-owned skills, independent of each member's own. Added skills are shared by all and injected into each member's context on a run.",
   "channels.skillsEmpty":
     'This channel has no skills yet. Use "Add skill" in the top right to pick from the library; every member can then use it.',
   "channels.tasksEmpty":

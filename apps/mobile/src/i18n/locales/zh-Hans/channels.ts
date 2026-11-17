@@ -4,7 +4,7 @@ import type { Dictionary } from "../../types";
 const channels = {
   "channels.heading": "频道",
   "channels.create": "新建频道",
-  "channels.createConfirm": "创建频道",
+  "channels.createConfirm": "新建频道",
   "channels.loading": "正在加载频道…",
   "channels.emptyTitle": "还没有频道",
   "channels.emptyDetail": "创建一个频道，让多个智能体聚在一起做联合研究。",
@@ -74,7 +74,7 @@ const channels = {
   "channels.filesEmpty": "这个频道还没有产出的文件或报告。发起一次投研后，成果会出现在这里。",
   "channels.memberCount": "{count} 位成员",
   "channels.skillsHint":
-    "频道自己的技能，与成员智能体各自的技能互相独立；添加到频道后由全体成员共享，投研时会注入到每位成员的上下文。",
+    "频道自己的技能，与成员各自的技能互相独立；添加后全员共享，投研时注入每位成员的上下文。",
   "channels.skillsEmpty":
     "这个频道还没有技能。点右上角「添加技能」从技能库挑选，添加后全体成员都能用。",
   "channels.tasksEmpty": "这个频道还没有投研任务。回到频道对话发起一次投研吧。",
