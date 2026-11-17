@@ -53,3 +53,30 @@ export const channelUpdateSchema = z.object({
   instructions: z.string().trim().max(4000).optional(),
 });
 export type ChannelUpdate = z.infer<typeof channelUpdateSchema>;
+
+/**
+ * 频道群聊消息。与「编排任务结果」解耦：一条用户提问 + 每个成员各自一条对话回复，
+ * 逐条落库，刷新后能回看。成员回复用各自的 threadId/人设/模型生成，文本是真对话而非子任务汇总。
+ */
+export interface ChannelMessage {
+  id: string;
+  channelId: string;
+  role: "user" | "member";
+  text: string;
+  createdAt: string;
+  /** member 消息：发言成员的 Agent id（= agent-space agents[].id）。 */
+  agentId?: string;
+  /** member 消息：发言时带的话术标题（如角色名），仅用于展示。 */
+  title?: string;
+  /** user 消息：本轮附加的文件 / 产物 id，回看时可复原上下文。 */
+  attachmentIds?: string[];
+  /** user 消息：本轮选定的应用连接器 slug。 */
+  connectorSlugs?: string[];
+}
+
+export const channelMessageInputSchema = z.object({
+  text: z.string().trim().min(1).max(20_000),
+  attachmentIds: z.array(z.string().min(1)).max(30).optional(),
+  connectorSlugs: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+});
+export type ChannelMessageInput = z.infer<typeof channelMessageInputSchema>;

@@ -31,6 +31,7 @@ const channels = {
     "Send a message and the channel members each contribute their expertise to collaborate on the research.",
   "channels.composerPlaceholder": "Ask the channel or start research…",
   "channels.sending": "Coordinating experts…",
+  "channels.chatFailed": "Group reply failed",
   "channels.researchRequired": "Describe what you want the channel to research.",
   "channels.roleUnset": "member",
   "channels.noGoal": "no shared goal set",

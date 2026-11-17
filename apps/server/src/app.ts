@@ -10,6 +10,7 @@ import {
   type Channel,
   calendarRangeSchema,
   channelInputSchema,
+  channelMessageInputSchema,
   channelUpdateSchema,
   emailDraftSchema,
   type OrchestrationPlan,
@@ -33,6 +34,7 @@ import {
 } from "./conversation-history.ts";
 import type { Store } from "./db.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
+import { listChannelMessages, runChannelChat } from "./engine/channel-chat.ts";
 import { financialRoutes } from "./engine/financial-routes.ts";
 import { marketRoutes } from "./engine/market-routes.ts";
 import { noteRoutes } from "./engine/notes-routes.ts";
@@ -507,6 +509,85 @@ export async function createApp(
     if (!existing) throw new AppError("Channel not found", 404);
     await db.remove(owner, "channels", id);
     return c.json({ ok: true });
+  });
+  /** 频道群聊历史：所有轮次的用户提问与成员回复，按时间升序。 */
+  app.get("/api/channels/:id/messages", async (c) => {
+    const owner = c.get("owner");
+    const id = c.req.param("id");
+    if (!(await db.get<Channel>(owner, "channels", id)))
+      throw new AppError("Channel not found", 404);
+    return c.json(await listChannelMessages(db, owner, id));
+  });
+  /**
+   * 频道群聊流式对话：用户消息落库后，各成员依次以对话方式回复（SSE）。
+   * 事件：member_start / delta / member_done / done / error。
+   */
+  app.post("/api/channels/:id/chat", async (c) => {
+    const owner = c.get("owner");
+    const id = c.req.param("id");
+    const channel = await db.get<Channel>(owner, "channels", id);
+    if (!channel) throw new AppError("Channel not found", 404);
+    const input = channelMessageInputSchema.parse(await c.req.json());
+    const encoder = new TextEncoder();
+    const abort = new AbortController();
+    c.req.raw.signal.addEventListener("abort", () => abort.abort(), { once: true });
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        async start(controller) {
+          let closed = false;
+          const send = (event: string, data: unknown) => {
+            if (closed) return;
+            try {
+              controller.enqueue(
+                encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+              );
+            } catch {
+              closed = true;
+            }
+          };
+          try {
+            await runChannelChat(
+              {
+                db,
+                config,
+                files,
+                models: workspace.models,
+              },
+              owner,
+              channel,
+              input,
+              (event) => send(event.type, event),
+              abort.signal,
+            );
+          } catch (error) {
+            send("error", {
+              message: error instanceof Error ? error.message : String(error),
+            });
+          } finally {
+            if (!closed) {
+              closed = true;
+              try {
+                controller.close();
+              } catch {
+                // consumer already cancelled
+              }
+            }
+          }
+        },
+        cancel() {
+          abort.abort();
+        },
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      },
+    );
   });
   /** 列出当前用户最近的编排计划（含节点状态与汇总结果），供前端呈现多 Agent 协作进度。 */
   app.get("/api/orchestrations", async (c) => {

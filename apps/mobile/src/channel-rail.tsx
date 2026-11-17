@@ -171,6 +171,9 @@ export function ChannelRail({
             }}
           >
             {channel.name}
+            <Text style={{ fontSize: 14, color: colors.faint, fontWeight: "400" }}>
+              {`（ ${members.length} ）`}
+            </Text>
           </Text>
           <Text style={[s.small, { color: colors.faint, marginTop: -6 }]}>
             {t("channels.memberCount", { count: channel.agentIds.length })}

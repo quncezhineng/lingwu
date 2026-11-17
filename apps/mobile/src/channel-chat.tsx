@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
-import type { Channel } from "../../../packages/domain/src/channel";
+import type { Channel, ChannelMessage } from "../../../packages/domain/src/channel";
 import { agentLayout } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
@@ -15,27 +15,23 @@ import {
   type ConnectorOption,
   ConnectorPickerSheet,
 } from "./capability-picker";
+import { type ChannelChatStream, streamChannelChat } from "./channel-chat-stream";
 import { promptWithAttachments } from "./chat-content";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { useTranslation } from "./i18n";
 import { Brain, FileText, FolderOpen, Globe2, Link2, Sparkles, Upload, Users } from "./icons";
-import { useOrchestrations } from "./orchestration";
 import { PromptComposer } from "./prompt-composer";
 import { colors, fonts, radius, s } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /**
- * 频道群聊对话页（M2）。
+ * 频道群聊对话页。
  *
- * 与 Agent 对话页同级的「多 Agent 群聊」：用户在频道发一条消息，编排者拆解后
- * 各成员 Agent 用自己的 thread + 人设独立执行，结果以「成员回复」形式聚合展示。
- * 消息承载：用户消息本地暂存，成员回复来自编排子任务 result（轮询编排计划）。
+ * 与智能体对话同构：用户在频道发一条消息，成员 Agent 依次用自己的 threadId / 人设 /
+ * 模型跑一轮真实对话，文本逐字流式回来，像群聊里依次发言（后成员能看到前面的分析）。
+ * 消息落库，刷新后回看；用户消息保留附件与连接器选择。
  */
-
-type ChannelMessage =
-  | { id: string; role: "user"; text: string; at: string }
-  | { id: string; role: "member"; agentId: string; title: string; text: string; at: string };
 
 /** 应用连接器分类 → 输入区选择弹层里的图标。 */
 function connectorIcon(category: AppConnectorView["category"]) {
@@ -63,14 +59,15 @@ export function ChannelChatScreen({
 }) {
   const { t } = useTranslation();
   const { agents } = useAgentSpace();
-  const { delegate, data: agentWorkspace } = useAgentWorkspace();
-  const { plans } = useOrchestrations();
+  const { data: agentWorkspace } = useAgentWorkspace();
   const { notify, api, refresh, workspace, navigate } = useWorkspace();
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [streamingId, setStreamingId] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
+  const streamRef = useRef<ChannelChatStream | null>(null);
   // 附件与连接器选择（与 Agent 对话页同一套能力选择）。
   const [attachments, setAttachments] = useState<string[]>([]);
   const [picking, setPicking] = useState(false);
@@ -105,44 +102,33 @@ export function ChannelChatScreen({
   );
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
 
-  // 当前投研的编排计划：把已完成的节点结果渲染成成员回复。
-  const activePlan = useMemo(
-    () => (activeTaskId ? plans.find((p) => p.parentTaskId === activeTaskId) : undefined),
-    [plans, activeTaskId],
-  );
-
-  // 编排计划里「有结果」的节点 → 转成成员回复消息（去重、保持节点顺序）。
+  // 打开频道先加载历史消息（用户提问 + 成员回复）。切换频道时先清空，避免串味。
   useEffect(() => {
-    if (!activePlan) return;
-    setMessages((existing) => {
-      const seen = new Set(existing.map((m) => m.id));
-      const additions: ChannelMessage[] = [];
-      for (const node of activePlan.nodes) {
-        if (!node.result) continue;
-        const key = `member:${node.id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const member = memberById.get(node.agentTemplate);
-        additions.push({
-          id: key,
-          role: "member",
-          agentId: member?.id ?? node.agentTemplate,
-          title: node.title,
-          text: node.result,
-          at: activePlan.updatedAt,
-        });
-      }
-      return additions.length ? [...existing, ...additions] : existing;
-    });
-  }, [activePlan, memberById]);
-
-  // 编排终态后停止「进行中」态。
-  useEffect(() => {
-    if (activePlan && (activePlan.status === "succeeded" || activePlan.status === "failed")) {
-      setBusy(false);
-      setActiveTaskId(null);
-    }
-  }, [activePlan]);
+    let alive = true;
+    setLoaded(false);
+    setMessages([]);
+    setAttachments([]);
+    setSelectedConnectorIds([]);
+    setBusy(false);
+    streamRef.current?.close();
+    streamRef.current = null;
+    void api
+      .request<ChannelMessage[]>(`/api/channels/${encodeURIComponent(channel.id)}/messages`)
+      .then((history) => {
+        if (alive) setMessages(history);
+      })
+      .catch(() => {
+        if (alive) setMessages([]);
+      })
+      .finally(() => {
+        if (alive) setLoaded(true);
+      });
+    return () => {
+      alive = false;
+      streamRef.current?.close();
+      streamRef.current = null;
+    };
+  }, [api, channel.id]);
 
   async function uploadMaterial() {
     if (uploading) return;
@@ -170,78 +156,108 @@ export function ChannelChatScreen({
     setPicking(true);
   }
 
-  async function send() {
+  const send = useCallback(() => {
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!text || busy || !loaded || members.length === 0) return;
     setDraft("");
-    const userMsg: ChannelMessage = {
-      id: `user:${Date.now()}`,
-      role: "user",
-      text,
-      at: new Date().toISOString(),
-    };
-    setMessages((m) => [...m, userMsg]);
     setBusy(true);
-    // 每行一个成员：`name（role）→ id`，让编排者把 DAG 节点精确指派到具体成员。
-    const roster = members
-      .map((m) => `${m.name}（${m.role || t("channels.roleUnset")}）→ id:${m.id}`)
-      .join("\n");
-    // 附件：把选中的文件/分析产物作为「附加文档」引用进投研请求。
     const files = workspace.files.filter((f) => attachments.includes(f.id));
     const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
       attachments.includes(artifact.id),
     );
-    // 连接器：把已选应用连接器（slug）注入投研请求，并随任务 input 下传给成员子任务，
-    // 由后端 createSubtask/executeModelTask 强约束成员用 use_connection 真正调用。
-    const connectorSlugs = selectedConnectors.map((c) => c.id);
-    const connectorLine = connectorSlugs.length
-      ? `\n\nSelected connectors: ${selectedConnectors
-          .map((c) => `${c.name} (slug: ${c.id})`)
-          .join(", ")}`
-      : "";
-    const topic = `${text}${connectorLine}`;
-    const prompt = t("channels.researchPrompt", {
-      topic: promptWithAttachments(topic, files, analysis),
-      roster,
-      description: channel.description || t("channels.noGoal"),
-      instructionsContext: channel.instructions
-        ? t("channels.instructionsContext", { instructions: channel.instructions })
-        : "",
-    });
+    // 附件正文与选定连接器一并写进请求：附件进本轮文本上下文，连接器 slug 由后端注入成员工具引导。
+    const withAttachments = promptWithAttachments(text, files, analysis);
     try {
-      const task = await delegate(
+      streamRef.current = streamChannelChat(
+        api,
+        channel.id,
         {
-          title: `${channel.name} · ${text.slice(0, 40)}`,
-          prompt,
-          kind: "agent",
-          input: {
-            forceOrchestration: true,
-            channelId: channel.id,
-            ...(connectorSlugs.length ? { channelConnectorSlugs: connectorSlugs } : {}),
+          text: withAttachments,
+          attachmentIds: attachments.length ? attachments : undefined,
+          connectorSlugs: selectedConnectorIds.length ? selectedConnectorIds : undefined,
+        },
+        {
+          onEvent: (event, data) => {
+            if (event === "member_start") {
+              setStreamingId(String(data.agentId ?? ""));
+            } else if (event === "delta") {
+              const agentId = String(data.agentId ?? "");
+              const delta = String(data.text ?? "");
+              if (!delta) return;
+              setMessages((current) => {
+                // 正在流式输出的是最后一条同 agent 的 member 消息；没有就新建一条。
+                const last = current.at(-1);
+                if (
+                  last?.role === "member" &&
+                  last.agentId === agentId &&
+                  last.id.startsWith("live:")
+                ) {
+                  return [...current.slice(0, -1), { ...last, text: last.text + delta }];
+                }
+                return [
+                  ...current,
+                  {
+                    id: `live:${agentId}:${Date.now()}`,
+                    channelId: channel.id,
+                    role: "member",
+                    agentId,
+                    title: String(data.title ?? ""),
+                    text: delta,
+                    createdAt: new Date().toISOString(),
+                  },
+                ];
+              });
+            } else if (event === "done") {
+              setStreamingId(null);
+              setBusy(false);
+              void refresh();
+            } else if (event === "member_done") {
+              setStreamingId(null);
+            } else if (event === "error") {
+              notify(String(data.message ?? t("channels.chatFailed")));
+            }
+          },
+          onError: (message) => {
+            notify(message);
+            setBusy(false);
+            setStreamingId(null);
+          },
+          // 服务端未发 done 就断开时也要恢复输入，避免一直卡在「生成中」。
+          onClose: () => {
+            setBusy(false);
+            setStreamingId(null);
           },
         },
-        `channel-research:${channel.id}:${Date.now()}`,
       );
-      setActiveTaskId(task.id);
-      notify(t("channels.researchStarted"));
       // 发送后清空附件与连接器选择，避免带到下一轮。
       setAttachments([]);
       setSelectedConnectorIds([]);
       setPicking(false);
     } catch (e) {
       setBusy(false);
-      setMessages((m) => [
-        ...m,
-        {
-          id: `err:${Date.now()}`,
-          role: "member",
-          agentId: "",
-          title: t("channels.researchFailed"),
-          text: e instanceof Error ? e.message : String(e),
-          at: new Date().toISOString(),
-        },
-      ]);
+      setStreamingId(null);
+      notify(e instanceof Error ? e.message : String(e));
     }
+  }, [
+    api,
+    agentWorkspace?.artifacts,
+    attachments,
+    busy,
+    channel.id,
+    draft,
+    loaded,
+    members.length,
+    notify,
+    selectedConnectorIds,
+    t,
+    workspace.files,
+  ]);
+
+  function stop() {
+    streamRef.current?.close();
+    streamRef.current = null;
+    setBusy(false);
+    setStreamingId(null);
   }
 
   return (
@@ -317,16 +333,17 @@ export function ChannelChatScreen({
             ) : (
               <MemberBubble
                 key={msg.id}
-                agentId={msg.agentId}
-                title={msg.title}
+                agentId={msg.agentId ?? ""}
+                title={msg.title ?? ""}
                 text={msg.text}
-                member={memberById.get(msg.agentId)}
+                streaming={streamingId === msg.agentId && msg.id.startsWith("live:")}
+                member={memberById.get(msg.agentId ?? "")}
               />
             ),
           )
         )}
 
-        {busy && (
+        {busy && streamingId === null && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 }}>
             <Sparkles size={14} color={colors.primary} />
             <Text style={[s.small, { color: colors.primary }]}>{t("channels.sending")}</Text>
@@ -346,7 +363,7 @@ export function ChannelChatScreen({
         <PromptComposer
           value={draft}
           onChangeText={setDraft}
-          onSubmit={() => void send()}
+          onSubmit={busy ? stop : send}
           placeholder={t("channels.composerPlaceholder")}
           accessibilityLabel={t("channels.composerPlaceholder")}
           sendLabel={t("chat.sendMessage")}
@@ -480,11 +497,13 @@ function MemberBubble({
   agentId,
   title,
   text,
+  streaming,
   member,
 }: {
   agentId: string;
   title: string;
   text: string;
+  streaming: boolean;
   member?: AgentDefinition;
 }) {
   return (
@@ -529,7 +548,7 @@ function MemberBubble({
             backgroundColor: colors.paper,
           }}
         >
-          <AssistantResponse content={text} />
+          <AssistantResponse content={text} streaming={streaming} />
         </View>
       </View>
     </View>

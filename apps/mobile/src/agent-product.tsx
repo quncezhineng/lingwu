@@ -620,9 +620,15 @@ function ChannelListItem({
         >
           {avatarView(44)}
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <Text numberOfLines={1} style={{ ...typography.agentName, color: colors.text }}>
-              {channel.name}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+              <Text
+                numberOfLines={1}
+                style={{ ...typography.agentName, color: colors.text, flexShrink: 1 }}
+              >
+                {channel.name}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.faint }}>{`（ ${members.length} ）`}</Text>
+            </View>
             <Text
               numberOfLines={1}
               style={{ flex: 1, fontSize: 13, lineHeight: 20, color: colors.muted }}
@@ -703,6 +709,9 @@ function ChannelListItem({
             }}
           >
             {channel.name}
+            <Text style={{ fontSize: 11, color: colors.faint, fontWeight: "400" }}>
+              {`（ ${members.length} ）`}
+            </Text>
           </Text>
         </View>
       </Pressable>

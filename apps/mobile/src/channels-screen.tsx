@@ -98,7 +98,12 @@ export function ChannelsScreen() {
                   ))}
                 </View>
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                  <Text style={[s.text, { fontWeight: "600" }]}>{channel.name}</Text>
+                  <Text style={[s.text, { fontWeight: "600" }]}>
+                    {channel.name}
+                    <Text style={[s.small, { color: colors.faint, fontWeight: "400" }]}>
+                      {`（ ${members.length} ）`}
+                    </Text>
+                  </Text>
                   <Text numberOfLines={1} style={[s.small, { color: colors.faint }]}>
                     {members.map((m) => m.name).join(" · ")}
                   </Text>

@@ -227,8 +227,18 @@ export interface ExecutionBackend {
   health(): Promise<{ available: boolean; detail: string }>;
 }
 
-export type { Channel, ChannelInput, ChannelUpdate } from "./channel.ts";
-export { channelInputSchema, channelUpdateSchema } from "./channel.ts";
+export type {
+  Channel,
+  ChannelInput,
+  ChannelMessage,
+  ChannelMessageInput,
+  ChannelUpdate,
+} from "./channel.ts";
+export {
+  channelInputSchema,
+  channelMessageInputSchema,
+  channelUpdateSchema,
+} from "./channel.ts";
 export type { ComputerCommand, ComputerDirectory, ComputerSnapshot } from "./computer.ts";
 export type {
   OrchestrationNode,

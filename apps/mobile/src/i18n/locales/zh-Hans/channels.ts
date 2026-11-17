@@ -29,6 +29,7 @@ const channels = {
   "channels.chatEmptyDetail": "发一条消息，频道成员会各自给出专业视角，协作完成研究。",
   "channels.composerPlaceholder": "向频道提问或发起投研…",
   "channels.sending": "正在协调专家…",
+  "channels.chatFailed": "群聊回复失败",
   "channels.researchRequired": "请描述你想让频道研究的问题。",
   "channels.roleUnset": "成员",
   "channels.noGoal": "未设置共同目标",
