@@ -1614,13 +1614,32 @@ const RESEARCH_TEMPLATES: ResearchTemplate[] = [
   },
 ] as const;
 
-export function IdeasScreen({ onUsePrompt }: { onUsePrompt?: () => void } = {}) {
+export function IdeasScreen({
+  onUsePrompt,
+  onPickPrompt,
+  subtitle,
+}: {
+  /** 模板用完之后收尾（例如关掉灵感浮层）。 */
+  onUsePrompt?: () => void;
+  /**
+   * 自定义模板落地方式：传了就只把文案交给调用方（写进当前对话的输入框），
+   * 不再走「写进工作区草稿 + 跳回智能体对话」的默认路径。频道对话用这个。
+   */
+  onPickPrompt?: (prompt: string) => void;
+  /** 副标题覆写：频道里说「当前 Agent」不准确，改由调用方给出措辞。 */
+  subtitle?: string;
+} = {}) {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const { prefillPrompt, navigate } = useWorkspace();
   const { width } = useWindowDimensions();
   /** 模板只预填输入框，用户确认后再发送，避免一点就自动开跑。 */
   function fillPromptForAgent(prompt: string) {
+    if (onPickPrompt) {
+      onPickPrompt(prompt);
+      onUsePrompt?.();
+      return;
+    }
     prefillPrompt(prompt);
     navigate("chat");
     onUsePrompt?.();
@@ -1635,7 +1654,7 @@ export function IdeasScreen({ onUsePrompt }: { onUsePrompt?: () => void } = {}) 
       <AgentStatus />
       <View style={{ gap: 14 }}>
         <View style={{ gap: 4 }}>
-          <Text style={s.muted}>{t("agent.researchTemplatesDetail")}</Text>
+          <Text style={s.muted}>{subtitle ?? t("agent.researchTemplatesDetail")}</Text>
         </View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
           {RESEARCH_TEMPLATES.map((template, index) => {
@@ -1725,7 +1744,12 @@ export function IdeasScreen({ onUsePrompt }: { onUsePrompt?: () => void } = {}) 
         <View style={{ gap: 6 }}>
           <SectionHeading title={t("agent.ideasForYou")} />
           {ideas.map((idea) => (
-            <IdeaCard key={idea.id} idea={idea} onUsePrompt={onUsePrompt} />
+            <IdeaCard
+              key={idea.id}
+              idea={idea}
+              onUsePrompt={onUsePrompt}
+              onPickPrompt={onPickPrompt}
+            />
           ))}
         </View>
       )}
@@ -1757,7 +1781,16 @@ function TaskLink({ taskId, onOpen }: { taskId: string; onOpen?: () => void }) {
     </Button>
   );
 }
-function IdeaCard({ idea, onUsePrompt }: { idea: Idea; onUsePrompt?: () => void }) {
+function IdeaCard({
+  idea,
+  onUsePrompt,
+  onPickPrompt,
+}: {
+  idea: Idea;
+  onUsePrompt?: () => void;
+  /** 传了就不直接发送，只把文案交给调用方填进当前输入框。 */
+  onPickPrompt?: (prompt: string) => void;
+}) {
   const { t } = useTranslation();
   const { mutate } = useAgentWorkspace();
   const { ask, navigate } = useWorkspace();
@@ -1768,6 +1801,12 @@ function IdeaCard({ idea, onUsePrompt }: { idea: Idea; onUsePrompt?: () => void 
   const [busy, setBusy] = useState(false);
   async function act(action: "accept" | "dismiss") {
     if (action === "accept") {
+      // 频道等自定义场景只预填，问题交给用户确认后再发出去。
+      if (onPickPrompt) {
+        onPickPrompt(prompt.trim());
+        onUsePrompt?.();
+        return;
+      }
       ask(prompt.trim());
       navigate("chat");
       onUsePrompt?.();

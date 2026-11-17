@@ -1533,7 +1533,7 @@ export function ChatScreen({
           ref={list}
           style={[
             messageColumnStyle,
-            { opacity: historyPositioned ? 1 : 0 },
+            { flex: 1, opacity: historyPositioned ? 1 : 0 },
             phoneChatFade && edgeFadeMask(contentTopInset, contentBottomInset),
           ]}
           showsVerticalScrollIndicator={false}
@@ -1672,7 +1672,15 @@ export function ChatScreen({
                   gap: wideEmpty ? 54 : 26,
                 }}
               >
-                <View style={{ flex: 1, minWidth: 0, justifyContent: "center", gap: 14 }}>
+                <View
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    justifyContent: "center",
+                    alignItems: hideHeader ? "center" : "stretch",
+                    gap: 14,
+                  }}
+                >
                   {hideHeader ? (
                     <AgentOrb
                       avatar={agentContext?.avatar ?? "orb"}
@@ -1696,6 +1704,7 @@ export function ChatScreen({
                     accessibilityLabel={t("chat.emptyTitle")}
                     style={{
                       maxWidth: 560,
+                      textAlign: hideHeader ? "center" : "left",
                       color: colors.heading,
                       fontSize: hideHeader ? 22 : wideEmpty ? 34 : 28,
                       lineHeight: hideHeader ? 32 : wideEmpty ? 46 : 38,

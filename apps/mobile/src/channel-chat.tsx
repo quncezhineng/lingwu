@@ -29,7 +29,8 @@ import { ComposerDock } from "./composer-dock";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { useTranslation } from "./i18n";
-import { Brain, FolderOpen, Link2, Sparkles, Upload, Users } from "./icons";
+import { Brain, FolderOpen, Lightbulb, Link2, Sparkles, Upload, Users } from "./icons";
+import { IdeasOverlay } from "./ideas-overlay";
 import { MessageActions } from "./message-actions";
 import { PromptComposer } from "./prompt-composer";
 import { publishShare } from "./share-page";
@@ -84,6 +85,8 @@ export function ChannelChatScreen({
   const [pickerSelection, setPickerSelection] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [connectorPickerOpen, setConnectorPickerOpen] = useState(false);
+  /** 灵感浮层：和智能体对话页同一个组件，模板点选后只填进本频道输入框。 */
+  const [ideasOpen, setIdeasOpen] = useState(false);
   const [selectedConnectorIds, setSelectedConnectorIds] = useState<string[]>([]);
   // 频道技能选择（与 Agent 对话的技能选择同组件）：勾选后进入本轮讨论上下文。
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
@@ -438,7 +441,7 @@ export function ChannelChatScreen({
           }}
         />
         <PromptComposer
-          style={conversationColumnStyle}
+          style={[conversationColumnStyle, { marginBottom: 12 }]}
           value={draft}
           onChangeText={setDraft}
           onSubmit={busy ? stop : send}
@@ -482,6 +485,12 @@ export function ChannelChatScreen({
               onPress: () => setConnectorPickerOpen(true),
             },
           ]}
+          cornerAction={{
+            // 与智能体对话页同一位置（输入框右上角）、同一入口：打开灵感浮层挑模板。
+            icon: Lightbulb,
+            label: t("agentSpace.openIdeasPage"),
+            onPress: () => setIdeasOpen(true),
+          }}
           attachments={
             <>
               <ComposerSelectionChips
@@ -588,6 +597,14 @@ export function ChannelChatScreen({
             setConnectorPickerOpen(false);
             navigate("connections");
           }}
+        />
+      )}
+      {ideasOpen && (
+        <IdeasOverlay
+          onClose={() => setIdeasOpen(false)}
+          subtitle={t("channels.ideasSubtitle")}
+          // 频道里不回填工作区草稿、也不跳去智能体对话：直接写进本频道输入框，由用户确认后再发。
+          onPickPrompt={(prompt) => setDraft(prompt)}
         />
       )}
     </View>
@@ -697,9 +714,6 @@ function MemberBubble({
           <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>
             {member?.name ?? agentId}
           </Text>
-          {member?.role ? (
-            <Text style={[s.small, { color: colors.faint }]}>{member.role}</Text>
-          ) : null}
         </View>
         <View style={{ paddingLeft: 42 }}>
           {title ? <Text style={[s.small, { color: colors.primaryStrong }]}>{title}</Text> : null}

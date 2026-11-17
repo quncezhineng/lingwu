@@ -5,6 +5,53 @@
 
 ## 变更记录
 
+### 2026-11-18 · 界面：删除频道对话页成员名字右侧的角色文案
+
+**背景**
+
+频道对话页里，成员名字右侧会显示角色文案，例如「个股研究员」。当前需求是删除这个元素，只保留成员名字、头像和回复内容，让消息头更干净。
+
+**处理**
+
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：在 `MemberBubble` 中移除 `member?.role` 的渲染，仅保留成员名 `member?.name ?? agentId`。这次改动只作用于频道对话页，不影响 Agent 定义里的 `role` 数据，也不影响其他页面继续使用角色文案。
+
+**验证**
+
+- `pnpm --filter @lingwu/mobile typecheck` 通过。
+- 请刷新频道对话页确认：成员名字右侧的「个股研究员」这类角色文字不再显示。
+
+### 2026-11-18 · 界面：频道对话输入框上移，与智能体对话页保持一致的底部留白
+
+**背景**
+
+频道对话页的悬浮输入框完全贴在页面最底边（`marginBottom: 0`），而智能体对话页（`hideHeader`）输入框距底部有 12px 留白。希望频道页输入框同样上移一点，不与页面最下边紧贴。
+
+**处理**
+
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx#L443-L444)：`PromptComposer` 的 `style` 由 `conversationColumnStyle` 改为 `[conversationColumnStyle, { marginBottom: 12 }]`，与 [chat.tsx](../apps/mobile/src/chat.tsx#L2428) 智能体页 `hideHeader` 模式取值一致。`ComposerDock` 的 `onLayout` 会把新增的 12px 计入输入框高度，消息列表的 `contentBottomInset` 自动跟随，滚动站位不受影响。
+
+**验证**
+
+- `pnpm --filter @lingwu/mobile typecheck` 通过。
+- 请刷新频道对话页确认：输入框整体上移 12px，不再紧贴网页最下边；滚动到消息末尾时仍不会被输入框遮挡。
+
+### 2026-11-18 · 界面：左侧栏「新建」菜单、按钮与 Agent 对话空状态的多项优化
+
+**背景**
+
+连续 5 项 UI 调整：①「新建」菜单需锚定在按钮下方左侧而非漂到栏右侧；②「新建」按钮加号图标与文字放大；③频道技能提示文案精简；④「新建频道」与「创建 Agent」菜单顺序调换；⑤Agent 对话页空状态（orb + 欢迎语）改为页面中间水平、垂直居中。
+
+**处理**
+
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx)：`CreateEntryMenu` 定位从「按钮右边缘右对齐」改为与按钮左边缘对齐 `Math.min(anchor.x, width - menuWidth - 12)`；菜单项顺序调整为「创建 Agent」在前，分隔线后「新建频道」；「新建」按钮 `minHeight` 提到 44、`gap` 9、`<Plus size={18} strokeWidth={2}>`、文字 `fontSize: 14`。
+- [chat.tsx](../apps/mobile/src/chat.tsx)：空状态外层 ScrollView style 增加 `flex: 1`（与 [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx#L330) 的 `style={[conversationColumnStyle, { flex: 1 }]}` 同款，让视口占满对话列、`contentContainerStyle.flexGrow: 1` 与空状态 `justifyContent: "center"` 才能生效）；空状态内容 View 在 `hideHeader` 下 `alignItems: "center"`，标题 Text 追加 `textAlign: "center"`，实现水平居中。Agent 页 `hideHeader` 时 `firstRunWelcome` 面板垂直居中在整列中间。
+- [i18n/locales/zh-Hans/channels.ts](../apps/mobile/src/i18n/locales/zh-Hans/channels.ts) 与 [en/channels.ts](../apps/mobile/src/i18n/locales/en/channels.ts)：`channels.skillsHint` 精简为「频道自己的技能，与成员各自的技能互相独立；添加后全员共享，投研时注入每位成员的上下文。」（中英文同步）。
+
+**验证**
+
+- `pnpm --filter @lingwu/mobile typecheck` 通过。
+- 请刷新页面确认：①新建弹窗贴靠按钮下方左侧；②新建按钮更大；③技能提示更短；④菜单顺序调换；⑤Agent 对话页首次进入时空状态位于页面正中间。
+
 ### 2026-11-17 · 功能：频道对话输入框新增「频道技能」选择（与 Agent 对话技能选择同组件）
 
 **背景**

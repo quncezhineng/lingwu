@@ -88,6 +88,8 @@ const channels = {
   "channels.tasksEmpty":
     "This channel has no research tasks yet. Go back to the channel chat and start one.",
   "channels.instructionsEmpty": "No shared instructions set yet.",
+  "channels.ideasSubtitle":
+    "Pick a direction, drop it into the channel composer, then decide who runs it.",
 } satisfies Dictionary;
 
 export default channels;

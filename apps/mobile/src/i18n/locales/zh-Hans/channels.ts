@@ -79,6 +79,7 @@ const channels = {
     "这个频道还没有技能。点右上角「添加技能」从技能库挑选，添加后全体成员都能用。",
   "channels.tasksEmpty": "这个频道还没有投研任务。回到频道对话发起一次投研吧。",
   "channels.instructionsEmpty": "尚未设置共享指令。",
+  "channels.ideasSubtitle": "选一个方向，填进频道输入框后再决定发给谁。",
 } satisfies Dictionary;
 
 export default channels;

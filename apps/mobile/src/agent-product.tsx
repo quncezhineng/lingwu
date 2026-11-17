@@ -62,7 +62,6 @@ import {
   ChevronRight,
   CircleUserRound,
   Languages,
-  Lightbulb,
   LogOut,
   MessageCircle,
   MoreHorizontal,
@@ -72,6 +71,7 @@ import {
   Trash2,
   X,
 } from "./icons";
+import { IdeasOverlay } from "./ideas-overlay";
 import { IosStack } from "./ios-stack";
 import { type BotPreview, latestReplyPreview } from "./mobile-bots";
 import { MobileBotsHome } from "./mobile-bots-home";
@@ -2052,95 +2052,6 @@ function SecondarySection({
     >
       {content}
     </ScrollView>
-  );
-}
-
-function IdeasOverlay({ onClose }: { onClose: () => void }) {
-  const { width, height } = useWindowDimensions();
-  const { t } = useTranslation();
-  const desktop = width >= breakpoints.desktop;
-  const panelWidth = Math.min(1180, Math.floor(width * (desktop ? 0.8 : 0.92)));
-  const panelHeight = Math.min(900, Math.floor(height * (desktop ? 0.8 : 0.9)));
-  return (
-    <ModalOverlay transition="fade" backdrop="subtle" onRequestClose={onClose}>
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          padding: desktop ? 24 : 12,
-        }}
-      >
-        <View
-          style={{
-            width: panelWidth,
-            height: panelHeight,
-            maxWidth: "100%",
-            maxHeight: "100%",
-            overflow: "hidden",
-            borderRadius: radius.sheet,
-            borderWidth: 1,
-            borderColor: colors.line,
-            backgroundColor: colors.canvas,
-            ...shadow.sheet,
-          }}
-        >
-          <View
-            style={{
-              height: 54,
-              flexShrink: 0,
-              paddingHorizontal: 18,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.line,
-              backgroundColor: colors.paper,
-            }}
-          >
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: radius.control,
-                backgroundColor: colors.sky,
-              }}
-            >
-              <Lightbulb size={17} color={colors.primary} />
-            </View>
-            <Text style={[typography.heading, { flex: 1, fontSize: 16 }]}>
-              {t("agentSpace.openIdeasPage")}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("ui.closeDetails")}
-              onPress={onClose}
-              style={({ pressed }) => ({
-                width: 36,
-                height: 36,
-                borderRadius: radius.full,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: pressed ? colors.overlay1 : "transparent",
-              })}
-            >
-              <X size={18} color={colors.muted} />
-            </Pressable>
-          </View>
-          <ScrollView
-            contentContainerStyle={{
-              paddingHorizontal: desktop ? 26 : 18,
-              paddingTop: 22,
-              paddingBottom: 34,
-            }}
-          >
-            <IdeasScreen onUsePrompt={onClose} />
-          </ScrollView>
-        </View>
-      </View>
-    </ModalOverlay>
   );
 }
 
