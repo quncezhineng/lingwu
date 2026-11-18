@@ -36,8 +36,9 @@ export function SkillSectionCard({
   const hasContent = Boolean(children);
 
   return (
-    // 外层不再套卡片样式：去掉外框线，间距与层级由内层内容卡承担。
-    <View style={{ gap: 22, padding: 20, borderRadius: 18 }}>
+    // 外层不再套 padding 容器：去掉内边距与圆角，网格直接铺满外层卡片内容区；
+    // gap 保留用来分隔说明行 / 数量行 / 技能网格。
+    <View style={{ gap: 22 }}>
       <View
         style={{
           flexDirection: wide ? "row" : "column",

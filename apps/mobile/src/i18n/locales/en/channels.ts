@@ -91,7 +91,7 @@ const channels = {
     'This channel has no skills yet. Use "Add skill" in the top right to pick from the library; every member can then use it.',
   "channels.tasksEmpty": "This channel has no tasks yet.",
   "channels.railTasksEmpty":
-    "This channel doesn't have any research tasks yet. Go back to the channel chat to start one.",
+    "This channel doesn't have any tasks yet. Go back to the channel chat to start one.",
   "channels.instructionsEmpty": "No shared instructions set yet.",
   "channels.ideasSubtitle":
     "Pick a direction, drop it into the channel composer, then decide who runs it.",

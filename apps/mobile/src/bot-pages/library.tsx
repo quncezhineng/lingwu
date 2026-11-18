@@ -46,10 +46,8 @@ export function BotLibraryPage({ onClose, embedded }: BotPageProps) {
 
   return (
     <BotPage title={t("agentSpace.library")} onClose={onClose} embedded={embedded}>
-      <View
-        // 外层不再套卡片样式：去掉外框线，文件/产出物卡片自带描边，间距与层级不受影响。
-        style={{ gap: 12, padding: 20, borderRadius: 18 }}
-      >
+      {/* 不再套 padding 容器：网格直接铺满外层卡片，只保留两个分节之间的纵向间距。 */}
+      <View style={{ gap: 12 }}>
         {!artifacts.length && !files.length ? (
           <View style={{ gap: 8, alignItems: "center", paddingVertical: 18 }}>
             <FolderOpen size={28} color={colors.faint} />

@@ -810,6 +810,7 @@ const agent = {
   "agent.run.event.meaningfulChange": "A meaningful change was found",
   "agent.run.event.detailsNeeded": "Your details are needed",
   "agent.run.event.readyForReview": "Ready for your review",
+  "agent.run.event.multiAgentResearchComplete": "Multi-agent research complete",
   "agent.run.event.newBrowserSession": "New browser session",
   "agent.run.event.watchNeedsAttention": "Watch needs attention",
   "agent.run.event.watchPaused": "Watch paused after repeated failures",
@@ -1055,7 +1056,7 @@ const agent = {
   "agentSpace.openIdeasPage": "Ideas",
   "agentSpace.ready": "Ready when you are",
   "agentSpace.noTasks":
-    "No automations or tasks yet. Return to chat and let an Agent start a piece of work.",
+    "This Agent has no active tasks yet. Return to chat and let an Agent start a piece of work.",
   "agentSpace.noInsights":
     "No insight cards yet. Completed research keeps its conclusion and source here.",
 } satisfies Dictionary;

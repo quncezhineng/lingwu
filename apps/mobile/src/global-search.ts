@@ -12,7 +12,11 @@ export interface SearchDocument {
   id: string;
   kind: GlobalSearchKind;
   title: string;
+  /** Search result rows may show a friendlier title than the raw indexed title. */
+  displayTitle?: string;
   detail: string;
+  /** Optional rich preview shown in the result row while plain `detail` stays searchable text. */
+  detailMarkdown?: string;
   /** Additional searchable text that should not be shown in the result row. */
   keywords?: string;
   updatedAt?: string;

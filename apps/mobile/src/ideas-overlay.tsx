@@ -31,7 +31,9 @@ export function IdeasOverlay({
   const panelHeight = Math.min(900, Math.floor(height * (desktop ? 0.8 : 0.9)));
   return (
     <ModalOverlay transition="fade" backdrop="subtle" onRequestClose={onClose}>
-      <View
+      {/* 背板：点击面板外任意区域即关闭灵感浮层（与 Sheet 同一套交互）。 */}
+      <Pressable
+        onPress={onClose}
         style={{
           flex: 1,
           alignItems: "center",
@@ -39,7 +41,9 @@ export function IdeasOverlay({
           padding: desktop ? 24 : 12,
         }}
       >
-        <View
+        {/* 面板自身拦截点击，避免面板内点击冒泡到背板导致误关。 */}
+        <Pressable
+          onPress={(event) => event.stopPropagation()}
           style={{
             width: panelWidth,
             height: panelHeight,
@@ -106,8 +110,8 @@ export function IdeasOverlay({
           >
             <IdeasScreen subtitle={subtitle} onUsePrompt={onClose} onPickPrompt={onPickPrompt} />
           </ScrollView>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </ModalOverlay>
   );
 }

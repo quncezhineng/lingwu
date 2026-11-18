@@ -723,6 +723,7 @@ const agent = {
   "agent.run.event.meaningfulChange": "发现有意义的变化",
   "agent.run.event.detailsNeeded": "需要你补充信息",
   "agent.run.event.readyForReview": "等待你的复核",
+  "agent.run.event.multiAgentResearchComplete": "多智能体研究已完成",
   "agent.run.event.newBrowserSession": "新的浏览器会话",
   "agent.run.event.watchNeedsAttention": "自动化需要关注",
   "agent.run.event.watchPaused": "多次失败后监控已暂停",
@@ -951,7 +952,7 @@ const agent = {
   "agentSpace.composer": "发消息给 {name}…",
   "agentSpace.openIdeasPage": "灵感",
   "agentSpace.ready": "随时可以开始",
-  "agentSpace.noTasks": "还没有自动化或任务。回到对话，让 Agent 开始一次分析。",
+  "agentSpace.noTasks": "这个智能体还没有任务。回到对话，让 Agent 开始一次分析。",
   "agentSpace.noInsights": "还没有可汇总的领悟卡。完成一次研究后，结论会保留来源。",
 } satisfies Dictionary;
 

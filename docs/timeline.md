@@ -5,6 +5,96 @@
 
 ## 变更记录
 
+### 2026-11-19 · Agent 详情技能页数量文案移到技能区左侧
+
+**背景**
+
+用户进一步调整智能体详情页面技能板块的头部布局，希望“{count} 个技能”不要继续放在右上角按钮下面，而是放到整个技能区头部的左侧，与右侧“添加技能”按钮形成左右分布。
+
+**处理**
+
+- [apps/mobile/src/bot-pages/skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：将技能数量文案从按钮下方改到头部左侧，头部容器改为左右两端对齐，右侧继续保留蓝色“添加技能”按钮。
+
+**验证**
+
+- `npx tsc --noEmit -p apps/mobile/tsconfig.json` 通过。
+
+### 2026-11-19 · 通知页运行态标题补充中英文双语显示
+
+**背景**
+
+用户希望通知页面里的运行态提示标题不要只显示英文，而是像“Multi-agent research complete”这类固定通知标题能够同时显示中文和英文，便于快速识别。
+
+**处理**
+
+- [apps/mobile/src/i18n/translate.ts](../apps/mobile/src/i18n/translate.ts)：为运行态固定标题新增 `runtimeLabelBilingual()`，统一输出“中文 / English”双语标题。
+- [apps/mobile/src/agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)：通知列表里的标题与无障碍标签改为使用双语标题显示。
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)、[apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：补充 `Multi-agent research complete` 对应的中英文运行时文案。
+
+**验证**
+
+- `npx tsc --noEmit -p apps/mobile/tsconfig.json` 通过。
+
+### 2026-11-19 · Agent 详情技能页补充当前技能数量显示
+
+**背景**
+
+用户希望智能体详情页面技能板块右上角“添加技能”按钮下方，增加一个显示当前已添加技能数量的元素，和频道详情页面技能区的反馈方式保持一致。
+
+**处理**
+
+- [apps/mobile/src/bot-pages/skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：在右上角“添加技能”主按钮下方补充技能数量文案，直接复用现有 `agentSpace.skillCount` 翻译键，按当前已挂载技能总数（目录技能 + 自建技能）实时显示。
+
+**验证**
+
+- `npx tsc --noEmit -p apps/mobile/tsconfig.json` 通过。
+
+### 2026-11-19 · 搜索页产物结果支持 Markdown 预览渲染
+
+**背景**
+
+用户在搜索页面里查看研究产物结果时，发现结果内容仍按纯文本显示，像 `#`、`**` 这类 Markdown 标记会直接露出来，阅读体验很差，希望改成真正的 Markdown 渲染显示。
+
+**处理**
+
+- [apps/mobile/src/search-sheet.tsx](../apps/mobile/src/search-sheet.tsx)：为搜索结果里的分析产物补充 `detailMarkdown` 预览字段；当产物标题里混入“标签: Markdown 正文”时，先拆出更短的展示标题，再把正文部分交给 Markdown 渲染。
+- [apps/mobile/src/ui.tsx](../apps/mobile/src/ui.tsx)：扩展 `LinkRow`，除了原来的纯文本 `detail`，也支持传入自定义 `detailNode`，让搜索页可以挂载紧凑版 Markdown 预览而不影响其他列表。
+- [apps/mobile/src/global-search.ts](../apps/mobile/src/global-search.ts)：补充搜索结果的可选展示标题与 Markdown 预览字段，搜索排序逻辑保持不变，仍使用纯文本内容参与匹配。
+
+**验证**
+
+- `npx tsc --noEmit -p apps/mobile/tsconfig.json` 通过。
+
+### 2026-11-19 · Agent 详情技能页“添加技能”按钮改为频道同款蓝色主按钮
+
+**背景**
+
+用户希望智能体详情页面技能板块右上角的“添加技能”按钮，和频道详情修改页面里的“添加技能”按钮保持同一套视觉风格，改为更明显的蓝色主按钮。
+
+**处理**
+
+- [apps/mobile/src/bot-pages/skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：将右上角“添加技能”按钮从默认小号描边按钮改为 `primary` 主按钮，沿用频道详情技能区已在使用的蓝色按钮样式与图标组合。
+
+**验证**
+
+- `npx tsc --noEmit -p apps/mobile/tsconfig.json` 通过。
+
+### 2026-11-19 · 频道对话页补齐“最新消息”返回底部按钮
+
+**背景**
+
+用户在频道对话页向上拖动查看历史消息时，希望像智能体对话页一样，在离开底部后出现一个“最新消息”按钮，点击即可快速回到最新一条回复，减少长对话里手动拖到底部的操作成本。
+
+**处理**
+
+- [apps/mobile/src/channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：复用智能体对话页同一套滚动阈值，新增 `awayFromLatest` 状态；当频道消息列表距离底部超过 `awayFromLatestSlack` 时，在悬浮输入框上方显示“最新消息”按钮。
+- 点击按钮后直接调用频道页现有 `ScrollView` 的 `scrollToEnd`，并重置跟随最新消息状态，后续新回复继续自动贴底。
+- 继续保留频道页原有的“展开工作过程时不强行拉到底部”行为，两套逻辑互不冲突。
+
+**验证**
+
+- `npx tsc --noEmit -p apps/mobile/tsconfig.json` 通过。
+
 ### 2026-11-18 · 频道详情技能页技能网格改为与 Agent 详情一致的宽度/双列布局
 
 **背景**
@@ -534,7 +624,7 @@ iPad 端左侧抽屉底部仍是“个人中心 + 设置”组合，和 PC 端�
 
 **背景**
 
-频道对话页输入框左侧弹出小窗口只有「上传资料 / 从我的资料选择 / 连接器选择」，希望像 Agent 对话页那样可以从弹出小窗口里选择技能。
+频道对话页输入框左侧弹出小窗口只有「上传资料 / 从我的资料选择 / 选择连接器」，希望像 Agent 对话页那样可以从弹出小窗口里选择技能。
 
 **处理**
 
@@ -1121,7 +1211,7 @@ iPad 端左侧抽屉底部仍是“个人中心 + 设置”组合，和 PC 端�
 - 全量 `pnpm test` 中 `tests/computer-e2b-desktop.test.ts` 1 例失败（E2B 沙箱环境不可用所致，与本次改动无关）。
 - 请在 `localhost:8081` 刷新后确认：智能体对话「选择资料」弹层同时列出上传资料与「分析生成」的分析产物，二者皆可勾选随消息发送；领悟卡与笔记不出现在弹层里。
 
-### 2026-11-14 · 界面：智能体对话的资料/连接器选择弹层改为双列布局
+### 2026-11-14 · 界面：智能体对话的资料/选择连接器弹层改为双列布局
 
 **背景**
 
@@ -2198,7 +2288,7 @@ Agent 详情 → 记忆页（`BotGoalsMemoryPage`）复用 `PreferencesScreen`�
 
 **处理**
 
-- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx)：`OptionCard` 新增可选 `onViewDetail` / `detailLabel`，在复选框左侧渲染 24×24 的 `FileText` 图标按钮，`stopPropagation` 保证点击不会顺带切换勾选；`SkillPickerSheet` 新增 `onInspectSkill?: (id: string) => void`，自建技能与目录技能两类卡片都把技能 id 交给调用方。连接器选择弹层用 `OptionRow`，不受影响。
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx)：`OptionCard` 新增可选 `onViewDetail` / `detailLabel`，在复选框左侧渲染 24×24 的 `FileText` 图标按钮，`stopPropagation` 保证点击不会顺带切换勾选；`SkillPickerSheet` 新增 `onInspectSkill?: (id: string) => void`，自建技能与目录技能两类卡片都把技能 id 交给调用方。选择连接器弹层用 `OptionRow`，不受影响。
 - [chat.tsx](../apps/mobile/src/chat.tsx)：新增 `inspectSkillId` 状态，把 `SkillPickerSheet` 与 `AgentSkillInspectSheet` 作为**兄弟节点**挂载（沿用 `AgentSheets` 的既有模式，避免嵌套 Modal）；详情直接复用现成的只读弹层——自建技能走 `MySkillDetailSheet`、目录技能走 `SkillDetailSheet`（不传 `agents` 即为只读，不会在选择对话技能时改动 Agent 的安装配置）。关闭详情回到选择列表；「应用」/关闭选择弹层、切换对话时清空该状态。
 - [i18n] zh-Hans / en 同步新增 `chat.skillPickerDetail`（「查看技能详情」/ "View skill details"）作为按钮的无障碍标签。
 
@@ -2589,11 +2679,11 @@ Agent 详情页右上角「更多」菜单弹窗宽度 180px，超出项目下�
 - `pnpm biome check --write apps/mobile/src/capability-picker.tsx`：通过。
 - `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
 
-### 2026-11-07 · 交互：连接器选择弹层未连接行支持「去连接」引导
+### 2026-11-07 · 交互：选择连接器弹层未连接行支持「去连接」引导
 
 **背景**
 
-连接器选择弹层中，未连接的连接器整行 `disabled`（半透明 + `pointerEvents: none`），点击没有任何反馈，用户只能依赖左下角「管理连接」按钮进入连接管理，路径不直观。现场反馈「为什么无法选择连接器」——连接器确实全部未连接（live 模式未做 Google OAuth、浏览器 worker 与 OpenBot 未配置），但产品层面应给未连接行一条明确的「去连接」出口。
+选择连接器弹层中，未连接的连接器整行 `disabled`（半透明 + `pointerEvents: none`），点击没有任何反馈，用户只能依赖左下角「管理连接」按钮进入连接管理，路径不直观。现场反馈「为什么无法选择连接器」——连接器确实全部未连接（live 模式未做 Google OAuth、浏览器 worker 与 OpenBot 未配置），但产品层面应给未连接行一条明确的「去连接」出口。
 
 **处理**
 

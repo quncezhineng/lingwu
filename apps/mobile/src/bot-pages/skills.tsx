@@ -276,31 +276,28 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
   return (
     <BotPage title={t("agentSpace.skills")} onClose={onClose} embedded={embedded}>
       <View style={{ gap: 8 }}>
-        <View style={{ alignItems: "flex-end", marginBottom: 5 }}>
-          <Button small icon={Plus} onPress={() => setAdding(true)}>
+        <View style={[s.between, { alignItems: "center", marginBottom: 5, gap: 12 }]}>
+          <Text style={s.small}>{t("agentSpace.skillCount", { count: skillCards.length })}</Text>
+          <Button primary icon={Plus} onPress={() => setAdding(true)}>
             {t("agentSpace.addSkill")}
           </Button>
         </View>
-        <View
-          // 外层不再套卡片样式：去掉外框线，技能卡自带描边，间距与层级不受影响。
-          style={{ padding: 20, borderRadius: 18 }}
-        >
-          {skillCards.length ? (
-            <CardGrid
-              items={skillCards}
-              minColumnWidth={300}
-              getKey={(card) => card.key}
-              render={(card) => card.node}
-            />
-          ) : (
-            <View style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
-              <Brain size={28} color={colors.faint} />
-              <Text style={[s.muted, { textAlign: "center", lineHeight: 22 }]}>
-                {t("agentSpace.skillEmpty")}
-              </Text>
-            </View>
-          )}
-        </View>
+        {/* 不再套 padding 容器：技能卡网格直接铺满外层卡片，卡片更宽、更贴近边缘。 */}
+        {skillCards.length ? (
+          <CardGrid
+            items={skillCards}
+            minColumnWidth={300}
+            getKey={(card) => card.key}
+            render={(card) => card.node}
+          />
+        ) : (
+          <View style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
+            <Brain size={28} color={colors.faint} />
+            <Text style={[s.muted, { textAlign: "center", lineHeight: 22 }]}>
+              {t("agentSpace.skillEmpty")}
+            </Text>
+          </View>
+        )}
       </View>
       {viewingCustom && (
         <MySkillDetailSheet

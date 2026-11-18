@@ -963,12 +963,14 @@ export function SectionHeading({
 export function LinkRow({
   title,
   detail,
+  detailNode,
   onPress,
   icon: Icon,
   tint,
 }: {
   title: string;
   detail?: string;
+  detailNode?: ReactNode;
   onPress: () => void;
   icon: IconComponent;
   tint?: string;
@@ -1003,7 +1005,7 @@ export function LinkRow({
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[s.text, { fontWeight: "500" }]}>{title}</Text>
-        {!!detail && <Text style={s.small}>{detail}</Text>}
+        {detailNode ?? (!!detail && <Text style={s.small}>{detail}</Text>)}
       </View>
       <ChevronRight size={14} color={semantic.subtleForeground} />
     </HoverPressable>
