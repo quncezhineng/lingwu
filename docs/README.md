@@ -74,6 +74,7 @@ LingWu（灵悟）是面向个人投资者的 AI 投研智能体。它把行情�
 | [行情数据源评估](市场数据源评估报告.md) | 美股、A 股、港股数据源比较 |
 | [行情缓存与降级](行情数据缓存与降级策略.md) | 缓存、降级、限流、监控设计 |
 | [对话流式协议](conversation-streaming.md) | AG-UI/SSE 事件与可靠性 |
+| [2026-11-18 群聊变更](channel-changes-2026-11-18.md) | `8b9f8f6` 的发言、换组长、工具、四拍、气泡、工作过程与分页 |
 | [Rich Threads](RICH-THREADS.md) | CopilotKit Intelligence 配置 |
 | [交互设计](EXPERIENCE.md) | 对话行为、卡片、反馈与边界 |
 | [OpenBot 集成契约](OPENBOT-INTEGRATION.md) | 适配器、身份与范围 |
