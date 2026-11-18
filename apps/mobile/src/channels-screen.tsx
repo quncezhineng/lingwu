@@ -250,11 +250,27 @@ export function CreateChannelSheet({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [leaderId, setLeaderId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const toggle = (id: string) =>
     setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
+  useEffect(() => {
+    setLeaderId((current) => {
+      if (current && selectedIds.includes(current)) return current;
+      return selectedIds[0] ?? null;
+    });
+  }, [selectedIds]);
+
+  const selectedAgents = useMemo(
+    () =>
+      selectedIds
+        .map((id) => agents.find((agent) => agent.id === id))
+        .filter((agent): agent is NonNullable<typeof agent> => Boolean(agent)),
+    [agents, selectedIds],
+  );
 
   async function submit() {
     setError("");
@@ -272,6 +288,7 @@ export function CreateChannelSheet({
         name: name.trim(),
         agentIds: selectedIds,
         description: description.trim() || undefined,
+        leaderId: leaderId ?? selectedIds[0],
       });
       onCreated(channel);
     } catch (e) {
@@ -304,6 +321,68 @@ export function CreateChannelSheet({
             </View>
           ))}
         </ScrollView>
+        {selectedAgents.length > 0 && (
+          <View style={{ gap: 8 }}>
+            <Text style={[s.heading, { fontSize: 14 }]}>{t("channels.leaderLabel")}</Text>
+            <Text style={[s.small, { color: colors.faint }]}>{t("channels.leaderHint")}</Text>
+            <View style={{ gap: 8 }}>
+              {selectedAgents.map((agent) => {
+                const selected = leaderId === agent.id;
+                return (
+                  <Pressable
+                    key={agent.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    onPress={() => setLeaderId(agent.id)}
+                    style={{
+                      minHeight: 44,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                      borderRadius: radius.card,
+                      borderWidth: 1,
+                      borderColor: selected ? colors.primary : colors.line,
+                      backgroundColor: selected ? colors.sky : colors.paper,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: selected ? colors.primary : colors.line,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: colors.paper,
+                      }}
+                    >
+                      {selected ? (
+                        <View
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 999,
+                            backgroundColor: colors.primary,
+                          }}
+                        />
+                      ) : null}
+                    </View>
+                    <AgentOrb avatar={agent.avatar} size={26} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[s.text, { fontWeight: "600" }]}>{agent.name}</Text>
+                      <Text style={[s.small, { color: colors.faint }]}>
+                        {agent.role || t("channels.roleUnset")}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
         <ErrorNotice error={error} />
         <Button primary busy={busy} onPress={() => void submit()}>
           {t("channels.createConfirm")}
@@ -321,7 +400,11 @@ function ChannelDetailSheet({ channel, onClose }: { channel: Channel; onClose: (
   const [goal, setGoal] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const members = channel.agentIds
+  const currentLeaderId =
+    channel.leaderId && channel.agentIds.includes(channel.leaderId)
+      ? channel.leaderId
+      : channel.agentIds[0];
+  const members = [currentLeaderId, ...channel.agentIds.filter((id) => id !== currentLeaderId)]
     .map((id) => agents.find((a) => a.id === id))
     .filter((m): m is NonNullable<typeof m> => Boolean(m));
 

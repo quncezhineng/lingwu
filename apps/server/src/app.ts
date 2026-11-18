@@ -490,9 +490,7 @@ export async function createApp(
       instructions: input.instructions ?? "",
       installedSkills: input.installedSkills ?? [],
       skillRefs: input.skillRefs ?? [],
-      leaderId: input.agentIds.includes(input.leaderId ?? "")
-        ? input.leaderId
-        : input.agentIds[0],
+      leaderId: input.agentIds.includes(input.leaderId ?? "") ? input.leaderId : input.agentIds[0],
       createdAt: now,
       updatedAt: now,
     };
@@ -537,7 +535,10 @@ export async function createApp(
     });
     const page = channelHistoryPage(messages, query);
     if ("missing" in page)
-      throw new AppError("The history position is no longer available. Reload the conversation.", 409);
+      throw new AppError(
+        "The history position is no longer available. Reload the conversation.",
+        409,
+      );
     return c.json(page);
   });
   /**

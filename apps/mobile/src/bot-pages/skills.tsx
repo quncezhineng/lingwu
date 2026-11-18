@@ -1,12 +1,14 @@
 import { type ReactNode, useState } from "react";
 import { Pressable, View } from "react-native";
+import type { Channel } from "../../../../packages/domain/src/channel";
 import { useAgentSpace } from "../agent-space";
 import { type AgentDefinition, type AgentSkill, heldCustomSkills } from "../agent-space-model";
 import { Text } from "../app-text";
 import { MySkillDetailSheet, SkillDetailSheet } from "../capability-hub";
 import { CardGrid } from "../card-grid";
+import { useChannels } from "../channels";
 import { useTranslation } from "../i18n";
-import { Plus } from "../icons";
+import { Brain, Plus } from "../icons";
 import { type SkillCatalogEntry, skillCatalog } from "../skill-catalog";
 import { SkillEditor } from "../skill-editor";
 import { SkillLibraryPanel, SkillRemoveButton } from "../skill-library-panel";
@@ -25,6 +27,7 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
     setSkillInstalled,
     skillLibrary,
   } = useAgentSpace();
+  const { channels, updateChannel } = useChannels();
   const { notify } = useWorkspace();
   /** 只用于编辑已有自建技能；创建入口统一收在「应用与能力 → 技能」。 */
   const [editingSkill, setEditingSkill] = useState<AgentSkill>();
@@ -40,6 +43,11 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
 
   /** 「添加到智能体」展示全部 Agent，含当前 Agent（技能创建于它，天然已添加）。 */
   const shareAddedIds = viewingCustom ? skillHolderAgentIds(agentList, viewingCustom) : [];
+  const shareAddedChannelIds = viewingCustom
+    ? channels
+        .filter((channel) => (channel.skillRefs ?? []).includes(viewingCustom.id))
+        .map((channel) => channel.id)
+    : [];
 
   /**
    * 「添加到智能体」：与「应用与能力 → 我的技能」共用同一套判定与切换逻辑。
@@ -57,6 +65,22 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
     );
   };
 
+  const toggleSkillInChannel = (channel: Channel) => {
+    if (!viewingCustom) return;
+    const installed = (channel.skillRefs ?? []).includes(viewingCustom.id);
+    void updateChannel(channel.id, {
+      skillRefs: installed
+        ? (channel.skillRefs ?? []).filter((id) => id !== viewingCustom.id)
+        : [...new Set([...(channel.skillRefs ?? []), viewingCustom.id])],
+    });
+    notify(
+      t(installed ? "agent.skillUninstalledToast" : "agent.skillInstalledToast", {
+        title: viewingCustom.name,
+        agent: channel.name,
+      }),
+    );
+  };
+
   /**
    * 技能库技能的「添加到智能体」：按智能体逐一开关安装状态，
    * 与「应用与能力 → 技能市场」的详情弹层共用同一套判定与提示。
@@ -69,6 +93,22 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
       t(installed ? "agent.skillUninstalledToast" : "agent.skillInstalledToast", {
         title: zh ? viewingCatalog.titleZh : viewingCatalog.titleEn,
         agent: agent.name,
+      }),
+    );
+  };
+
+  const toggleCatalogSkillInstallInChannel = (channel: Channel) => {
+    if (!viewingCatalog) return;
+    const installed = (channel.installedSkills ?? []).includes(viewingCatalog.id);
+    void updateChannel(channel.id, {
+      installedSkills: installed
+        ? (channel.installedSkills ?? []).filter((id) => id !== viewingCatalog.id)
+        : [...new Set([...(channel.installedSkills ?? []), viewingCatalog.id])],
+    });
+    notify(
+      t(installed ? "agent.skillUninstalledToast" : "agent.skillInstalledToast", {
+        title: zh ? viewingCatalog.titleZh : viewingCatalog.titleEn,
+        agent: channel.name,
       }),
     );
   };
@@ -157,7 +197,9 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
           <SkillDetailSheet
             skill={viewingCatalog}
             agents={agentList}
-            onToggleInstall={toggleCatalogSkillInstall}
+            channels={channels}
+            onToggleInstallAgent={toggleCatalogSkillInstall}
+            onToggleInstallChannel={toggleCatalogSkillInstallInChannel}
             onClose={() => setViewingCatalog(undefined)}
           />
         )}
@@ -234,30 +276,42 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
   return (
     <BotPage title={t("agentSpace.skills")} onClose={onClose} embedded={embedded}>
       <View style={{ gap: 8 }}>
-        {/* 右对齐的「+ 添加技能」：直接打开技能库，不再提供创建技能入口。 */}
         <View style={{ alignItems: "flex-end", marginBottom: 5 }}>
           <Button small icon={Plus} onPress={() => setAdding(true)}>
             {t("agentSpace.addSkill")}
           </Button>
         </View>
-        {customSkills.length || installedEntries.length ? (
-          <CardGrid
-            items={skillCards}
-            minColumnWidth={300}
-            getKey={(card) => card.key}
-            render={(card) => card.node}
-          />
-        ) : (
-          <Text style={[s.muted, { paddingVertical: 18 }]}>{t("agentSpace.skillEmpty")}</Text>
-        )}
+        <View
+          // 外层不再套卡片样式：去掉外框线，技能卡自带描边，间距与层级不受影响。
+          style={{ padding: 20, borderRadius: 18 }}
+        >
+          {skillCards.length ? (
+            <CardGrid
+              items={skillCards}
+              minColumnWidth={300}
+              getKey={(card) => card.key}
+              render={(card) => card.node}
+            />
+          ) : (
+            <View style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
+              <Brain size={28} color={colors.faint} />
+              <Text style={[s.muted, { textAlign: "center", lineHeight: 22 }]}>
+                {t("agentSpace.skillEmpty")}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
       {viewingCustom && (
         <MySkillDetailSheet
           title={viewingCustom.name}
           skill={viewingCustom}
           agents={agentList}
+          channels={channels}
           addedAgentIds={shareAddedIds}
-          onToggleAdd={toggleSkillInAgent}
+          addedChannelIds={shareAddedChannelIds}
+          onToggleAddAgent={toggleSkillInAgent}
+          onToggleAddChannel={toggleSkillInChannel}
           onClose={() => setViewingCustom(undefined)}
           footer={
             <Button
@@ -277,7 +331,9 @@ export function BotSkillsPage({ onClose, embedded }: BotPageProps) {
         <SkillDetailSheet
           skill={viewingCatalog}
           agents={agentList}
-          onToggleInstall={toggleCatalogSkillInstall}
+          channels={channels}
+          onToggleInstallAgent={toggleCatalogSkillInstall}
+          onToggleInstallChannel={toggleCatalogSkillInstallInChannel}
           onClose={() => setViewingCatalog(undefined)}
         />
       )}

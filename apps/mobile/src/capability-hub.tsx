@@ -1,12 +1,14 @@
 import { type ReactNode, useState } from "react";
 import { Linking, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import Markdown from "react-native-markdown-renderer";
+import { type Channel, normalizeChannelAvatar } from "../../../packages/domain/src/channel";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition, AgentSkill } from "./agent-space-model";
 import { AppConnectorSheet, type AppConnectorView, useAppConnectors } from "./app-connectors";
 import { Text, TextInput } from "./app-text";
 import { assistantMarkdown } from "./assistant-markdown";
+import { useChannels } from "./channels";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
 import {
@@ -495,15 +497,19 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
   );
 }
 
-/** 安装面板里的一行智能体：已安装的用底色 + 徽标区分，未安装保留空选中圈。 */
-function AgentInstallRow({
-  agent,
+/** 安装面板里的一行目标：可挂到智能体，也可挂到频道。 */
+function InstallTargetRow({
+  title,
+  detail,
+  avatar,
   installed,
   first,
   locked,
   onPress,
 }: {
-  agent: AgentDefinition;
+  title: string;
+  detail: string;
+  avatar: ReactNode;
   installed: boolean;
   first: boolean;
   /** 库化前「来源 Agent / 最后一份副本」的只读行；账户级技能库下当前 UI 不再传入。 */
@@ -516,7 +522,7 @@ function AgentInstallRow({
     <Pressable
       disabled={locked}
       accessibilityRole="checkbox"
-      accessibilityLabel={`${agent.name} · ${
+      accessibilityLabel={`${title} · ${
         installed ? installedLabel : t("agent.skillInstallAction")
       }`}
       accessibilityState={{ checked: installed, disabled: locked }}
@@ -535,7 +541,7 @@ function AgentInstallRow({
         },
       ]}
     >
-      <AgentOrb avatar={agent.avatar} size={30} />
+      {avatar}
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text
           numberOfLines={1}
@@ -547,7 +553,7 @@ function AgentInstallRow({
             fontFamily: fonts.sans,
           }}
         >
-          {agent.name}
+          {title}
         </Text>
         <Text
           numberOfLines={1}
@@ -558,7 +564,7 @@ function AgentInstallRow({
             fontFamily: fonts.sans,
           }}
         >
-          {agent.role}
+          {detail}
         </Text>
       </View>
       {installed ? (
@@ -589,31 +595,57 @@ function AgentInstallRow({
 }
 
 /**
- * 智能体选择面板：技能详情弹层的「添加到智能体」视图。
+ * 目标选择面板：技能详情弹层的「添加到智能体/频道」视图。
  *
- * 目录技能（安装到智能体）与自建技能（添加到智能体）共用这一版式，
- * 两者都展示全部智能体，只有「是否已持有」的判定方式不同，由调用方通过 `isAdded` 传入。
+ * 目录技能（安装）与自建技能（添加）共用这一版式，
+ * 同时展示全部智能体和频道，只有「是否已持有」的判定方式不同，由调用方传入。
  */
-function AgentPickerPanel({
+function InstallTargetPickerPanel({
   agents,
-  isAdded,
+  channels,
+  isAgentAdded,
+  isChannelAdded,
   lockedAgentIds,
-  onToggle,
+  onToggleAgent,
+  onToggleChannel,
 }: {
   agents: AgentDefinition[];
-  isAdded: (agent: AgentDefinition) => boolean;
+  channels: Channel[];
+  isAgentAdded: (agent: AgentDefinition) => boolean;
+  isChannelAdded: (channel: Channel) => boolean;
   /** 兼容旧数据的只读 Agent 列表；账户级技能库下当前 UI 不再传入。 */
   lockedAgentIds?: string[];
-  onToggle: (agent: AgentDefinition) => void;
+  onToggleAgent: (agent: AgentDefinition) => void;
+  onToggleChannel: (channel: Channel) => void;
 }) {
   const { t } = useTranslation();
+  const targets = [
+    ...agents.map((agent) => ({
+      key: `agent:${agent.id}`,
+      title: agent.name,
+      detail: agent.role,
+      avatar: <AgentOrb avatar={agent.avatar} size={30} />,
+      installed: isAgentAdded(agent),
+      locked: (lockedAgentIds ?? []).includes(agent.id),
+      onPress: () => onToggleAgent(agent),
+    })),
+    ...channels.map((channel) => ({
+      key: `channel:${channel.id}`,
+      title: channel.name,
+      detail: t("channels.memberCount", { count: channel.agentIds.length }),
+      avatar: <AgentOrb avatar={normalizeChannelAvatar(channel.avatar)} size={30} />,
+      installed: isChannelAdded(channel),
+      locked: false,
+      onPress: () => onToggleChannel(channel),
+    })),
+  ];
   // 只有真正传入锁定列表的面板才提示「不可移除」，避免无锁定视图出现误导性说明。
   return (
     <View style={{ gap: 12 }}>
       <Text style={s.small}>
         {t(lockedAgentIds ? "agent.skillInstallHint" : "agent.skillInstallHintNoLock")}
       </Text>
-      {agents.length ? (
+      {targets.length ? (
         <View
           style={{
             borderWidth: 1,
@@ -622,16 +654,17 @@ function AgentPickerPanel({
             overflow: "hidden",
           }}
         >
-          {agents.map((agent, index) => {
-            const installed = isAdded(agent);
+          {targets.map((target, index) => {
             return (
-              <AgentInstallRow
-                key={agent.id}
-                agent={agent}
-                installed={installed}
+              <InstallTargetRow
+                key={target.key}
+                title={target.title}
+                detail={target.detail}
+                avatar={target.avatar}
+                installed={target.installed}
                 first={index === 0}
-                locked={installed && (lockedAgentIds ?? []).includes(agent.id)}
-                onPress={() => onToggle(agent)}
+                locked={target.installed && target.locked}
+                onPress={target.onPress}
               />
             );
           })}
@@ -640,7 +673,11 @@ function AgentPickerPanel({
         <Text style={s.small}>{t("agent.skillShareNoTargets")}</Text>
       )}
       <Text style={[s.small, { color: colors.faint }]}>
-        {t("agent.skillInstallSummary", { count: agents.filter(isAdded).length })}
+        {t("agent.skillInstallSummary", {
+          count:
+            agents.filter((agent) => isAgentAdded(agent)).length +
+            channels.filter((channel) => isChannelAdded(channel)).length,
+        })}
       </Text>
     </View>
   );
@@ -655,25 +692,32 @@ function AgentPickerPanel({
 export function SkillDetailSheet({
   skill,
   agents,
+  channels,
   onClose,
   onUse,
-  onToggleInstall,
+  onToggleInstallAgent,
+  onToggleInstallChannel,
 }: {
   skill: SkillCatalogEntry;
-  /** 传入即展示「安装到智能体」面板；不传则为只读详情。 */
+  /** 传入即展示「安装到智能体/频道」面板；不传则为只读详情。 */
   agents?: AgentDefinition[];
+  channels?: Channel[];
   onClose: () => void;
   /** 传入即展示「使用此技能」操作；不传则隐藏该区域。 */
   onUse?: () => void;
   /** 切换某个智能体的安装状态（已安装则移除）。 */
-  onToggleInstall?: (agent: AgentDefinition) => void;
+  onToggleInstallAgent?: (agent: AgentDefinition) => void;
+  /** 切换某个频道的安装状态（已安装则移除）。 */
+  onToggleInstallChannel?: (channel: Channel) => void;
 }) {
   const { t, locale } = useTranslation();
   const [installing, setInstalling] = useState(false);
   const appearance = SKILL_CATEGORY_APPEARANCE[skillCategory(skill)];
   const primaryTitle = locale === "zh-Hans" ? skill.titleZh : skill.titleEn;
   const secondaryTitle = locale === "zh-Hans" ? skill.titleEn : skill.titleZh;
-  const installable = Boolean(agents && onToggleInstall);
+  const installable = Boolean(
+    (agents || channels) && onToggleInstallAgent && onToggleInstallChannel,
+  );
 
   return (
     <Sheet
@@ -694,10 +738,13 @@ export function SkillDetailSheet({
       }
     >
       {installable && installing ? (
-        <AgentPickerPanel
+        <InstallTargetPickerPanel
           agents={agents ?? []}
-          isAdded={(agent) => agent.installedSkills.includes(skill.id)}
-          onToggle={(agent) => onToggleInstall?.(agent)}
+          channels={channels ?? []}
+          isAgentAdded={(agent) => agent.installedSkills.includes(skill.id)}
+          isChannelAdded={(channel) => (channel.installedSkills ?? []).includes(skill.id)}
+          onToggleAgent={(agent) => onToggleInstallAgent?.(agent)}
+          onToggleChannel={(channel) => onToggleInstallChannel?.(channel)}
         />
       ) : (
         <View style={{ gap: 18 }}>
@@ -782,28 +829,36 @@ export function MySkillDetailSheet({
   skill,
   footer,
   agents,
+  channels,
   addedAgentIds,
+  addedChannelIds,
   lockedAgentIds,
-  onToggleAdd,
+  onToggleAddAgent,
+  onToggleAddChannel,
   onClose,
 }: {
   title: string;
   subtitle?: string;
   skill: Pick<AgentSkill, "name" | "purpose" | "instructions" | "outputFormat" | "version">;
   footer?: ReactNode;
-  /** 可选的智能体（全部，含技能来源 Agent）。传入即展示「添加到智能体」入口。 */
+  /** 可选的智能体（全部，含技能来源 Agent）。传入即展示「添加到智能体/频道」入口。 */
   agents?: AgentDefinition[];
+  channels?: Channel[];
   /** 已持有该技能的智能体 id，用于行内「已添加」标记与计数。 */
   addedAgentIds?: string[];
+  /** 已持有该技能的频道 id，用于行内「已添加」标记与计数。 */
+  addedChannelIds?: string[];
   /** 兼容旧数据：需保留的副本所在智能体 id；账户级技能库下当前 UI 不再传入。 */
   lockedAgentIds?: string[];
   /** 切换某个智能体是否持有该技能。 */
-  onToggleAdd?: (agent: AgentDefinition) => void;
+  onToggleAddAgent?: (agent: AgentDefinition) => void;
+  /** 切换某个频道是否持有该技能。 */
+  onToggleAddChannel?: (channel: Channel) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
-  const shareable = Boolean(agents && onToggleAdd);
+  const shareable = Boolean((agents || channels) && onToggleAddAgent && onToggleAddChannel);
   return (
     <Sheet
       title={shareable && adding ? t("agent.skillInstallTitle") : title}
@@ -823,11 +878,14 @@ export function MySkillDetailSheet({
       }
     >
       {shareable && adding ? (
-        <AgentPickerPanel
+        <InstallTargetPickerPanel
           agents={agents ?? []}
-          isAdded={(agent) => (addedAgentIds ?? []).includes(agent.id)}
+          channels={channels ?? []}
+          isAgentAdded={(agent) => (addedAgentIds ?? []).includes(agent.id)}
+          isChannelAdded={(channel) => (addedChannelIds ?? []).includes(channel.id)}
           lockedAgentIds={lockedAgentIds}
-          onToggle={(agent) => onToggleAdd?.(agent)}
+          onToggleAgent={(agent) => onToggleAddAgent?.(agent)}
+          onToggleChannel={(channel) => onToggleAddChannel?.(channel)}
         />
       ) : (
         <View style={{ gap: 16 }}>
@@ -1240,6 +1298,7 @@ export function CapabilityHubScreen() {
     saveLibrarySkill,
     deleteLibrarySkill,
   } = useAgentSpace();
+  const { channels, updateChannel } = useChannels();
   const [category, setCategory] = useState<CategoryId>("all");
   const [typeFilter, setTypeFilter] = useState<CapabilityType>("skills");
   const [query, setQuery] = useState("");
@@ -1316,6 +1375,12 @@ export function CapabilityHubScreen() {
   const mySkillAddedAgentIds = selectedMySkill
     ? skillHolderAgentIds(agentList, selectedMySkill.skill)
     : [];
+  /** 频道对账户级自建技能直接保存引用，所以只需看 `skillRefs`。 */
+  const mySkillAddedChannelIds = selectedMySkill
+    ? channels
+        .filter((channel) => (channel.skillRefs ?? []).includes(selectedMySkill.skill.id))
+        .map((channel) => channel.id)
+    : [];
 
   async function openGoogleConnector(id: "gmail" | "calendar") {
     if (googleConnectingId) return;
@@ -1364,6 +1429,22 @@ export function CapabilityHubScreen() {
       t(action === "added" ? "agent.skillInstalledToast" : "agent.skillUninstalledToast", {
         title: selectedMySkill.skill.name,
         agent: agent.name,
+      }),
+    );
+  }
+
+  function toggleMySkillInChannel(channel: Channel) {
+    if (!selectedMySkill) return;
+    const installed = (channel.skillRefs ?? []).includes(selectedMySkill.skill.id);
+    void updateChannel(channel.id, {
+      skillRefs: installed
+        ? (channel.skillRefs ?? []).filter((id) => id !== selectedMySkill.skill.id)
+        : [...new Set([...(channel.skillRefs ?? []), selectedMySkill.skill.id])],
+    });
+    notify(
+      t(installed ? "agent.skillUninstalledToast" : "agent.skillInstalledToast", {
+        title: selectedMySkill.skill.name,
+        agent: channel.name,
       }),
     );
   }
@@ -1419,6 +1500,22 @@ export function CapabilityHubScreen() {
       t(installed ? "agent.skillUninstalledToast" : "agent.skillInstalledToast", {
         title: locale === "zh-Hans" ? selectedSkill.titleZh : selectedSkill.titleEn,
         agent: agent.name,
+      }),
+    );
+  }
+
+  function toggleSkillInstallInChannel(channel: Channel) {
+    if (!selectedSkill) return;
+    const installed = (channel.installedSkills ?? []).includes(selectedSkill.id);
+    void updateChannel(channel.id, {
+      installedSkills: installed
+        ? (channel.installedSkills ?? []).filter((id) => id !== selectedSkill.id)
+        : [...new Set([...(channel.installedSkills ?? []), selectedSkill.id])],
+    });
+    notify(
+      t(installed ? "agent.skillUninstalledToast" : "agent.skillInstalledToast", {
+        title: locale === "zh-Hans" ? selectedSkill.titleZh : selectedSkill.titleEn,
+        agent: channel.name,
       }),
     );
   }
@@ -1877,8 +1974,11 @@ export function CapabilityHubScreen() {
           title={selectedMySkill.skill.name}
           skill={selectedMySkill.skill}
           agents={agentList}
+          channels={channels}
           addedAgentIds={mySkillAddedAgentIds}
-          onToggleAdd={toggleMySkillInAgent}
+          addedChannelIds={mySkillAddedChannelIds}
+          onToggleAddAgent={toggleMySkillInAgent}
+          onToggleAddChannel={toggleMySkillInChannel}
           onClose={() => setSelectedMySkill(undefined)}
           footer={
             <View style={[s.row, { gap: 10 }]}>
@@ -1907,9 +2007,11 @@ export function CapabilityHubScreen() {
         <SkillDetailSheet
           skill={selectedSkill}
           agents={agentList}
+          channels={channels}
           onClose={() => setSelectedSkillId(undefined)}
           onUse={() => startSelectedSkill(selectedSkill)}
-          onToggleInstall={toggleSkillInstall}
+          onToggleInstallAgent={toggleSkillInstall}
+          onToggleInstallChannel={toggleSkillInstallInChannel}
         />
       )}
 

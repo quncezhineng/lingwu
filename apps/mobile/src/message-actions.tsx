@@ -1,5 +1,5 @@
 import { type ReactNode, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
 import { saveTextFile } from "./csv-file";
@@ -39,7 +39,11 @@ export function MessageActions({
   onPublishShare?: PublishShare;
 }) {
   const { t } = useTranslation();
+  const { width } = useWindowDimensions();
+  const [rowWidth, setRowWidth] = useState(0);
   const sentAt = formatMessageTime(at);
+  const effectiveWidth = rowWidth || width;
+  const compact = effectiveWidth < 430;
   // 点赞与点踩互斥：再次点击已选中的一侧取消选择。
   const [feedback, setFeedback] = useState<"like" | "dislike" | null>(null);
   const [copied, setCopied] = useState(false);
@@ -154,10 +158,18 @@ export function MessageActions({
         </View>
       )}
 
-      <View style={styles.row}>
+      <View
+        onLayout={(event) => {
+          const nextWidth = Math.round(event.nativeEvent.layout.width);
+          setRowWidth((current) => (current === nextWidth ? current : nextWidth));
+        }}
+        style={[styles.row, compact && styles.rowCompact]}
+      >
         <ActionButton
-          label={t(feedback === "like" ? "chat.liked" : "chat.like")}
+          accessibilityLabel={t(feedback === "like" ? "chat.liked" : "chat.like")}
+          label={compact ? undefined : t(feedback === "like" ? "chat.liked" : "chat.like")}
           active={feedback === "like"}
+          compact={compact}
           onPress={() => onToggleFeedback("like")}
         >
           <ThumbsUp
@@ -167,8 +179,10 @@ export function MessageActions({
           />
         </ActionButton>
         <ActionButton
-          label={t(feedback === "dislike" ? "chat.disliked" : "chat.dislike")}
+          accessibilityLabel={t(feedback === "dislike" ? "chat.disliked" : "chat.dislike")}
+          label={compact ? undefined : t(feedback === "dislike" ? "chat.disliked" : "chat.dislike")}
           active={feedback === "dislike"}
+          compact={compact}
           onPress={() => onToggleFeedback("dislike")}
         >
           <ThumbsDown
@@ -177,19 +191,28 @@ export function MessageActions({
             fill={feedback === "dislike" ? colors.primary : undefined}
           />
         </ActionButton>
-        <ActionButton label={t("chat.exportMarkdown")} onPress={onExport}>
+        <ActionButton
+          accessibilityLabel={t("chat.exportMarkdown")}
+          label={t(compact ? "chat.exportShort" : "chat.exportMarkdown")}
+          compact={compact}
+          onPress={onExport}
+        >
           <ArrowDownToLine size={15} color={colors.muted} />
         </ActionButton>
         <ActionButton
-          label={t(copied ? "chat.copiedMarkdown" : "chat.copyMarkdown")}
+          accessibilityLabel={t(copied ? "chat.copiedMarkdown" : "chat.copyMarkdown")}
+          label={t(copied ? "chat.copiedShort" : compact ? "chat.copyShort" : "chat.copyMarkdown")}
+          compact={compact}
           onPress={onCopy}
         >
           <Copy size={15} color={copied ? colors.primary : colors.muted} />
         </ActionButton>
         <View style={styles.shareWrap}>
           <ActionButton
+            accessibilityLabel={t("chat.share")}
             label={t("chat.share")}
             active={shareOpen}
+            compact={compact}
             onPress={() => setShareOpen((value) => !value)}
           >
             <Share2 size={15} color={shareOpen ? colors.primary : colors.muted} />
@@ -211,8 +234,7 @@ export function MessageActions({
             </View>
           )}
         </View>
-        {/* 回复时间：贴在操作栏最左，紧挨「喜欢」按钮。 */}
-        {sentAt ? <Text style={styles.time}>{sentAt}</Text> : null}
+        {sentAt ? <Text style={[styles.time, compact && styles.timeCompact]}>{sentAt}</Text> : null}
       </View>
     </>
   );
@@ -261,29 +283,44 @@ function ShareMenuItem({
 }
 
 function ActionButton({
+  accessibilityLabel,
   label,
   onPress,
   active = false,
+  compact = false,
   children,
 }: {
-  label: string;
+  accessibilityLabel: string;
+  label?: string;
   onPress: () => void;
   active?: boolean;
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       hitSlop={8}
       style={({ pressed }) => [
         styles.button,
+        compact && styles.buttonCompact,
         (pressed || active) && { backgroundColor: colors.overlay1 },
       ]}
     >
       {children}
-      <Text style={[styles.label, active && { color: colors.primaryStrong }]}>{label}</Text>
+      {label ? (
+        <Text
+          style={[
+            styles.label,
+            compact && styles.labelCompact,
+            active && { color: colors.primaryStrong },
+          ]}
+        >
+          {label}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -295,6 +332,9 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 2,
   },
+  rowCompact: {
+    gap: 2,
+  },
   button: {
     flexDirection: "row",
     alignItems: "center",
@@ -303,17 +343,30 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: radius.control,
   },
+  buttonCompact: {
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
   label: {
     fontSize: 12,
     lineHeight: 18,
     color: colors.muted,
   },
+  labelCompact: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
   time: {
-    // 时间位于操作栏最左（喜欢按钮左侧），不再需要向右推。
     paddingRight: 8,
     fontSize: 11,
     lineHeight: 18,
     color: colors.faint,
+  },
+  timeCompact: {
+    paddingRight: 0,
+    fontSize: 10,
+    lineHeight: 16,
   },
   shareWrap: {
     position: "relative",

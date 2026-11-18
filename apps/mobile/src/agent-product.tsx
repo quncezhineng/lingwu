@@ -337,12 +337,16 @@ function CreateEntryMenu({
   onCreateAgent: () => void;
 }) {
   const { t } = useTranslation();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const menuWidth = Math.min(180, width - 24);
+  // 两行菜单 + 分隔线的高度，和 AgentMenu / ChannelMenu 用同一套估算方式。
+  const menuHeight = 10 + 2 * 34 + 7;
   // 「新建」按钮横向占满整个侧栏，菜单对齐按钮左边缘，正好落在「+ 新建」文字下方靠左。
   const left = Math.max(12, Math.min(anchor.x, width - menuWidth - 12));
-  // 永远贴在「新建」按钮的正下方，不做上方翻转。
-  const top = anchor.y + anchor.height + 6;
+  // 默认贴在「新建」按钮下方；手机抽屉里按钮靠底部，向下会超出屏幕时翻到上方，
+  // 保证「创建 Agent / 新建频道」选择菜单在手机上一定可见（与电脑端一致）。
+  const below = anchor.y + anchor.height + 6;
+  const top = below + menuHeight > height - 12 ? Math.max(12, anchor.y - menuHeight - 6) : below;
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1 }}>
@@ -353,6 +357,7 @@ function CreateEntryMenu({
           style={{ flex: 1 }}
         />
         <View
+          testID="create-entry-menu"
           style={{
             position: "absolute",
             top,
@@ -1034,12 +1039,14 @@ function AgentRail({
   onSignOut,
   onClose,
   compact = false,
+  desktopLikeCompactFooter = false,
 }: {
   onOpen: (panel: AgentPanel) => void;
   onSearch: () => void;
   onSignOut: () => void;
   onClose?: () => void;
   compact?: boolean;
+  desktopLikeCompactFooter?: boolean;
 }) {
   const { t } = useTranslation();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -1360,7 +1367,7 @@ function AgentRail({
           </Text>
         </Pressable>
       </ScrollView>
-      {compact ? (
+      {compact && !desktopLikeCompactFooter ? (
         <View
           style={{
             borderTopWidth: 1,
@@ -2464,7 +2471,12 @@ export function AgentProductShell({
                           selectAgent(agent.id);
                           setBotOpen(true);
                         }}
-                        onCreate={() => openPanel("create")}
+                        onOpenChannel={(channel) => {
+                          selectChannel(channel.id);
+                          setBotOpen(true);
+                        }}
+                        onCreateAgent={() => openPanel("create")}
+                        onCreateChannel={() => openPanel("create-channel")}
                         onAccount={() => setMobileAccountMenu(true)}
                         onNotifications={() => open({ type: "notifications" })}
                         onConnections={() => setAppsSheet(true)}
@@ -2573,6 +2585,7 @@ export function AgentProductShell({
           >
             <AgentRail
               compact
+              desktopLikeCompactFooter={!phone}
               onOpen={openPanel}
               onSearch={() => setSearchOpen(true)}
               onSignOut={onSignOut}

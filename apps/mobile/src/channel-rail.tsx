@@ -2,29 +2,33 @@ import { useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { type Channel, normalizeChannelAvatar } from "../../../packages/domain/src/channel";
 import { AgentOrb } from "./agent-orb";
+import { type AgentPanel, WorkspacePanelButtons } from "./agent-sheets";
 import { useAgentSpace } from "./agent-space";
-import type { AgentPanel } from "./agent-sheets";
+import { RAIL_WORK_PREVIEW_LIMIT, RailWorkGroups } from "./agent-work-dialog";
+import { useAgentWorkspace } from "./agent-workspace";
+import { Text } from "./app-text";
+import { railWorkItems } from "./automation-task-rail";
 import type { ChannelSettingsTab } from "./channel-settings-screen";
 import { useTranslation } from "./i18n";
 import { X } from "./icons";
-import { colors, radius, semantic, typography } from "./theme";
-import { Text } from "./app-text";
-import { HoverPressable, s } from "./ui";
+import { colors, fonts, radius, semantic, typography } from "./theme";
+import { Button, HoverPressable } from "./ui";
 
 /**
- * 频道右侧栏：只放成员列表，并标出组长。
- * 组长在聊天里用 @ 指定，这里不能改。
+ * 频道右侧栏：恢复成「最近任务 + 全局工作区」结构。
+ *
+ * 顶部仍保留频道身份信息；中间显示这个频道最近的投研任务；
+ * 底部复用全局工作区入口，和 Agent 右侧栏保持一致。
  */
 export function ChannelRail({
   channel,
   onOpenSettings,
-  onOpenPanel: _onOpenPanel,
+  onOpenPanel,
   onCollapse,
   page = false,
 }: {
   channel: Channel;
   onOpenSettings: (tab: ChannelSettingsTab) => void;
-  /** 保留参数，避免调用方改签名。工作区不再从这里打开。 */
   onOpenPanel: (panel: AgentPanel) => void;
   onCollapse?: () => void;
   /** 窄屏全屏页：去掉左描边，关闭交给页眉返回。 */
@@ -32,6 +36,7 @@ export function ChannelRail({
 }) {
   const { t } = useTranslation();
   const { agents } = useAgentSpace();
+  const { data } = useAgentWorkspace();
   const [hovered, setHovered] = useState(false);
   const members = useMemo(
     () =>
@@ -40,10 +45,18 @@ export function ChannelRail({
         .filter((agent): agent is NonNullable<typeof agent> => Boolean(agent)),
     [agents, channel.agentIds],
   );
-  const leaderId =
-    channel.leaderId && channel.agentIds.includes(channel.leaderId)
-      ? channel.leaderId
-      : channel.agentIds[0];
+  const tasks = useMemo(
+    () =>
+      (data?.tasks ?? []).filter(
+        (task) => typeof task.input?.channelId === "string" && task.input.channelId === channel.id,
+      ),
+    [data?.tasks, channel.id],
+  );
+  const monitors = useMemo(() => {
+    const taskIds = new Set(tasks.map((task) => task.id));
+    return (data?.monitors ?? []).filter((monitor) => taskIds.has(monitor.taskId));
+  }, [data?.monitors, tasks]);
+  const work = useMemo(() => railWorkItems(tasks, monitors), [tasks, monitors]);
 
   return (
     <View
@@ -121,55 +134,64 @@ export function ChannelRail({
           >
             {channel.name}
           </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              lineHeight: 20,
+              color: colors.faint,
+              marginTop: -2,
+            }}
+          >
+            {t("channels.memberCount", { count: members.length })}
+          </Text>
         </View>
 
-        <Text style={[s.small, { color: colors.faint, paddingHorizontal: 6, marginBottom: 8 }]}>
-          {t("channels.membersLabel")}
+        <Text
+          style={{
+            marginBottom: 10,
+            paddingHorizontal: 6,
+            fontSize: 15,
+            lineHeight: 22,
+            fontFamily: fonts.serif,
+            fontWeight: "600",
+            color: colors.text,
+          }}
+        >
+          {t("agentSpace.delegatedWork")}
         </Text>
-        <View testID="channel-rail-members" style={{ gap: 4 }}>
-          {members.map((member) => {
-            const leader = member.id === leaderId;
-            return (
-              <View
-                key={member.id}
-                testID={leader ? "channel-rail-leader" : undefined}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  paddingHorizontal: 8,
-                  paddingVertical: 8,
-                  borderRadius: radius.card,
-                }}
-              >
-                <AgentOrb avatar={member.avatar} size={32} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={[s.text, { fontWeight: "600" }]} numberOfLines={1}>
-                      {member.name}
-                    </Text>
-                    {leader && (
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          lineHeight: 16,
-                          color: colors.primaryStrong,
-                          fontWeight: "600",
-                        }}
-                      >
-                        {t("channels.leader")}
-                      </Text>
-                    )}
-                  </View>
-                  {!!member.role && (
-                    <Text style={[s.small, { color: colors.faint }]} numberOfLines={1}>
-                      {member.role}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            );
-          })}
+        <View testID="channel-rail-tasks">
+          <RailWorkGroups
+            items={work}
+            limit={RAIL_WORK_PREVIEW_LIMIT}
+            emptyText={t("channels.railTasksEmpty")}
+          />
+        </View>
+        <View style={{ marginTop: 12 }}>
+          <Button
+            variant="outline"
+            style={{ alignSelf: "stretch" }}
+            onPress={() => onOpenSettings("tasks")}
+          >
+            {t("agentSpace.moreDelegated")}
+          </Button>
+        </View>
+
+        <Text
+          style={{
+            marginTop: 26,
+            marginBottom: 14,
+            paddingHorizontal: 6,
+            fontSize: 15,
+            lineHeight: 22,
+            fontFamily: fonts.serif,
+            fontWeight: "600",
+            color: colors.text,
+          }}
+        >
+          {t("agentSpace.more")}
+        </Text>
+        <View style={{ marginTop: -4 }}>
+          <WorkspacePanelButtons onPanel={onOpenPanel} compact={false} />
         </View>
       </ScrollView>
     </View>

@@ -20,12 +20,6 @@ Built with CopilotKit React Native for iOS, Android, and web.
 
 Clone this template and customize it however you want.
 
-**[Building on LingWu? Meet with the CopilotKit team →](https://www.copilotkit.ai/talk-to-an-engineer?ref=lingwu_hero)**
-
-https://github.com/user-attachments/assets/8014d185-346c-4954-8ff0-26c582c5093a
-
-https://github.com/user-attachments/assets/0cc87de0-c3c1-4f24-b7df-e7d04bb946fd
-
 </div>
 
 > **Alpha, for self-hosting and building on.** Open-ended reasoning, live Google accounts, and CopilotKit Rich Threads require their own configuration. See [what is verified](docs/VERIFICATION.md) and the [roadmap](ROADMAP.md).

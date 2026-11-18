@@ -5,6 +5,484 @@
 
 ## 变更记录
 
+### 2026-11-18 · 频道详情技能页技能网格改为与 Agent 详情一致的宽度/双列布局
+
+**背景**
+
+用户在频道详情技能页反馈希望技能网格与 Agent 详情技能页一致：双列布局。两端都用 `CardGrid`（`minColumnWidth=300`），但频道页内容区原来多套了一层 `padding: 16`，把网格可用宽度额外收窄，在常见窗口宽度下会退化成单列。
+
+**处理**
+
+- [skill-section-card.tsx](../apps/mobile/src/skill-section-card.tsx)：有内容时的技能网格容器去掉 `padding: 16`，只保留 `gap: 12` 间距，让 `CardGrid` 的可用宽度与 Agent 详情技能页完全一致，列数判定随之对齐为双列。
+
+**验证**
+
+- `pnpm exec biome check apps/mobile/src/skill-section-card.tsx` 通过。
+- `pnpm typecheck` 通过。
+
+### 2026-11-18 · 频道详情技能页去掉技能网格外框线（含有技能时）
+
+**背景**
+
+频道详情技能页此前已完成「外层卡片去掉外框」，但用户在有技能时仍看到一层包住技能网格的白卡外框线（即 `hasContent` 分支的内容卡）。用户反馈这层多余，希望去掉，让技能卡列表直接铺开。
+
+**处理**
+
+- [skill-section-card.tsx](../apps/mobile/src/skill-section-card.tsx)：有内容时技能网格容器不再套 `s.card`，去掉外框线与底色，只保留 `padding` / `gap` 间距排版。
+- 每张技能卡（`Pressable`）自带描边，视觉锚点不变；空态盒子（图标 + 标题 + 说明）保持不变。
+
+**验证**
+
+- `pnpm exec biome check apps/mobile/src/skill-section-card.tsx` 通过。
+- `pnpm typecheck` 通过。
+
+### 2026-11-18 · Agent 详情资料页去掉外层卡片外框（含有产物时）
+
+**背景**
+
+Agent 详情页「资料」分区的外层卡片第一版只去掉了「空态」时的外框；随后用户反馈当资料有分析产物时外框线仍在，希望与频道技能页等区块一致：无论有没有资料都不再显示这层外框线，让文件卡 / 产物卡网格直接铺开。
+
+**处理**
+
+- [bot-pages/library.tsx](../apps/mobile/src/bot-pages/library.tsx)：外层容器不再套 `s.card`，直接移除条件样式，彻底去掉外框线与底色，只保留 `gap` / `padding` / `borderRadius` 间距排版。
+- 每张文件卡 / 分析产出物卡（`ArtifactCard`）自带描边，网格视觉锚点不变；空态时图标与提示文案原样保留。
+
+**验证**
+
+- `pnpm exec biome check apps/mobile/src/bot-pages/library.tsx` 通过。
+- `pnpm typecheck` 通过。
+
+### 2026-11-18 · Agent 详情技能页去掉外层卡片外框（含有技能时）
+
+**背景**
+
+Agent 详情页「技能」分区原有一层带 1px 描边的外层卡片。用户在有技能时反馈外框多余，希望与频道技能页一致：无论有没有技能都不再显示这层外框线，让技能卡网格直接铺开。
+
+**处理**
+
+- [bot-pages/skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：外层容器不再套 `s.card`，直接移除样式，彻底去掉外框线与底色，只保留 `padding` / `borderRadius` 间距排版。
+- 每张技能卡（目录技能 / 自建技能 `Pressable`）自带描边，网格视觉锚点不变；空态时图标与提示文案原样保留。
+
+**验证**
+
+- `pnpm exec biome check apps/mobile/src/bot-pages/skills.tsx` 通过。
+- `pnpm typecheck` 通过。
+
+### 2026-11-18 · Agent 详情任务页去掉外层卡片外框（含有任务时）
+
+**背景**
+
+Agent 详情页「任务」分区原有一层带 1px 描边的外层卡片。第一步只去掉了「空态」时的外框；随后用户反馈有任务时外框仍在，希望无论有没有任务都不再显示这层外框线，让任务卡网格直接铺开。
+
+**处理**
+
+- [bot-pages/history.tsx](../apps/mobile/src/bot-pages/history.tsx)：外层容器不再套 `s.card`，直接移除条件样式，彻底去掉外框线与底色，只保留 `padding` / `borderRadius` 间距排版。
+- 每张任务卡（`TaskCard`）自带描边，网格视觉锚点不变；空态时图标与提示文案原样保留。
+
+**验证**
+
+- `pnpm exec biome check apps/mobile/src/bot-pages/history.tsx` 通过。
+- `pnpm typecheck` 通过。
+
+### 2026-11-18 · 频道详情技能页去掉外层卡片外框（含已有技能时）
+
+**背景**
+
+频道详情页「技能」分区原本由外层一张带 1px 描边的卡片包住说明、数量与技能网格。第一步只去掉了「空态」时的外框；随后用户反馈挂载了几个技能之后外框仍在，希望无论有没有技能都不再显示这层外框线。
+
+**处理**
+
+- [skill-section-card.tsx](../apps/mobile/src/skill-section-card.tsx)：外层容器不再套 `s.card`，直接移除条件样式，彻底去掉外框线与底色，只保留 `gap` / `padding` / `borderRadius` 间距排版。
+- 真正的卡片视觉交给内层内容卡：有技能时是技能网格卡，空态时是空态盒子，两者自带描边，视觉锚点不变。
+- 该组件仅被频道详情技能页使用，Agent 详情技能页不受影响。
+
+**验证**
+
+- `pnpm exec biome check apps/mobile/src/skill-section-card.tsx` 通过。
+- `pnpm typecheck` 通过。
+
+### 2026-11-18 · Agent 详情资料页去掉外层卡片外框（无条件版本）
+
+**背景**
+
+Agent 详情页「资料」分区在外层卡片第一版时只去掉了「空态」条件下的外框。随后用户反馈当资料有分析产物时外框线仍在，因此本条目由「空态去掉外层卡片外框」升级为无条件版本（详见顶部最新条目）：无论有没有文件或产出物，都不再显示这层外框线。
+
+**处理**
+
+- [bot-pages/library.tsx](../apps/mobile/src/bot-pages/library.tsx)：外层卡片样式原先按是否有资料条件应用（空态不套 `s.card`，有资料时保留白卡描边）——该条件已经移除，统一为无条件去掉外框，保留 `gap` / `padding` 间距。
+- 空态内容（文件夹图标 + 提示文案）原样保留，位置与层级不变。
+
+**验证**
+
+- `pnpm exec biome check apps/mobile/src/bot-pages/library.tsx` 通过。
+- `pnpm typecheck` 通过。
+
+### 2026-11-18 · 频道详情技能页空态去掉外层卡片外框
+
+**背景**
+
+频道详情页「技能」分区在没有技能时，外层仍是一整张带 1px 描边的卡片（顶部说明 + 「添加技能」 + 「0 个技能」 + 空态盒子都被包在里面）。用户希望在无技能时去掉这层外框线，让空态看起来更轻。
+
+**处理**
+
+- [skill-section-card.tsx](../apps/mobile/src/skill-section-card.tsx)：外层容器样式改为 `hasContent && s.card` 条件应用——有技能时保持原来的白卡描边；空态时不再套 `s.card`，去掉描边与底色，仅保留 `gap` / `padding` 间距，避免布局跳动。
+- 空态盒子本身（图标 + 标题 + 说明）仍保留自己的内层卡片描边，视觉锚点不变。
+- 该组件仅被频道详情技能页使用，Agent 详情技能页不受影响。
+
+**验证**
+
+- `pnpm exec biome check apps/mobile/src/skill-section-card.tsx` 通过。
+- `pnpm typecheck` 通过。
+
+### 2026-11-18 · Agent 详情任务区改成频道任务区同风格单层卡片
+
+**背景**
+
+Agent 详情页里的「任务」分区原本是直接渲染任务网格，空态时只有一行提示文案；而频道详情页里的任务区已经是更稳定的单层卡片结构。用户希望 Agent 详情页这块也和频道任务区保持一致。
+
+**处理**
+
+- [bot-pages/history.tsx](../apps/mobile/src/bot-pages/history.tsx)：给 Agent 任务页补上一层与频道任务区一致的单层白卡容器。
+- 空态改为卡片内居中展示图标与提示文案，不再只显示裸文本。
+- 有任务时继续复用原有 `TaskCard + CardGrid` 逻辑，只调整区块容器层级，不改任务卡交互与数据来源。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- `pnpm exec biome check apps/mobile/src/bot-pages/history.tsx` 通过。
+
+### 2026-11-18 · Agent 详情资料区改成频道资料区同风格单层卡片
+
+**背景**
+
+Agent 详情页里的「资料」分区原本在空态时只有一行提示文案，缺少频道详情页那种更完整的区块感。用户希望它和频道详情里的资料区一致，使用同样的单层圆角卡片与居中空态布局。
+
+**处理**
+
+- [bot-pages/library.tsx](../apps/mobile/src/bot-pages/library.tsx)：给 Agent 资料页补上一层与频道资料区一致的单层卡片容器。
+- 空态改为卡片内居中展示 `FolderOpen` 图标和说明文案，不再只显示一行裸文本。
+- 有资料时也沿用同一层卡片承载文件区与产物区，保持 Agent 详情页整体视觉更统一。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- `pnpm exec biome check apps/mobile/src/bot-pages/library.tsx` 通过。
+
+### 2026-11-18 · Agent 详情技能区改成频道任务区同风格单层卡片
+
+**背景**
+
+Agent 详情页里的技能区前一版刚被改成了接近「记忆」分区的双层卡片，但用户进一步确认，希望它更像频道详情里的「任务」区块：结构更轻，只保留右上角操作按钮，内容区使用单层卡片承载技能网格或空态。
+
+**处理**
+
+- [bot-pages/skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：移除 `SkillSectionCard` 包裹，不再沿用「记忆」区的双层卡片。
+- Agent 技能页改成「右上角添加技能按钮 + 单层内容卡」结构，和频道任务区保持同一类视觉层级。
+- 空态改为直接在内容卡中居中展示图标与提示文案，避免再出现内嵌二级卡片。
+- 保留原有技能卡片网格、点击查看详情、移除技能、添加技能等交互逻辑，不扩大修改范围到频道详情页。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- `pnpm exec biome check apps/mobile/src/bot-pages/skills.tsx` 通过。
+
+### 2026-11-18 · Agent 详情技能说明文案改成更通用的智能体口吻
+
+**背景**
+
+Agent 详情页技能区顶部说明文案此前写成了“为灵悟启用可复用的专业动作，直接处理研究与投研工作”。这更像平台级介绍，而且过于偏投研，不够贴合不同 Agent 的详情语境。
+
+**处理**
+
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：将 `agent.skillsDetail` 改成更贴近当前智能体的通用描述，强调“为当前智能体补充可复用动作”。
+- [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步更新英文文案，保持多语言一致。
+
+**验证**
+
+- 代码变更仅涉及 locale 文案键 `agent.skillsDetail`，不会影响页面结构与交互逻辑。
+
+### 2026-11-18 · Agent/频道详情里的技能区改成记忆页同风格双层卡片
+
+**背景**
+
+智能体详情页和频道详情页里的「技能」区此前是更轻的列表排布：上方只有按钮，下面直接接技能网格或一行空态文案。相比之下，「记忆」区已经形成了更稳定的视觉层级：外层说明卡、数量行、内层内容卡，阅读上更整洁。用户希望把技能区也改成接近记忆区的样式。
+
+**处理**
+
+- 新增 [skill-section-card.tsx](../apps/mobile/src/skill-section-card.tsx)，作为技能区统一外壳：
+  - 顶部为说明文案 + 右侧主按钮；
+  - 中间展示技能数量；
+  - 底部使用内层内容卡承载技能网格或空态。
+- [bot-pages/skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：Agent 详情里的技能页改为复用这张统一外壳，保留原有技能卡片、详情弹层、移除与添加逻辑。
+- [channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx)：频道详情里的技能页同步改成同一版式，保证 Agent 与频道的技能区视觉一致。
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：补充技能数量与空态标题文案。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- `pnpm exec biome check apps/mobile/src/skill-section-card.tsx apps/mobile/src/bot-pages/skills.tsx apps/mobile/src/channel-settings-screen.tsx apps/mobile/src/capability-hub.tsx apps/mobile/src/i18n/locales/zh-Hans/agent.ts apps/mobile/src/i18n/locales/en/agent.ts` 通过。
+
+### 2026-11-18 · “添加到智能体”目标统一扩展为智能体 + 频道
+
+**背景**
+
+“技能与连接”页里的技能详情弹层此前只有“添加到智能体”这一种目标列表，下面只能勾选 Agent。用户希望把所有涉及这个按钮的入口统一扩展，让频道也能和智能体一起作为技能挂载目标。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：把共享目标选择面板从“仅智能体”扩展为“智能体 + 频道”混合列表。
+- 技能市场与“我的技能”详情弹层现在都会同时展示全部 Agent 和全部频道；频道行复用频道头像，并显示成员数。
+- 目录技能写入频道的 `installedSkills`，自建技能写入频道的 `skillRefs`，与现有频道技能模型保持一致。
+- [bot-pages/skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：同步把 Agent 详情页里复用的技能详情弹层接到同一套“智能体 + 频道”目标切换逻辑。
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：把“添加到智能体”相关提示文案统一改成“智能体/频道”。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：技能市场、“我的技能”、Agent 详情技能页里所有复用的“添加到智能体”按钮，现在都会同时显示智能体和频道目标。
+
+### 2026-11-18 · 频道详情成员列表改为组长固定置顶
+
+**背景**
+
+频道详情页里虽然已经可以手动切换组长，但成员列表仍然沿用原始加入顺序展示，导致新组长有时会出现在中间或底部。用户希望凡是组长的智能体都固定显示在成员区最上方。
+
+**处理**
+
+- [channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx)：成员列表改为先渲染当前组长，再渲染其余成员。
+- 组长判断继续沿用 `leaderId`；若未显式设置，则回退到成员列表第一位。
+- [channels-screen.tsx](../apps/mobile/src/channels-screen.tsx)：同步把旧版频道详情弹层的成员展示顺序也调整为组长置顶，避免不同入口显示不一致。
+
+**验证**
+
+- 频道详情页成员列表中，当前组长会稳定排在第一位。
+- 切换组长后，新的组长会立即跳到成员列表最上方。
+
+### 2026-11-18 · 新建频道弹窗支持直接选择频道组长
+
+**背景**
+
+左侧栏点击“新建”后，创建频道弹窗原本只能填写频道名称、频道说明并勾选成员；虽然频道数据模型已经支持 `leaderId`，但创建时无法直接指定哪位智能体作为频道组长。
+
+**处理**
+
+- [channels-screen.tsx](../apps/mobile/src/channels-screen.tsx)：在 `CreateChannelSheet` 里新增“频道组长”区块。
+- 用户勾选成员后，会在表单下方显示当前已选成员列表，并允许在其中单选一位作为组长。
+- 若用户没有手动切换，默认取当前已选成员里的第一位，保证创建请求始终带上合法的 `leaderId`。
+- [zh-Hans/channels.ts](../apps/mobile/src/i18n/locales/zh-Hans/channels.ts) 与 [en/channels.ts](../apps/mobile/src/i18n/locales/en/channels.ts)：补充“频道组长”与说明文案。
+
+**验证**
+
+- 新建频道时，勾选成员后即可在同一弹窗里设置组长。
+- 提交创建时会把 `leaderId` 与 `agentIds` 一并写入频道创建请求。
+
+### 2026-11-18 · 频道详情成员区增加“设为组长”操作
+
+**背景**
+
+频道详情页的“成员”分区此前只能看到当前组长标记，以及添加成员、移除成员，但不能在这里手动切换频道组长。用户希望直接在成员列表里，把某位智能体设为这个频道的组长。
+
+**处理**
+
+- [channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx)：在频道详情的成员列表中，给非当前组长成员增加“设为组长”按钮。
+- 点击后直接更新频道的 `leaderId`，并沿用现有的“组长”标签实时反映当前状态。
+- 保留原有“移除成员”逻辑；在请求进行中，组长切换与移除按钮都会暂时禁用，避免重复提交。
+- [zh-Hans/channels.ts](../apps/mobile/src/i18n/locales/zh-Hans/channels.ts) 与 [en/channels.ts](../apps/mobile/src/i18n/locales/en/channels.ts)：补充“设为组长”按钮与成功提示文案。
+
+**验证**
+
+- 成员区现在支持直接把任意非当前组长成员设为频道组长。
+- 当前组长继续显示“组长”标签，不再显示“设为组长”按钮。
+
+### 2026-11-18 · 频道对话右侧栏恢复为“最近任务 + 工作区”视图
+
+**背景**
+
+从首页进入频道对话后，右侧栏此前被改成了成员列表，和原先频道详情的“最近任务 + 全局工作区”结构不一致。用户希望恢复成旧版布局：顶部保留频道身份信息，中间展示该频道的最近任务，底部显示统一的工作区入口。
+
+**处理**
+
+- [channel-rail.tsx](../apps/mobile/src/channel-rail.tsx)：移除当前成员列表区块，恢复频道右侧栏的任务预览与工作区结构。
+- 顶部保留频道头像、频道名与成员数。
+- 中间改为复用 `RailWorkGroups + railWorkItems` 展示这个频道的最近任务；“更多”按钮跳到频道详情的 `tasks` 分区。
+- 底部改为复用 [agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx) 里的 `WorkspacePanelButtons`，保证频道右栏与 Agent 右栏的工作区入口一致。
+- [zh-Hans/channels.ts](../apps/mobile/src/i18n/locales/zh-Hans/channels.ts) 与 [en/channels.ts](../apps/mobile/src/i18n/locales/en/channels.ts)：补充频道右栏任务空态文案。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：频道对话页右侧栏不再显示成员列表，而是恢复为“任务 / 更多 / 工作区”的层级结构。
+
+### 2026-11-18 · 手机端对话消息操作栏切换为紧凑模式，补齐“分享”按钮显示
+
+**背景**
+
+手机端智能体对话页和频道对话页里，每条回复下方的操作栏同时展示「喜欢 / 不喜欢 / 导出 Markdown / 复制 Markdown / 分享 / 时间」。在窄屏下，这组按钮沿用桌面端文案和间距会显得过宽，导致最后的「分享」按钮容易被挤出可视范围。
+
+**处理**
+
+- [message-actions.tsx](../apps/mobile/src/message-actions.tsx)：给通用消息操作栏增加窄屏紧凑模式（`width < 430`）。
+- 紧凑模式下：
+  - 减小按钮之间的间距与内边距；
+  - 「喜欢 / 不喜欢」只显示图标，保留无障碍标签；
+  - 「导出 Markdown / 复制 Markdown」缩短为「导出 / 复制」；
+  - 时间字号与右侧留白同步收紧。
+- 同时把紧凑模式的触发条件从“窗口宽度”改成“操作栏自身的实际宽度”，避免智能体对话页因为外层消息容器更窄而误判成宽屏，导致 `分享` 仍被挤掉。
+- [zh-Hans/chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts) 与 [en/chat.ts](../apps/mobile/src/i18n/locales/en/chat.ts)：补充紧凑模式使用的短文案。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：`chat.tsx` 与 `channel-chat.tsx` 复用同一个 `MessageActions` 组件，因此这次调整会同时作用于智能体对话页和频道对话页。
+
+### 2026-11-18 · iPhone 首页底部搜索改为复用 PC 端全局搜索
+
+**背景**
+
+手机端 bots 首页底部搜索此前是单独写在 `mobile-bots-home.tsx` 里的本地搜索，只会返回 Agent 和频道结果；而 PC 端使用的是统一的全局搜索面板，内容范围还包括任务、产物、文件、会话、邮件、日历事件、记忆和监控。两端内容不一致，用户在手机上会误以为“搜索只能搜智能体”。
+
+**处理**
+
+- [mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：移除手机首页自建的 `TextInput + query + searchRows + Sheet` 搜索实现。
+- 改为直接复用 [search-sheet.tsx](../apps/mobile/src/search-sheet.tsx) 里的 `GlobalSearchSheet`，让手机端与 PC 端共用同一套搜索内容、排序和跳转逻辑。
+- 搜索入口样式保持原位，只替换点击后的弹层内容。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：手机端点击底部搜索后，不再只显示 Agent/频道结果，而是进入与 PC 端一致的全局搜索面板。
+
+### 2026-11-18 · iPhone 首页 Agent/频道列表去掉右上角最近对话时间
+
+**背景**
+
+手机端 bots 首页里的 Agent 和频道卡片右上角此前会显示最近一次对话时间，例如“17 小时前”。在当前移动端列表密度下，这块信息优先级不高，反而会干扰标题和更多操作按钮。
+
+**处理**
+
+- [mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：移除手机首页主列表中 Agent 卡片右上角的最近对话时间。
+- 同步移除频道卡片右上角的最近对话时间。
+- 搜索面板原本就没有显示时间，这次不需要额外调整。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：手机端首页主列表中的 Agent 与频道都不再显示最近对话时间。
+
+### 2026-11-18 · iPhone 首页 Agent 文案与 PC 对齐，仅显示名称
+
+**背景**
+
+手机端 bots 首页里的 Agent 卡片此前沿用了 `名称 · 职责` 的展示方式，例如“资产 Agent · 组合观察员”。但 PC 端左侧栏只显示 Agent 名称，移动端继续带职责后缀会显得更挤，也不一致。
+
+**处理**
+
+- [mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：把手机首页主列表里的 Agent 标题从 `name + role` 改成只显示 `name`。
+- 搜索面板中的 Agent 结果同步改成只显示名称，避免首页和搜索结果不一致。
+- 频道条目保持原样，不受这次调整影响。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：手机端首页与搜索结果中的 Agent 都只显示名称，不再显示职责后缀。
+
+### 2026-11-18 · iPhone 首页 Agent/频道卡片补齐 PC 同款更多菜单
+
+**背景**
+
+手机端 bots 首页虽然已经能展示 Agent 和频道，但每张卡片右上角还没有与 PC 端一致的“更多”操作入口，用户无法在列表里直接完成置顶、进入设置/详情或删除。
+
+**处理**
+
+- [mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：给每个 Agent 卡片和频道卡片右上角增加 `...` 按钮，并通过锚点菜单弹出操作项。
+- Agent 菜单支持：
+  - 置顶 / 取消置顶（系统 Agent 仅保留设置入口）
+  - 进入设置页
+  - 删除 Agent
+- 频道菜单支持：
+  - 置顶 / 取消置顶
+  - 进入详情/设置页
+  - 删除频道
+- 手机首页排序同步补齐 PC 逻辑：
+  - 系统 Agent 永远最上
+  - 置顶 Agent / 置顶频道优先
+  - 其余条目再按最近消息时间排序
+- 删除操作补上确认弹窗，避免误删。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：手机端首页每个 Agent/频道卡片右上角均有更多菜单，且三类动作都已接到现有数据和导航逻辑。
+
+### 2026-11-18 · iPhone 首页未读蓝点从条目行收口到左下角通知按钮
+
+**背景**
+
+手机端 bots 首页原先把“有任务通知”的蓝点显示在具体 Agent 条目右侧，但底部本身已经有独立的通知入口。继续把蓝点挂在列表项上，会让提醒位置分散，也和用户预期的“去通知里看”不一致。
+
+**处理**
+
+- [mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：移除 Agent 行内的蓝色未读点。
+- 改为读取全局未读通知数 `unreadCount(data?.notifications)`，当存在未读时，只在左下角通知按钮的铃铛图标右上角显示蓝点。
+- 搜索面板里的 Agent 结果也同步去掉行尾未读点，保持手机首页与搜索结果表现一致。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：任务类未读提醒不再显示在 Agent 列表项中，而是统一显示在左下角通知按钮上。
+
+### 2026-11-18 · iPhone 首页列表补齐频道入口，与左侧栏保持一致
+
+**背景**
+
+手机端 bots 首页此前只读取并展示 Agent 列表，频道虽然已经存在于左侧栏和频道对话链路里，但在手机首页完全不可见，导致用户无法从这一级直接进入频道会话。
+
+**处理**
+
+- [mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：接入 `useChannels()` 与频道消息预览查询。
+- 手机首页主列表改为同时渲染 Agent 和频道，两者都按最近回复时间排序；频道显示群组头像、名称、成员数和最近一条成员回复。
+- 手机首页搜索面板同步支持频道结果，点击频道时会像点击 Agent 一样直接进入对应会话。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx) 增加 `onOpenChannel` 回调，把手机首页的频道点击接到现有频道会话打开逻辑。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：手机首页与搜索结果都不再只显示 Agent，频道也会出现并可点击进入。
+
+### 2026-11-18 · iPhone 首页顶部“新建”按钮改为与 PC 一致的二选一小窗
+
+**背景**
+
+iPhone 端 bots 首页顶部的 `+` 按钮此前直接进入“创建 Agent”，而 PC 端与侧栏版本都已经是统一的“新建”入口：点击后先弹出一个小窗，再选择“创建 Agent”或“新建频道”。
+
+**处理**
+
+- [mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：给顶部 `+` 按钮增加锚点测量与悬浮菜单。
+- 菜单保持两项：`创建 Agent` 与 `新建频道`；点击空白处关闭，空间不足时自动翻到按钮上方，逻辑与侧栏 `CreateEntryMenu` 一致。
+- [agent-product.tsx](../apps/mobile/src/agent-product.tsx) 同步把手机首页入口拆成 `onCreateAgent` / `onCreateChannel` 两条回调，分别打开对应面板。
+
+**验证**
+
+- `pnpm typecheck` 通过。
+- 代码路径确认：iPhone 首页点击 `+` 不再直接创建 Agent，而是先弹出二选一小窗。
+
+### 2026-11-18 · iPad 左侧栏底部改成与 PC 一致的账户 / 技能与连接入口
+
+**背景**
+
+iPad 端左侧抽屉底部仍是“个人中心 + 设置”组合，和 PC 端现行的“左侧账户头像 + 右侧技能与连接胶囊按钮”不一致，导致跨端体验割裂。
+
+**处理**
+
+- `apps/mobile/src/agent-product.tsx` 为 `AgentRail` 增加平板抽屉专用底部样式开关。
+- iPad / 平板（非手机）的左侧抽屉底部改为复用 PC 端同款布局：左侧头像按钮打开账户小弹窗，右侧胶囊按钮进入“技能与连接”页。
+- 手机端继续保留原有紧凑底部布局，避免误伤窄屏操作密度。
+
+**验证**
+
+- 代码层确认 `AgentSideDrawer -> AgentRail compact` 在非手机场景传入桌面同款底部开关。
+- 保持账户弹窗、进入“技能与连接”页、手机端现有抽屉底部三条路径互不冲突。
+
 ### 2026-11-18 · 界面：删除频道对话页成员名字右侧的角色文案
 
 **背景**
@@ -1952,7 +2430,7 @@ Agent 详情页右上角「更多」菜单弹窗宽度 180px，超出项目下�
 - [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：
   - `agent.mySkillDeleteConfirmTitle` 改为「确定永久删除技能「{title}」？」（Permanently delete），仅用于「我的技能」页的全量删除。
   - 新增 `agent.mySkillDeleteConfirmTitleOne` =「确定删除技能「{title}」？」（Delete），用于「智能体设置 → 技能」页的按智能体删除。
-  - `agent.mySkillDeleteConfirmNoteAll` 改为「将永久删除这份技能及其在所有智能体中的副本，删除后无法恢复。」（This permanently deletes the skill and its copies from all agents. This can't be undone.）。
+  - `agent.mySkillDeleteConfirmNoteAll` 改为「将永久删除这份技能，删除后无法恢复。」（This permanently deletes the skill and its copies from all agents. This can't be undone.）。
 - [skills.tsx](../apps/mobile/src/bot-pages/skills.tsx)：智能体设置页的删除确认由共用的 `mySkillDeleteConfirmTitle` 改为 `mySkillDeleteConfirmTitleOne`。
 
 **验证**
@@ -4473,8 +4951,6 @@ allowHeaders: ["Content-Type", "Authorization", "Accept", "Last-Event-ID", "Cach
 
 - 新增 `docs/BROWSER-WORKER-本地启动指南.md`：说明 worker 用途与启用判定（`BROWSER_WORKER_URL` + `WORKER_TOKEN` 同时配置才启用 `browse_web` 工具）、方式 A（`pnpm dev:browser` 本地直接运行）与方式 B（`docker compose -f infra/compose.yaml up --build -d`）的完整步骤、验证方法、停止与恢复、常见问题与安全注意。
 - `docs/README.md` 的 Guides 列表增加该指南入口，保留对 `apps/worker/README.md` 的引用（该文件为 API/持久化/网络边界的权威说明）。
-
-**验证**
 
 - 启动命令 `pnpm dev:browser`（即 `node --env-file=.env --import tsx apps/worker/src/index.ts`）与 Docker 配置均取自根目录 `package.json` / `apps/worker/README.md` / `infra/compose.yaml`，与代码一致。
 

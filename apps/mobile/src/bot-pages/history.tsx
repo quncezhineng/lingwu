@@ -1,7 +1,11 @@
+import { View } from "react-native";
 import { TaskCard } from "../agent-ui";
+import { Text } from "../app-text";
 import { CardGrid } from "../card-grid";
 import { useTranslation } from "../i18n";
-import { BotEmpty, BotPage, type BotPageProps, useBotResources } from "./shared";
+import { Users } from "../icons";
+import { colors, s } from "../ui";
+import { BotPage, type BotPageProps, useBotResources } from "./shared";
 
 /**
  * 「任务」页：展示当前 Agent 的近期分析任务。
@@ -15,21 +19,31 @@ export function BotHistoryPage({ onClose, embedded }: BotPageProps) {
   const { tasks } = useBotResources();
   return (
     <BotPage title={t("agentSpace.analysisHistory")} onClose={onClose} embedded={embedded}>
-      {tasks.length ? (
-        <CardGrid
-          items={tasks}
-          // 详情页正文列比任务中心窄（左栏 180 + 卡片内距之后约 690），
-          // 用 340 的下限会一路退化成单列，放宽到 280 才能稳定排成双列。
-          minColumnWidth={280}
-          getKey={(task) => task.id}
-          render={(task, _index, { columns }) => (
-            // 双列时换成纵向版式，否则图标 + 标题 + 时间会挤在同一行里。
-            <TaskCard task={task} compact stacked={columns > 1} />
-          )}
-        />
-      ) : (
-        <BotEmpty>{t("agentSpace.noTasks")}</BotEmpty>
-      )}
+      <View
+        // 外层不再套卡片样式：去掉外框线，任务卡网格自带描边，间距与层级不受影响。
+        style={{ padding: 20, borderRadius: 18 }}
+      >
+        {tasks.length ? (
+          <CardGrid
+            items={tasks}
+            // 详情页正文列比任务中心窄（左栏 180 + 卡片内距之后约 690），
+            // 用 340 的下限会一路退化成单列，放宽到 280 才能稳定排成双列。
+            minColumnWidth={280}
+            getKey={(task) => task.id}
+            render={(task, _index, { columns }) => (
+              // 双列时换成纵向版式，否则图标 + 标题 + 时间会挤在同一行里。
+              <TaskCard task={task} compact stacked={columns > 1} />
+            )}
+          />
+        ) : (
+          <View style={{ gap: 8, alignItems: "center", paddingVertical: 18 }}>
+            <Users size={28} color={colors.faint} />
+            <Text style={[s.muted, { textAlign: "center", lineHeight: 22 }]}>
+              {t("agentSpace.noTasks")}
+            </Text>
+          </View>
+        )}
+      </View>
     </BotPage>
   );
 }

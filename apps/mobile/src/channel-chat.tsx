@@ -27,15 +27,15 @@ import {
   skillDisplayName,
 } from "./capability-picker";
 import { type ChannelChatStream, streamChannelChat } from "./channel-chat-stream";
-import {
-  followLatestSlack,
-  pinnedTailNudge,
-  type PrependAnchor,
-  restorePrependOffset,
-} from "./conversation-scroll";
 import { useChannels } from "./channels";
 import { promptWithAttachments } from "./chat-content";
 import { ComposerDock } from "./composer-dock";
+import {
+  followLatestSlack,
+  type PrependAnchor,
+  pinnedTailNudge,
+  restorePrependOffset,
+} from "./conversation-scroll";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { useTranslation } from "./i18n";
@@ -53,8 +53,8 @@ import {
 import { IdeasOverlay } from "./ideas-overlay";
 import { MessageActions } from "./message-actions";
 import { PromptComposer } from "./prompt-composer";
-import { publishShare } from "./share-page";
 import { QuoteToolCard } from "./quote-tool-card";
+import { publishShare } from "./share-page";
 import { skillCatalog } from "./skill-catalog";
 import { ToolStep } from "./tool-step";
 import { colors, fonts, radius, s } from "./ui";
@@ -69,7 +69,10 @@ import { useWorkspace } from "./workspace";
  * 消息落库，刷新后回看；用户消息保留附件与连接器选择。
  */
 
-function mergeChannelMessages(earlier: readonly ChannelMessage[], current: readonly ChannelMessage[]) {
+function mergeChannelMessages(
+  earlier: readonly ChannelMessage[],
+  current: readonly ChannelMessage[],
+) {
   const seen = new Set<string>();
   const merged: ChannelMessage[] = [];
   for (const message of [...earlier, ...current]) {
@@ -192,9 +195,7 @@ export function ChannelChatScreen({
   const mentionCandidates =
     mentionQuery === undefined
       ? []
-      : members.filter(
-          (member) => mentionQuery === "" || member.name.includes(mentionQuery),
-        );
+      : members.filter((member) => mentionQuery === "" || member.name.includes(mentionQuery));
 
   // 每条成员回复对应的用户提问：分享为图片 / 链接时一并带上，让分享内容自带上下文。
   // 单次前向遍历维护「最近一条用户消息」，避免在渲染循环里反复切数组。
@@ -412,7 +413,14 @@ export function ChannelChatScreen({
               const agentId = String(data.agentId ?? "");
               setStreamingId(agentId);
               setMessages((current) => {
-                if (current.some((message) => message.role === "member" && message.agentId === agentId && message.id.startsWith("live:")))
+                if (
+                  current.some(
+                    (message) =>
+                      message.role === "member" &&
+                      message.agentId === agentId &&
+                      message.id.startsWith("live:"),
+                  )
+                )
                   return current;
                 return [
                   ...current,
@@ -434,7 +442,11 @@ export function ChannelChatScreen({
               if (!tool?.id) return;
               setMessages((current) =>
                 current.map((message) => {
-                  if (message.role !== "member" || message.agentId !== agentId || !message.id.startsWith("live:"))
+                  if (
+                    message.role !== "member" ||
+                    message.agentId !== agentId ||
+                    !message.id.startsWith("live:")
+                  )
                     return message;
                   const tools = message.tools ?? [];
                   const next = tools.some((item) => item.id === tool.id)
