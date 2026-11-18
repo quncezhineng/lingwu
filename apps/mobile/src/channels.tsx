@@ -18,6 +18,8 @@ interface ChannelsContextValue {
   refresh: () => Promise<void>;
   createChannel: (input: ChannelInput) => Promise<Channel>;
   updateChannel: (id: string, patch: Partial<ChannelInput>) => Promise<Channel>;
+  /** 聊天里 @ 了一位成员后，先把组长标到本地列表。服务端会在同一轮里落库。 */
+  noteLeader: (id: string, leaderId: string) => void;
   deleteChannel: (id: string) => Promise<void>;
 }
 
@@ -68,6 +70,12 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
     [api],
   );
 
+  const noteLeader = useCallback((id: string, leaderId: string) => {
+    setChannels((items) =>
+      items.map((item) => (item.id === id ? { ...item, leaderId } : item)),
+    );
+  }, []);
+
   const deleteChannel = useCallback(
     async (id: string) => {
       await api.request(`/api/channels/${id}`, undefined, "DELETE");
@@ -88,6 +96,7 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
         refresh,
         createChannel,
         updateChannel,
+        noteLeader,
         deleteChannel,
       }}
     >

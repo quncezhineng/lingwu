@@ -12,7 +12,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   type Channel,
-  type ChannelMessage,
+  type ChannelHistoryPage,
   normalizeChannelAvatar,
 } from "../../../packages/domain/src/channel";
 import { AccountScreen } from "./account";
@@ -1121,13 +1121,15 @@ function AgentRail({
     let alive = true;
     for (const channel of channels) {
       void api
-        .request<ChannelMessage[]>(`/api/channels/${encodeURIComponent(channel.id)}/messages`)
-        .then((messages) => {
+        .request<ChannelHistoryPage>(
+          `/api/channels/${encodeURIComponent(channel.id)}/messages?limit=30`,
+        )
+        .then((page) => {
           if (!alive) return;
           // 频道里只有成员（member）发言算「回复」，用户自己的话不算。
           setChannelPreviews((current) => ({
             ...current,
-            [channel.id]: latestReplyPreview(messages, ["member"]),
+            [channel.id]: latestReplyPreview(page.messages, ["member"]),
           }));
         })
         .catch(() => {

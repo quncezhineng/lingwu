@@ -230,6 +230,7 @@ export interface ExecutionBackend {
 export type {
   Channel,
   ChannelAvatarId,
+  ChannelHistoryPage,
   ChannelInput,
   ChannelMessage,
   ChannelMessageInput,
@@ -237,6 +238,8 @@ export type {
 } from "./channel.ts";
 export {
   CHANNEL_AVATARS,
+  channelHistoryPage,
+  channelHistoryPageSize,
   channelInputSchema,
   channelMessageInputSchema,
   channelUpdateSchema,

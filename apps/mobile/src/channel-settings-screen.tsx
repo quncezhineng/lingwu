@@ -5,6 +5,7 @@ import {
   CHANNEL_AVATARS,
   type Channel,
   type ChannelAvatarId,
+  type ChannelMessage,
   normalizeChannelAvatar,
 } from "../../../packages/domain/src/channel";
 import { agentLayout } from "./agent-layout";
@@ -506,7 +507,17 @@ function ChannelMembersPanel({ channel }: { channel: Channel }) {
         <View key={member.id} style={[s.row, { gap: 10, alignItems: "center" }]}>
           <AgentOrb avatar={member.avatar} size={30} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[s.text, { fontWeight: "600" }]}>{member.name}</Text>
+            <View style={[s.row, { gap: 6, alignItems: "center" }]}>
+              <Text style={[s.text, { fontWeight: "600" }]}>{member.name}</Text>
+              {member.id ===
+                (channel.leaderId && channel.agentIds.includes(channel.leaderId)
+                  ? channel.leaderId
+                  : channel.agentIds[0]) && (
+                <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
+                  {t("channels.leader")}
+                </Text>
+              )}
+            </View>
             <Text style={[s.small, { color: colors.faint }]}>{member.role}</Text>
           </View>
           <Button
@@ -825,19 +836,38 @@ function ChannelFilesPanel({ channel }: { channel: Channel }) {
   const { workspace, open, api, notify } = useWorkspace();
   // 同一个资料库里可能连着点开多个文件，忙碌状态按 id 记录，避免互相挡住。
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [chatFileIds, setChatFileIds] = useState<string[]>([]);
 
-  // 频道范围：投研顶层任务的 artifactIds 指向的文件，以及这些任务产出的产物。
+  useEffect(() => {
+    let alive = true;
+    void api
+      .request<ChannelMessage[]>(`/api/channels/${encodeURIComponent(channel.id)}/messages`)
+      .then((messages) => {
+        if (!alive) return;
+        setChatFileIds([
+          ...new Set(messages.flatMap((message) => message.attachmentIds ?? [])),
+        ]);
+      })
+      .catch(() => {
+        if (alive) setChatFileIds([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [api, channel.id]);
+
+  // 频道范围：对话里附过的文件，以及这个频道任务带上的文件和产物。
   const { files, artifacts } = useMemo(() => {
     const tasks = (data?.tasks ?? []).filter(
       (task) => typeof task.input?.channelId === "string" && task.input.channelId === channel.id,
     );
     const taskIds = new Set(tasks.map((task) => task.id));
-    const fileIds = new Set(tasks.flatMap((task) => task.artifactIds));
+    const fileIds = new Set([...tasks.flatMap((task) => task.artifactIds), ...chatFileIds]);
     return {
       files: workspace.files.filter((file) => fileIds.has(file.id)),
       artifacts: (data?.artifacts ?? []).filter((artifact) => taskIds.has(artifact.taskId)),
     };
-  }, [data?.tasks, data?.artifacts, workspace.files, channel.id]);
+  }, [chatFileIds, data?.tasks, data?.artifacts, workspace.files, channel.id]);
 
   async function share(file: Artifact) {
     if (busyId) return;

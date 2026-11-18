@@ -62,6 +62,8 @@ export interface Channel {
   skillRefs?: string[];
   /** 是否置顶：只影响左侧栏展示顺序，置顶的频道排在前面。 */
   pinned?: boolean;
+  /** 内部指定的组长。不在界面上展示。缺省时用成员列表的第一位。 */
+  leaderId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +80,7 @@ export const channelInputSchema = z.object({
   installedSkills: z.array(z.string().min(1).max(128)).max(200).optional(),
   skillRefs: z.array(z.string().min(1).max(128)).max(200).optional(),
   pinned: z.boolean().optional(),
+  leaderId: z.string().min(1).max(128).optional(),
 });
 export type ChannelInput = z.infer<typeof channelInputSchema>;
 
@@ -93,6 +96,7 @@ export const channelUpdateSchema = z.object({
   installedSkills: z.array(z.string().min(1).max(128)).max(200).optional(),
   skillRefs: z.array(z.string().min(1).max(128)).max(200).optional(),
   pinned: z.boolean().optional(),
+  leaderId: z.string().min(1).max(128).optional(),
 });
 export type ChannelUpdate = z.infer<typeof channelUpdateSchema>;
 
@@ -116,6 +120,78 @@ export interface ChannelMessage {
   connectorSlugs?: string[];
   /** user 消息：本轮选定的频道技能 id（频道共享，成员 use_skill 可读到）。 */
   skillIds?: string[];
+  /** member 消息：这一轮实际调用过的工具，刷新后仍能看到。 */
+  tools?: ChannelToolTrace[];
+}
+
+/** 群聊打开时先看最新这一页，再往上按页取更早的消息。 */
+export const channelHistoryPageSize = 30;
+
+export interface ChannelHistoryPage {
+  messages: ChannelMessage[];
+  hasMore: boolean;
+  before: string | null;
+}
+
+/**
+ * 最新一页是列表末尾。before 是已加载的最老一条，下一页不包含它。
+ * 不从第一条开始切。
+ */
+export function channelHistoryPage(
+  messages: readonly ChannelMessage[],
+  options: { limit?: number; before?: string },
+): ChannelHistoryPage | { missing: true } {
+  const limit = options.limit ?? channelHistoryPageSize;
+  const end =
+    options.before === undefined
+      ? messages.length
+      : messages.findIndex((message) => message.id === options.before);
+  if (end < 0) return { missing: true };
+  const start = Math.max(0, end - limit);
+  return {
+    messages: messages.slice(start, end),
+    hasMore: start > 0,
+    before: start > 0 ? messages[start].id : null,
+  };
+}
+
+/** 频道成员在一轮回复里调用过的工具。 */
+export interface ChannelToolTrace {
+  id: string;
+  name: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
+}
+
+function mentionsLabel(text: string, label: string) {
+  const value = label.trim();
+  if (!value) return false;
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`@${escaped}(?=$|[\\s，。！？、,.!?（）()【】「」:：])`, "iu").test(text);
+}
+
+/** 这条消息 @ 到的成员 id，按传入顺序。 */
+export function mentionedMemberIds(
+  members: readonly { id: string; name: string }[],
+  text: string,
+): string[] {
+  return members
+    .filter((member) =>
+      [member.name, member.id].some((label) => mentionsLabel(text, label)),
+    )
+    .map((member) => member.id);
+}
+
+/**
+ * 只 @ 了一位成员时返回这一位。这只表示这一轮点到了谁，不表示要换成组长。
+ * @ 了多位则没有单独被点到的人。
+ */
+export function appointedLeaderId(
+  members: readonly { id: string; name: string }[],
+  text: string,
+): string | undefined {
+  const ids = mentionedMemberIds(members, text);
+  return ids.length === 1 ? ids[0] : undefined;
 }
 
 export const channelMessageInputSchema = z.object({

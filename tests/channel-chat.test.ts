@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, type TestContext, test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
+import {
+  channelLeader,
+  channelMemberTools,
+  circledMembers,
+  parseLeaderChange,
+  parseRelevance,
+} from "../apps/server/src/engine/channel-chat.ts";
+import { appointedLeaderId, channelHistoryPage } from "../packages/domain/src/channel.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
 import type { Channel, ChannelMessage } from "../packages/domain/src/channel.ts";
@@ -38,6 +47,36 @@ async function textModelFixture(t: TestContext) {
     const emit = (type: string, value: object) =>
       response.write(`data: ${JSON.stringify({ type, ...value })}\n\n`);
     const base = { id: "response-fixture", created_at: 1000, model: "fixture" };
+    const leaderChange = body.includes("LEADER_ONLY");
+    const relevance = body.includes("RELEVANCE_ONLY");
+    const isJia = body.includes("You are 甲");
+    const replyText = leaderChange
+      ? body.includes("FORCE_LEAD")
+        ? "LEAD"
+        : "NO"
+      : relevance
+      ? body.includes("FORCE_NONE")
+        ? "NO"
+        : body.includes("FORCE_ASSIGN")
+          ? isJia
+            ? "ASSIGN"
+            : "NO"
+          : body.includes("FORCE_BOTH")
+            ? "ANSWER"
+            : body.includes("FORCE_SPECIALIST")
+              ? isJia
+                ? "NO"
+                : "ANSWER"
+              : isJia
+                ? "ANSWER"
+                : "NO"
+      : body.includes("SUMMARIZE_ONLY")
+        ? "两边都看完了。"
+        : body.includes("WORK_PART")
+          ? "@甲 这一份做完了。"
+          : body.includes("ASSIGN_ONLY")
+            ? "@乙 看港股。"
+            : "先看需求，再给结论。";
     emit("response.created", { response: { ...base, status: "in_progress" } });
     emit("response.output_item.added", {
       output_index: 0,
@@ -49,16 +88,13 @@ async function textModelFixture(t: TestContext) {
         content: [],
       },
     });
-    emit("response.output_text.delta", {
-      item_id: "msg-fixture",
-      output_index: 0,
-      delta: "先看需求，",
-    });
-    emit("response.output_text.delta", {
-      item_id: "msg-fixture",
-      output_index: 0,
-      delta: "再给结论。",
-    });
+    for (const delta of replyText === "先看需求，再给结论。" ? ["先看需求，", "再给结论。"] : [replyText]) {
+      emit("response.output_text.delta", {
+        item_id: "msg-fixture",
+        output_index: 0,
+        delta,
+      });
+    }
     emit("response.output_item.done", {
       output_index: 0,
       item: {
@@ -66,7 +102,7 @@ async function textModelFixture(t: TestContext) {
         type: "message",
         role: "assistant",
         status: "completed",
-        content: [{ type: "output_text", text: "先看需求，再给结论。" }],
+        content: [{ type: "output_text", text: replyText }],
       },
     });
     emit("response.completed", {
@@ -79,7 +115,7 @@ async function textModelFixture(t: TestContext) {
             type: "message",
             role: "assistant",
             status: "completed",
-            content: [{ type: "output_text", text: "先看需求，再给结论。" }],
+            content: [{ type: "output_text", text: replyText }],
           },
         ],
         usage: {
@@ -171,7 +207,7 @@ async function readSse(response: Response) {
   return events;
 }
 
-test("channel chat streams each member in order, passes prior replies, and persists history", async (t) => {
+test("channel chat replies with one member, keeps history, and a mention selects who speaks", async (t) => {
   // 两个成员各回一轮文本。
   const prompts = await textModelFixture(t);
   // 先写入 agent-space，否则成员 threadId 无法解析（members 为空）。
@@ -215,13 +251,15 @@ test("channel chat streams each member in order, passes prior replies, and persi
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
-      name: "双专家",
+      name: "双成员",
       agentIds: ["agent-a", "agent-b"],
       description: "测试频道",
+      installedSkills: ["earnings-analysis"],
     }),
   });
   assert.equal(created.status, 201);
   const channel = (await created.json()) as Channel;
+  assert.equal(channel.leaderId, "agent-a", "没指定时组长是成员列表的第一位");
 
   // 空历史
   const empty = await server.app.request(`/api/channels/${channel.id}/messages`, {
@@ -240,30 +278,485 @@ test("channel chat streams each member in order, passes prior replies, and persi
   const starts = events.filter((e) => e.event === "member_start");
   assert.deepEqual(
     starts.map((e) => e.data.agentId),
-    ["agent-a", "agent-b"],
+    ["agent-a"],
+    "没点名时，只有模型判断有关的成员回复",
   );
   assert.ok(events.some((e) => e.event === "delta"));
   assert.equal(events.at(-1)?.event, "done");
+  assert.ok(prompts[0]?.includes("RELEVANCE_ONLY"), "每个成员先做一次是否有关的判断");
+  assert.ok(prompts[0]?.includes("You are 甲"));
+  assert.ok(prompts[1]?.includes("RELEVANCE_ONLY"));
+  assert.ok(prompts[1]?.includes("You are 乙"));
+  const answer = prompts[2] ?? "";
+  assert.ok(answer.includes("earnings-analysis"), "频道技能只以清单进入提示词");
+  assert.equal(answer.includes("# Equity Research"), false);
+  assert.ok(answer.includes("use_connection"), "提示词列出账号已连接的连接");
+  assert.ok(answer.includes("get_quote"), "频道成员和单聊一样能要行情");
+  assert.equal(answer.includes("这条频道现在没有行情工具"), false);
+  assert.equal(
+    events.some((e) => e.data && JSON.stringify(e.data).includes("RELEVANCE_ONLY")),
+    false,
+    "是否有关的判断不推给界面",
+  );
 
-  // 落库：1 条用户 + 2 条成员回复
   const historyRes = await server.app.request(`/api/channels/${channel.id}/messages`, {
     headers: headers(),
   });
   const history = (await historyRes.json()) as ChannelMessage[];
-  assert.equal(history.length, 3);
+  assert.equal(history.length, 2);
   assert.equal(history[0].role, "user");
-  assert.equal(history[0].text, "分析一下 AI 芯片需求");
+  assert.equal(history[1].agentId, "agent-a");
+  const latestPage = (await (
+    await server.app.request(`/api/channels/${channel.id}/messages?limit=1`, { headers: headers() })
+  ).json()) as { messages: ChannelMessage[]; hasMore: boolean; before: string | null };
+  assert.equal(latestPage.messages.length, 1);
+  assert.equal(latestPage.messages[0]?.id, history[1]?.id, "打开时只取最新一条，不从最早开始");
+  assert.equal(latestPage.hasMore, true);
+  const earlierPage = (await (
+    await server.app.request(
+      `/api/channels/${channel.id}/messages?limit=1&before=${encodeURIComponent(latestPage.before ?? "")}`,
+      { headers: headers() },
+    )
+  ).json()) as { messages: ChannelMessage[]; hasMore: boolean };
+  assert.equal(earlierPage.messages[0]?.id, history[0]?.id);
+  assert.equal(earlierPage.hasMore, false);
+
+  const named = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@乙 接着说需求" }),
+  });
+  assert.equal(named.status, 200);
+  const namedEvents = await readSse(named);
   assert.deepEqual(
-    history.slice(1).map((m) => m.agentId),
-    ["agent-a", "agent-b"],
+    namedEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    ["agent-b"],
   );
-  // 后一个成员（第二次模型请求）看到了前一个成员的回复文本 → 真正的接话讨论。
-  assert.ok(prompts.length >= 2, `expected two model calls, got ${prompts.length}`);
+  const afterMention = (await (
+    await server.app.request("/api/channels", { headers: headers() })
+  ).json()) as Channel[];
+  assert.equal(
+    afterMention.find((item) => item.id === channel.id)?.leaderId,
+    "agent-a",
+    "只 @ 一个人问话，组长不变",
+  );
+  assert.equal(
+    namedEvents.some((event) => event.event === "leader"),
+    false,
+  );
+  const pcb = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@乙 分析一下 PCB板块还能延续吗" }),
+  });
+  assert.equal(pcb.status, 200);
+  const pcbEvents = await readSse(pcb);
+  assert.deepEqual(
+    pcbEvents.filter((event) => event.event === "member_start").map((event) => event.data.agentId),
+    ["agent-b"],
+  );
+  assert.equal(pcbEvents.some((event) => event.event === "leader"), false);
+  assert.ok(prompts.some((prompt) => prompt.includes("LEADER_ONLY") && prompt.includes("PCB")));
+  assert.equal(
+    pcbEvents.some((event) => JSON.stringify(event.data).includes("LEADER_ONLY")),
+    false,
+  );
+  const afterPcb = (await (
+    await server.app.request("/api/channels", { headers: headers() })
+  ).json()) as Channel[];
+  assert.equal(afterPcb.find((item) => item.id === channel.id)?.leaderId, "agent-a");
+  const keyword = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@乙 你来当组长，分析一下" }),
+  });
+  assert.equal(keyword.status, 200);
+  await readSse(keyword);
+  const afterKeyword = (await (
+    await server.app.request("/api/channels", { headers: headers() })
+  ).json()) as Channel[];
+  assert.equal(
+    afterKeyword.find((item) => item.id === channel.id)?.leaderId,
+    "agent-a",
+    "句子里写了当组长，模型没确认就不换",
+  );
+  const promote = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@乙 FORCE_LEAD 继续看" }),
+  });
+  assert.equal(promote.status, 200);
+  const promoteEvents = await readSse(promote);
+  assert.equal(promoteEvents.some((event) => event.event === "leader" && event.data.leaderId === "agent-b"), true);
+  const afterPromote = (await (
+    await server.app.request("/api/channels", { headers: headers() })
+  ).json()) as Channel[];
+  assert.equal(
+    afterPromote.find((item) => item.id === channel.id)?.leaderId,
+    "agent-b",
+    "模型确认要换组长时才换",
+  );
+  const followUp = prompts.at(-1) ?? "";
+  assert.ok(followUp.includes("分析一下 AI 芯片需求"), "追问要带上这个频道最近的消息");
+  assert.ok(followUp.includes("先看需求，再给结论。"));
+
+  const remembered = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "记住：茅台按消费股来看" }),
+  });
+  assert.equal(remembered.status, 200);
+  await readSse(remembered);
+  const memories = await db.list<{ agentId?: string; text: string }>("alice", "memories");
   assert.ok(
-    prompts[1].includes("先看需求，再给结论。"),
-    "second member should see the first member's reply as context",
+    memories.some((memory) => memory.agentId === channel.id && memory.text.includes("茅台")),
   );
-  assert.ok(prompts[0].includes("甲"), "first member should receive its own persona/name");
+  const forgotten = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "不要记住：这句不该留下" }),
+  });
+  assert.equal(forgotten.status, 200);
+  await readSse(forgotten);
+  const afterForget = await db.list<{ text: string }>("alice", "memories");
+  assert.equal(
+    afterForget.some((memory) => memory.text.includes("这句不该留下")),
+    false,
+  );
+
+  const form = new FormData();
+  form.set("file", new File(["营收同比增长百分之十二"], "note.txt", { type: "text/plain" }));
+  const uploaded = await server.app.request("/api/files", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  assert.equal(uploaded.status, 201);
+  const file = (await uploaded.json()) as { id: string };
+  const attached = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@甲 看这份资料", attachmentIds: [file.id] }),
+  });
+  assert.equal(attached.status, 200);
+  await readSse(attached);
+  assert.ok(prompts.at(-1)?.includes("营收同比增长百分之十二"), "附件要带上正文");
+
+  const together = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "你们几个一起分析需求" }),
+  });
+  assert.equal(together.status, 200);
+  const togetherEvents = await readSse(together);
+  assert.deepEqual(
+    togetherEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    ["agent-a"],
+    "「你们几个一起」本身不让所有人发言",
+  );
+  const both = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "今天看两眼 FORCE_BOTH" }),
+  });
+  assert.equal(both.status, 200);
+  const bothEvents = await readSse(both);
+  assert.deepEqual(
+    bothEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    ["agent-a", "agent-b"],
+    "模型判断两边都有关时，两边都回复",
+  );
+  const silent = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "你们几个一起 FORCE_NONE" }),
+  });
+  assert.equal(silent.status, 200);
+  const silentEvents = await readSse(silent);
+  assert.deepEqual(
+    silentEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    [],
+    "模型判断都无关时，即使写了你们几个，也没有人发言",
+  );
+  const namedGroup = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@乙 你们几个一起看" }),
+  });
+  assert.equal(namedGroup.status, 200);
+  const namedGroupEvents = await readSse(namedGroup);
+  assert.deepEqual(
+    namedGroupEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    ["agent-b"],
+    "点名某一个时，即使带着一起说，也只让那一个回复",
+  );
+
+  const led = await server.app.request("/api/channels", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      name: "乙来圈",
+      agentIds: ["agent-a", "agent-b"],
+      leaderId: "agent-b",
+    }),
+  });
+  assert.equal(led.status, 201);
+  const ledChannel = (await led.json()) as Channel;
+  assert.equal(ledChannel.leaderId, "agent-b");
+  const ledChat = await server.app.request(`/api/channels/${ledChannel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "看一下现金" }),
+  });
+  assert.equal(ledChat.status, 200);
+  const ledEvents = await readSse(ledChat);
+  assert.deepEqual(
+    ledEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    ["agent-a"],
+    "模型判断有关的成员回复，组长不会因为身份自动发言",
+  );
+  const ledJudgments = prompts.filter(
+    (prompt) => prompt.includes("看一下现金") && prompt.includes("RELEVANCE_ONLY"),
+  );
+  assert.equal(ledJudgments.length, 2);
+  assert.ok(ledJudgments.some((prompt) => prompt.includes("You are 乙")));
+  assert.ok(ledJudgments.some((prompt) => prompt.includes("The lead is 乙")));
+
+  const splitting = await server.app.request("/api/channels", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ name: "分工", agentIds: ["agent-a", "agent-b"] }),
+  });
+  assert.equal(splitting.status, 201);
+  const splitChannel = (await splitting.json()) as Channel;
+  const beforeSplit = prompts.length;
+  const splitChat = await server.app.request(`/api/channels/${splitChannel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "今天看看盘面 FORCE_ASSIGN" }),
+  });
+  assert.equal(splitChat.status, 200);
+  const splitEvents = await readSse(splitChat);
+  assert.deepEqual(
+    splitEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    ["agent-a", "agent-b", "agent-a"],
+    "模型让组长安排时，即使句子里没有安排、分工，也先安排再做再总结",
+  );
+  const splitDone = splitEvents.filter((e) => e.event === "member_done");
+  assert.ok(String(splitDone[0]?.data.text).includes("@乙"));
+  assert.ok(String(splitDone[1]?.data.text).includes("@甲"), "成员做完要 @ 回组长");
+  assert.ok(String(splitDone[2]?.data.text).includes("两边都看完了"));
+  const splitPrompts = prompts.slice(beforeSplit);
+  assert.ok(splitPrompts.some((prompt) => prompt.includes("RELEVANCE_ONLY")));
+  const assignPrompt = splitPrompts.find((prompt) => prompt.includes("ASSIGN_ONLY")) ?? "";
+  assert.ok(assignPrompt.includes("no tools"));
+  assert.ok(splitPrompts.some((prompt) => prompt.includes("WORK_PART")));
+  assert.ok(splitPrompts.at(-1)?.includes("SUMMARIZE_ONLY"));
+  const namedAssign = await server.app.request(`/api/channels/${splitChannel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@乙 组长分配下任务" }),
+  });
+  assert.equal(namedAssign.status, 200);
+  const namedAssignEvents = await readSse(namedAssign);
+  assert.deepEqual(
+    namedAssignEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    ["agent-b"],
+    "点名某一个时不走分工",
+  );
+
+  const arranged = await server.app.request("/api/channels", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ name: "安排", agentIds: ["agent-a", "agent-b"] }),
+  });
+  assert.equal(arranged.status, 201);
+  const arrangedChannel = (await arranged.json()) as Channel;
+  const beforeArrange = prompts.length;
+  const arrangeChat = await server.app.request(`/api/channels/${arrangedChannel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      text: "腾讯出财报了，组长安排下做个详细分析。 FORCE_SPECIALIST",
+    }),
+  });
+  assert.equal(arrangeChat.status, 200);
+  const arrangeEvents = await readSse(arrangeChat);
+  assert.deepEqual(
+    arrangeEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
+    ["agent-b"],
+    "句子里有安排，模型说只有组员有关时，不走四拍",
+  );
+  const arrangePrompts = prompts.slice(beforeArrange);
+  assert.equal(
+    arrangePrompts.some((prompt) => prompt.includes("ASSIGN_ONLY")),
+    false,
+  );
+
+  const slow = createServer((request, response) => {
+    response.writeHead(200, { "Content-Type": "text/event-stream" });
+    response.write(
+      `data: ${JSON.stringify({
+        type: "response.output_text.delta",
+        item_id: "msg-slow",
+        output_index: 0,
+        delta: "已经说到这里",
+      })}\n\n`,
+    );
+    const timer = setTimeout(() => {
+      if (!response.writableEnded) response.end();
+    }, 8_000);
+    request.on("close", () => clearTimeout(timer));
+  });
+  slow.listen(0, "127.0.0.1");
+  await once(slow, "listening");
+  const slowAddress = slow.address();
+  assert.ok(slowAddress && typeof slowAddress !== "string");
+  const fixtureUrl = process.env.OPENAI_BASE_URL;
+  process.env.OPENAI_BASE_URL = `http://127.0.0.1:${slowAddress.port}/v1`;
+  t.after(async () => {
+    process.env.OPENAI_BASE_URL = fixtureUrl;
+    slow.closeAllConnections();
+    await new Promise<void>((resolve) => slow.close(() => resolve()));
+  });
+  const controller = new AbortController();
+  const interrupted = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@甲 说到一半" }),
+    signal: controller.signal,
+  });
+  assert.equal(interrupted.status, 200);
+  const reader = interrupted.body?.getReader();
+  assert.ok(reader);
+  const decoder = new TextDecoder();
+  let seen = "";
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    seen += decoder.decode(chunk.value, { stream: true });
+    if (seen.includes("已经说到这里")) {
+      controller.abort();
+      break;
+    }
+  }
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const kept = (await (
+    await server.app.request(`/api/channels/${channel.id}/messages`, { headers: headers() })
+  ).json()) as ChannelMessage[];
+  assert.ok(
+    kept.some((message) => message.role === "member" && message.text.includes("已经说到这里")),
+    "断开后已经说出的内容要留下",
+  );
+});
+
+test("channel members can call the quote tool instead of a connector", async () => {
+  const tools = channelMemberTools(
+    {
+      config: { webSearchEnabled: true, jevMode: "off" },
+      computer: { provider: "docker" },
+      market: {
+        async getBatchQuotes(symbols: string[]) {
+          return symbols.map((symbol) => ({ symbol, price: 1402.5, currency: "CNY" }));
+        },
+      },
+      search: { async search() { return { results: [] }; } },
+      files: { async list() { return [{ id: "f1", name: "note.txt", mimeType: "text/plain" }]; }, async bytes() { return Buffer.from("营收"); } },
+      browser: { async observeForThread() { return { url: "https://example.com", title: "", text: "" }; } },
+    } as never,
+    "alice",
+    "thread",
+    new AbortController().signal,
+  );
+  const names = tools.map((tool) => tool.name);
+  assert.ok(names.includes("get_quote"));
+  assert.ok(names.includes("search_web"));
+  assert.ok(names.includes("list_files"));
+  assert.ok(names.includes("read_file"));
+  for (const name of [
+    "read_calendar",
+    "search_mail",
+    "read_mail_thread",
+    "delegate_task",
+    "research_stock",
+    "agent_status",
+    "remember_fact",
+    "write_memory",
+    "recall_memory",
+    "computer_status",
+  ])
+    assert.ok(names.includes(name), name);
+  assert.equal(names.includes("list_reminders"), false);
+  assert.equal(names.includes("watch_page"), false);
+  assert.equal(names.includes("create_goal"), false);
+  assert.equal(
+    tools.find((tool) => tool.name === "delegate_task")?.description?.includes("watch_page"),
+    false,
+  );
+  const quote = tools.find((tool) => tool.name === "get_quote");
+  assert.ok(quote);
+  const executed = quote as { execute?: (args: { symbols: string[] }) => Promise<unknown> };
+  assert.equal(typeof executed.execute, "function");
+  const result = (await executed.execute?.({ symbols: ["600519.SS"] })) as {
+    quotes?: { price?: number }[];
+  };
+  assert.equal(result.quotes?.[0]?.price, 1402.5);
+});
+
+test("channel leader and circled ids stay inside the roster", () => {
+  const members = [
+    { id: "a", name: "甲", role: "甲" },
+    { id: "b", name: "乙", role: "乙" },
+  ];
+  assert.equal(parseRelevance("ASSIGN"), "assign");
+  assert.equal(parseRelevance("ANSWER"), "answer");
+  assert.equal(parseRelevance("NO"), "no");
+  assert.equal(parseRelevance("腾讯出财报了，组长安排下做个详细分析。"), "no");
+  assert.equal(parseRelevance("你们几个一起分析需求"), "no");
+  assert.equal(parseRelevance("组长分工、分配、布置一下"), "no");
+  assert.equal(parseLeaderChange("LEAD"), true);
+  assert.equal(parseLeaderChange("NO"), false);
+  assert.equal(parseLeaderChange("@乙 分析一下 PCB板块还能延续吗"), false);
+  assert.equal(parseLeaderChange("@乙 你来当组长"), false);
+  const many = Array.from({ length: 45 }, (_, index) => ({
+    id: `m${index}`,
+    channelId: "c",
+    role: "user" as const,
+    text: String(index),
+    createdAt: new Date(index).toISOString(),
+  }));
+  const latest = channelHistoryPage(many, { limit: 30 });
+  assert.equal("missing" in latest, false);
+  if ("missing" in latest) return;
+  assert.equal(latest.messages[0]?.id, "m15");
+  assert.equal(latest.messages.at(-1)?.id, "m44");
+  assert.equal(latest.hasMore, true);
+  assert.equal(latest.messages.some((message) => message.id === "m0"), false);
+  const older = channelHistoryPage(many, { limit: 30, before: latest.before ?? "" });
+  assert.equal("missing" in older, false);
+  if ("missing" in older) return;
+  assert.equal(older.messages[0]?.id, "m0");
+  assert.equal(older.messages.at(-1)?.id, "m14");
+  assert.equal(older.hasMore, false);
+  assert.equal("missing" in channelHistoryPage(many, { before: "gone" }), true);
+  const source = readFileSync(new URL("../apps/server/src/engine/channel-chat.ts", import.meta.url), "utf8");
+  assert.equal(source.includes("asksLeaderToAssign"), false);
+  assert.equal(source.includes("asksEveryone"), false);
+  assert.equal(source.includes("chooseSpeakers"), false);
+  assert.equal(source.includes("CIRCLE_ONLY"), false);
+  assert.equal(appointedLeaderId(members, "@乙 你们几个一起"), "b");
+  assert.equal(
+    appointedLeaderId([{ id: "mkt-1", name: "观市" }], "@观市（市场观察员） 看指数"),
+    "mkt-1",
+  );
+  assert.equal(appointedLeaderId(members, "@甲 @乙 一起看"), undefined);
+  assert.equal(channelLeader(members, "missing")?.id, "a");
+  assert.equal(channelLeader(members, "b")?.id, "b");
+  assert.deepEqual(
+    circledMembers(members, '先这样 ["b","没有这个人"]').map((member) => member.id),
+    ["b"],
+  );
+  assert.deepEqual(circledMembers(members, "没有名单"), []);
 });
 
 test("channel chat requires auth and rejects unknown channels", async () => {

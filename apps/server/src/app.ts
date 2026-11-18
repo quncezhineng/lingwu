@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   type Channel,
   calendarRangeSchema,
+  channelHistoryPage,
   channelInputSchema,
   channelMessageInputSchema,
   channelUpdateSchema,
@@ -489,6 +490,9 @@ export async function createApp(
       instructions: input.instructions ?? "",
       installedSkills: input.installedSkills ?? [],
       skillRefs: input.skillRefs ?? [],
+      leaderId: input.agentIds.includes(input.leaderId ?? "")
+        ? input.leaderId
+        : input.agentIds[0],
       createdAt: now,
       updatedAt: now,
     };
@@ -502,6 +506,7 @@ export async function createApp(
     if (!existing) throw new AppError("Channel not found", 404);
     const patch = channelUpdateSchema.parse(await c.req.json());
     const next: Channel = { ...existing, ...patch, updatedAt: new Date().toISOString() };
+    if (next.leaderId && !next.agentIds.includes(next.leaderId)) next.leaderId = next.agentIds[0];
     await db.put(owner, "channels", next);
     return c.json(next);
   });
@@ -513,17 +518,31 @@ export async function createApp(
     await db.remove(owner, "channels", id);
     return c.json({ ok: true });
   });
-  /** 频道群聊历史：所有轮次的用户提问与成员回复，按时间升序。 */
+  /**
+   * 频道群聊历史，按时间升序。
+   * 不带 limit 时返回全部（设置页要汇总附件）。带 limit 时只返回最新一页，before 再往上翻。
+   */
   app.get("/api/channels/:id/messages", async (c) => {
     const owner = c.get("owner");
     const id = c.req.param("id");
     if (!(await db.get<Channel>(owner, "channels", id)))
       throw new AppError("Channel not found", 404);
-    return c.json(await listChannelMessages(db, owner, id));
+    const messages = await listChannelMessages(db, owner, id);
+    const limit = c.req.query("limit");
+    const before = c.req.query("before");
+    if (limit === undefined && before === undefined) return c.json(messages);
+    const query = historyQuery.parse({
+      ...(limit === undefined ? {} : { limit }),
+      ...(before === undefined ? {} : { before }),
+    });
+    const page = channelHistoryPage(messages, query);
+    if ("missing" in page)
+      throw new AppError("The history position is no longer available. Reload the conversation.", 409);
+    return c.json(page);
   });
   /**
    * 频道群聊流式对话：用户消息落库后，各成员依次以对话方式回复（SSE）。
-   * 事件：member_start / delta / member_done / done / error。
+   * 事件：member_start / delta / tool / member_done / leader / done / error。
    */
   app.post("/api/channels/:id/chat", async (c) => {
     const owner = c.get("owner");
@@ -555,6 +574,12 @@ export async function createApp(
                 config,
                 files,
                 models: workspace.models,
+                market: agent.market,
+                search: agent.search,
+                browser,
+                computer,
+                workspace,
+                service: agent,
               },
               owner,
               channel,

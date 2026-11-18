@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, Platform, ScrollView, View } from "react-native";
+import { ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, View } from "react-native";
 import {
   type Channel,
+  type ChannelHistoryPage,
   type ChannelMessage,
+  type ChannelToolTrace,
+  channelHistoryPageSize,
   normalizeChannelAvatar,
 } from "../../../packages/domain/src/channel";
 import { conversationColumnStyle } from "./agent-layout";
@@ -24,17 +27,36 @@ import {
   skillDisplayName,
 } from "./capability-picker";
 import { type ChannelChatStream, streamChannelChat } from "./channel-chat-stream";
+import {
+  followLatestSlack,
+  pinnedTailNudge,
+  type PrependAnchor,
+  restorePrependOffset,
+} from "./conversation-scroll";
+import { useChannels } from "./channels";
 import { promptWithAttachments } from "./chat-content";
 import { ComposerDock } from "./composer-dock";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { useTranslation } from "./i18n";
-import { Brain, FolderOpen, Lightbulb, Link2, Sparkles, Upload, Users } from "./icons";
+import {
+  Brain,
+  ChevronDown,
+  ChevronRight,
+  FolderOpen,
+  Lightbulb,
+  Link2,
+  Sparkles,
+  Upload,
+  Users,
+} from "./icons";
 import { IdeasOverlay } from "./ideas-overlay";
 import { MessageActions } from "./message-actions";
 import { PromptComposer } from "./prompt-composer";
 import { publishShare } from "./share-page";
+import { QuoteToolCard } from "./quote-tool-card";
 import { skillCatalog } from "./skill-catalog";
+import { ToolStep } from "./tool-step";
 import { colors, fonts, radius, s } from "./ui";
 import { UserMessageMeta } from "./user-message-meta";
 import { useWorkspace } from "./workspace";
@@ -46,6 +68,30 @@ import { useWorkspace } from "./workspace";
  * 模型跑一轮真实对话，文本逐字流式回来，像群聊里依次发言（后成员能看到前面的分析）。
  * 消息落库，刷新后回看；用户消息保留附件与连接器选择。
  */
+
+function mergeChannelMessages(earlier: readonly ChannelMessage[], current: readonly ChannelMessage[]) {
+  const seen = new Set<string>();
+  const merged: ChannelMessage[] = [];
+  for (const message of [...earlier, ...current]) {
+    if (seen.has(message.id)) continue;
+    seen.add(message.id);
+    merged.push(message);
+  }
+  return merged;
+}
+
+/** 刷新最新一页时留下已经向上翻出来的更早消息，丢掉还没落库的临时气泡。 */
+function stitchLatestPage(current: readonly ChannelMessage[], latest: readonly ChannelMessage[]) {
+  if (!latest.length) return current.filter((message) => !message.id.startsWith("live:"));
+  const floor = latest[0]?.createdAt ?? "";
+  const kept = current.filter(
+    (message) =>
+      !message.id.startsWith("live:") &&
+      message.createdAt < floor &&
+      !latest.some((item) => item.id === message.id),
+  );
+  return mergeChannelMessages(kept, latest);
+}
 
 export function ChannelChatScreen({
   channel,
@@ -59,12 +105,27 @@ export function ChannelChatScreen({
   const { agents, skillLibrary } = useAgentSpace();
   const { data: agentWorkspace } = useAgentWorkspace();
   const { notify, api, refresh, workspace, navigate } = useWorkspace();
+  const { noteLeader } = useChannels();
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderError, setOlderError] = useState(false);
+  const [positioned, setPositioned] = useState(false);
   const [busy, setBusy] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const initialScroll = useRef(true);
+  const followLatest = useRef(true);
+  const olderRequest = useRef(false);
+  const preserveY = useRef<number | null>(null);
+  const prependAnchor = useRef<PrependAnchor | null>(null);
+  const scrollMetrics = useRef({ height: 0, y: 0, bottomInset: 0 });
+  const scrollViewport = useRef(0);
+  const ownScroll = useRef(false);
   const streamRef = useRef<ChannelChatStream | null>(null);
   // 悬浮输入框：输入框绝对定位悬浮在页面底部，不占用文档流；消息列表用它实时测量出的
   // 高度做底部内距（contentBottomInset）预留滚动站位，滚动时不会被输入框遮挡。
@@ -127,6 +188,13 @@ export function ChannelChatScreen({
     [agents, channel.agentIds],
   );
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
+  const mentionQuery = draft.match(/@([^\s@]*)$/)?.[1];
+  const mentionCandidates =
+    mentionQuery === undefined
+      ? []
+      : members.filter(
+          (member) => mentionQuery === "" || member.name.includes(mentionQuery),
+        );
 
   // 每条成员回复对应的用户提问：分享为图片 / 链接时一并带上，让分享内容自带上下文。
   // 单次前向遍历维护「最近一条用户消息」，避免在渲染循环里反复切数组。
@@ -140,11 +208,85 @@ export function ChannelChatScreen({
     return map;
   }, [messages]);
 
-  // 打开频道先加载历史消息（用户提问 + 成员回复）。切换频道时先清空，避免串味。
+  const historyPath = useCallback(
+    (before?: string) =>
+      `/api/channels/${encodeURIComponent(channel.id)}/messages?limit=${channelHistoryPageSize}${
+        before ? `&before=${encodeURIComponent(before)}` : ""
+      }`,
+    [channel.id],
+  );
+  const loadHistory = useCallback(
+    async (mode: "open" | "tail" = "tail") => {
+      try {
+        const page = await api.request<ChannelHistoryPage>(historyPath());
+        if (mode === "open") {
+          setMessages(page.messages);
+          setHasOlder(page.hasMore);
+        } else {
+          setMessages((current) => stitchLatestPage(current, page.messages));
+          setHasOlder((current) => current || page.hasMore);
+        }
+        setOlderError(false);
+      } catch {
+        if (mode === "open") {
+          setMessages([]);
+          setHasOlder(false);
+        }
+      } finally {
+        setLoaded(true);
+      }
+    },
+    [api, historyPath],
+  );
+  const holdReadingPosition = useCallback(() => {
+    preserveY.current = scrollMetrics.current.y;
+    followLatest.current = false;
+  }, []);
+  const loadOlder = useCallback(async () => {
+    const oldest = messagesRef.current[0];
+    if (
+      !loaded ||
+      !hasOlder ||
+      !oldest ||
+      olderRequest.current ||
+      initialScroll.current ||
+      prependAnchor.current
+    )
+      return;
+    olderRequest.current = true;
+    setLoadingOlder(true);
+    setOlderError(false);
+    try {
+      const page = await api.request<ChannelHistoryPage>(historyPath(oldest.id));
+      const nextFirst = page.messages[0]?.id;
+      if (nextFirst && nextFirst !== oldest.id)
+        prependAnchor.current = {
+          ...scrollMetrics.current,
+          firstMessageId: nextFirst,
+        };
+      followLatest.current = false;
+      setMessages((current) => mergeChannelMessages(page.messages, current));
+      setHasOlder(page.hasMore);
+    } catch {
+      setOlderError(true);
+    } finally {
+      olderRequest.current = false;
+      setLoadingOlder(false);
+    }
+  }, [api, hasOlder, historyPath, loaded]);
+
+  // 打开频道只取最新一页，并先藏起来再跳到末尾。切换频道时先清空，避免串味。
   useEffect(() => {
     let alive = true;
+    initialScroll.current = true;
+    followLatest.current = true;
+    preserveY.current = null;
+    prependAnchor.current = null;
+    setPositioned(false);
     setLoaded(false);
     setMessages([]);
+    setHasOlder(false);
+    setOlderError(false);
     setAttachments([]);
     setSelectedConnectorIds([]);
     setSelectedSkillIds([]);
@@ -153,23 +295,15 @@ export function ChannelChatScreen({
     setBusy(false);
     streamRef.current?.close();
     streamRef.current = null;
-    void api
-      .request<ChannelMessage[]>(`/api/channels/${encodeURIComponent(channel.id)}/messages`)
-      .then((history) => {
-        if (alive) setMessages(history);
-      })
-      .catch(() => {
-        if (alive) setMessages([]);
-      })
-      .finally(() => {
-        if (alive) setLoaded(true);
-      });
+    void loadHistory("open").finally(() => {
+      if (!alive) setLoaded(true);
+    });
     return () => {
       alive = false;
       streamRef.current?.close();
       streamRef.current = null;
     };
-  }, [api, channel.id]);
+  }, [loadHistory]);
 
   // Android 键盘从底部顶起悬浮输入框；iOS 由 ComposerDock 内部的
   // KeyboardAvoidingView（behavior=padding）接管，这里只处理 Android 的额外上推。
@@ -186,6 +320,30 @@ export function ChannelChatScreen({
       showSub.remove();
       hideSub.remove();
     };
+  }, []);
+  useEffect(() => {
+    if (!loaded || !initialScroll.current) return;
+    let reveal = 0;
+    const position = requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated: false });
+      reveal = requestAnimationFrame(() => {
+        initialScroll.current = false;
+        setPositioned(true);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(position);
+      cancelAnimationFrame(reveal);
+    };
+  }, [loaded, channel.id]);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const id = "lingwu-channel-scroll-anchor";
+    const style = document.getElementById(id) ?? document.createElement("style");
+    style.id = id;
+    style.textContent =
+      "[data-testid='channel-chat-viewport'],[data-testid='channel-chat-viewport'] *{overflow-anchor:none !important}";
+    document.head.appendChild(style);
   }, []);
 
   async function uploadMaterial() {
@@ -219,6 +377,16 @@ export function ChannelChatScreen({
     if (!text || busy || !loaded || members.length === 0) return;
     setDraft("");
     setBusy(true);
+    setMessages((current) => [
+      ...current,
+      {
+        id: `live:user:${Date.now()}`,
+        channelId: channel.id,
+        role: "user",
+        text,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
     const files = workspace.files.filter((f) => attachments.includes(f.id));
     const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
       attachments.includes(artifact.id),
@@ -237,8 +405,44 @@ export function ChannelChatScreen({
         },
         {
           onEvent: (event, data) => {
-            if (event === "member_start") {
-              setStreamingId(String(data.agentId ?? ""));
+            if (event === "leader") {
+              const leaderId = String(data.leaderId ?? "");
+              if (leaderId) noteLeader(channel.id, leaderId);
+            } else if (event === "member_start") {
+              const agentId = String(data.agentId ?? "");
+              setStreamingId(agentId);
+              setMessages((current) => {
+                if (current.some((message) => message.role === "member" && message.agentId === agentId && message.id.startsWith("live:")))
+                  return current;
+                return [
+                  ...current,
+                  {
+                    id: `live:${agentId}:${Date.now()}`,
+                    channelId: channel.id,
+                    role: "member",
+                    agentId,
+                    title: String(data.title ?? ""),
+                    text: "",
+                    createdAt: new Date().toISOString(),
+                    tools: [],
+                  },
+                ];
+              });
+            } else if (event === "tool") {
+              const agentId = String(data.agentId ?? "");
+              const tool = data.tool as ChannelToolTrace | undefined;
+              if (!tool?.id) return;
+              setMessages((current) =>
+                current.map((message) => {
+                  if (message.role !== "member" || message.agentId !== agentId || !message.id.startsWith("live:"))
+                    return message;
+                  const tools = message.tools ?? [];
+                  const next = tools.some((item) => item.id === tool.id)
+                    ? tools.map((item) => (item.id === tool.id ? { ...item, ...tool } : item))
+                    : [...tools, tool];
+                  return { ...message, tools: next };
+                }),
+              );
             } else if (event === "delta") {
               const agentId = String(data.agentId ?? "");
               const delta = String(data.text ?? "");
@@ -269,9 +473,27 @@ export function ChannelChatScreen({
             } else if (event === "done") {
               setStreamingId(null);
               setBusy(false);
-              void refresh();
+              void loadHistory();
             } else if (event === "member_done") {
-              setStreamingId(null);
+              const agentId = String(data.agentId ?? "");
+              const finalText = typeof data.text === "string" ? data.text : "";
+              setStreamingId((current) => (current === agentId ? null : current));
+              // 同一位会先分工、再总结。结束上一条后再开新气泡，避免总结写进分工里。
+              setMessages((current) =>
+                current.map((message) => {
+                  if (
+                    message.role !== "member" ||
+                    message.agentId !== agentId ||
+                    !message.id.startsWith("live:")
+                  )
+                    return message;
+                  return {
+                    ...message,
+                    id: message.id.replace("live:", "said:"),
+                    text: finalText || message.text,
+                  };
+                }),
+              );
             } else if (event === "error") {
               notify(String(data.message ?? t("channels.chatFailed")));
             }
@@ -281,10 +503,11 @@ export function ChannelChatScreen({
             setBusy(false);
             setStreamingId(null);
           },
-          // 服务端未发 done 就断开时也要恢复输入，避免一直卡在「生成中」。
+          // 断开时服务端会留下已经说出的内容，这里重新读一次历史。
           onClose: () => {
             setBusy(false);
             setStreamingId(null);
+            void loadHistory();
           },
         },
       );
@@ -305,8 +528,10 @@ export function ChannelChatScreen({
     busy,
     channel.id,
     draft,
+    loadHistory,
     loaded,
-    members.length,
+    members,
+    noteLeader,
     notify,
     selectedConnectorIds,
     selectedSkillIds,
@@ -319,6 +544,8 @@ export function ChannelChatScreen({
     streamRef.current = null;
     setBusy(false);
     setStreamingId(null);
+    // 服务端在断开时先落库，稍后再读，刷新前也能看到已经说出的内容。
+    setTimeout(() => void loadHistory(), 400);
   }
 
   return (
@@ -327,8 +554,69 @@ export function ChannelChatScreen({
         testID="channel-chat-viewport"
         ref={listRef}
         // 消息列与输入框共用 conversationColumnStyle：回复区块宽度与输入对话框完全一致。
-        style={[conversationColumnStyle, { flex: 1 }]}
+        style={[conversationColumnStyle, { flex: 1, opacity: positioned ? 1 : 0 }]}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={100}
+        onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+          const previousY = scrollMetrics.current.y;
+          scrollViewport.current = layoutMeasurement.height;
+          scrollMetrics.current.y = contentOffset.y;
+          if (initialScroll.current || prependAnchor.current || preserveY.current !== null) return;
+          const gap = contentSize.height - contentOffset.y - layoutMeasurement.height;
+          if (ownScroll.current) {
+            ownScroll.current = false;
+            if (gap < followLatestSlack) followLatest.current = true;
+            return;
+          }
+          followLatest.current = gap < followLatestSlack;
+          if (contentOffset.y < 160 && contentOffset.y < previousY && !olderError) void loadOlder();
+        }}
+        onContentSizeChange={(_width, height) => {
+          const previousHeight = scrollMetrics.current.height;
+          const previousOffset = scrollMetrics.current.y;
+          scrollMetrics.current = {
+            ...scrollMetrics.current,
+            height,
+            bottomInset: contentBottomInset,
+          };
+          if (!loaded) return;
+          if (preserveY.current !== null) {
+            const y = preserveY.current;
+            preserveY.current = null;
+            ownScroll.current = true;
+            scrollMetrics.current.y = y;
+            listRef.current?.scrollTo({ y, animated: false });
+            return;
+          }
+          if (prependAnchor.current) {
+            const y = restorePrependOffset(prependAnchor.current, {
+              height,
+              bottomInset: contentBottomInset,
+              firstMessageId: messagesRef.current[0]?.id ?? null,
+            });
+            if (y === undefined) return;
+            prependAnchor.current = null;
+            ownScroll.current = true;
+            scrollMetrics.current.y = y;
+            listRef.current?.scrollTo({ y, animated: false });
+            return;
+          }
+          if (initialScroll.current) {
+            listRef.current?.scrollToEnd({ animated: false });
+            return;
+          }
+          const next = pinnedTailNudge({
+            following: followLatest.current,
+            previousHeight,
+            height,
+            offset: previousOffset,
+            viewport: scrollViewport.current,
+          });
+          if (next === undefined) return;
+          ownScroll.current = true;
+          scrollMetrics.current.y = next;
+          listRef.current?.scrollTo({ y: next, animated: false });
+        }}
         contentContainerStyle={{
           gap: 13,
           paddingTop: contentTopInset,
@@ -337,8 +625,24 @@ export function ChannelChatScreen({
           paddingBottom: contentBottomInset,
           flexGrow: 1,
         }}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
       >
+        {hasOlder && (
+          <View style={{ height: 34, justifyContent: "center", alignItems: "center" }}>
+            {loadingOlder ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.faint}
+                accessibilityLabel={t("chat.loadingEarlierMessages")}
+              />
+            ) : (
+              <Pressable accessibilityRole="button" onPress={() => void loadOlder()} hitSlop={8}>
+                <Text style={{ color: olderError ? colors.primary : colors.muted, fontSize: 12 }}>
+                  {t(olderError ? "chat.retryEarlierMessages" : "chat.loadEarlierMessages")}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
         {messages.length === 0 ? (
           <View
             style={{
@@ -399,12 +703,14 @@ export function ChannelChatScreen({
                 agentId={msg.agentId ?? ""}
                 title={msg.title ?? ""}
                 text={msg.text}
+                tools={msg.tools}
                 streaming={streamingId === msg.agentId && msg.id.startsWith("live:")}
                 member={memberById.get(msg.agentId ?? "")}
                 prompt={promptByMessageId.get(msg.id) ?? ""}
                 at={Date.parse(msg.createdAt)}
                 onNotify={notify}
                 onPublishShare={(input) => publishShare(api, input)}
+                onHold={holdReadingPosition}
               />
             ),
           )
@@ -440,6 +746,30 @@ export function ChannelChatScreen({
             borderRadius: radius.full,
           }}
         />
+        {mentionCandidates.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+            {mentionCandidates.map((member) => (
+              <Pressable
+                key={member.id}
+                accessibilityRole="button"
+                accessibilityLabel={`@${member.name}`}
+                onPress={() =>
+                  setDraft((value) => value.replace(/@([^\s@]*)$/, `@${member.name} `))
+                }
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                }}
+              >
+                <Text style={[s.small, { color: colors.text }]}>{`@${member.name}`}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         <PromptComposer
           style={[conversationColumnStyle, { marginBottom: 12 }]}
           value={draft}
@@ -664,20 +994,92 @@ function UserBubble({
   );
 }
 
+/** 频道里的工具过程收成一行。进行中只显示「工作中」；做完后默认收起，点开才能看每一步。 */
+function ChannelWorkFold({ tools, onHold }: { tools: ChannelToolTrace[]; onHold?: () => void }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const working = tools.some((tool) => tool.result === undefined);
+  useEffect(() => {
+    if (working) setOpen(false);
+  }, [working]);
+  const label = working
+    ? t("channels.working")
+    : t("channels.workProcess", { count: tools.length });
+  return (
+    <View style={{ paddingLeft: 42, gap: 8 }} testID="channel-work-fold">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ expanded: open, busy: working }}
+        disabled={working}
+        onPress={() => {
+          if (working) return;
+          onHold?.();
+          setOpen((value) => !value);
+        }}
+        style={{
+          alignSelf: "flex-start",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.line,
+          backgroundColor: colors.surface,
+        }}
+      >
+        {working ? (
+          <ActivityIndicator
+            size="small"
+            color={colors.primary}
+            style={{ width: 14, height: 14, transform: [{ scale: 0.72 }] }}
+          />
+        ) : open ? (
+          <ChevronDown size={14} color={colors.muted} />
+        ) : (
+          <ChevronRight size={14} color={colors.muted} />
+        )}
+        <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 18 }}>{label}</Text>
+      </Pressable>
+      {open && !working
+        ? tools.map((tool) => (
+            <ToolStep
+              key={tool.id}
+              tool={tool.name}
+              args={tool.args}
+              result={tool.result}
+              status="complete"
+              defaultOpen={false}
+            >
+              {tool.name === "get_quote" ? (
+                <QuoteToolCard result={tool.result} loading={false} />
+              ) : null}
+            </ToolStep>
+          ))
+        : null}
+    </View>
+  );
+}
+
 function MemberBubble({
   agentId,
   title,
   text,
+  tools,
   streaming,
   member,
   prompt,
   at,
   onNotify,
   onPublishShare,
+  onHold,
 }: {
   agentId: string;
   title: string;
   text: string;
+  tools?: ChannelToolTrace[];
   streaming: boolean;
   member?: AgentDefinition;
   /** 该条回复对应的用户提问；有值时一并出现在分享的图片与网页里。 */
@@ -686,6 +1088,8 @@ function MemberBubble({
   at: number;
   onNotify: (message: string) => void;
   onPublishShare: (input: { question: string; answer: string }) => Promise<string>;
+  /** 展开工具过程前记下阅读位置，避免列表被拉到最底部。 */
+  onHold?: () => void;
 }) {
   return (
     <View style={{ position: "relative", width: "100%" }}>
@@ -718,21 +1122,24 @@ function MemberBubble({
         <View style={{ paddingLeft: 42 }}>
           {title ? <Text style={[s.small, { color: colors.primaryStrong }]}>{title}</Text> : null}
         </View>
-        <View
-          style={{
-            alignSelf: "stretch",
-            // 左右 padding 相等（56+14 的一半），回复正文在卡片内水平居中。
-            paddingLeft: 35,
-            paddingRight: 35,
-            paddingVertical: 10,
-            borderRadius: radius.card,
-            borderWidth: 1,
-            borderColor: colors.line,
-            backgroundColor: colors.paper,
-          }}
-        >
-          <AssistantResponse content={text} streaming={streaming} />
-        </View>
+        {!!tools?.length && <ChannelWorkFold tools={tools} onHold={onHold} />}
+        {(text || !tools?.length) && (
+          <View
+            style={{
+              alignSelf: "stretch",
+              // 左右 padding 相等（56+14 的一半），回复正文在卡片内水平居中。
+              paddingLeft: 35,
+              paddingRight: 35,
+              paddingVertical: 10,
+              borderRadius: radius.card,
+              borderWidth: 1,
+              borderColor: colors.line,
+              backgroundColor: colors.paper,
+            }}
+          >
+            <AssistantResponse content={text} streaming={streaming} />
+          </View>
+        )}
         {/* 回复底部功能栏：喜欢/不喜欢、复制与导出 Markdown、分享为图片/链接、时间显示，
             与智能体对话页回复底部同一套交互。整栏左移贴齐回复卡片的左侧框线（整列左缘），
             不再保留 56px 缩进。 */}

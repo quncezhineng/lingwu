@@ -4,7 +4,7 @@ import type { LingWuApi } from "./api";
 /**
  * 频道群聊流式对话客户端。
  *
- * POST /api/channels/:id/chat 返回 SSE：member_start / delta / member_done / done / error。
+ * POST /api/channels/:id/chat 返回 SSE：member_start / delta / tool / member_done / leader / done / error。
  * Web 用 fetch 的可读流，React Native 用 XHR 的渐进 responseText（与 conversation-stream 同口径）。
  */
 export interface ChannelChatCallbacks {
