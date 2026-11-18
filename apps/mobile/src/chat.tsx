@@ -155,6 +155,7 @@ import {
   radius,
   s,
   shadow,
+  space,
 } from "./ui";
 import { UserMessageMeta } from "./user-message-meta";
 import { type ComposerPrompt, useWorkspace } from "./workspace";
@@ -1538,7 +1539,8 @@ export function ChatScreen({
           ]}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            gap: 13,
+            // 消息之间留 16：一问一答自成一组，滚动时不再挤成一整块。
+            gap: space.md,
             paddingTop: contentTopInset,
             paddingBottom: floatingComposer ? 0 : contentBottomInset,
             flexGrow: 1,
@@ -1658,8 +1660,8 @@ export function ChatScreen({
                 flexGrow: 1,
                 flexShrink: 0,
                 justifyContent: "center",
-                paddingVertical: hideHeader ? 28 : wideEmpty ? 42 : 30,
-                paddingHorizontal: hideHeader ? 8 : 0,
+                paddingVertical: hideHeader ? space.xl : wideEmpty ? space.xxxl : space.xxl,
+                paddingHorizontal: hideHeader ? space.xs : 0,
               }}
             >
               <View
@@ -1669,7 +1671,7 @@ export function ChatScreen({
                   alignSelf: "center",
                   flexDirection: wideEmpty && firstRunWelcome ? "row" : "column",
                   alignItems: "stretch",
-                  gap: wideEmpty ? 54 : 26,
+                  gap: wideEmpty ? space.section : space.relaxed,
                 }}
               >
                 <View
@@ -1678,7 +1680,7 @@ export function ChatScreen({
                     minWidth: 0,
                     justifyContent: "center",
                     alignItems: hideHeader ? "center" : "stretch",
-                    gap: 14,
+                    gap: space.md,
                   }}
                 >
                   {hideHeader ? (
@@ -1687,7 +1689,7 @@ export function ChatScreen({
                       size={firstRunWelcome ? 40 : 56}
                     />
                   ) : (
-                    <View style={[s.row, { gap: 8 }]}>
+                    <View style={[s.row, { gap: space.xs }]}>
                       <View
                         style={{
                           width: 20,
@@ -1746,28 +1748,28 @@ export function ChatScreen({
                   style={{
                     display: firstRunWelcome ? undefined : "none",
                     width: wideEmpty ? 360 : "100%",
-                    paddingLeft: wideEmpty ? 28 : 0,
-                    paddingTop: hideHeader ? 0 : wideEmpty ? 0 : 18,
+                    paddingLeft: wideEmpty ? space.relaxed : 0,
+                    paddingTop: hideHeader ? 0 : wideEmpty ? 0 : space.lg,
                     borderLeftWidth: wideEmpty ? 1 : 0,
                     borderLeftColor: colors.line,
                     borderTopWidth: hideHeader || wideEmpty ? 0 : 1,
                     borderTopColor: colors.line,
-                    ...(hideHeader ? { gap: 8 } : undefined),
+                    ...(hideHeader ? { gap: space.xs } : undefined),
                   }}
                 >
                   {firstRunWelcome && (
                     <View
                       style={{
-                        paddingHorizontal: 14,
-                        paddingVertical: 12,
+                        paddingHorizontal: space.md,
+                        paddingVertical: space.sm,
                         borderRadius: radius.card,
                         borderWidth: 1,
                         borderColor: colors.line,
                         backgroundColor: colors.paper,
-                        gap: 6,
+                        gap: space.compact,
                       }}
                     >
-                      <View style={[s.row, { gap: 8 }]}>
+                      <View style={[s.row, { gap: space.xs }]}>
                         <AgentOrb avatar={agentContext?.avatar ?? "orb"} size={22} />
                         <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
                           {agentContext?.name ?? t("common.agentName")}
@@ -1921,8 +1923,8 @@ export function ChatScreen({
                     !!text && (
                       <View
                         style={{
-                          paddingHorizontal: 14,
-                          paddingVertical: 11,
+                          paddingHorizontal: space.md,
+                          paddingVertical: space.sm,
                           borderRadius: radius.card,
                           borderWidth: user ? 0 : 1,
                           borderColor: colors.line,
@@ -2031,10 +2033,10 @@ export function ChatScreen({
             <View key={`live-${draft.id}`} style={{ alignSelf: "flex-start", width: "100%" }}>
               <View
                 style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderRadius: 14,
-                  borderBottomLeftRadius: 4,
+                  paddingHorizontal: space.md,
+                  paddingVertical: space.sm,
+                  borderRadius: radius.large,
+                  borderBottomLeftRadius: radius.small,
                   borderWidth: 1,
                   borderColor: colors.line,
                   backgroundColor: colors.paper,

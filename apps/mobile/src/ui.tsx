@@ -27,6 +27,7 @@ import {
   breakpoints,
   colors,
   elevation,
+  feedback,
   fonts,
   grid,
   radius,
@@ -50,6 +51,7 @@ export {
   colors,
   composerMetrics,
   elevation,
+  feedback,
   fonts,
   grid,
   iconStroke,
@@ -75,13 +77,16 @@ export const s = StyleSheet.create({
   /** 浮层标题：与页面 H1 同一档字阶（22/32）。 */
   title: { color: colors.heading, ...typography.h1 },
   heading: { color: colors.heading, ...typography.heading },
-  /** 白纸卡片：1px 描边 + medium 圆角，靠描边与留白建立层级（无阴影）。 */
+  /**
+   * 白纸卡片：1px 描边 + medium 圆角，靠描边与留白建立层级（无阴影）。
+   * 内距取 20：与正文行高、区块标题同处 4px 栅格，卡片读起来更透气。
+   */
   card: {
     backgroundColor: semantic.card,
     borderRadius: radius.medium,
     borderWidth: 1,
     borderColor: semantic.border,
-    padding: space.md,
+    padding: space.lg,
   },
   /** 需要浮起时叠加的 TDesign level1 阴影（色值沿用既有令牌）。 */
   cardElevated: { ...elevation.level1 },
@@ -90,7 +95,7 @@ export const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: semantic.input,
     borderRadius: radius.default,
-    paddingHorizontal: space.sm,
+    paddingHorizontal: space.md,
     paddingVertical: space.xs,
     color: semantic.foreground,
     ...textScale.bodyMedium,
@@ -98,7 +103,8 @@ export const s = StyleSheet.create({
     minHeight: sizing.inputMd,
     fontFamily: fonts.sans,
   },
-  field: { gap: space.compact, marginBottom: space.sm },
+  /** 字段之间留 16：标签 + 输入框自成一组，组与组之间才有呼吸。 */
+  field: { gap: space.compact, marginBottom: space.md },
   /** 表单字段标签：TDesign markMedium 档 12/20 w500。 */
   fieldLabel: {
     ...textScale.markMedium,
@@ -143,6 +149,8 @@ export const s = StyleSheet.create({
   buttonLink: { backgroundColor: "transparent", borderColor: "transparent", paddingHorizontal: 4 },
   buttonHoverDefault: { backgroundColor: colors.primaryStrong, borderColor: colors.primaryStrong },
   buttonHoverMuted: { backgroundColor: semantic.accent },
+  /** 非主按钮的按压态：比悬停再深一档，保证触摸端没有 hover 也有明确回馈。 */
+  buttonPressed: { backgroundColor: feedback.pressedSurface, borderColor: feedback.pressedSurface },
   /** 兼容既有引用的旧样式名。 */
   primary: { backgroundColor: colors.primaryAction, borderColor: colors.primaryAction },
   secondary: { backgroundColor: colors.paper, borderColor: colors.line },
@@ -362,11 +370,16 @@ export function Button({
           !busy &&
           hovered &&
           (resolvedVariant === "default" ? s.buttonHoverDefault : s.buttonHoverMuted),
+        // 按压再深一档：触摸端没有 hover，靠这一层保证点击有明确回馈。
+        !disabled &&
+          !busy &&
+          pressed &&
+          (resolvedVariant === "default" ? s.buttonHoverDefault : s.buttonPressed),
         // 键盘导航时的 focus-visible 等价物：只换 1px ring 描边。
         focused && s.focusRing,
         style,
         {
-          opacity: disabled ? 0.4 : busy && !quietBusy ? 0.75 : pressed ? 0.9 : 1,
+          opacity: disabled ? feedback.disabledOpacity : busy && !quietBusy ? 0.75 : 1,
         },
       ]}
     >
@@ -421,9 +434,9 @@ export function IconButton({
         variant === "outline" && s.iconButtonOutline,
         variant === "secondary" && s.iconButtonSecondary,
         !disabled && pressed && s.iconButtonPressed,
-        !disabled && variant === "ghost" && hovered && !pressed && s.iconButtonHover,
+        !disabled && !pressed && hovered && s.iconButtonHover,
         focused && s.focusRing,
-        { opacity: disabled ? 0.35 : 1 },
+        { opacity: disabled ? feedback.disabledOpacity : 1 },
         style,
       ]}
     >
@@ -520,13 +533,13 @@ export function Empty({
     <View
       style={{
         alignItems: "center",
-        paddingVertical: space.xxl,
+        paddingVertical: space.xxxl,
         paddingHorizontal: space.xl,
-        gap: space.compact,
+        gap: space.xs,
       }}
     >
       <Icon size={22} color={semantic.mutedForeground} />
-      <Text style={[s.heading, textScale.titleSmall, { marginTop: space.compact }]}>{title}</Text>
+      <Text style={[s.heading, textScale.titleMedium, { marginTop: space.xs }]}>{title}</Text>
       <Text
         style={[
           s.small,
@@ -727,7 +740,9 @@ export function Sheet({
             style={[
               s.between,
               {
-                padding: space.md,
+                // 标题栏与正文同一套内距：20 的留白让浮层不再顶着边框。
+                paddingHorizontal: space.lg,
+                paddingVertical: space.md,
                 borderBottomWidth: 1,
                 borderBottomColor: semantic.border,
                 flexShrink: 0,
@@ -816,13 +831,14 @@ export function Sheet({
               style={[{ flexShrink: 1, minHeight: 0 }, (fullscreen || bottomSheet) && { flex: 1 }]}
               contentContainerStyle={
                 fullscreen
-                  ? { flexGrow: 1, padding: space.md }
+                  ? { flexGrow: 1, padding: space.lg }
                   : bottomSheet
                     ? {
-                        paddingHorizontal: mobileBotLayout ? space.lg : space.md,
-                        paddingBottom: Math.max(insets.bottom, 16) + 16,
+                        paddingHorizontal: space.lg,
+                        paddingTop: space.md,
+                        paddingBottom: Math.max(insets.bottom, 16) + space.md,
                       }
-                    : { padding: space.md }
+                    : { padding: space.lg }
               }
             >
               {children}
@@ -831,7 +847,7 @@ export function Sheet({
             <View
               testID="sheet-fixed-content"
               style={[
-                { flex: 1, minHeight: 0, padding: space.md },
+                { flex: 1, minHeight: 0, padding: space.lg },
                 compact && fullscreen && { paddingBottom: Math.max(insets.bottom, 10) },
               ]}
             >
@@ -880,8 +896,9 @@ export function CheckRow({
 /**
  * 区块标题：标题 + 可选计数 chip + 可选文本按钮。
  *
- * 七个模块的二级分区统一走这里：标题 16/600、计数 10 号 chip（r4 / #EFEFEF）、
- * 动作 11 号文本按钮；`onPress` 缺省时动作纯展示。
+ * 七个模块的二级分区统一走这里：标题 16/24/600（高于正文一档）、
+ * 计数 10 号 chip（r4 / #EFEFEF）、动作 12/20 文本按钮；下留白 16，
+ * `onPress` 缺省时动作纯展示。
  */
 export function SectionHeading({
   title,
@@ -900,15 +917,16 @@ export function SectionHeading({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <View style={[s.between, { marginBottom: space.sm, gap: space.xs }, style]}>
-      <View style={[s.row, { gap: space.compact, flexShrink: 1, minWidth: 0 }]}>
-        <Text style={[textScale.titleSmall, { color: semantic.foreground }]}>{title}</Text>
+    <View style={[s.between, { marginBottom: space.md, gap: space.xs }, style]}>
+      <View style={[s.row, { gap: space.xs, flexShrink: 1, minWidth: 0 }]}>
+        {/* 区块标题取 16/24：必须高于正文 15/24，层级才不会读反。 */}
+        <Text style={[textScale.titleMedium, { color: semantic.foreground }]}>{title}</Text>
         {count !== undefined && (
           <View
             style={{
-              minWidth: 16,
-              paddingHorizontal: space.xxs,
-              paddingVertical: 1,
+              minWidth: 18,
+              paddingHorizontal: space.compact,
+              paddingVertical: space.hairline,
               borderRadius: radius.small,
               backgroundColor: semantic.secondary,
               alignItems: "center",
@@ -929,9 +947,14 @@ export function SectionHeading({
       {actions ? (
         actions
       ) : action && onPress ? (
-        <Pressable accessibilityRole="button" onPress={onPress} style={[s.row, { gap: 3 }]}>
-          <Text style={[s.small, { color: colors.link }]}>{action}</Text>
-          <ArrowUpRight size={12} color={colors.link} />
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onPress}
+          style={[s.row, { gap: space.xxs, minHeight: 24 }]}
+        >
+          <Text style={[textScale.markMedium, { color: colors.link }]}>{action}</Text>
+          <ArrowUpRight size={13} color={colors.link} />
         </Pressable>
       ) : null}
     </View>
@@ -951,19 +974,21 @@ export function LinkRow({
   tint?: string;
 }) {
   return (
-    <Pressable
+    <HoverPressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         s.row,
         {
-          paddingVertical: space.xs,
-          paddingHorizontal: space.compact,
-          marginHorizontal: -space.compact,
+          minHeight: sizing.rowLg,
+          paddingVertical: space.tight,
+          paddingHorizontal: space.xs,
+          marginHorizontal: -space.xs,
           gap: space.tight,
           borderRadius: radius.default,
         },
-        pressed && { backgroundColor: colors.overlay1 },
+        // 列表行同样保留悬停与按压两级回馈，与按钮 / 图标按钮一致。
+        (pressed || hovered) && { backgroundColor: pressed ? colors.overlay2 : colors.overlay1 },
       ]}
     >
       <View
@@ -981,7 +1006,7 @@ export function LinkRow({
         {!!detail && <Text style={s.small}>{detail}</Text>}
       </View>
       <ChevronRight size={14} color={semantic.subtleForeground} />
-    </Pressable>
+    </HoverPressable>
   );
 }
 /**

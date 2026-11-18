@@ -640,6 +640,23 @@ export const motion = {
 } as const;
 
 /**
+ * 交互反馈（悬停 / 按压 / 禁用）的唯一位阶。
+ *
+ * 全站只允许这三档：悬停用最浅的一层底、按压加深一档、禁用统一降透明度。
+ * 组件不再各写 0.8 / 0.85 / 0.9 / 0.35 / 0.4，反馈强度因此保持一致。
+ */
+export const feedback = {
+  /** 悬停底色（等价于最浅的 overlay1）。 */
+  hoverSurface: colors.overlay1,
+  /** 按压底色，比悬停再深一档。 */
+  pressedSurface: colors.overlay2,
+  /** 实心按钮按压时的透明度，仅用于无法换色的品牌底色。 */
+  pressedOpacity: 0.9,
+  /** 禁用态透明度。 */
+  disabledOpacity: 0.4,
+} as const;
+
+/**
  * 图标线宽：常规与底栏统一 1.75，仅导航激活态用 2（Lucide 默认线宽）。
  *
  * 全站只保留这两档，图标重量不再随位置漂移；除两档与填充态 0 之外

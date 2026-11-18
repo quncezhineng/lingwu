@@ -36,7 +36,7 @@ import {
 } from "./mobile-chrome";
 import { unreadCount } from "./notification-actions";
 import { GlobalSearchSheet } from "./search-sheet";
-import { colors, fonts, radius, shadow } from "./theme";
+import { colors, fonts, radius, shadow, space } from "./theme";
 import { useWorkspace } from "./workspace";
 
 type MobileHomeEntry =
@@ -75,12 +75,12 @@ function MobileMenuRow({
       accessibilityLabel={label}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 34,
-        paddingHorizontal: 8,
+        minHeight: 36,
+        paddingHorizontal: space.tight,
         borderRadius: radius.control,
         flexDirection: "row",
         alignItems: "center",
-        gap: 10,
+        gap: space.tight,
         backgroundColor: pressed ? (danger ? colors.errorSoft : colors.overlay1) : "transparent",
       })}
     >
@@ -135,8 +135,8 @@ function MobileAgentMenu({
             top,
             left,
             width: menuWidth,
-            padding: 4,
-            gap: 1,
+            padding: space.xxs,
+            gap: space.hairline,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: radius.card,
@@ -204,8 +204,8 @@ function MobileChannelMenu({
             top,
             left,
             width: menuWidth,
-            padding: 4,
-            gap: 1,
+            padding: space.xxs,
+            gap: space.hairline,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: radius.card,
@@ -266,8 +266,8 @@ function MobileCreateEntryMenu({
             top,
             left,
             width: menuWidth,
-            padding: 4,
-            gap: 1,
+            padding: space.xxs,
+            gap: space.hairline,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: radius.card,
@@ -487,14 +487,14 @@ export function MobileBotsHome({
                       accessibilityLabel={label}
                       onPress={() => onOpenBot(agent)}
                       style={({ pressed }) => ({
-                        minHeight: 68,
-                        paddingLeft: 8,
+                        minHeight: 72,
+                        paddingLeft: space.xs,
                         paddingRight: 44,
-                        paddingVertical: 10,
+                        paddingVertical: space.sm,
                         borderRadius: radius.card,
                         flexDirection: "row",
                         alignItems: "center",
-                        gap: 12,
+                        gap: space.sm,
                         backgroundColor: pressed ? colors.overlay1 : "transparent",
                       })}
                     >
@@ -569,14 +569,14 @@ export function MobileBotsHome({
                     accessibilityLabel={channel.name}
                     onPress={() => onOpenChannel(channel)}
                     style={({ pressed }) => ({
-                      minHeight: 68,
-                      paddingLeft: 8,
+                      minHeight: 72,
+                      paddingLeft: space.xs,
                       paddingRight: 44,
-                      paddingVertical: 10,
+                      paddingVertical: space.sm,
                       borderRadius: radius.card,
                       flexDirection: "row",
                       alignItems: "center",
-                      gap: 12,
+                      gap: space.sm,
                       backgroundColor: pressed ? colors.overlay1 : "transparent",
                     })}
                   >
