@@ -31,7 +31,7 @@ import { CardGrid } from "./card-grid";
 import { useChannels } from "./channels";
 import { fileTypeName } from "./file-kind";
 import { activeLocaleTag, type TranslationFn, type TranslationKey, useTranslation } from "./i18n";
-import { runtimeLabel, statusLabel, tr } from "./i18n/translate";
+import { runtimeLabel, runtimeLabelBilingual, statusLabel, tr } from "./i18n/translate";
 import {
   Activity,
   AlertTriangle,
@@ -3334,7 +3334,7 @@ export function MonitorCard({
     </Card>
   );
 }
-export function NotificationsSheet({ embedded = false }: { embedded?: boolean } = {}) {
+export function NotificationsSheet() {
   const { t } = useTranslation();
   const { data } = useAgentWorkspace();
   const { close, open } = useWorkspace();
@@ -3398,7 +3398,7 @@ export function NotificationsSheet({ embedded = false }: { embedded?: boolean } 
                 <HoverPressable
                   key={item.id}
                   accessibilityRole="button"
-                  accessibilityLabel={runtimeLabel(item.title)}
+                  accessibilityLabel={runtimeLabelBilingual(item.title)}
                   onPress={() => void openNotification(item)}
                   style={({ pressed, hovered }) => ({
                     gap: 6,
@@ -3418,7 +3418,7 @@ export function NotificationsSheet({ embedded = false }: { embedded?: boolean } 
                 >
                   <View style={[s.between, { gap: 10 }]}>
                     <Text numberOfLines={2} style={s.heading}>
-                      {runtimeLabel(item.title)}
+                      {runtimeLabelBilingual(item.title)}
                     </Text>
                     {!item.read && <Chip>{t("agent.newChip")}</Chip>}
                   </View>

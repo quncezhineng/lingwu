@@ -1,7 +1,11 @@
+import { View } from "react-native";
 import { TaskCard } from "../agent-ui";
+import { Text } from "../app-text";
 import { CardGrid } from "../card-grid";
 import { useTranslation } from "../i18n";
-import { BotEmpty, BotPage, type BotPageProps, useBotResources } from "./shared";
+import { Users } from "../icons";
+import { colors, s } from "../ui";
+import { BotPage, type BotPageProps, useBotResources } from "./shared";
 
 /**
  * 「任务」页：展示当前 Agent 的近期分析任务。
@@ -15,6 +19,7 @@ export function BotHistoryPage({ onClose, embedded }: BotPageProps) {
   const { tasks } = useBotResources();
   return (
     <BotPage title={t("agentSpace.analysisHistory")} onClose={onClose} embedded={embedded}>
+      {/* 不再套 padding 容器：任务网格直接铺满外层容器，卡片更大、更贴近边缘。 */}
       {tasks.length ? (
         <CardGrid
           items={tasks}
@@ -28,7 +33,12 @@ export function BotHistoryPage({ onClose, embedded }: BotPageProps) {
           )}
         />
       ) : (
-        <BotEmpty>{t("agentSpace.noTasks")}</BotEmpty>
+        <View style={{ gap: 8, alignItems: "center", paddingVertical: 18 }}>
+          <Users size={28} color={colors.faint} />
+          <Text style={[s.muted, { textAlign: "center", lineHeight: 22 }]}>
+            {t("agentSpace.noTasks")}
+          </Text>
+        </View>
       )}
     </BotPage>
   );

@@ -41,6 +41,7 @@ import { ModalOverlay } from "./modal-overlay";
 import { PreferencesScreen } from "./preferences-screen";
 import { type SkillCatalogEntry, skillCatalog } from "./skill-catalog";
 import { SkillLibraryPanel, SkillRemoveButton } from "./skill-library-panel";
+import { SkillSectionCard } from "./skill-section-card";
 import { breakpoints, colors, radius, shadow, space, typography } from "./theme";
 import {
   Button,
@@ -423,13 +424,19 @@ function ChannelMembersPanel({ channel }: { channel: Channel }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const members = useMemo(
-    () =>
-      channel.agentIds
-        .map((id) => agents.find((a) => a.id === id))
-        .filter((m): m is NonNullable<typeof m> => Boolean(m)),
-    [agents, channel.agentIds],
-  );
+  const currentLeaderId =
+    channel.leaderId && channel.agentIds.includes(channel.leaderId)
+      ? channel.leaderId
+      : channel.agentIds[0];
+  const members = useMemo(() => {
+    const orderedIds = [
+      currentLeaderId,
+      ...channel.agentIds.filter((id) => id !== currentLeaderId),
+    ];
+    return orderedIds
+      .map((id) => agents.find((a) => a.id === id))
+      .filter((m): m is NonNullable<typeof m> => Boolean(m));
+  }, [agents, channel.agentIds, currentLeaderId]);
 
   // 候选：尚未加入频道的智能体；频道上限 10 人，已满则不再提供可选项。
   const MAX_MEMBERS = 10;
@@ -495,6 +502,20 @@ function ChannelMembersPanel({ channel }: { channel: Channel }) {
     }
   }
 
+  async function setLeader(member: { id: string; name: string }) {
+    if (member.id === currentLeaderId) return;
+    setBusy(true);
+    setError("");
+    try {
+      await updateChannel(channel.id, { leaderId: member.id });
+      notify(t("channels.setLeaderSuccess", { name: member.name }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <View style={{ gap: 8 }}>
       <View style={[s.row, { justifyContent: "space-between", alignItems: "center" }]}>
@@ -509,10 +530,7 @@ function ChannelMembersPanel({ channel }: { channel: Channel }) {
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={[s.row, { gap: 6, alignItems: "center" }]}>
               <Text style={[s.text, { fontWeight: "600" }]}>{member.name}</Text>
-              {member.id ===
-                (channel.leaderId && channel.agentIds.includes(channel.leaderId)
-                  ? channel.leaderId
-                  : channel.agentIds[0]) && (
+              {member.id === currentLeaderId && (
                 <Text style={[s.small, { color: colors.primaryStrong, fontWeight: "600" }]}>
                   {t("channels.leader")}
                 </Text>
@@ -520,15 +538,22 @@ function ChannelMembersPanel({ channel }: { channel: Channel }) {
             </View>
             <Text style={[s.small, { color: colors.faint }]}>{member.role}</Text>
           </View>
-          <Button
-            small
-            danger
-            icon={CircleMinus}
-            disabled={!canRemove(member)}
-            onPress={() => setRemoving({ id: member.id, name: member.name })}
-          >
-            {t("channels.removeMember")}
-          </Button>
+          <View style={[s.row, { gap: 8, alignItems: "center" }]}>
+            {member.id !== currentLeaderId && (
+              <Button small disabled={busy} onPress={() => void setLeader(member)}>
+                {t("channels.setLeader")}
+              </Button>
+            )}
+            <Button
+              small
+              danger
+              icon={CircleMinus}
+              disabled={!canRemove(member) || busy}
+              onPress={() => setRemoving({ id: member.id, name: member.name })}
+            >
+              {t("channels.removeMember")}
+            </Button>
+          </View>
         </View>
       ))}
       {atMinimum && (
@@ -761,23 +786,23 @@ function ChannelSkillsPanel({ channel }: { channel: Channel }) {
 
   return (
     <View style={{ gap: 8 }}>
-      <Text style={[s.muted, { lineHeight: 20 }]}>{t("channels.skillsHint")}</Text>
-      {/* 右对齐的「+ 添加技能」：与 Agent 详情技能页同一位置、同一按钮。 */}
-      <View style={{ alignItems: "flex-end", marginBottom: 5 }}>
-        <Button small icon={Plus} onPress={() => setAdding(true)}>
-          {t("agentSpace.addSkill")}
-        </Button>
-      </View>
-      {cards.length ? (
-        <CardGrid
-          items={cards}
-          minColumnWidth={300}
-          getKey={(card) => card.key}
-          render={(card) => card.node}
-        />
-      ) : (
-        <Text style={[s.muted, { paddingVertical: 18 }]}>{t("channels.skillsEmpty")}</Text>
-      )}
+      <SkillSectionCard
+        description={t("channels.skillsHint")}
+        countLabel={t("agentSpace.skillCount", { count: cards.length })}
+        emptyTitle={t("agentSpace.skillEmptyTitle")}
+        emptyDetail={t("channels.skillsEmpty")}
+        addLabel={t("agentSpace.addSkill")}
+        onAdd={() => setAdding(true)}
+      >
+        {cards.length ? (
+          <CardGrid
+            items={cards}
+            minColumnWidth={300}
+            getKey={(card) => card.key}
+            render={(card) => card.node}
+          />
+        ) : null}
+      </SkillSectionCard>
       {viewingCatalog && (
         <SkillDetailSheet skill={viewingCatalog} onClose={() => setViewingCatalog(undefined)} />
       )}
@@ -844,9 +869,7 @@ function ChannelFilesPanel({ channel }: { channel: Channel }) {
       .request<ChannelMessage[]>(`/api/channels/${encodeURIComponent(channel.id)}/messages`)
       .then((messages) => {
         if (!alive) return;
-        setChatFileIds([
-          ...new Set(messages.flatMap((message) => message.attachmentIds ?? [])),
-        ]);
+        setChatFileIds([...new Set(messages.flatMap((message) => message.attachmentIds ?? []))]);
       })
       .catch(() => {
         if (alive) setChatFileIds([]);

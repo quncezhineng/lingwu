@@ -13,6 +13,8 @@ const channels = {
   "channels.descriptionPlaceholder": "e.g. Look at new-energy companies together",
   "channels.membersLabel": "Members",
   "channels.leader": "Lead",
+  "channels.leaderLabel": "Channel lead",
+  "channels.leaderHint": "Choose one selected Agent to be the lead for this channel.",
   "channels.addMembers": "Add members",
   "channels.addMembersTitle": "Add members",
   "channels.addMembersHint":
@@ -24,6 +26,8 @@ const channels = {
   "channels.removeMemberConfirm": 'Remove "{name}"? The Agent itself is kept.',
   "channels.removeMemberMin": "A channel needs at least 2 members — cannot remove more.",
   "channels.removeMemberSuccess": "Member removed.",
+  "channels.setLeader": "Set as lead",
+  "channels.setLeaderSuccess": '"{name}" is now the channel lead.',
   "channels.nameRequired": "Give the channel a name.",
   "channels.minMembers": "Pick at least two Agents.",
   "channels.deleteTitle": "Delete channel",
@@ -66,8 +70,7 @@ const channels = {
   "channels.resultLabel": "Final report",
   "channels.instructionsContext":
     "Channel shared instructions (all members must follow): {instructions}\n",
-  "channels.instructionsHint":
-    "Instructions written here are given to whichever member answers.",
+  "channels.instructionsHint": "Instructions written here are given to whichever member answers.",
   "channels.settingsProfile": "General",
   "channels.saveChannel": "Save info",
   "channels.settingsTitle": "Channel details",
@@ -87,6 +90,8 @@ const channels = {
   "channels.skillsEmpty":
     'This channel has no skills yet. Use "Add skill" in the top right to pick from the library; every member can then use it.',
   "channels.tasksEmpty": "This channel has no tasks yet.",
+  "channels.railTasksEmpty":
+    "This channel doesn't have any tasks yet. Go back to the channel chat to start one.",
   "channels.instructionsEmpty": "No shared instructions set yet.",
   "channels.ideasSubtitle":
     "Pick a direction, drop it into the channel composer, then decide who runs it.",

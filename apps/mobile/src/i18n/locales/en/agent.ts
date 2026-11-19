@@ -685,10 +685,10 @@ const agent = {
     "No skills yet. Tap “Create skill” above to write one, or “Upload skill” to import an existing one.",
   "agent.mySkillDeletedToast": "Deleted “{title}”.",
   "agent.mySkillDeleteConfirmTitle": "Permanently delete “{title}”?",
-  "agent.mySkillDeleteConfirmNoteAll":
-    "This permanently deletes the skill and its copies from all agents. This can't be undone.",
+  "agent.mySkillDeleteConfirmNoteAll": "This permanently deletes the skill, This can't be undone.",
   "agent.mySkillDeleteAction": "Delete skill",
-  "agent.skillsDetail": "Enable reusable specialist actions for research and investment work.",
+  "agent.skillsDetail":
+    "Add reusable specialist skills to this Agent so it can handle analysis, execution and collaboration when needed.",
   "agent.connectorsHeading": "Connections",
   "agent.connectorsDetail": "Bring models, mail, calendars and browsing into your workspace.",
   "agent.workspaceAppsHeading": "Workspace apps",
@@ -729,15 +729,16 @@ const agent = {
   "agent.skillDetailSource": "Skill source",
   "agent.skillDetailUse": "Use this skill",
   "agent.skillAddedToChat": "“{title}” is ready in the chat composer.",
-  "agent.skillInstallAction": "Add to Agent",
-  "agent.skillInstallTitle": "Add to Agent",
+  "agent.skillInstallAction": "Add to Agent/Channel",
+  "agent.skillInstallTitle": "Add to Agent/Channel",
   "agent.skillInstallHint":
-    "Agents that already have this skill are marked as added. Tap an Agent to add or remove it; copies that must be kept are locked.",
+    "Agents and Channels that already have this skill are marked as added. Tap a target to add or remove it; copies that must be kept are locked.",
   "agent.skillInstallHintNoLock":
-    "Agents that already have this skill are marked as added. Tap an Agent to add or remove it.",
+    "Agents and Channels that already have this skill are marked as added. Tap a target to add or remove it.",
   "agent.skillInstallInstalled": "Added",
-  "agent.skillInstallSummary": "{count} Agents added",
-  "agent.skillShareNoTargets": "No Agents yet. Create one first, then add this skill to it.",
+  "agent.skillInstallSummary": "{count} Agents or Channels added",
+  "agent.skillShareNoTargets":
+    "No Agents or Channels yet. Create one first, then add this skill to it.",
   "agent.skillShareLocked": "Added · locked",
   "agent.skillShareBlockedToast":
     "This copy can't be removed — the skill must stay in at least one Agent.",
@@ -809,6 +810,7 @@ const agent = {
   "agent.run.event.meaningfulChange": "A meaningful change was found",
   "agent.run.event.detailsNeeded": "Your details are needed",
   "agent.run.event.readyForReview": "Ready for your review",
+  "agent.run.event.multiAgentResearchComplete": "Multi-agent research complete",
   "agent.run.event.newBrowserSession": "New browser session",
   "agent.run.event.watchNeedsAttention": "Watch needs attention",
   "agent.run.event.watchPaused": "Watch paused after repeated failures",
@@ -971,6 +973,8 @@ const agent = {
   "agentSpace.skillSampleOutput":
     "Lead with the conclusion, then list the data, open questions and next verification step.",
   "agentSpace.saveSkill": "Save skill",
+  "agentSpace.skillCount": "{count} skills",
+  "agentSpace.skillEmptyTitle": "No skills yet",
   "agentSpace.skillEmpty": "No skills yet. Tap Add skill in the top-right to browse the library.",
   "agentSpace.skillDisabled": "Disabled",
   "agentSpace.skillVersion": "Version {version}",
@@ -1052,7 +1056,7 @@ const agent = {
   "agentSpace.openIdeasPage": "Ideas",
   "agentSpace.ready": "Ready when you are",
   "agentSpace.noTasks":
-    "No automations or tasks yet. Return to chat and let an Agent start a piece of work.",
+    "This Agent has no active tasks yet. Return to chat and let an Agent start a piece of work.",
   "agentSpace.noInsights":
     "No insight cards yet. Completed research keeps its conclusion and source here.",
 } satisfies Dictionary;

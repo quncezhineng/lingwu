@@ -47,7 +47,7 @@ import {
 } from "./agent-space-model";
 import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
-import { useAppConnectors } from "./app-connectors";
+import { AppConnectorSheet, type AppConnectorView, useAppConnectors } from "./app-connectors";
 import { Text, type TextInput } from "./app-text";
 import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { AssistantResponse } from "./assistant-response";
@@ -153,8 +153,10 @@ import {
   ErrorNotice,
   fonts,
   radius,
+  Sheet,
   s,
   shadow,
+  space,
 } from "./ui";
 import { UserMessageMeta } from "./user-message-meta";
 import { type ComposerPrompt, useWorkspace } from "./workspace";
@@ -838,6 +840,67 @@ export function ChatScreen({
   const selectedConnectors = connectorChoices.filter((option) =>
     selectedConnectorIds.includes(option.id),
   );
+  // —— 「选择连接器」弹层内的直接连接：账户级连接器在弹层上方再挂一个连接表单
+  // （兄弟节点，避免嵌套 Modal），内置连接器（智能体电脑 / Gmail / 日历 / OpenBot）
+  // 各走自己的连接路径；连接成功后刷新候选并自动勾选，给出明确反馈。
+  const [connectingSlug, setConnectingSlug] = useState<string | null>(null);
+  const [openbotSheetOpen, setOpenbotSheetOpen] = useState(false);
+  const [googleConnecting, setGoogleConnecting] = useState(false);
+  const googleConnected = w.connections.some(
+    (connection) =>
+      connection.id === "google" &&
+      (connection.status === "connected" || connection.status === "sample"),
+  );
+  /** Google 系连接器（Gmail / 日历）的 OAuth 连接：与「所有技能与链接」同一流程。 */
+  async function openGoogleConnector(id: "gmail" | "calendar") {
+    if (googleConnecting) return;
+    if (googleConnected) {
+      navigate(id === "gmail" ? "mail" : "calendar");
+      return;
+    }
+    setGoogleConnecting(true);
+    try {
+      const result = await api.request<{ url: string | null }>("/api/google/connect", {
+        capability: "read",
+      });
+      if (result.url) {
+        await Linking.openURL(result.url);
+        notify(t("screens.connectionsNotifyFinish"));
+      } else {
+        await refresh();
+        notify(t("screens.connectionsNotifyLocalReady"));
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGoogleConnecting(false);
+    }
+  }
+  /** 弹层里点击「去连接」：按连接器类型分发到各自的连接流程。 */
+  function handleConnectorConnect(id: string) {
+    if (appConnectors.items.some((item) => item.slug === id)) {
+      setConnectingSlug(id);
+      return;
+    }
+    if (id === "browser") {
+      open({ type: "computer" });
+      return;
+    }
+    if (id === "gmail" || id === "calendar") {
+      void openGoogleConnector(id);
+      return;
+    }
+    if (id === "openbot") {
+      setOpenbotSheetOpen(true);
+    }
+  }
+  /** 账户级连接器连接成功：刷新目录、把新连接器自动勾进当前对话，并提示结果。 */
+  function handleAppConnectorChanged(connectedSlug: string) {
+    void appConnectors.refresh();
+    setSelectedConnectorIds((ids) => (ids.includes(connectedSlug) ? ids : [...ids, connectedSlug]));
+    const option = connectorChoices.find((candidate) => candidate.id === connectedSlug);
+    if (option) notify(t("chat.connectorConnectedToast", { name: option.name }));
+  }
   // 切换对话时清空能力选择，避免把上一个对话的技能/连接器带到新对话。
   useEffect(() => {
     setSelectedSkillIds([]);
@@ -1538,7 +1601,8 @@ export function ChatScreen({
           ]}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            gap: 13,
+            // 消息之间留 16：一问一答自成一组，滚动时不再挤成一整块。
+            gap: space.md,
             paddingTop: contentTopInset,
             paddingBottom: floatingComposer ? 0 : contentBottomInset,
             flexGrow: 1,
@@ -1658,8 +1722,8 @@ export function ChatScreen({
                 flexGrow: 1,
                 flexShrink: 0,
                 justifyContent: "center",
-                paddingVertical: hideHeader ? 28 : wideEmpty ? 42 : 30,
-                paddingHorizontal: hideHeader ? 8 : 0,
+                paddingVertical: hideHeader ? space.xl : wideEmpty ? space.xxxl : space.xxl,
+                paddingHorizontal: hideHeader ? space.xs : 0,
               }}
             >
               <View
@@ -1669,7 +1733,7 @@ export function ChatScreen({
                   alignSelf: "center",
                   flexDirection: wideEmpty && firstRunWelcome ? "row" : "column",
                   alignItems: "stretch",
-                  gap: wideEmpty ? 54 : 26,
+                  gap: wideEmpty ? space.section : space.relaxed,
                 }}
               >
                 <View
@@ -1678,7 +1742,7 @@ export function ChatScreen({
                     minWidth: 0,
                     justifyContent: "center",
                     alignItems: hideHeader ? "center" : "stretch",
-                    gap: 14,
+                    gap: space.md,
                   }}
                 >
                   {hideHeader ? (
@@ -1687,7 +1751,7 @@ export function ChatScreen({
                       size={firstRunWelcome ? 40 : 56}
                     />
                   ) : (
-                    <View style={[s.row, { gap: 8 }]}>
+                    <View style={[s.row, { gap: space.xs }]}>
                       <View
                         style={{
                           width: 20,
@@ -1746,28 +1810,28 @@ export function ChatScreen({
                   style={{
                     display: firstRunWelcome ? undefined : "none",
                     width: wideEmpty ? 360 : "100%",
-                    paddingLeft: wideEmpty ? 28 : 0,
-                    paddingTop: hideHeader ? 0 : wideEmpty ? 0 : 18,
+                    paddingLeft: wideEmpty ? space.relaxed : 0,
+                    paddingTop: hideHeader ? 0 : wideEmpty ? 0 : space.lg,
                     borderLeftWidth: wideEmpty ? 1 : 0,
                     borderLeftColor: colors.line,
                     borderTopWidth: hideHeader || wideEmpty ? 0 : 1,
                     borderTopColor: colors.line,
-                    ...(hideHeader ? { gap: 8 } : undefined),
+                    ...(hideHeader ? { gap: space.xs } : undefined),
                   }}
                 >
                   {firstRunWelcome && (
                     <View
                       style={{
-                        paddingHorizontal: 14,
-                        paddingVertical: 12,
+                        paddingHorizontal: space.md,
+                        paddingVertical: space.sm,
                         borderRadius: radius.card,
                         borderWidth: 1,
                         borderColor: colors.line,
                         backgroundColor: colors.paper,
-                        gap: 6,
+                        gap: space.compact,
                       }}
                     >
-                      <View style={[s.row, { gap: 8 }]}>
+                      <View style={[s.row, { gap: space.xs }]}>
                         <AgentOrb avatar={agentContext?.avatar ?? "orb"} size={22} />
                         <Text style={[s.small, { fontWeight: "600", color: colors.text }]}>
                           {agentContext?.name ?? t("common.agentName")}
@@ -1921,8 +1985,8 @@ export function ChatScreen({
                     !!text && (
                       <View
                         style={{
-                          paddingHorizontal: 14,
-                          paddingVertical: 11,
+                          paddingHorizontal: space.md,
+                          paddingVertical: space.sm,
                           borderRadius: radius.card,
                           borderWidth: user ? 0 : 1,
                           borderColor: colors.line,
@@ -2031,10 +2095,10 @@ export function ChatScreen({
             <View key={`live-${draft.id}`} style={{ alignSelf: "flex-start", width: "100%" }}>
               <View
                 style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderRadius: 14,
-                  borderBottomLeftRadius: 4,
+                  paddingHorizontal: space.md,
+                  paddingVertical: space.sm,
+                  borderRadius: radius.large,
+                  borderBottomLeftRadius: radius.small,
                   borderWidth: 1,
                   borderColor: colors.line,
                   backgroundColor: colors.paper,
@@ -2485,25 +2549,46 @@ export function ChatScreen({
         </>
       )}
       {connectorPickerOpen && (
-        <ConnectorPickerSheet
-          options={connectorChoices}
-          selectedIds={selectedConnectorIds}
-          onToggle={(id) =>
-            setSelectedConnectorIds((ids) =>
-              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
-            )
-          }
-          onConfirm={() => setConnectorPickerOpen(false)}
-          onClose={() => setConnectorPickerOpen(false)}
-          onManage={() => {
-            setConnectorPickerOpen(false);
-            navigate("connections");
-          }}
-          onConnect={() => {
-            setConnectorPickerOpen(false);
-            navigate("connections");
-          }}
-        />
+        <>
+          <ConnectorPickerSheet
+            options={connectorChoices}
+            selectedIds={selectedConnectorIds}
+            onToggle={(id) =>
+              setSelectedConnectorIds((ids) =>
+                ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+              )
+            }
+            onConfirm={() => setConnectorPickerOpen(false)}
+            onClose={() => setConnectorPickerOpen(false)}
+            onManage={() => {
+              setConnectorPickerOpen(false);
+              navigate("connections");
+            }}
+            onConnect={handleConnectorConnect}
+          />
+          {connectingSlug && appConnectors.items.some((item) => item.slug === connectingSlug) && (
+            <AppConnectorSheet
+              item={
+                appConnectors.items.find((item) => item.slug === connectingSlug) as AppConnectorView
+              }
+              api={api}
+              onClose={() => setConnectingSlug(null)}
+              onChanged={() => handleAppConnectorChanged(connectingSlug)}
+            />
+          )}
+          {openbotSheetOpen && (
+            <Sheet
+              title="OpenBot"
+              subtitle={t("screens.connectionsOpenBotSubtitle")}
+              onClose={() => setOpenbotSheetOpen(false)}
+            >
+              <View style={{ gap: 14 }}>
+                <Text style={s.text}>{t("screens.connectionsOpenBotNotice")}</Text>
+                <Text style={s.muted}>{t("screens.connectionsOpenBotDetail")}</Text>
+              </View>
+            </Sheet>
+          )}
+        </>
       )}
       {filesOpen && (
         <ThreadArtifactsPanel

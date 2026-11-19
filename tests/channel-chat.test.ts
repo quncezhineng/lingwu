@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, type TestContext, test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
+import type { Config } from "../apps/server/src/config.ts";
+import { createStore, type Store } from "../apps/server/src/db.ts";
 import {
   channelLeader,
   channelMemberTools,
@@ -15,10 +17,8 @@ import {
   parseMentionIntent,
   parseRelevance,
 } from "../apps/server/src/engine/channel-chat.ts";
-import { appointedLeaderId, channelHistoryPage } from "../packages/domain/src/channel.ts";
-import type { Config } from "../apps/server/src/config.ts";
-import { createStore, type Store } from "../apps/server/src/db.ts";
 import type { Channel, ChannelMessage } from "../packages/domain/src/channel.ts";
+import { appointedLeaderId, channelHistoryPage } from "../packages/domain/src/channel.ts";
 
 /** 最小 OpenAI Responses 协议 fixture：每个请求回一段逐字文本，验证流式链路。 */
 async function textModelFixture(t: TestContext) {
@@ -61,28 +61,28 @@ async function textModelFixture(t: TestContext) {
           ? "ASSIGN"
           : "ANSWER"
         : relevance
-      ? body.includes("FORCE_NONE")
-        ? "NO"
-        : body.includes("FORCE_ASSIGN")
-          ? isJia
-            ? "ASSIGN"
-            : "NO"
-          : body.includes("FORCE_BOTH")
-            ? "ANSWER"
-            : body.includes("FORCE_SPECIALIST")
+          ? body.includes("FORCE_NONE")
+            ? "NO"
+            : body.includes("FORCE_ASSIGN")
               ? isJia
-                ? "NO"
-                : "ANSWER"
-              : isJia
-                ? "ANSWER"
+                ? "ASSIGN"
                 : "NO"
-      : body.includes("SUMMARIZE_ONLY")
-        ? "两边都看完了。"
-        : body.includes("WORK_PART")
-          ? "@甲 这一份做完了。"
-          : body.includes("ASSIGN_ONLY")
-            ? "@乙 看港股。"
-            : "先看需求，再给结论。";
+              : body.includes("FORCE_BOTH")
+                ? "ANSWER"
+                : body.includes("FORCE_SPECIALIST")
+                  ? isJia
+                    ? "NO"
+                    : "ANSWER"
+                  : isJia
+                    ? "ANSWER"
+                    : "NO"
+          : body.includes("SUMMARIZE_ONLY")
+            ? "两边都看完了。"
+            : body.includes("WORK_PART")
+              ? "@甲 这一份做完了。"
+              : body.includes("ASSIGN_ONLY")
+                ? "@乙 看港股。"
+                : "先看需求，再给结论。";
     emit("response.created", { response: { ...base, status: "in_progress" } });
     emit("response.output_item.added", {
       output_index: 0,
@@ -94,7 +94,9 @@ async function textModelFixture(t: TestContext) {
         content: [],
       },
     });
-    for (const delta of replyText === "先看需求，再给结论。" ? ["先看需求，", "再给结论。"] : [replyText]) {
+    for (const delta of replyText === "先看需求，再给结论。"
+      ? ["先看需求，", "再给结论。"]
+      : [replyText]) {
       emit("response.output_text.delta", {
         item_id: "msg-fixture",
         output_index: 0,
@@ -361,7 +363,10 @@ test("channel chat replies with one member, keeps history, and a mention selects
     pcbEvents.filter((event) => event.event === "member_start").map((event) => event.data.agentId),
     ["agent-b"],
   );
-  assert.equal(pcbEvents.some((event) => event.event === "leader"), false);
+  assert.equal(
+    pcbEvents.some((event) => event.event === "leader"),
+    false,
+  );
   assert.ok(prompts.some((prompt) => prompt.includes("LEADER_ONLY") && prompt.includes("PCB")));
   assert.equal(
     pcbEvents.some((event) => JSON.stringify(event.data).includes("LEADER_ONLY")),
@@ -393,7 +398,10 @@ test("channel chat replies with one member, keeps history, and a mention selects
   });
   assert.equal(promote.status, 200);
   const promoteEvents = await readSse(promote);
-  assert.equal(promoteEvents.some((event) => event.event === "leader" && event.data.leaderId === "agent-b"), true);
+  assert.equal(
+    promoteEvents.some((event) => event.event === "leader" && event.data.leaderId === "agent-b"),
+    true,
+  );
   const afterPromote = (await (
     await server.app.request("/api/channels", { headers: headers() })
   ).json()) as Channel[];
@@ -713,9 +721,24 @@ test("channel members can call the quote tool instead of a connector", async () 
           return symbols.map((symbol) => ({ symbol, price: 1402.5, currency: "CNY" }));
         },
       },
-      search: { async search() { return { results: [] }; } },
-      files: { async list() { return [{ id: "f1", name: "note.txt", mimeType: "text/plain" }]; }, async bytes() { return Buffer.from("营收"); } },
-      browser: { async observeForThread() { return { url: "https://example.com", title: "", text: "" }; } },
+      search: {
+        async search() {
+          return { results: [] };
+        },
+      },
+      files: {
+        async list() {
+          return [{ id: "f1", name: "note.txt", mimeType: "text/plain" }];
+        },
+        async bytes() {
+          return Buffer.from("营收");
+        },
+      },
+      browser: {
+        async observeForThread() {
+          return { url: "https://example.com", title: "", text: "" };
+        },
+      },
     } as never,
     "alice",
     "thread",
@@ -788,7 +811,10 @@ test("channel leader and circled ids stay inside the roster", () => {
   assert.equal(latest.messages[0]?.id, "m15");
   assert.equal(latest.messages.at(-1)?.id, "m44");
   assert.equal(latest.hasMore, true);
-  assert.equal(latest.messages.some((message) => message.id === "m0"), false);
+  assert.equal(
+    latest.messages.some((message) => message.id === "m0"),
+    false,
+  );
   const older = channelHistoryPage(many, { limit: 30, before: latest.before ?? "" });
   assert.equal("missing" in older, false);
   if ("missing" in older) return;
@@ -796,7 +822,10 @@ test("channel leader and circled ids stay inside the roster", () => {
   assert.equal(older.messages.at(-1)?.id, "m14");
   assert.equal(older.hasMore, false);
   assert.equal("missing" in channelHistoryPage(many, { before: "gone" }), true);
-  const source = readFileSync(new URL("../apps/server/src/engine/channel-chat.ts", import.meta.url), "utf8");
+  const source = readFileSync(
+    new URL("../apps/server/src/engine/channel-chat.ts", import.meta.url),
+    "utf8",
+  );
   assert.equal(source.includes("asksLeaderToAssign"), false);
   assert.equal(source.includes("asksEveryone"), false);
   assert.equal(source.includes("chooseSpeakers"), false);

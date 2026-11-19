@@ -159,6 +159,7 @@ const RUNTIME_LABEL_KEYS: Record<string, string> = {
   "A meaningful change was found": "agent.run.event.meaningfulChange",
   "Your details are needed": "agent.run.event.detailsNeeded",
   "Ready for your review": "agent.run.event.readyForReview",
+  "Multi-agent research complete": "agent.run.event.multiAgentResearchComplete",
   "New browser session": "agent.run.event.newBrowserSession",
   "Watch needs attention": "agent.run.event.watchNeedsAttention",
   "Watch paused after repeated failures": "agent.run.event.watchPaused",
@@ -182,6 +183,16 @@ export function runtimeLabel(value?: string | null): string {
   if (!value) return "";
   const key = RUNTIME_LABEL_KEYS[value];
   return key ? tr(key) : value;
+}
+
+/** 通知标题固定显示中英文，便于用户快速识别运行态事件。 */
+export function runtimeLabelBilingual(value?: string | null): string {
+  if (!value) return "";
+  const key = RUNTIME_LABEL_KEYS[value];
+  if (!key) return value;
+  const zh = translate("zh-Hans", key);
+  const en = translate("en", key);
+  return zh === en ? en : `${zh} / ${en}`;
 }
 
 /** 新旧版本使用过的默认智能体名称；这些值需要随界面语言自动本地化。 */

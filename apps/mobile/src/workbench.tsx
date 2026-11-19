@@ -45,6 +45,8 @@ import {
   SectionHeading,
   Sheet,
   s,
+  sizing,
+  space,
   typography,
 } from "./ui";
 
@@ -104,7 +106,7 @@ function WatchlistRail() {
   }, [api, locale]);
 
   return (
-    <View style={{ gap: 10 }}>
+    <View style={{ gap: space.sm }}>
       <SectionHeading
         title={t("workbench.myWatchlist")}
         count={list?.symbols.length}
@@ -114,7 +116,7 @@ function WatchlistRail() {
       />
 
       {watchState.status === "loading" && !list ? (
-        <View style={[s.card, { paddingVertical: 24, alignItems: "center" }]}>
+        <View style={[s.card, { paddingVertical: space.xl, alignItems: "center" }]}>
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
       ) : list?.symbols.length ? (
@@ -139,26 +141,26 @@ function WatchlistRail() {
                   })
                 }
                 style={({ pressed }) => ({
-                  minHeight: 55,
+                  minHeight: sizing.rowLg,
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 9,
-                  paddingHorizontal: 9,
-                  marginHorizontal: -9,
-                  borderRadius: 7,
+                  gap: space.tight,
+                  paddingHorizontal: space.xs,
+                  marginHorizontal: -space.xs,
+                  borderRadius: radius.control,
                   borderTopWidth: index ? 1 : 0,
                   borderTopColor: colors.line,
                   backgroundColor: pressed ? colors.overlay1 : "transparent",
                 })}
               >
-                <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                <View style={{ flex: 1, minWidth: 0, gap: space.hairline }}>
                   <Text
                     numberOfLines={1}
-                    style={{ fontSize: 12, fontWeight: "500", color: colors.text }}
+                    style={{ ...typography.meta, color: colors.text, fontSize: 13 }}
                   >
                     {displayName}
                   </Text>
-                  <Text numberOfLines={1} style={{ fontSize: 10, color: colors.faint }}>
+                  <Text numberOfLines={1} style={[typography.caption, { color: colors.faint }]}>
                     {item.symbol.code} · {t(SYMBOL_MARKET_LABEL_KEYS[item.symbol.market])}
                   </Text>
                 </View>
@@ -184,25 +186,27 @@ function WatchlistRail() {
             accessibilityRole="button"
             onPress={() => navigate("watchlist")}
             style={({ pressed }) => ({
-              minHeight: 36,
+              minHeight: sizing.controlLg,
               alignItems: "center",
               justifyContent: "center",
               flexDirection: "row",
-              gap: 6,
-              marginTop: 9,
+              gap: space.compact,
+              marginTop: space.sm,
               borderWidth: 1,
               borderColor: colors.lineStrong,
               borderStyle: "dashed",
-              borderRadius: 7,
+              borderRadius: radius.control,
               backgroundColor: pressed ? colors.overlay1 : "transparent",
             })}
           >
             <Plus size={13} color={colors.muted} />
-            <Text style={{ fontSize: 11, color: colors.muted }}>{t("workbench.addWatch")}</Text>
+            <Text style={[typography.caption, { color: colors.muted }]}>
+              {t("workbench.addWatch")}
+            </Text>
           </Pressable>
         </View>
       ) : (
-        <View style={[s.card, { gap: 10, padding: 14 }]}>
+        <View style={[s.card, { gap: space.sm, padding: space.md }]}>
           <Text style={[s.small, { lineHeight: 18 }]}>{t("workbench.watchlistEmpty")}</Text>
           <Button small icon={Plus} onPress={() => navigate("watchlist")}>
             {t("workbench.addWatch")}
@@ -222,10 +226,10 @@ function ApprovalCard() {
   );
   if (!task) {
     return (
-      <View style={[s.card, { gap: 11, padding: 14, backgroundColor: colors.surface }]}>
-        <View style={[s.row, { gap: 7 }]}>
+      <View style={[s.card, { gap: space.sm, padding: space.md, backgroundColor: colors.surface }]}>
+        <View style={[s.row, { gap: space.xs }]}>
           <Bell size={14} strokeWidth={1.7} color={colors.muted} />
-          <Text style={{ fontSize: 11, fontWeight: "600", color: colors.text }}>
+          <Text style={[typography.caption, { color: colors.text, fontWeight: "600" }]}>
             {t("workbench.noPendingTitle")}
           </Text>
         </View>
@@ -233,23 +237,30 @@ function ApprovalCard() {
         <Pressable
           accessibilityRole="button"
           onPress={() => navigate("goals")}
-          style={[s.between, { paddingTop: 9, borderTopWidth: 1, borderTopColor: colors.line }]}
+          style={[
+            s.between,
+            { paddingTop: space.sm, borderTopWidth: 1, borderTopColor: colors.line },
+          ]}
         >
-          <Text style={{ fontSize: 11, color: colors.text }}>{t("workbench.setupAlert")}</Text>
+          <Text style={[typography.caption, { color: colors.text }]}>
+            {t("workbench.setupAlert")}
+          </Text>
           <ChevronRight size={13} strokeWidth={1.7} color={colors.faint} />
         </Pressable>
       </View>
     );
   }
   return (
-    <View style={[s.card, { gap: 9, padding: 14 }]}>
-      <View style={[s.row, { gap: 7 }]}>
+    <View style={[s.card, { gap: space.sm, padding: space.md }]}>
+      <View style={[s.row, { gap: space.xs }]}>
         <ShieldCheck size={14} strokeWidth={1.7} color={colors.primary} />
-        <Text style={{ fontSize: 11, color: colors.muted }}>{t("workbench.waitingEyebrow")}</Text>
+        <Text style={[typography.caption, { color: colors.muted }]}>
+          {t("workbench.waitingEyebrow")}
+        </Text>
       </View>
       <Text
         numberOfLines={2}
-        style={{ fontSize: 14, lineHeight: 20, fontWeight: "600", color: colors.text }}
+        style={{ fontSize: 15, lineHeight: 22, fontWeight: "600", color: colors.text }}
       >
         {task.title}
       </Text>
@@ -261,9 +272,14 @@ function ApprovalCard() {
       <Pressable
         accessibilityRole="button"
         onPress={() => open({ type: "task", taskId: task.id })}
-        style={[s.between, { paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line }]}
+        style={[
+          s.between,
+          { paddingTop: space.sm, borderTopWidth: 1, borderTopColor: colors.line },
+        ]}
       >
-        <Text style={{ fontSize: 11, color: colors.text }}>{t("workbench.viewAndConfirm")}</Text>
+        <Text style={[typography.caption, { color: colors.text }]}>
+          {t("workbench.viewAndConfirm")}
+        </Text>
         <ChevronRight size={13} strokeWidth={1.7} color={colors.faint} />
       </Pressable>
     </View>
@@ -276,10 +292,10 @@ function PreferenceRail() {
   const { navigate } = useWorkspace();
   const memories = data?.memories.slice(0, 2) ?? [];
   return (
-    <View style={{ gap: 9 }}>
-      <View style={[s.row, { gap: 7 }]}>
+    <View style={{ gap: space.sm }}>
+      <View style={[s.row, { gap: space.xs }]}>
         <Heart size={14} strokeWidth={1.7} color={colors.muted} />
-        <Text style={{ fontSize: 11, fontWeight: "600", color: colors.text }}>
+        <Text style={[typography.caption, { color: colors.text, fontWeight: "600" }]}>
           {t("workbench.remembers")}
         </Text>
       </View>
@@ -288,7 +304,7 @@ function PreferenceRail() {
           <Text
             key={memory.id}
             numberOfLines={2}
-            style={{ fontSize: 12, lineHeight: 20, color: colors.muted }}
+            style={[typography.meta, { color: colors.muted }]}
           >
             “{memory.text}”
           </Text>
@@ -298,15 +314,18 @@ function PreferenceRail() {
       )}
       <Pressable
         accessibilityRole="button"
+        hitSlop={6}
         onPress={() => navigate("memories")}
-        style={[s.row, { gap: 3 }]}
+        style={[s.row, { gap: space.xxs, minHeight: 24 }]}
       >
-        <Text style={{ fontSize: 11, color: colors.muted }}>{t("workbench.viewPreferences")}</Text>
+        <Text style={[typography.caption, { color: colors.muted }]}>
+          {t("workbench.viewPreferences")}
+        </Text>
         <ChevronRight size={12} strokeWidth={1.7} color={colors.faint} />
       </Pressable>
-      <View style={[s.row, { gap: 6, marginTop: 4 }]}>
+      <View style={[s.row, { gap: space.compact, marginTop: space.xxs }]}>
         <ShieldCheck size={13} color={colors.faint} />
-        <Text style={{ fontSize: 10, color: colors.faint }}>{t("workbench.privacy")}</Text>
+        <Text style={[typography.eyebrow, { color: colors.faint }]}>{t("workbench.privacy")}</Text>
       </View>
     </View>
   );
@@ -328,8 +347,8 @@ function TaskRow({ task }: { task: AgentTask }) {
         minHeight: 64,
         flexDirection: "row",
         alignItems: "center",
-        gap: 10,
-        paddingVertical: 10,
+        gap: space.tight,
+        paddingVertical: space.sm,
         borderTopWidth: 1,
         borderTopColor: colors.line,
         backgroundColor: pressed ? colors.overlay1 : "transparent",
@@ -355,8 +374,11 @@ function TaskRow({ task }: { task: AgentTask }) {
           <Check size={16} strokeWidth={1.9} color={colors.success} />
         )}
       </View>
-      <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "600", color: colors.text }}>
+      <View style={{ flex: 1, gap: space.hairline, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={{ fontSize: 15, lineHeight: 22, fontWeight: "600", color: colors.text }}
+        >
           {task.title}
         </Text>
         <View style={s.between}>
@@ -492,19 +514,26 @@ export function WorkbenchScreen() {
       <View
         style={{
           flexDirection: sideBySide ? "row" : "column",
-          gap: sideBySide ? 40 : 26,
+          gap: sideBySide ? space.gutter : space.relaxed,
           alignItems: "flex-start",
         }}
       >
-        <View style={{ flex: 1, minWidth: 0, width: sideBySide ? undefined : "100%", gap: 26 }}>
-          <View style={{ gap: 18 }}>
+        <View
+          style={{
+            flex: 1,
+            minWidth: 0,
+            width: sideBySide ? undefined : "100%",
+            gap: space.relaxed,
+          }}
+        >
+          <View style={{ gap: space.lg }}>
             <View
               style={[
                 narrow ? null : s.between,
-                { alignItems: "flex-start", gap: narrow ? 12 : 16 },
+                { alignItems: "flex-start", gap: narrow ? space.sm : space.md },
               ]}
             >
-              <View style={{ flex: 1, gap: 6, width: narrow ? "100%" : undefined }}>
+              <View style={{ flex: 1, gap: space.compact, width: narrow ? "100%" : undefined }}>
                 <Text style={[typography.eyebrow, { color: colors.faint }]}>
                   {dateLine} · {t("workbench.marketContext")}
                 </Text>
@@ -526,9 +555,9 @@ export function WorkbenchScreen() {
                   minHeight: 56,
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
+                  gap: space.tight,
+                  paddingHorizontal: space.sm,
+                  paddingVertical: space.xs,
                   borderWidth: 1,
                   borderColor: colors.line,
                   borderRadius: radius.card,
@@ -595,7 +624,7 @@ export function WorkbenchScreen() {
               sendLabel={t("workbench.sendAnalysis")}
             />
 
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
               {quickPrompts.map((item) => (
                 <Pressable
                   key={item.label}
@@ -603,11 +632,11 @@ export function WorkbenchScreen() {
                   hitSlop={6}
                   onPress={() => submitPrompt(item.prompt)}
                   style={({ pressed }) => ({
-                    minHeight: 32,
+                    minHeight: sizing.controlMd,
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 7,
-                    paddingHorizontal: 10,
+                    gap: space.xs,
+                    paddingHorizontal: space.sm,
                     borderWidth: 1,
                     borderColor: colors.line,
                     borderRadius: radius.control,
@@ -615,13 +644,13 @@ export function WorkbenchScreen() {
                   })}
                 >
                   <item.icon size={13} strokeWidth={1.7} color={colors.muted} />
-                  <Text style={{ fontSize: 11, color: colors.muted }}>{item.label}</Text>
+                  <Text style={[typography.caption, { color: colors.muted }]}>{item.label}</Text>
                 </Pressable>
               ))}
             </View>
           </View>
 
-          <View style={{ gap: 10 }}>
+          <View style={{ gap: space.md }}>
             <SectionHeading
               title={t("workbench.todayInsight")}
               count={insights.length ? `${insightPosition + 1} / ${insights.length}` : undefined}
@@ -727,7 +756,7 @@ export function WorkbenchScreen() {
               count={latestTasks.length}
               action={t("workbench.allActivity")}
               onPress={() => navigate("activity")}
-              style={{ marginBottom: 2 }}
+              style={{ marginBottom: space.hairline }}
             />
             {latestTasks.length ? (
               latestTasks.slice(0, 3).map((task) => <TaskRow key={task.id} task={task} />)
@@ -736,10 +765,10 @@ export function WorkbenchScreen() {
                 style={[
                   s.card,
                   {
-                    marginTop: 10,
-                    paddingVertical: 22,
+                    marginTop: space.sm,
+                    paddingVertical: space.xxl,
                     alignItems: "center",
-                    gap: 8,
+                    gap: space.xs,
                   },
                 ]}
               >
@@ -755,9 +784,9 @@ export function WorkbenchScreen() {
 
         <View
           style={{
-            width: sideBySide ? 270 : "100%",
-            gap: 24,
-            paddingLeft: sideBySide ? 28 : 0,
+            width: sideBySide ? 280 : "100%",
+            gap: space.xl,
+            paddingLeft: sideBySide ? space.relaxed : 0,
             borderLeftWidth: sideBySide ? 1 : 0,
             borderLeftColor: colors.line,
           }}

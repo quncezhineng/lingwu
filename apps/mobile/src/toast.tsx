@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Modal, Platform, Pressable, type StyleProp, View, type ViewStyle } from "react-native";
 import { Text } from "./app-text";
-import { colors, radius, space, typography } from "./theme";
+import { colors, elevation, layout, radius, space, textScale } from "./theme";
 export type ToastState = {
   text: string;
   /** 可撤销动作（如「撤销」）；不传则是纯提示。 */
@@ -55,7 +55,14 @@ export function Toast({
     <View
       pointerEvents="box-none"
       style={[
-        { position: "absolute", bottom: 94, left: 20, right: 20, alignItems: "center" },
+        {
+          // 停在底栏之上：底栏高度 + 一档间距，各平台读到同一个基准。
+          position: "absolute",
+          bottom: layout.bottomNav + space.xxl,
+          left: space.lg,
+          right: space.lg,
+          alignItems: "center",
+        },
         style,
       ]}
     >
@@ -65,19 +72,18 @@ export function Toast({
           flexDirection: "row",
           alignItems: "center",
           gap: space.sm,
-          paddingHorizontal: 14,
-          paddingVertical: 10,
+          paddingHorizontal: space.md,
+          paddingVertical: space.sm,
           backgroundColor: colors.toast,
-          borderRadius: radius.field,
+          borderRadius: radius.medium,
           maxWidth: 560,
+          ...elevation.level2,
         }}
       >
         <Text
           numberOfLines={2}
           style={{
-            ...typography.meta,
-            fontSize: 13,
-            lineHeight: 20,
+            ...textScale.bodyMedium,
             color: colors.onToast,
             flexShrink: 1,
           }}
@@ -93,8 +99,9 @@ export function Toast({
               toast.action?.onPress();
               onDismiss();
             }}
+            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
           >
-            <Text style={[typography.caption, { color: colors.accentLine, fontWeight: "600" }]}>
+            <Text style={[textScale.markMedium, { color: colors.accentLine, fontWeight: "600" }]}>
               {toast.action.label}
             </Text>
           </Pressable>

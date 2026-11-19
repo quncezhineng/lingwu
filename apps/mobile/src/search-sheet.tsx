@@ -3,8 +3,9 @@ import { useMemo, useState } from "react";
 import { Platform, type TextStyle, View } from "react-native";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
-import { TextInput } from "./app-text";
-import { fileSourceLabel } from "./file-library";
+import { Text, TextInput } from "./app-text";
+import { AssistantResponse } from "./assistant-response";
+import { fileSourceLabel, markdownExcerpt } from "./file-library";
 import {
   type GlobalSearchKind,
   rankSearchDocuments,
@@ -75,9 +76,14 @@ const KIND_ORDER: GlobalSearchKind[] = [
   "monitor",
 ];
 
-function excerpt(value: string, length = 110) {
-  const compact = value.replace(/\s+/g, " ").trim();
-  return compact.length > length ? `${compact.slice(0, length - 1).trimEnd()}…` : compact;
+function splitArtifactHeadline(value: string) {
+  const match = /^(.{1,80}?)[：:]\s+([\s\S]+)$/.exec(value.trim());
+  if (!match) return { displayTitle: value.trim(), markdown: "" };
+  const [, displayTitle, markdown] = match;
+  const richTail =
+    markdown.length > 80 || /(^#{1,6}\s)|(\*\*)|(`)|(^\s*(?:[-*+]|\d+\.)\s)/m.test(markdown);
+  if (!richTail) return { displayTitle: value.trim(), markdown: "" };
+  return { displayTitle: displayTitle.trim(), markdown: markdown.trim() };
 }
 
 function taskDocument(task: AgentTask): SearchDocument {
@@ -92,11 +98,15 @@ function taskDocument(task: AgentTask): SearchDocument {
 }
 
 function artifactDocument(artifact: AgentArtifact): SearchDocument {
+  const headline = splitArtifactHeadline(artifact.title);
+  const markdownPreview = headline.markdown || artifact.summary.trim();
   return {
     id: artifact.id,
     kind: "artifact",
     title: artifact.title,
-    detail: excerpt(artifact.summary) || statusLabel(artifact.kind),
+    displayTitle: headline.displayTitle,
+    detail: markdownExcerpt(markdownPreview || statusLabel(artifact.kind), 160),
+    detailMarkdown: markdownPreview || undefined,
     keywords: `${statusLabel(artifact.kind)} ${artifact.summary}`,
     updatedAt: artifact.createdAt,
   };
@@ -242,6 +252,34 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
     items: visible.filter((document) => document.kind === kind),
   })).filter((group) => group.items.length > 0);
 
+  function renderDocumentRow(document: SearchDocument, recent = false) {
+    const title = document.displayTitle ?? document.title;
+    const detail = recent
+      ? `${t(KIND_LABELS[document.kind])} · ${document.detail}`
+      : document.detail;
+    return (
+      <LinkRow
+        key={`${document.kind}-${document.id}`}
+        icon={KIND_ICONS[document.kind]}
+        title={title}
+        detail={document.detailMarkdown ? undefined : detail}
+        detailNode={
+          document.detailMarkdown ? (
+            <View style={{ gap: 4 }}>
+              {recent ? (
+                <Text style={[s.small, { color: colors.faint }]}>
+                  {t(KIND_LABELS[document.kind])}
+                </Text>
+              ) : null}
+              <AssistantResponse content={document.detailMarkdown} compact />
+            </View>
+          ) : undefined
+        }
+        onPress={() => choose(document)}
+      />
+    );
+  }
+
   return (
     <Sheet title={t("search.title")} subtitle={t("search.subtitle")} onClose={onClose}>
       <View style={{ gap: 18 }}>
@@ -292,15 +330,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
             <View key={group.kind} style={{ gap: 8 }}>
               <SectionHeading title={t(KIND_LABELS[group.kind])} />
               <Card style={{ paddingVertical: 2 }}>
-                {group.items.map((document) => (
-                  <LinkRow
-                    key={`${document.kind}-${document.id}`}
-                    icon={KIND_ICONS[document.kind]}
-                    title={document.title}
-                    detail={document.detail}
-                    onPress={() => choose(document)}
-                  />
-                ))}
+                {group.items.map((document) => renderDocumentRow(document))}
               </Card>
             </View>
           ))
@@ -308,15 +338,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
           <View style={{ gap: 8 }}>
             <SectionHeading title={t("search.recent")} />
             <Card style={{ paddingVertical: 2 }}>
-              {visible.map((document) => (
-                <LinkRow
-                  key={`${document.kind}-${document.id}`}
-                  icon={KIND_ICONS[document.kind]}
-                  title={document.title}
-                  detail={`${t(KIND_LABELS[document.kind])} · ${document.detail}`}
-                  onPress={() => choose(document)}
-                />
-              ))}
+              {visible.map((document) => renderDocumentRow(document, true))}
             </Card>
           </View>
         )}

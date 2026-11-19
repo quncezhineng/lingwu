@@ -11,16 +11,28 @@ import {
   CalendarDays,
   Check,
   FileText,
+  FolderOpen,
   Globe2,
   type IconComponent,
   Link2,
   Mail,
   Search as SearchIcon,
   Sparkles,
+  Terminal,
   X,
 } from "./icons";
 import { skillCatalog } from "./skill-catalog";
-import { Button, colors, Empty, IconButton, radius, SectionHeading, Sheet, s } from "./ui";
+import {
+  Button,
+  colors,
+  Empty,
+  IconButton,
+  radius,
+  SectionHeading,
+  Sheet,
+  s,
+  serviceBrands,
+} from "./ui";
 
 /** 无关键词时目录一次渲染的技能上限，避免把 180+ 条技能全部铺进滚动列表。 */
 const SKILL_PAGE_SIZE = 80;
@@ -43,6 +55,10 @@ export type ConnectorOption = {
   detail: string;
   connected: boolean;
   icon: IconComponent;
+  /** 品牌色图标：与「所有技能与链接」模块同一套视觉，缺省回落 muted。 */
+  iconColor?: string;
+  /** 品牌色图标底：与「所有技能与链接」模块同一套视觉，缺省回落 surface。 */
+  iconSurface?: string;
 };
 
 /**
@@ -67,6 +83,8 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
       detail: tr("agent.hubBrowserDetail"),
       connected: browserConnected,
       icon: Globe2,
+      iconColor: serviceBrands.browser.fg,
+      iconSurface: serviceBrands.browser.surface,
     },
     {
       id: "gmail",
@@ -74,6 +92,8 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
       detail: tr("agent.hubGmailDetail"),
       connected: googleConnected,
       icon: Mail,
+      iconColor: serviceBrands.gmail.fg,
+      iconSurface: serviceBrands.gmail.surface,
     },
     {
       id: "calendar",
@@ -81,6 +101,8 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
       detail: tr("agent.hubCalendarDetail"),
       connected: googleConnected,
       icon: CalendarDays,
+      iconColor: serviceBrands.googleCalendar.fg,
+      iconSurface: serviceBrands.googleCalendar.surface,
     },
     {
       id: "openbot",
@@ -88,24 +110,31 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
       detail: tr("agent.hubOpenBotDetail"),
       connected: Boolean(workspace.runtime.openbotConfigured),
       icon: Sparkles,
+      iconColor: serviceBrands.openbot.fg,
+      iconSurface: serviceBrands.openbot.surface,
     },
   ];
   return options;
 }
 
-/** 应用连接器分类 → 选择弹层里的图标（与「技能与连接」页同一套视觉分档）。 */
+/**
+ * 应用连接器分类 → 选择弹层里的图标。
+ * 与「所有技能与链接」模块（capability-hub）的 appConnectorCard 同一套映射，保证视觉一致。
+ */
 export function appConnectorIcon(category: AppConnectorView["category"]): IconComponent {
   switch (category) {
     case "search":
-      return Globe2;
-    case "office":
+      return SearchIcon;
     case "documents":
-    case "files":
       return FileText;
+    case "files":
+      return FolderOpen;
     case "development":
-      return Link2;
+      return Terminal;
+    case "office":
+      return Mail;
     default:
-      return Brain;
+      return Link2;
   }
 }
 
@@ -122,6 +151,8 @@ export function appConnectorOptions(items: readonly AppConnectorView[]): Connect
     detail: item.summary,
     connected: item.connected,
     icon: appConnectorIcon(item.category),
+    iconColor: colors.primary,
+    iconSurface: colors.sky,
   }));
 }
 
@@ -240,6 +271,8 @@ function OptionRow({
   onPress,
   onConnect,
   connectLabel,
+  iconColor,
+  iconSurface,
 }: {
   checked: boolean;
   disabled?: boolean;
@@ -255,6 +288,10 @@ function OptionRow({
   onConnect?: () => void;
   /** 「去连接」引导文字，仅在 disabled 且提供了 onConnect 时展示。 */
   connectLabel?: string;
+  /** 图标品牌色：与「所有技能与链接」模块一致；不传回落 muted。 */
+  iconColor?: string;
+  /** 图标品牌色底：与「所有技能与链接」模块一致；不传回落 surface。 */
+  iconSurface?: string;
 }) {
   // 仅当既未连接、又没有连接引导时才真正屏蔽点击；
   // 提供 onConnect 的卡片保留整卡点击，交给上层引导用户去完成连接。
@@ -292,12 +329,12 @@ function OptionRow({
           borderRadius: 8,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: colors.surface,
+          backgroundColor: iconSurface ?? colors.surface,
           borderWidth: 1,
           borderColor: colors.line,
         }}
       >
-        <Icon size={14} color={colors.muted} />
+        <Icon size={14} color={iconColor ?? colors.muted} />
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>
@@ -666,7 +703,7 @@ export function SkillPickerSheet({
 }
 
 /**
- * 连接器选择弹层：只允许勾选已连接的连接器；未连接时给出跳转连接管理的入口。
+ * 选择连接器弹层：只允许勾选已连接的连接器；未连接时给出跳转连接管理的入口。
  */
 export function ConnectorPickerSheet({
   options,
@@ -705,6 +742,8 @@ export function ConnectorPickerSheet({
                   checked={selectedIds.includes(option.id)}
                   disabled={!option.connected}
                   icon={option.icon}
+                  iconColor={option.iconColor}
+                  iconSurface={option.iconSurface}
                   title={option.name}
                   detail={option.detail}
                   status={t(

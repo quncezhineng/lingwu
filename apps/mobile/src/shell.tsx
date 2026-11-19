@@ -51,7 +51,19 @@ import { relativeDate } from "./relative-date";
 import { toggleSidebar, useSidebarCollapsed } from "./sidebar-state";
 import { layout } from "./theme";
 import { useLingWuThread } from "./threads";
-import { Button, colors, ErrorNotice, fonts, radius, s, shadow } from "./ui";
+import {
+  Button,
+  colors,
+  ErrorNotice,
+  fonts,
+  radius,
+  s,
+  shadow,
+  sizing,
+  space,
+  textScale,
+  typography,
+} from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** 侧栏中的导航项：都对应一个页面，点击切换到对应 section。 */
@@ -169,14 +181,15 @@ function SidebarNavItem({
       onPress={onPress}
       style={({ pressed }) => ({
         width: "100%",
-        minHeight: 42,
+        // 导航行按 44 触控基线：行高、左右内距与图标—文字间距全部走令牌。
+        minHeight: sizing.touch,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: collapsed ? "center" : "flex-start",
-        gap: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-        borderRadius: 8,
+        gap: space.sm,
+        paddingHorizontal: space.sm,
+        paddingVertical: space.xs,
+        borderRadius: radius.medium,
         backgroundColor: active ? colors.skyStrong : pressed ? colors.overlay1 : "transparent",
       })}
     >
@@ -288,9 +301,9 @@ export function Rail() {
           borderRightWidth: 1,
           borderRightColor: colors.line,
           backgroundColor: colors.sidebar,
-          paddingHorizontal: collapsed ? 12 : 20,
-          paddingTop: 22,
-          paddingBottom: 18,
+          paddingHorizontal: collapsed ? space.sm : space.lg,
+          paddingTop: space.xl,
+          paddingBottom: space.lg,
         }}
       >
         <View style={[s.row, { gap: 10, minHeight: 34, justifyContent: "center" }]}>
@@ -357,13 +370,13 @@ export function Rail() {
           accessibilityLabel={t("app.newAnalysis")}
           onPress={() => navigate("chat")}
           style={({ pressed }) => ({
-            marginTop: 28,
-            minHeight: 44,
+            marginTop: space.relaxed,
+            minHeight: sizing.touch,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: collapsed ? "center" : "flex-start",
-            gap: 9,
-            paddingHorizontal: 13,
+            gap: space.tight,
+            paddingHorizontal: space.sm,
             borderRadius: radius.control,
             borderWidth: 1,
             borderColor: colors.lineStrong,
@@ -382,8 +395,8 @@ export function Rail() {
         </SidebarButton>
 
         <ScrollView
-          style={{ flex: 1, marginHorizontal: -8, marginTop: 14 }}
-          contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12 }}
+          style={{ flex: 1, marginHorizontal: -space.xs, marginTop: space.md }}
+          contentContainerStyle={{ paddingHorizontal: space.xs, paddingBottom: space.sm }}
           showsVerticalScrollIndicator={false}
           onScroll={hideTooltip}
         >
@@ -429,12 +442,12 @@ export function Rail() {
               style={({ pressed, hovered }) => ({
                 ...(collapsed ? { width: "100%" as const } : { flex: 1 }),
                 minWidth: 0,
-                minHeight: 38,
+                minHeight: sizing.controlLg,
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: collapsed ? "center" : "flex-start",
-                gap: 9,
-                paddingHorizontal: collapsed ? 0 : 10,
+                gap: space.tight,
+                paddingHorizontal: collapsed ? 0 : space.tight,
                 borderRadius: radius.control,
                 backgroundColor: accountActive
                   ? colors.skyStrong
@@ -693,9 +706,9 @@ function ThreadRow({
         disabled={editing}
         style={({ pressed }) => ({
           flex: 1,
-          paddingHorizontal: 10,
-          paddingVertical: 8,
-          borderRadius: 10,
+          paddingHorizontal: space.sm,
+          paddingVertical: space.xs,
+          borderRadius: radius.control,
           borderWidth: 1,
           borderColor: active ? colors.line : "transparent",
           backgroundColor: active ? colors.paper : pressed ? colors.overlay1 : "transparent",
@@ -721,11 +734,14 @@ function ThreadRow({
             }}
           />
         ) : (
-          <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: "500", color: colors.text }}>
+          <Text
+            numberOfLines={1}
+            style={[textScale.bodyMedium, { fontWeight: "500", color: colors.text }]}
+          >
             {title}
           </Text>
         )}
-        <Text numberOfLines={1} style={{ fontSize: 11, lineHeight: 16, color: colors.muted }}>
+        <Text numberOfLines={1} style={[textScale.bodySmall, { color: colors.muted }]}>
           {detail}
         </Text>
       </Pressable>
@@ -899,14 +915,20 @@ export function ChatsColumn() {
         backgroundColor: colors.surface,
       }}
     >
-      <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8 }}>
+      <View
+        style={{
+          paddingHorizontal: space.md,
+          paddingTop: space.md,
+          paddingBottom: space.xs,
+        }}
+      >
         <Text
           style={{
-            paddingHorizontal: 4,
+            ...typography.heading,
             fontSize: 15,
-            fontWeight: "600",
+            lineHeight: 22,
+            paddingHorizontal: space.xxs,
             color: colors.text,
-            letterSpacing: 0,
           }}
         >
           {t("app.chatsColumnTitle")}
@@ -915,11 +937,11 @@ export function ChatsColumn() {
           style={[
             s.row,
             {
-              gap: 9,
-              marginTop: 8,
-              height: 38,
-              paddingHorizontal: 12,
-              borderRadius: 10,
+              gap: space.tight,
+              marginTop: space.xs,
+              height: sizing.inputLg,
+              paddingHorizontal: space.sm,
+              borderRadius: radius.control,
               borderWidth: 1,
               borderColor: colors.line,
               backgroundColor: colors.paper,
@@ -1067,7 +1089,15 @@ export function ChatsColumn() {
       </ScrollView>
 
       <View
-        style={[s.row, { gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: colors.line }]}
+        style={[
+          s.row,
+          {
+            gap: space.xs,
+            padding: space.sm,
+            borderTopWidth: 1,
+            borderTopColor: colors.line,
+          },
+        ]}
       >
         <TextInput
           value={title}
@@ -1079,9 +1109,9 @@ export function ChatsColumn() {
           style={{
             flex: 1,
             minWidth: 0,
-            height: 36,
-            paddingHorizontal: 12,
-            borderRadius: 10,
+            height: sizing.inputMd,
+            paddingHorizontal: space.sm,
+            borderRadius: radius.control,
             borderWidth: 1,
             borderColor: colors.line,
             backgroundColor: colors.paper,
@@ -1121,12 +1151,13 @@ export function ChatsColumn() {
 
 const columnHeading = {
   fontSize: 11,
+  lineHeight: 17,
   fontWeight: "600" as const,
   letterSpacing: 0.6,
   color: colors.muted,
-  paddingHorizontal: 10,
-  paddingTop: 10,
-  paddingBottom: 4,
+  paddingHorizontal: space.tight,
+  paddingTop: space.tight,
+  paddingBottom: space.hairline,
 };
 
 const columnHeadingCompact = { ...columnHeading, paddingHorizontal: 0, paddingTop: 0 };

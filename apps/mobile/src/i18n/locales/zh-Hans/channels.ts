@@ -13,6 +13,8 @@ const channels = {
   "channels.descriptionPlaceholder": "例如：一起看新能源公司",
   "channels.membersLabel": "成员",
   "channels.leader": "组长",
+  "channels.leaderLabel": "频道组长",
+  "channels.leaderHint": "选择一位已勾选的智能体作为这个频道的组长。",
   "channels.addMembers": "添加成员",
   "channels.addMembersTitle": "添加成员",
   "channels.addMembersHint": "选择要加入频道的智能体，可多选。",
@@ -23,6 +25,8 @@ const channels = {
   "channels.removeMemberConfirm": "确定移除「{name}」？智能体本身会保留。",
   "channels.removeMemberMin": "频道至少保留 2 位成员，无法再移除。",
   "channels.removeMemberSuccess": "成员已移除。",
+  "channels.setLeader": "设为组长",
+  "channels.setLeaderSuccess": "已将「{name}」设为频道组长。",
   "channels.nameRequired": "请给频道起个名字。",
   "channels.minMembers": "至少选择两个智能体。",
   "channels.deleteTitle": "删除频道",
@@ -81,6 +85,7 @@ const channels = {
   "channels.skillsEmpty":
     "这个频道还没有技能。点右上角「添加技能」从技能库挑选，添加后全体成员都能用。",
   "channels.tasksEmpty": "这个频道还没有任务。",
+  "channels.railTasksEmpty": "这个频道还没有任务。回到频道对话发起一次投研吧。",
   "channels.instructionsEmpty": "尚未设置共享指令。",
   "channels.ideasSubtitle": "选一个方向，填进频道输入框后再决定发给谁。",
 } satisfies Dictionary;

@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, View } from "react-native";
+import {
+  ActivityIndicator,
+  Keyboard,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 import {
   type Channel,
   type ChannelHistoryPage,
@@ -13,33 +21,36 @@ import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition } from "./agent-space-model";
 import { useAgentWorkspace } from "./agent-workspace";
-import { useAppConnectors } from "./app-connectors";
+import { AppConnectorSheet, type AppConnectorView, useAppConnectors } from "./app-connectors";
 import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
 import { MySkillDetailSheet, SkillDetailSheet } from "./capability-hub";
 import {
-  appConnectorOptions,
+  allConnectorOptions,
   type ComposerSelection,
   ComposerSelectionChips,
   type ConnectorOption,
   ConnectorPickerSheet,
+  connectorOptions,
   SkillPickerSheet,
   skillDisplayName,
 } from "./capability-picker";
 import { type ChannelChatStream, streamChannelChat } from "./channel-chat-stream";
-import {
-  followLatestSlack,
-  pinnedTailNudge,
-  type PrependAnchor,
-  restorePrependOffset,
-} from "./conversation-scroll";
 import { useChannels } from "./channels";
 import { promptWithAttachments } from "./chat-content";
 import { ComposerDock } from "./composer-dock";
+import {
+  awayFromLatestSlack,
+  followLatestSlack,
+  type PrependAnchor,
+  pinnedTailNudge,
+  restorePrependOffset,
+} from "./conversation-scroll";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { useTranslation } from "./i18n";
 import {
+  ArrowDown,
   Brain,
   ChevronDown,
   ChevronRight,
@@ -53,11 +64,11 @@ import {
 import { IdeasOverlay } from "./ideas-overlay";
 import { MessageActions } from "./message-actions";
 import { PromptComposer } from "./prompt-composer";
-import { publishShare } from "./share-page";
 import { QuoteToolCard } from "./quote-tool-card";
+import { publishShare } from "./share-page";
 import { skillCatalog } from "./skill-catalog";
 import { ToolStep } from "./tool-step";
-import { colors, fonts, radius, s } from "./ui";
+import { Button, colors, fonts, radius, Sheet, s, shadow } from "./ui";
 import { UserMessageMeta } from "./user-message-meta";
 import { useWorkspace } from "./workspace";
 
@@ -66,10 +77,13 @@ import { useWorkspace } from "./workspace";
  *
  * 与智能体对话同构：用户在频道发一条消息，成员 Agent 依次用自己的 threadId / 人设 /
  * 模型跑一轮真实对话，文本逐字流式回来，像群聊里依次发言（后成员能看到前面的分析）。
- * 消息落库，刷新后回看；用户消息保留附件与连接器选择。
+ * 消息落库，刷新后回看；用户消息保留附件与选择连接器。
  */
 
-function mergeChannelMessages(earlier: readonly ChannelMessage[], current: readonly ChannelMessage[]) {
+function mergeChannelMessages(
+  earlier: readonly ChannelMessage[],
+  current: readonly ChannelMessage[],
+) {
   const seen = new Set<string>();
   const merged: ChannelMessage[] = [];
   for (const message of [...earlier, ...current]) {
@@ -104,7 +118,7 @@ export function ChannelChatScreen({
   const { t } = useTranslation();
   const { agents, skillLibrary } = useAgentSpace();
   const { data: agentWorkspace } = useAgentWorkspace();
-  const { notify, api, refresh, workspace, navigate } = useWorkspace();
+  const { notify, api, refresh, workspace, navigate, open } = useWorkspace();
   const { noteLeader } = useChannels();
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -115,6 +129,7 @@ export function ChannelChatScreen({
   const [positioned, setPositioned] = useState(false);
   const [busy, setBusy] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [awayFromLatest, setAwayFromLatest] = useState(false);
   const listRef = useRef<ScrollView>(null);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -140,7 +155,7 @@ export function ChannelChatScreen({
     measuredDockHeight.current = height;
     setComposerDockHeight(height);
   }, []);
-  // 附件与连接器选择（与 Agent 对话页同一套能力选择）。
+  // 附件与选择连接器（与 Agent 对话页同一套能力选择）。
   const [attachments, setAttachments] = useState<string[]>([]);
   const [picking, setPicking] = useState(false);
   const [pickerSelection, setPickerSelection] = useState<string[]>([]);
@@ -155,15 +170,78 @@ export function ChannelChatScreen({
   const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
 
-  // 频道用「账户级应用连接器」（slug 与后端 use_connection 一致），而非旧版 connections。
+  // 频道连接器候选：内置连接器（智能体电脑 / Google 系 / OpenBot）+ 账户级应用连接器，
+  // 与「所有技能与链接」模块同源，让弹层里列出全部连接器。
   const appConnectors = useAppConnectors(api);
   const connectorChoices: ConnectorOption[] = useMemo(
-    () => appConnectorOptions(appConnectors.items),
-    [appConnectors.items],
+    () => allConnectorOptions(connectorOptions(workspace), appConnectors.items),
+    [workspace, appConnectors.items],
   );
   const selectedConnectors: ComposerSelection[] = connectorChoices
     .filter((option) => selectedConnectorIds.includes(option.id))
     .map((option) => ({ id: option.id, name: option.name }));
+
+  // —— 「选择连接器」弹层内的直接连接：账户级连接器在弹层外再挂一个连接表单
+  // （兄弟节点，避免嵌套 Modal），内置连接器（智能体电脑 / Gmail / 日历 / OpenBot）
+  // 各走自己的连接路径；连接成功后刷新候选并自动勾选，给出明确反馈。
+  const [connectingSlug, setConnectingSlug] = useState<string | null>(null);
+  const [openbotSheetOpen, setOpenbotSheetOpen] = useState(false);
+  const [googleConnecting, setGoogleConnecting] = useState(false);
+  const googleConnected = workspace.connections.some(
+    (connection) =>
+      connection.id === "google" &&
+      (connection.status === "connected" || connection.status === "sample"),
+  );
+  /** Google 系连接器（Gmail / 日历）的 OAuth 连接：与「所有技能与链接」同一流程。 */
+  async function openGoogleConnector(id: "gmail" | "calendar") {
+    if (googleConnecting) return;
+    if (googleConnected) {
+      navigate(id === "gmail" ? "mail" : "calendar");
+      return;
+    }
+    setGoogleConnecting(true);
+    try {
+      const result = await api.request<{ url: string | null }>("/api/google/connect", {
+        capability: "read",
+      });
+      if (result.url) {
+        await Linking.openURL(result.url);
+        notify(t("screens.connectionsNotifyFinish"));
+      } else {
+        await refresh();
+        notify(t("screens.connectionsNotifyLocalReady"));
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGoogleConnecting(false);
+    }
+  }
+  /** 弹层里点击「去连接」：按连接器类型分发到各自的连接流程。 */
+  function handleConnectorConnect(id: string) {
+    if (appConnectors.items.some((item) => item.slug === id)) {
+      setConnectingSlug(id);
+      return;
+    }
+    if (id === "browser") {
+      open({ type: "computer" });
+      return;
+    }
+    if (id === "gmail" || id === "calendar") {
+      void openGoogleConnector(id);
+      return;
+    }
+    if (id === "openbot") {
+      setOpenbotSheetOpen(true);
+    }
+  }
+  /** 账户级连接器连接成功：刷新目录、把新连接器自动勾进当前对话，并提示结果。 */
+  function handleAppConnectorChanged(connectedSlug: string) {
+    void appConnectors.refresh();
+    setSelectedConnectorIds((ids) => (ids.includes(connectedSlug) ? ids : [...ids, connectedSlug]));
+    const option = connectorChoices.find((candidate) => candidate.id === connectedSlug);
+    if (option) notify(t("chat.connectorConnectedToast", { name: option.name }));
+  }
 
   // 频道共享技能：目录技能（channel.installedSkills）+ 账户技能库引用（channel.skillRefs）。
   // 与频道详情「技能」分区同一读取口径，只列频道自己添加的技能，不混入成员各自的能力。
@@ -192,9 +270,7 @@ export function ChannelChatScreen({
   const mentionCandidates =
     mentionQuery === undefined
       ? []
-      : members.filter(
-          (member) => mentionQuery === "" || member.name.includes(mentionQuery),
-        );
+      : members.filter((member) => mentionQuery === "" || member.name.includes(mentionQuery));
 
   // 每条成员回复对应的用户提问：分享为图片 / 链接时一并带上，让分享内容自带上下文。
   // 单次前向遍历维护「最近一条用户消息」，避免在渲染循环里反复切数组。
@@ -412,7 +488,14 @@ export function ChannelChatScreen({
               const agentId = String(data.agentId ?? "");
               setStreamingId(agentId);
               setMessages((current) => {
-                if (current.some((message) => message.role === "member" && message.agentId === agentId && message.id.startsWith("live:")))
+                if (
+                  current.some(
+                    (message) =>
+                      message.role === "member" &&
+                      message.agentId === agentId &&
+                      message.id.startsWith("live:"),
+                  )
+                )
                   return current;
                 return [
                   ...current,
@@ -434,7 +517,11 @@ export function ChannelChatScreen({
               if (!tool?.id) return;
               setMessages((current) =>
                 current.map((message) => {
-                  if (message.role !== "member" || message.agentId !== agentId || !message.id.startsWith("live:"))
+                  if (
+                    message.role !== "member" ||
+                    message.agentId !== agentId ||
+                    !message.id.startsWith("live:")
+                  )
                     return message;
                   const tools = message.tools ?? [];
                   const next = tools.some((item) => item.id === tool.id)
@@ -511,7 +598,7 @@ export function ChannelChatScreen({
           },
         },
       );
-      // 发送后清空附件与连接器选择，避免带到下一轮。
+      // 发送后清空附件与选择连接器，避免带到下一轮。
       setAttachments([]);
       setSelectedConnectorIds([]);
       setSelectedSkillIds([]);
@@ -563,12 +650,17 @@ export function ChannelChatScreen({
           scrollMetrics.current.y = contentOffset.y;
           if (initialScroll.current || prependAnchor.current || preserveY.current !== null) return;
           const gap = contentSize.height - contentOffset.y - layoutMeasurement.height;
+          const away = messagesRef.current.length > 0 && gap > awayFromLatestSlack;
           if (ownScroll.current) {
             ownScroll.current = false;
-            if (gap < followLatestSlack) followLatest.current = true;
+            if (gap < followLatestSlack) {
+              followLatest.current = true;
+              setAwayFromLatest(false);
+            }
             return;
           }
           followLatest.current = gap < followLatestSlack;
+          setAwayFromLatest(away);
           if (contentOffset.y < 160 && contentOffset.y < previousY && !olderError) void loadOlder();
         }}
         onContentSizeChange={(_width, height) => {
@@ -612,7 +704,13 @@ export function ChannelChatScreen({
             offset: previousOffset,
             viewport: scrollViewport.current,
           });
-          if (next === undefined) return;
+          if (next === undefined) {
+            if (!followLatest.current) {
+              const gap = height - previousOffset - scrollViewport.current;
+              setAwayFromLatest(messagesRef.current.length > 0 && gap > awayFromLatestSlack);
+            }
+            return;
+          }
           ownScroll.current = true;
           scrollMetrics.current.y = next;
           listRef.current?.scrollTo({ y: next, animated: false });
@@ -731,6 +829,33 @@ export function ChannelChatScreen({
         keyboardPadding={keyboardPadding}
         onHeightChange={onComposerHeightChange}
       >
+        {awayFromLatest && (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: "absolute",
+              bottom: "100%",
+              left: 0,
+              right: 0,
+              paddingBottom: 10,
+              alignItems: "center",
+              zIndex: 2,
+            }}
+          >
+            <Button
+              small
+              icon={ArrowDown}
+              style={{ backgroundColor: `${colors.paper}E6`, ...shadow.card }}
+              onPress={() => {
+                followLatest.current = true;
+                setAwayFromLatest(false);
+                listRef.current?.scrollToEnd({ animated: true });
+              }}
+            >
+              {t("chat.latestMessages")}
+            </Button>
+          </View>
+        )}
         {/* 圆角过渡垫层：与悬浮输入框同款全圆角、左右各外扩 8px 的底色底托。
             内容向下滚动经过输入框背后时，它的直角边缘会被这层大圆角"收住"，
             露出的遮挡线是一段圆弧，与输入框圆角完全一致，不再出现硬切的白边直角。 */}
@@ -909,25 +1034,46 @@ export function ChannelChatScreen({
         </>
       )}
       {connectorPickerOpen && (
-        <ConnectorPickerSheet
-          options={connectorChoices}
-          selectedIds={selectedConnectorIds}
-          onToggle={(id) =>
-            setSelectedConnectorIds((ids) =>
-              ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
-            )
-          }
-          onConfirm={() => setConnectorPickerOpen(false)}
-          onClose={() => setConnectorPickerOpen(false)}
-          onManage={() => {
-            setConnectorPickerOpen(false);
-            navigate("connections");
-          }}
-          onConnect={() => {
-            setConnectorPickerOpen(false);
-            navigate("connections");
-          }}
-        />
+        <>
+          <ConnectorPickerSheet
+            options={connectorChoices}
+            selectedIds={selectedConnectorIds}
+            onToggle={(id) =>
+              setSelectedConnectorIds((ids) =>
+                ids.includes(id) ? ids.filter((candidate) => candidate !== id) : [...ids, id],
+              )
+            }
+            onConfirm={() => setConnectorPickerOpen(false)}
+            onClose={() => setConnectorPickerOpen(false)}
+            onManage={() => {
+              setConnectorPickerOpen(false);
+              navigate("connections");
+            }}
+            onConnect={handleConnectorConnect}
+          />
+          {connectingSlug && appConnectors.items.some((item) => item.slug === connectingSlug) && (
+            <AppConnectorSheet
+              item={
+                appConnectors.items.find((item) => item.slug === connectingSlug) as AppConnectorView
+              }
+              api={api}
+              onClose={() => setConnectingSlug(null)}
+              onChanged={() => handleAppConnectorChanged(connectingSlug)}
+            />
+          )}
+          {openbotSheetOpen && (
+            <Sheet
+              title="OpenBot"
+              subtitle={t("screens.connectionsOpenBotSubtitle")}
+              onClose={() => setOpenbotSheetOpen(false)}
+            >
+              <View style={{ gap: 14 }}>
+                <Text style={s.text}>{t("screens.connectionsOpenBotNotice")}</Text>
+                <Text style={s.muted}>{t("screens.connectionsOpenBotDetail")}</Text>
+              </View>
+            </Sheet>
+          )}
+        </>
       )}
       {ideasOpen && (
         <IdeasOverlay
@@ -1006,7 +1152,7 @@ function ChannelWorkFold({ tools, onHold }: { tools: ChannelToolTrace[]; onHold?
     ? t("channels.working")
     : t("channels.workProcess", { count: tools.length });
   return (
-    <View style={{ paddingLeft: 42, gap: 8 }} testID="channel-work-fold">
+    <View style={{ gap: 8 }} testID="channel-work-fold">
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}

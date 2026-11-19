@@ -139,13 +139,13 @@ function AgentMenuRow({
       accessibilityLabel={label}
       onPress={onPress}
       style={({ pressed, hovered }) => ({
-        minHeight: 34,
+        minHeight: 36,
         flexDirection: "row",
         alignItems: "center",
-        gap: 8,
-        paddingHorizontal: 9,
-        paddingVertical: 6,
-        borderRadius: radius.badge,
+        gap: space.xs,
+        paddingHorizontal: space.tight,
+        paddingVertical: space.compact,
+        borderRadius: radius.control,
         backgroundColor: pressed
           ? danger
             ? colors.errorSoft
@@ -162,7 +162,8 @@ function AgentMenuRow({
         numberOfLines={1}
         style={{
           flex: 1,
-          fontSize: 12,
+          fontSize: 13,
+          lineHeight: 20,
           fontWeight: "500",
           color: danger ? colors.danger : colors.text,
         }}
@@ -216,8 +217,8 @@ function AgentMenu({
             top,
             left,
             width: menuWidth,
-            padding: 4,
-            gap: 1,
+            padding: space.xxs,
+            gap: space.hairline,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: radius.card,
@@ -290,8 +291,8 @@ function ChannelMenu({
             top,
             left,
             width: menuWidth,
-            padding: 4,
-            gap: 1,
+            padding: space.xxs,
+            gap: space.hairline,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: radius.card,
@@ -337,12 +338,16 @@ function CreateEntryMenu({
   onCreateAgent: () => void;
 }) {
   const { t } = useTranslation();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const menuWidth = Math.min(180, width - 24);
+  // 两行菜单 + 分隔线的高度，和 AgentMenu / ChannelMenu 用同一套估算方式。
+  const menuHeight = 10 + 2 * 34 + 7;
   // 「新建」按钮横向占满整个侧栏，菜单对齐按钮左边缘，正好落在「+ 新建」文字下方靠左。
   const left = Math.max(12, Math.min(anchor.x, width - menuWidth - 12));
-  // 永远贴在「新建」按钮的正下方，不做上方翻转。
-  const top = anchor.y + anchor.height + 6;
+  // 默认贴在「新建」按钮下方；手机抽屉里按钮靠底部，向下会超出屏幕时翻到上方，
+  // 保证「创建 Agent / 新建频道」选择菜单在手机上一定可见（与电脑端一致）。
+  const below = anchor.y + anchor.height + 6;
+  const top = below + menuHeight > height - 12 ? Math.max(12, anchor.y - menuHeight - 6) : below;
   return (
     <Modal transparent visible animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1 }}>
@@ -353,13 +358,14 @@ function CreateEntryMenu({
           style={{ flex: 1 }}
         />
         <View
+          testID="create-entry-menu"
           style={{
             position: "absolute",
             top,
             left,
             width: menuWidth,
-            padding: 4,
-            gap: 1,
+            padding: space.xxs,
+            gap: space.hairline,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: radius.card,
@@ -424,13 +430,13 @@ function AgentListItem({
           onPress={onPress}
           style={{
             minHeight: 68,
-            paddingVertical: 10,
+            paddingVertical: space.sm,
             paddingLeft: space.xs,
             paddingRight: space.xl,
             borderRadius: radius.sheet,
             flexDirection: "row",
             alignItems: "center",
-            gap: 12,
+            gap: space.sm,
           }}
         >
           {/* 系统内置智能体（蓝色 orb + 光晕）视觉偏重，略缩小一号与下方自建智能体的浅色 logo 观感一致 */}
@@ -495,15 +501,15 @@ function AgentListItem({
         style={({ pressed }) => ({
           flex: 1,
           minWidth: 0,
-          minHeight: 44,
-          paddingLeft: 9,
-          paddingRight: 4,
-          paddingVertical: 5,
+          minHeight: sizing.touch,
+          paddingLeft: space.xs,
+          paddingRight: space.xxs,
+          paddingVertical: space.xxs,
           borderRadius: radius.control,
           backgroundColor: pressed ? colors.overlay1 : "transparent",
           flexDirection: "row",
           alignItems: "center",
-          gap: 10,
+          gap: space.sm,
         })}
       >
         <AgentOrb avatar={agent.avatar} size={agent.system ? 28 : 30} />
@@ -609,13 +615,13 @@ function ChannelListItem({
           onPress={onPress}
           style={{
             minHeight: 68,
-            paddingVertical: 10,
+            paddingVertical: space.sm,
             paddingLeft: space.xs,
             paddingRight: space.xl,
             borderRadius: radius.sheet,
             flexDirection: "row",
             alignItems: "center",
-            gap: 12,
+            gap: space.sm,
           }}
         >
           {avatarView(44)}
@@ -686,15 +692,15 @@ function ChannelListItem({
         style={({ pressed }) => ({
           flex: 1,
           minWidth: 0,
-          minHeight: 44,
-          paddingLeft: 9,
-          paddingRight: 4,
-          paddingVertical: 5,
+          minHeight: sizing.touch,
+          paddingLeft: space.xs,
+          paddingRight: space.xxs,
+          paddingVertical: space.xxs,
           borderRadius: radius.control,
           backgroundColor: pressed ? colors.overlay1 : "transparent",
           flexDirection: "row",
           alignItems: "center",
-          gap: 10,
+          gap: space.sm,
         })}
       >
         {avatarView(30)}
@@ -851,8 +857,8 @@ function LanguageMenuRow({ compact }: { compact: boolean }) {
             // 抽屉里空间不足，改为覆盖在下方选项上。
             ...(compact ? { top: 44, left: 6 } : { top: 0, left: "100%" as const }),
             width: 160,
-            padding: 4,
-            gap: 1,
+            padding: space.xxs,
+            gap: space.hairline,
             zIndex: 30,
             borderWidth: 1,
             borderColor: colors.line,
@@ -958,9 +964,9 @@ function AccountMenu({
             position: "absolute",
             ...(anchor
               ? { top: anchor.top, left: anchor.left }
-              : { left: compact ? 16 : 14, bottom: compact ? 72 : 58 }),
+              : { left: compact ? space.md : space.sm, bottom: compact ? 72 : 58 }),
             width: menuWidth,
-            padding: 6,
+            padding: space.compact,
             borderWidth: 1,
             borderColor: colors.line,
             borderRadius: radius.card,
@@ -1034,12 +1040,14 @@ function AgentRail({
   onSignOut,
   onClose,
   compact = false,
+  desktopLikeCompactFooter = false,
 }: {
   onOpen: (panel: AgentPanel) => void;
   onSearch: () => void;
   onSignOut: () => void;
   onClose?: () => void;
   compact?: boolean;
+  desktopLikeCompactFooter?: boolean;
 }) {
   const { t } = useTranslation();
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -1184,9 +1192,9 @@ function AgentRail({
       style={{
         width: "100%",
         height: "100%",
-        paddingHorizontal: compact ? 20 : 14,
-        paddingTop: compact ? 44 : 18,
-        paddingBottom: compact ? 14 : 18,
+        paddingHorizontal: compact ? space.lg : space.md,
+        paddingTop: compact ? 44 : space.lg,
+        paddingBottom: compact ? space.md : space.lg,
         borderRightWidth: compact ? 0 : 1,
         borderRightColor: colors.line,
         backgroundColor: colors.surfaceRaised,
@@ -1276,8 +1284,8 @@ function AgentRail({
       </View>
 
       <ScrollView
-        style={{ flex: 1, marginTop: 18 }}
-        contentContainerStyle={{ gap: 4, paddingBottom: 20 }}
+        style={{ flex: 1, marginTop: space.lg }}
+        contentContainerStyle={{ gap: space.xxs, paddingBottom: space.lg }}
         showsVerticalScrollIndicator={false}
       >
         {/* 系统智能体永远在最顶部，不参与置顶，也不会被置顶项盖过。 */}
@@ -1360,7 +1368,7 @@ function AgentRail({
           </Text>
         </Pressable>
       </ScrollView>
-      {compact ? (
+      {compact && !desktopLikeCompactFooter ? (
         <View
           style={{
             borderTopWidth: 1,
@@ -1659,7 +1667,13 @@ function RailIdentity({ onEdit }: { onEdit: () => void }) {
   const label = current.role ? `${current.name} · ${current.role}` : current.name;
   return (
     <View
-      style={{ width: "100%", alignItems: "center", paddingTop: 6, paddingBottom: 20, gap: 12 }}
+      style={{
+        width: "100%",
+        alignItems: "center",
+        paddingTop: space.compact,
+        paddingBottom: space.lg,
+        gap: space.sm,
+      }}
     >
       <View style={{ width: "100%", alignItems: "center" }}>
         <HoverPressable
@@ -1816,12 +1830,11 @@ function CapabilityRail({
           </View>
           <Text
             style={{
-              marginTop: 26,
-              marginBottom: 14,
-              paddingHorizontal: 6,
-              fontSize: 15,
+              ...typography.heading,
+              marginTop: space.xl,
+              marginBottom: space.md,
+              paddingHorizontal: space.compact,
               fontFamily: fonts.serif,
-              fontWeight: "600",
               color: colors.text,
             }}
           >
@@ -1959,7 +1972,9 @@ function AgentHeader({
         </Pressable>
       </View>
       <View style={{ flex: 1, alignItems: "center" }}>
-        <Text style={[typography.heading, { fontSize: 15 }]}>{sectionTitle}</Text>
+        <Text numberOfLines={1} style={typography.heading}>
+          {sectionTitle}
+        </Text>
       </View>
       <View style={{ width: 40, alignItems: "flex-end" }}>
         {railCollapsed && onExpandRail && (
@@ -2333,7 +2348,8 @@ export function AgentProductShell({
       style={{
         flex: 1,
         minHeight: 0,
-        paddingHorizontal: threeColumns ? 18 : desktop ? 24 : 17,
+        // 与悬浮顶栏同一条边距：三栏与手机都是 16，桌面独立时 24。
+        paddingHorizontal: threeColumns ? space.md : desktop ? space.xl : space.md,
       }}
     >
       <ChannelChatScreen channel={activeChannel} contentTopInset={floatingHeaderClearance()} />
@@ -2350,7 +2366,7 @@ export function AgentProductShell({
               display: active ? "flex" : "none",
               flex: 1,
               minHeight: 0,
-              paddingHorizontal: threeColumns ? 18 : desktop ? 24 : 17,
+              paddingHorizontal: threeColumns ? space.md : desktop ? space.xl : space.md,
             }}
           >
             <ChatScreen
@@ -2464,7 +2480,12 @@ export function AgentProductShell({
                           selectAgent(agent.id);
                           setBotOpen(true);
                         }}
-                        onCreate={() => openPanel("create")}
+                        onOpenChannel={(channel) => {
+                          selectChannel(channel.id);
+                          setBotOpen(true);
+                        }}
+                        onCreateAgent={() => openPanel("create")}
+                        onCreateChannel={() => openPanel("create-channel")}
                         onAccount={() => setMobileAccountMenu(true)}
                         onNotifications={() => open({ type: "notifications" })}
                         onConnections={() => setAppsSheet(true)}
@@ -2573,6 +2594,7 @@ export function AgentProductShell({
           >
             <AgentRail
               compact
+              desktopLikeCompactFooter={!phone}
               onOpen={openPanel}
               onSearch={() => setSearchOpen(true)}
               onSignOut={onSignOut}

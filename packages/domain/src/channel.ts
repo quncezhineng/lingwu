@@ -176,9 +176,7 @@ export function mentionedMemberIds(
   text: string,
 ): string[] {
   return members
-    .filter((member) =>
-      [member.name, member.id].some((label) => mentionsLabel(text, label)),
-    )
+    .filter((member) => [member.name, member.id].some((label) => mentionsLabel(text, label)))
     .map((member) => member.id);
 }
 

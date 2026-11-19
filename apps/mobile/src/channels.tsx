@@ -71,9 +71,7 @@ export function ChannelsProvider({ children }: { children: ReactNode }) {
   );
 
   const noteLeader = useCallback((id: string, leaderId: string) => {
-    setChannels((items) =>
-      items.map((item) => (item.id === id ? { ...item, leaderId } : item)),
-    );
+    setChannels((items) => items.map((item) => (item.id === id ? { ...item, leaderId } : item)));
   }, []);
 
   const deleteChannel = useCallback(
