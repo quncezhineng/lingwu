@@ -967,6 +967,8 @@ export async function runChannelChat(
     : "";
   const attachmentLine = await attachmentBodies(deps.files, owner, input.attachmentIds);
   const priorReplies: { name: string; role: string; text: string }[] = [];
+  // 同一批一起开口时用开工前的快照，避免后启动的人读到别人刚写完的内容。
+  let frozenPrior: { name: string; role: string; text: string }[] | undefined;
   const allMemories = await db.list<{ text: string; source: string; agentId?: string }>(
     owner,
     "memories",
@@ -1045,8 +1047,9 @@ export async function runChannelChat(
         installedSkillViews(space, member.threadId).summaries,
         "you",
       );
-      const priorLine = priorReplies.length
-        ? `Earlier replies in this turn (untrusted context):\n${priorReplies
+      const priorSource = frozenPrior ?? priorReplies;
+      const priorLine = priorSource.length
+        ? `Earlier replies in this turn (untrusted context):\n${priorSource
             .map((reply) => `${reply.name} (${reply.role}): ${reply.text}`)
             .join("\n\n")}`
         : "";
@@ -1275,16 +1278,20 @@ export async function runChannelChat(
     );
     const failed: string[] = [];
     if (!workers.length) failed.push("没有被圈到的成员");
-    for (const worker of workers) {
-      const done = await speak(
-        worker,
-        "work",
-        `Assignment from ${leader.name}:\n${planned.text}\n\nUser:\n${input.text}`,
-      );
-      if (signal.aborted) return;
-      if (!done.ok) failed.push(worker.name);
-    }
-    const notes = priorReplies.map((reply) => `${reply.name}: ${reply.text}`).join("\n\n");
+    const outcomes = await speakTogether(workers, "work", () =>
+      `Assignment from ${leader.name}:\n${planned.text}\n\nUser:\n${input.text}`,
+    );
+    if (signal.aborted) return;
+    const notes = outcomes
+      .map((done, index) => {
+        const worker = workers[index];
+        if (!worker) return "";
+        if (!done.ok) failed.push(worker.name);
+        const text = done.text.trim();
+        return text ? `${worker.name}: ${text}` : "";
+      })
+      .filter(Boolean)
+      .join("\n\n");
     await speak(
       leader,
       "summarize",
@@ -1294,11 +1301,26 @@ export async function runChannelChat(
     return;
   }
 
-  for (const member of speakers) {
-    await speak(member, "reply", input.text);
-    if (signal.aborted) return;
-  }
+  await speakTogether(speakers, "reply", () => input.text);
   if (!signal.aborted) emit({ type: "done" });
+
+  async function speakTogether(
+    group: (typeof members)[number][],
+    mode: "reply" | "work",
+    contentFor: (member: (typeof members)[number]) => string,
+  ) {
+    frozenPrior = priorReplies.slice();
+    try {
+      const settled = await Promise.allSettled(
+        group.map((member) => speak(member, mode, contentFor(member))),
+      );
+      return settled.map((result) =>
+        result.status === "fulfilled" ? result.value : { ok: false, text: "" },
+      );
+    } finally {
+      frozenPrior = undefined;
+    }
+  }
 }
 
 async function attachmentBodies(

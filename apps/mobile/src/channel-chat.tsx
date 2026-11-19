@@ -16,6 +16,7 @@ import {
   channelHistoryPageSize,
   normalizeChannelAvatar,
 } from "../../../packages/domain/src/channel";
+import { appendMemberDelta } from "./channel-live-text";
 import { conversationColumnStyle } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
@@ -128,7 +129,7 @@ export function ChannelChatScreen({
   const [olderError, setOlderError] = useState(false);
   const [positioned, setPositioned] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [streamingIds, setStreamingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   const listRef = useRef<ScrollView>(null);
   const messagesRef = useRef(messages);
@@ -486,7 +487,11 @@ export function ChannelChatScreen({
               if (leaderId) noteLeader(channel.id, leaderId);
             } else if (event === "member_start") {
               const agentId = String(data.agentId ?? "");
-              setStreamingId(agentId);
+              setStreamingIds((current) => {
+                const next = new Set(current);
+                next.add(agentId);
+                return next;
+              });
               setMessages((current) => {
                 if (
                   current.some(
@@ -534,37 +539,22 @@ export function ChannelChatScreen({
               const agentId = String(data.agentId ?? "");
               const delta = String(data.text ?? "");
               if (!delta) return;
-              setMessages((current) => {
-                // 正在流式输出的是最后一条同 agent 的 member 消息；没有就新建一条。
-                const last = current.at(-1);
-                if (
-                  last?.role === "member" &&
-                  last.agentId === agentId &&
-                  last.id.startsWith("live:")
-                ) {
-                  return [...current.slice(0, -1), { ...last, text: last.text + delta }];
-                }
-                return [
-                  ...current,
-                  {
-                    id: `live:${agentId}:${Date.now()}`,
-                    channelId: channel.id,
-                    role: "member",
-                    agentId,
-                    title: String(data.title ?? ""),
-                    text: delta,
-                    createdAt: new Date().toISOString(),
-                  },
-                ];
-              });
+              setMessages((current) =>
+                appendMemberDelta(current, channel.id, agentId, delta, String(data.title ?? "")),
+              );
             } else if (event === "done") {
-              setStreamingId(null);
+              setStreamingIds(new Set());
               setBusy(false);
               void loadHistory();
             } else if (event === "member_done") {
               const agentId = String(data.agentId ?? "");
               const finalText = typeof data.text === "string" ? data.text : "";
-              setStreamingId((current) => (current === agentId ? null : current));
+              setStreamingIds((current) => {
+                if (!current.has(agentId)) return current;
+                const next = new Set(current);
+                next.delete(agentId);
+                return next;
+              });
               // 同一位会先分工、再总结。结束上一条后再开新气泡，避免总结写进分工里。
               setMessages((current) =>
                 current.map((message) => {
@@ -588,12 +578,12 @@ export function ChannelChatScreen({
           onError: (message) => {
             notify(message);
             setBusy(false);
-            setStreamingId(null);
+            setStreamingIds(new Set());
           },
           // 断开时服务端会留下已经说出的内容，这里重新读一次历史。
           onClose: () => {
             setBusy(false);
-            setStreamingId(null);
+            setStreamingIds(new Set());
             void loadHistory();
           },
         },
@@ -605,7 +595,7 @@ export function ChannelChatScreen({
       setPicking(false);
     } catch (e) {
       setBusy(false);
-      setStreamingId(null);
+      setStreamingIds(new Set());
       notify(e instanceof Error ? e.message : String(e));
     }
   }, [
@@ -630,7 +620,7 @@ export function ChannelChatScreen({
     streamRef.current?.close();
     streamRef.current = null;
     setBusy(false);
-    setStreamingId(null);
+    setStreamingIds(new Set());
     // 服务端在断开时先落库，稍后再读，刷新前也能看到已经说出的内容。
     setTimeout(() => void loadHistory(), 400);
   }
@@ -802,7 +792,7 @@ export function ChannelChatScreen({
                 title={msg.title ?? ""}
                 text={msg.text}
                 tools={msg.tools}
-                streaming={streamingId === msg.agentId && msg.id.startsWith("live:")}
+                streaming={streamingIds.has(msg.agentId ?? "") && msg.id.startsWith("live:")}
                 member={memberById.get(msg.agentId ?? "")}
                 prompt={promptByMessageId.get(msg.id) ?? ""}
                 at={Date.parse(msg.createdAt)}
@@ -814,7 +804,7 @@ export function ChannelChatScreen({
           )
         )}
 
-        {busy && streamingId === null && (
+        {busy && streamingIds.size === 0 && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 }}>
             <Sparkles size={14} color={colors.primary} />
             <Text style={[s.small, { color: colors.primary }]}>{t("channels.sending")}</Text>

@@ -9,6 +9,7 @@ import { after, before, type TestContext, test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
+import { appendMemberDelta } from "../apps/mobile/src/channel-live-text.ts";
 import {
   channelLeader,
   channelMemberTools,
@@ -22,7 +23,9 @@ import { appointedLeaderId, channelHistoryPage } from "../packages/domain/src/ch
 
 /** 最小 OpenAI Responses 协议 fixture：每个请求回一段逐字文本，验证流式链路。 */
 async function textModelFixture(t: TestContext) {
-  const prompts: string[] = [];
+  const prompts: string[] & { maxWorkOverlap: number } = Object.assign([], { maxWorkOverlap: 0 });
+  let parallelWorkInFlight = 0;
+  let releaseParallelWork: (() => void) | undefined;
   const server = createServer(async (request, response) => {
     let body = "";
     for await (const chunk of request) body += chunk;
@@ -81,8 +84,24 @@ async function textModelFixture(t: TestContext) {
             : body.includes("WORK_PART")
               ? "@甲 这一份做完了。"
               : body.includes("ASSIGN_ONLY")
-                ? "@乙 看港股。"
+                ? body.includes("FORCE_PARALLEL")
+                  ? "@乙 看港股。\n@丙 看美股。"
+                  : "@乙 看港股。"
                 : "先看需求，再给结论。";
+    if (body.includes("WORK_PART") && body.includes("FORCE_PARALLEL")) {
+      parallelWorkInFlight += 1;
+      prompts.maxWorkOverlap = Math.max(prompts.maxWorkOverlap, parallelWorkInFlight);
+      if (parallelWorkInFlight >= 2) releaseParallelWork?.();
+      else {
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 1_500);
+          releaseParallelWork = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+        });
+      }
+    }
     emit("response.created", { response: { ...base, status: "in_progress" } });
     emit("response.output_item.added", {
       output_index: 0,
@@ -240,6 +259,7 @@ test("channel chat replies with one member, keeps history, and a mention selects
       agent("system-agent", "系统", true),
       agent("agent-a", "甲", false),
       agent("agent-b", "乙", false),
+      agent("agent-c", "丙", false),
     ],
     preferences: { name: "", risk: "", markets: [], areas: [], goal: "", horizon: "" },
     onboardingDone: true,
@@ -654,6 +674,43 @@ test("channel chat replies with one member, keeps history, and a mention selects
     false,
   );
 
+  const parallel = await server.app.request("/api/channels", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      name: "并行",
+      agentIds: ["agent-a", "agent-b", "agent-c"],
+    }),
+  });
+  assert.equal(parallel.status, 201);
+  const parallelChannel = (await parallel.json()) as Channel;
+  const beforeParallel = prompts.length;
+  const parallelChat = await server.app.request(`/api/channels/${parallelChannel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "今天看两个市场 FORCE_ASSIGN FORCE_PARALLEL" }),
+  });
+  assert.equal(parallelChat.status, 200);
+  const parallelEvents = await readSse(parallelChat);
+  assert.deepEqual(
+    parallelEvents.filter((event) => event.event === "member_start").map((event) => event.data.agentId),
+    ["agent-a", "agent-b", "agent-c", "agent-a"],
+    "分工说完后两个组员一起开始，汇总仍在最后",
+  );
+  assert.ok(prompts.maxWorkOverlap >= 2, "两个组员的 work 在对方结束前都已启动");
+  const parallelPrompts = prompts.slice(beforeParallel);
+  const workPrompts = parallelPrompts.filter((prompt) => prompt.includes("WORK_PART"));
+  assert.equal(workPrompts.length, 2);
+  assert.ok(workPrompts.every((prompt) => !prompt.includes("这一份做完了")));
+  const summaryAt = parallelPrompts.findIndex((prompt) => prompt.includes("SUMMARIZE_ONLY"));
+  const firstWork = parallelPrompts.findIndex((prompt) => prompt.includes("WORK_PART"));
+  const secondWork = parallelPrompts.findIndex(
+    (prompt, index) => index > firstWork && prompt.includes("WORK_PART"),
+  );
+  assert.ok(summaryAt > secondWork, "两个组员都开口之后才汇总");
+  assert.ok(parallelPrompts[summaryAt]?.includes("乙"));
+  assert.ok(parallelPrompts[summaryAt]?.includes("丙"));
+
   const slow = createServer((request, response) => {
     response.writeHead(200, { "Content-Type": "text/event-stream" });
     response.write(
@@ -709,6 +766,31 @@ test("channel chat replies with one member, keeps history, and a mention selects
     kept.some((message) => message.role === "member" && message.text.includes("已经说到这里")),
     "断开后已经说出的内容要留下",
   );
+});
+
+test("channel live deltas stay on the speaker's own bubble", () => {
+  const current = [
+    {
+      id: "live:agent-b:1",
+      channelId: "c",
+      role: "member" as const,
+      agentId: "agent-b",
+      text: "乙",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "live:agent-c:1",
+      channelId: "c",
+      role: "member" as const,
+      agentId: "agent-c",
+      text: "丙",
+      createdAt: "2026-01-01T00:00:01.000Z",
+    },
+  ];
+  const next = appendMemberDelta(current, "c", "agent-b", "继续");
+  assert.equal(next[0]?.text, "乙继续");
+  assert.equal(next[1]?.text, "丙");
+  assert.equal(next.length, 2);
 });
 
 test("channel members can call the quote tool instead of a connector", async () => {
