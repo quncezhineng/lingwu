@@ -61,6 +61,8 @@ export interface AgentDefinition {
   system: boolean;
   /** 置顶：在左侧 Agent 列表中排在未置顶的 Agent 之前（不改动 agents 的实际存储顺序）。 */
   pinned?: boolean;
+  /** 是否已公开到智能体市场（点击详情页「公开」后置为 true）。 */
+  public?: boolean;
   /** True once the server has created or already knows this thread. */
   threadExists: boolean;
   createdAt: string;
@@ -385,6 +387,8 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
   if (model) agent.model = model;
   // 置顶同理：只在置顶时写入标记，未置顶的 Agent 不产出多余字段（幂等归一化不会多出 key）。
   if (value.pinned === true) agent.pinned = true;
+  // 公开同理：只在公开时写入标记，未公开的 Agent 不产出多余字段。
+  if (value.public === true) agent.public = true;
   // 连接同理：只在有挂载记录时写入，空的 Agent 不产出多余字段（幂等归一化不会多出 key）。
   const installedConnectors = [...new Set(stringArray(value.installedConnectors))].slice(0, 20);
   if (installedConnectors.length) agent.installedConnectors = installedConnectors;

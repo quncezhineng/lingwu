@@ -5,6 +5,19 @@
 
 ## 变更记录
 
+### 2026-11-19 · 市场用户来源标签改为「@昵称」
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：市场页用户公开智能体的来源标签由通用文案「@用户公开」改为 `@` + 当前账号昵称（`workspace.profile.name`）；昵称为空时回退到 `agent.marketSourceUser` 通用文案。
+
+### 2026-11-19 · 市场页「市场公开」标题改为「智能体市场」
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agent.marketTabPublic` 由「市场公开」改为「智能体市场」；同步更新 `agent.marketPublishHint` 中的引用文案。
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：对应英文 `agent.marketTabPublic` / `agent.marketPublishHint` 由 "Public market" 改为 "Agent market"。
+
 ### 2026-11-19 · Agent / 频道详情页新增「连接」页签（技能与连接库）
 
 **背景**

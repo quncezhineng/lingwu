@@ -54,6 +54,8 @@ const agentSchema = z
     system: z.boolean(),
     // 列表置顶标记；旧客户端不带该字段，保持可选以兼容。
     pinned: z.boolean().optional(),
+    // 是否已公开到智能体市场；旧客户端不带该字段，保持可选以兼容。
+    public: z.boolean().optional(),
     threadExists: z.boolean(),
     createdAt: timestamp,
     skills: z.array(identifier).max(30),

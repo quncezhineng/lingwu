@@ -2,6 +2,13 @@ import { type ReactNode, useState } from "react";
 import { Linking, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import Markdown from "react-native-markdown-renderer";
 import { type Channel, normalizeChannelAvatar } from "../../../packages/domain/src/channel";
+import {
+  BUILTIN_MARKET_AGENTS,
+  type BuiltinMarketAgent,
+  builtinMarketEntries,
+  type MarketAgentEntry,
+  userMarketEntries,
+} from "./agent-market";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition, AgentSkill } from "./agent-space-model";
@@ -35,6 +42,7 @@ import {
   Terminal,
   Trash2,
   Upload,
+  Users,
   X,
 } from "./icons";
 import { instructionsMarkdownStyle } from "./instructions-markdown";
@@ -50,7 +58,7 @@ import { breakpoints, radius } from "./theme";
 import { appBrands, Button, Chip, colors, Empty, fonts, Sheet, s, serviceBrands } from "./ui";
 import { useWorkspace } from "./workspace";
 
-type CapabilityType = "plugins" | "skills" | "connectors";
+type CapabilityType = "plugins" | "skills" | "connectors" | "market";
 type ConfigSheet = "openbot";
 /** 「我的技能」条目：账户级技能库里的一份自建技能，与 Agent 是否持有无关。 */
 type MySkillEntry = { skill: AgentSkill };
@@ -138,6 +146,7 @@ const CATEGORY_OPTIONS_BY_TYPE: Record<CapabilityType, CategoryOption[]> = {
   plugins: CAPABILITY_CATEGORY_OPTIONS,
   skills: SKILL_CATEGORY_OPTIONS,
   connectors: CONNECTOR_CATEGORY_OPTIONS,
+  market: [{ id: "all", labelKey: "agent.hubCategoryAll" }],
 };
 
 const FILLER_KEYS = ["a", "b", "c", "d", "e", "f"] as const;
@@ -157,24 +166,28 @@ const TYPE_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.pluginsHeading",
   skills: "agent.skillsHeading",
   connectors: "agent.connectorsHeading",
+  market: "agent.marketHeading",
 };
 
 const HUB_SEARCH_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubSearchPlugins",
   skills: "agent.hubSearchSkills",
   connectors: "agent.hubSearchConnectors",
+  market: "agent.hubSearchAgents",
 };
 
 const HUB_COUNT_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubPluginCount",
   skills: "agent.hubSkillCount",
   connectors: "agent.hubConnectorCount",
+  market: "agent.hubAgentCount",
 };
 
 const HUB_EMPTY_TITLE_LABELS: Record<CapabilityType, TranslationKey> = {
   plugins: "agent.hubPluginNoMatchTitle",
   skills: "agent.hubSkillNoMatchTitle",
   connectors: "agent.hubConnectorNoMatchTitle",
+  market: "agent.hubAgentNoMatchTitle",
 };
 
 const SKILL_CATEGORY_LABELS: Record<SkillCategory, TranslationKey> = {
@@ -490,6 +503,154 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
                 {t("agent.skillDetailUse")}
               </Text>
             </Pressable>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** 市场里的智能体卡片：内置可导入，用户公开的展示详情 / 撤回入口。 */
+function MarketAgentCard({
+  entry,
+  onImport,
+  onOpen,
+}: {
+  entry: MarketAgentEntry;
+  /** 内置智能体的「导入」动作；用户公开智能体不传。 */
+  onImport?: () => void;
+  /** 打开智能体详情（用户公开智能体跳转到该智能体详情页）。 */
+  onOpen?: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: 172,
+        borderRadius: radius.card,
+        borderWidth: 1,
+        borderColor: colors.line,
+        backgroundColor: colors.paper,
+        overflow: "hidden",
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${entry.name} · ${entry.detail}`}
+        onPress={onOpen}
+        disabled={!onOpen}
+        style={({ pressed }) => ({
+          flex: 1,
+          paddingTop: 14,
+          paddingHorizontal: 14,
+          backgroundColor: pressed ? colors.surfaceSoft : colors.paper,
+        })}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
+          <AgentOrb avatar={entry.avatar} size={32} />
+          <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                color: colors.text,
+                fontSize: 14,
+                lineHeight: 20,
+                fontWeight: "500",
+                fontFamily: fonts.sans,
+              }}
+            >
+              {entry.name}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: colors.faint,
+                fontSize: 11,
+                lineHeight: 16,
+                fontFamily: fonts.sans,
+              }}
+            >
+              {entry.role}
+            </Text>
+          </View>
+          {!entry.builtin && <ArrowUpRight size={14} strokeWidth={1.7} color={colors.disabled} />}
+        </View>
+        <Text
+          numberOfLines={3}
+          style={{
+            flex: 1,
+            marginTop: 10,
+            color: colors.muted,
+            fontSize: 13,
+            lineHeight: 18,
+            fontFamily: fonts.sans,
+          }}
+        >
+          {entry.detail}
+        </Text>
+      </Pressable>
+      <View style={{ paddingHorizontal: 14, paddingBottom: 10 }}>
+        <View
+          style={[
+            s.between,
+            {
+              gap: 8,
+              paddingTop: 8,
+              borderTopWidth: 1,
+              borderTopColor: colors.line,
+            },
+          ]}
+        >
+          <Text
+            numberOfLines={1}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              color: colors.faint,
+              fontSize: 11,
+              lineHeight: 16,
+              fontFamily: fonts.sans,
+            }}
+          >
+            {entry.source}
+          </Text>
+          {entry.builtin && onImport ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t("agent.marketImport")} · ${entry.name}`}
+              hitSlop={6}
+              onPress={onImport}
+              style={({ pressed }) => ({
+                height: 24,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                paddingHorizontal: 9,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: colors.accentLine,
+                backgroundColor: pressed ? colors.skyStrong : colors.sky,
+              })}
+            >
+              <Download size={12} strokeWidth={1.8} color={colors.primaryStrong} />
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: colors.primaryStrong,
+                  fontSize: 11,
+                  lineHeight: 16,
+                  fontWeight: "500",
+                  fontFamily: fonts.sans,
+                }}
+              >
+                {t("agent.marketImport")}
+              </Text>
+            </Pressable>
+          ) : (
+            <StatusBadge tone="done" label={t("agent.marketPublicBadge")} />
           )}
         </View>
       </View>
@@ -1291,6 +1452,8 @@ export function CapabilityHubScreen() {
   const [appSlug, setAppSlug] = useState<string | null>(null);
   const {
     agents: agentList,
+    createAgent,
+    selectAgent,
     setSkillInstalled,
     setSkillRef,
     deleteSkill,
@@ -1318,6 +1481,10 @@ export function CapabilityHubScreen() {
   const [editingMySkill, setEditingMySkill] = useState<AgentSkill>();
   /** 技能 tab 的二级视角：「技能市场」技能目录 / 「我的技能」。 */
   const [skillTab, setSkillTab] = useState<"all" | "mine">("all");
+  /** 市场 tab 的二级视角：「市场公开」 / 「我的智能体」。 */
+  const [marketTab, setMarketTab] = useState<"all" | "mine">("all");
+  /** 市场里待导入（确认克隆）的内置智能体。 */
+  const [importingAgent, setImportingAgent] = useState<BuiltinMarketAgent>();
   /** 删除前二次确认：待删除的「我的技能」条目。 */
   const [deletingMySkill, setDeletingMySkill] = useState<MySkillEntry>();
 
@@ -1614,6 +1781,30 @@ export function CapabilityHubScreen() {
     setTypeFilter(next);
   };
 
+  // 市场数据：内置公开智能体 + 用户公开智能体。
+  const marketSourceBuiltin = t("agent.marketSourceBuiltin");
+  // 用户公开的智能体都来自当前账号，来源标签显示「@昵称」，昵称缺省时回退到通用文案。
+  const accountNickname = workspace.profile.name.trim();
+  const marketSourceUser = accountNickname ? `@${accountNickname}` : t("agent.marketSourceUser");
+  const builtinEntries = builtinMarketEntries(marketSourceBuiltin);
+  const userEntries = userMarketEntries(agentList, marketSourceUser);
+  const marketAllEntries: MarketAgentEntry[] = [...builtinEntries, ...userEntries];
+  const marketMineEntries: MarketAgentEntry[] = userEntries;
+  const marketVisibleEntries = marketTab === "mine" ? marketMineEntries : marketAllEntries;
+
+  /** 导入内置智能体：克隆成用户自己的 Agent，并切到该 Agent。 */
+  function importBuiltinAgent(builtin: BuiltinMarketAgent) {
+    const agent = createAgent({
+      template: "custom",
+      name: builtin.name,
+      role: builtin.role,
+      persona: builtin.persona,
+      avatar: builtin.avatar,
+    });
+    selectAgent(agent.id);
+    notify(t("agent.marketImportedToast", { name: agent.name }));
+  }
+
   const shortcuts: Shortcut[] = [
     {
       id: "skills",
@@ -1628,6 +1819,13 @@ export function CapabilityHubScreen() {
       detail: t("agent.hubConnectorsShortDetail"),
       icon: Link2,
       onPress: () => selectType("connectors"),
+    },
+    {
+      id: "market",
+      title: t("agent.marketHeading"),
+      detail: t("agent.marketShortDetail"),
+      icon: Users,
+      onPress: () => selectType("market"),
     },
   ];
   /**
@@ -1777,6 +1975,74 @@ export function CapabilityHubScreen() {
               {t("agent.hubConnectionsAccount", { count: appConnectors.connectedCount })}
             </Text>
           ) : null}
+          {typeFilter === "market" ? (
+            <View style={{ gap: 14 }}>
+              <HubTabBar
+                tabs={[
+                  { id: "all", label: t("agent.marketTabPublic") },
+                  { id: "mine", label: t("agent.marketTabMine") },
+                ]}
+                active={marketTab}
+                onChange={setMarketTab}
+              />
+              {marketVisibleEntries.length ? (
+                <View style={{ gap: 12 }}>
+                  {chunk(marketVisibleEntries, gridColumns).map((row) => (
+                    <View
+                      key={row[0].key}
+                      style={{ flexDirection: "row", gap: 12, alignItems: "stretch" }}
+                    >
+                      {row.map((entry) => (
+                        <MarketAgentCard
+                          key={entry.key}
+                          entry={entry}
+                          onImport={
+                            entry.builtin
+                              ? () => {
+                                  const builtin = BUILTIN_MARKET_AGENTS.find(
+                                    (item) => item.id === entry.builtinId,
+                                  );
+                                  if (builtin) setImportingAgent(builtin);
+                                }
+                              : undefined
+                          }
+                          onOpen={
+                            entry.builtin || !entry.agent
+                              ? undefined
+                              : () => {
+                                  const agent = entry.agent;
+                                  if (!agent) return;
+                                  selectAgent(agent.id);
+                                  navigate("agent");
+                                }
+                          }
+                        />
+                      ))}
+                      {FILLER_KEYS.slice(0, gridColumns - row.length).map((key) => (
+                        <View key={key} style={{ flex: 1 }} />
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={EMPTY_STATE_BOX}>
+                  <Empty
+                    icon={Users}
+                    title={t(
+                      marketTab === "mine"
+                        ? "agent.marketMineEmptyTitle"
+                        : "agent.marketEmptyTitle",
+                    )}
+                    detail={t(
+                      marketTab === "mine"
+                        ? "agent.marketMineEmptyDetail"
+                        : "agent.marketEmptyDetail",
+                    )}
+                  />
+                </View>
+              )}
+            </View>
+          ) : null}
           {typeFilter === "skills" && (
             <HubTabBar
               tabs={[
@@ -1802,7 +2068,7 @@ export function CapabilityHubScreen() {
               }
             />
           )}
-          {typeFilter === "skills" && skillTab === "mine" ? (
+          {typeFilter === "market" ? null : typeFilter === "skills" && skillTab === "mine" ? (
             <View style={{ gap: 12 }}>
               {mySkills.length ? (
                 <MySkillsList
@@ -1920,6 +2186,39 @@ export function CapabilityHubScreen() {
           <View style={{ gap: 14 }}>
             <Text style={s.text}>{t("screens.connectionsOpenBotNotice")}</Text>
             <Text style={s.muted}>{t("screens.connectionsOpenBotDetail")}</Text>
+          </View>
+        </Sheet>
+      )}
+
+      {importingAgent && (
+        <Sheet
+          title={t("agent.marketImportTitle")}
+          subtitle={importingAgent.name}
+          onClose={() => setImportingAgent(undefined)}
+          narrow
+        >
+          <View style={{ gap: 16 }}>
+            <Text style={s.muted}>{importingAgent.detail}</Text>
+            <View style={{ gap: 6 }}>
+              <Text style={s.label}>{t("agent.marketImportHint")}</Text>
+              <Text style={s.small}>{importingAgent.persona}</Text>
+            </View>
+            <View style={[s.row, { gap: 10, marginTop: 4 }]}>
+              <Button style={{ flex: 1 }} onPress={() => setImportingAgent(undefined)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                primary
+                style={{ flex: 1 }}
+                onPress={() => {
+                  const target = importingAgent;
+                  setImportingAgent(undefined);
+                  importBuiltinAgent(target);
+                }}
+              >
+                {t("agent.marketImportConfirm")}
+              </Button>
+            </View>
           </View>
         </Sheet>
       )}

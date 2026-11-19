@@ -11,8 +11,10 @@ import {
 } from "../agent-space-model";
 import { Text } from "../app-text";
 import { statusLabel, useTranslation } from "../i18n";
+import { Globe2 } from "../icons";
 import { ModalOverlay } from "../modal-overlay";
 import { Button, colors, Field, radius, s } from "../ui";
+import { useWorkspace } from "../workspace";
 import { BotPage, type BotPageProps } from "./shared";
 
 /** 语气 / 话说多少的单选项胶囊，与引导页的选项样式保持一致。 */
@@ -175,7 +177,8 @@ export function BotEditPage({
   embedded = false,
 }: BotPageProps & { onDeleted: () => void }) {
   const { t } = useTranslation();
-  const { current, deleteAgent } = useAgentSpace();
+  const { current, deleteAgent, setAgentPublic } = useAgentSpace();
+  const { notify } = useWorkspace();
   const [confirmDelete, setConfirmDelete] = useState(false);
   return (
     <BotPage title={t("agentSpace.editPersona")} onClose={onClose} embedded={embedded}>
@@ -190,6 +193,58 @@ export function BotEditPage({
           )
         }
       />
+      {/* 公开到市场：仅用户自建的智能体可公开，系统默认 Agent 不可公开。 */}
+      {!current.system && (
+        <View
+          style={{
+            marginTop: 12,
+            padding: 12,
+            borderRadius: radius.card,
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: colors.paper,
+            gap: 8,
+          }}
+        >
+          <View style={[s.row, { gap: 10, alignItems: "center" }]}>
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: radius.control,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: current.public ? colors.sky : colors.surfaceSoft,
+              }}
+            >
+              <Globe2 size={17} color={current.public ? colors.primaryStrong : colors.muted} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={[s.text, { fontSize: 13, fontWeight: "600" }]}>
+                {t("agent.marketPublish")}
+              </Text>
+              <Text style={[s.small, { color: colors.faint }]}>
+                {current.public ? t("agent.marketPublishedHint") : t("agent.marketPublishHint")}
+              </Text>
+            </View>
+            <Button
+              small
+              primary={!current.public}
+              onPress={() => {
+                const next = !current.public;
+                setAgentPublic(current.id, next);
+                notify(
+                  t(next ? "agent.marketPublishedToast" : "agent.marketUnpublishedToast", {
+                    name: current.name,
+                  }),
+                );
+              }}
+            >
+              {current.public ? t("agent.marketUnpublish") : t("agent.marketPublish")}
+            </Button>
+          </View>
+        </View>
+      )}
       <View style={{ marginTop: 12 }}>
         {current.system && (
           <Text style={[s.small, { color: colors.faint, marginTop: 10 }]}>
