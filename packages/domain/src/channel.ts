@@ -60,6 +60,11 @@ export interface Channel {
   installedSkills?: string[];
   /** 频道自己的自建技能引用（账户技能库 id），同样成员共享。 */
   skillRefs?: string[];
+  /**
+   * 频道自己的连接（连接 id）：与成员 Agent 各自的连接互相独立，
+   * 频道里添加后对全体成员生效（编排时注入到成员的可用连接里）。
+   */
+  installedConnectors?: string[];
   /** 是否置顶：只影响左侧栏展示顺序，置顶的频道排在前面。 */
   pinned?: boolean;
   /** 内部指定的组长。不在界面上展示。缺省时用成员列表的第一位。 */
@@ -79,6 +84,7 @@ export const channelInputSchema = z.object({
   instructions: z.string().trim().max(4000).optional(),
   installedSkills: z.array(z.string().min(1).max(128)).max(200).optional(),
   skillRefs: z.array(z.string().min(1).max(128)).max(200).optional(),
+  installedConnectors: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   pinned: z.boolean().optional(),
   leaderId: z.string().min(1).max(128).optional(),
 });
@@ -95,6 +101,7 @@ export const channelUpdateSchema = z.object({
   instructions: z.string().trim().max(4000).optional(),
   installedSkills: z.array(z.string().min(1).max(128)).max(200).optional(),
   skillRefs: z.array(z.string().min(1).max(128)).max(200).optional(),
+  installedConnectors: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   pinned: z.boolean().optional(),
   leaderId: z.string().min(1).max(128).optional(),
 });

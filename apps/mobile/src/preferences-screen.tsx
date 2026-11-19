@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Pressable, useWindowDimensions, View } from "react-native";
+import {
+  Linking,
+  Platform,
+  Pressable,
+  type TextStyle,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-markdown-renderer";
 import {
   type AgentMemory,
   type AgentMemoryV2,
@@ -9,6 +17,7 @@ import {
 } from "../../../packages/domain/src/agent";
 import { useAgentSpace } from "./agent-space";
 import { useAgentWorkspace } from "./agent-workspace";
+import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { Text } from "./app-text";
 import { useChannels } from "./channels";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
@@ -28,6 +37,64 @@ import {
 } from "./icons";
 import { colors, fonts } from "./theme";
 import { Button, ErrorNotice, Field, Sheet, s } from "./ui";
+
+const memoryCardMarkdownTextStyle: TextStyle = {
+  color: colors.text,
+  fontFamily: fonts.serif,
+  fontSize: 16,
+  lineHeight: 26,
+};
+
+const memoryCardMarkdownStyle: Partial<MarkdownStyles> = {
+  text: memoryCardMarkdownTextStyle,
+  paragraph: { marginTop: 0, marginBottom: 6 },
+  list: { marginBottom: 6 },
+  listUnorderedItemIcon: { fontFamily: fonts.serif },
+  listOrderedItemIcon: { fontFamily: fonts.serif },
+  headingContainer: { marginTop: 2, marginBottom: 3 },
+  heading: { fontFamily: fonts.serif, color: colors.text },
+  heading1: { fontSize: 18, lineHeight: 28, color: colors.text },
+  heading2: { fontSize: 17, lineHeight: 27, color: colors.text },
+  heading3: { fontSize: 16, lineHeight: 26, color: colors.text },
+  blockquote: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.line,
+    paddingLeft: 10,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  link: { color: colors.primaryStrong, textDecorationLine: "underline" },
+  codeInline: {
+    backgroundColor: colors.tertiary,
+    color: colors.primaryStrong,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 0,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    fontSize: 12,
+  },
+  codeBlock: {
+    borderRadius: 8,
+    backgroundColor: colors.tertiary,
+    color: colors.text,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+};
+
+const memoryCardMarkdownRules: RenderRules = {
+  textgroup: (node, children) => (
+    <Text key={node.key} selectable style={memoryCardMarkdownTextStyle}>
+      {children}
+    </Text>
+  ),
+};
+
+function openSafeMemoryLink(url: string): boolean {
+  if (!isSafeAssistantUrl(url)) return false;
+  void Linking.openURL(url).catch(() => {});
+  return false;
+}
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -152,16 +219,14 @@ function MemoryCard({
             </View>
           )}
         </View>
-        <Text
-          style={{
-            fontSize: 16,
-            lineHeight: 26,
-            color: colors.text,
-            fontFamily: fonts.serif,
-          }}
+        <Markdown
+          markdownit={assistantMarkdown}
+          style={memoryCardMarkdownStyle}
+          rules={memoryCardMarkdownRules}
+          onLinkPress={openSafeMemoryLink}
         >
           {memory.text}
-        </Text>
+        </Markdown>
       </View>
 
       {confirming ? (

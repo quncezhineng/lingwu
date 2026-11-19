@@ -16,10 +16,13 @@ import { ArtifactCard, TaskCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { AssistantResponse } from "./assistant-response";
+import { useAppConnectors } from "./app-connectors";
 import { BotInlineBack } from "./bot-pages/shared";
 import { MySkillDetailSheet, SkillDetailSheet } from "./capability-hub";
+import { allConnectorOptions, connectorOptions, type ConnectorOption } from "./capability-picker";
 import { CardGrid } from "./card-grid";
 import { useChannels } from "./channels";
+import { ConnectorLibraryPanel, ConnectorRemoveButton } from "./connector-library-panel";
 import { saveRemoteFile, shareRemoteFile } from "./file-export";
 import { type TranslationKey, useTranslation } from "./i18n";
 import {
@@ -29,6 +32,7 @@ import {
   FileText,
   FolderOpen,
   Heart,
+  Link2,
   ListChecks,
   Plus,
   Settings2,
@@ -42,6 +46,7 @@ import { PreferencesScreen } from "./preferences-screen";
 import { type SkillCatalogEntry, skillCatalog } from "./skill-catalog";
 import { SkillLibraryPanel, SkillRemoveButton } from "./skill-library-panel";
 import { SkillSectionCard } from "./skill-section-card";
+import { StatusBadge } from "./status-badge";
 import { breakpoints, colors, radius, shadow, space, typography } from "./theme";
 import {
   Button,
@@ -62,6 +67,7 @@ export type ChannelSettingsTab =
   | "profile"
   | "instructions"
   | "skills"
+  | "connectors"
   | "files"
   | "tasks"
   | "memory";
@@ -77,6 +83,8 @@ const TABS: ReadonlyArray<{
   { id: "tasks", icon: ListChecks, labelKey: "channels.settingsTasks" },
   { id: "instructions", icon: Terminal, labelKey: "channels.settingsInstructions" },
   { id: "skills", icon: Brain, labelKey: "channels.settingsSkills" },
+  // 「连接」紧跟「技能」：都是把账户里已有的能力挂到这个频道上，成员共享。
+  { id: "connectors", icon: Link2, labelKey: "channels.settingsConnectors" },
   { id: "files", icon: FolderOpen, labelKey: "channels.settingsFiles" },
   { id: "memory", icon: Heart, labelKey: "channels.settingsMemory" },
 ];
@@ -151,6 +159,8 @@ export function ChannelSettingsScreen({
         );
       case "skills":
         return <ChannelSkillsPanel channel={channel} />;
+      case "connectors":
+        return <ChannelConnectorsPanel channel={channel} />;
       case "files":
         return <ChannelFilesPanel channel={channel} />;
       case "tasks":
@@ -812,6 +822,140 @@ function ChannelSkillsPanel({ channel }: { channel: Channel }) {
           skill={viewingCustom}
           onClose={() => setViewingCustom(undefined)}
         />
+      )}
+    </View>
+  );
+}
+
+/**
+ * 连接页：**这个频道自己的连接**，与成员智能体各自的连接互相独立。
+ *
+ * 版式与 Agent 详情「连接」页完全一致（右上角「+ 添加连接」+ 自适应卡片网格 +
+ * 卡片内「移除」），区别只在归属：连接挂在频道上，添加后对全体成员共享
+ * （频道群聊编排时注入到每位成员的可用连接），移除也只从频道摘掉。
+ * 只允许勾选已连接的连接，未连接的连接器置灰，与输入区选择弹层同一套判定。
+ */
+function ChannelConnectorsPanel({ channel }: { channel: Channel }) {
+  const { t } = useTranslation();
+  const { workspace, api, notify } = useWorkspace();
+  const { updateChannel } = useChannels();
+  const appConnectors = useAppConnectors(api);
+  /** 连接库视图：点「+ 添加连接」切进来挑选，挑完退回已挂列表。 */
+  const [adding, setAdding] = useState(false);
+  // 连接库 = 工作区内置连接器 + 账户级应用连接器，按 id 去重、已连接优先。
+  const options = allConnectorOptions(connectorOptions(workspace), appConnectors.items);
+  const installedIds = channel.installedConnectors ?? [];
+  const assigned = installedIds
+    .map((id) => options.find((option) => option.id === id))
+    .filter((option): option is ConnectorOption => Boolean(option));
+
+  const toggle = (id: string, installed: boolean) => {
+    void updateChannel(channel.id, {
+      installedConnectors: installed
+        ? [...new Set([...installedIds, id])]
+        : installedIds.filter((x) => x !== id),
+    });
+    const option = options.find((item) => item.id === id);
+    notify(
+      t(installed ? "agent.connectorInstalledToast" : "agent.connectorUninstalledToast", {
+        name: option?.name ?? id,
+        agent: channel.name,
+      }),
+    );
+  };
+
+  /** 卡片上的「移除」：只把连接从这个频道摘掉，Agent 自己的连接与连接库原件都不动。 */
+  const remove = (option: ConnectorOption) => {
+    if (!installedIds.includes(option.id)) return;
+    toggle(option.id, false);
+  };
+
+  // 添加连接视图：与 Agent 详情「连接 → 添加连接」同一版式——
+  // 左上角 `‹ 返回` 切回已挂列表，下面直接铺连接库（提示 / 搜索 / 卡片格子）。
+  if (adding)
+    return (
+      <View style={{ gap: 2 }}>
+        <BotInlineBack label={t("common.back")} onPress={() => setAdding(false)} />
+        <ConnectorLibraryPanel installedIds={installedIds} onToggle={toggle} />
+      </View>
+    );
+
+  const cards: { key: string; node: ReactNode }[] = assigned.map((option) => ({
+    key: option.id,
+    // 连接没有详情弹层，卡片只做只读展示：品牌色图标 + 名称 + 说明 + 连接状态 + 移除。
+    node: (
+      <View
+        style={{
+          flex: 1,
+          padding: 14,
+          borderRadius: 15,
+          borderWidth: 1,
+          borderColor: colors.line,
+          backgroundColor: colors.paper,
+          gap: 7,
+        }}
+      >
+        <View style={s.between}>
+          <View style={[s.row, { flex: 1, minWidth: 0, gap: 10 }]}>
+            <View
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: option.iconSurface ?? colors.surfaceSoft,
+              }}
+            >
+              <option.icon size={16} color={option.iconColor ?? colors.muted} />
+            </View>
+            <Text numberOfLines={1} style={[s.text, { flex: 1, minWidth: 0, fontWeight: "600" }]}>
+              {option.name}
+            </Text>
+          </View>
+          <ConnectorRemoveButton name={option.name} onRemove={() => remove(option)} />
+        </View>
+        <Text numberOfLines={2} style={s.small}>
+          {option.detail}
+        </Text>
+        <View>
+          <StatusBadge
+            tone={option.connected ? "done" : "paused"}
+            label={t(
+              option.connected
+                ? "agent.hubConnectorStateConnected"
+                : "agent.hubConnectorStateDisconnected",
+            )}
+            style={{ borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}
+          />
+        </View>
+      </View>
+    ),
+  }));
+
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={[s.muted, { lineHeight: 21 }]}>{t("channels.connectorsHint")}</Text>
+      <View style={[s.between, { alignItems: "center", marginBottom: 5, gap: 12 }]}>
+        <Text style={s.small}>{t("agentSpace.connectorCount", { count: assigned.length })}</Text>
+        <Button primary icon={Plus} onPress={() => setAdding(true)}>
+          {t("agentSpace.addConnector")}
+        </Button>
+      </View>
+      {assigned.length ? (
+        <CardGrid
+          items={cards}
+          minColumnWidth={300}
+          getKey={(card) => card.key}
+          render={(card) => card.node}
+        />
+      ) : (
+        <View style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
+          <Link2 size={28} color={colors.faint} />
+          <Text style={[s.muted, { textAlign: "center", lineHeight: 22 }]}>
+            {t("channels.connectorsEmpty")}
+          </Text>
+        </View>
       )}
     </View>
   );

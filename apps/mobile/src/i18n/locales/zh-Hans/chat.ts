@@ -77,7 +77,7 @@ const chat = {
   "chat.filePickerDefaultPrompt": "请结合这些资料，整理核心观点、关键数据和需要进一步核验的问题。",
   "chat.selectAttachment": "选择资料：{name}",
   "chat.uploadMaterial": "上传资料",
-  "chat.skillPickerTool": "技能选择",
+  "chat.skillPickerTool": "选择技能",
   "chat.skillPickerTitle": "选择技能",
   "chat.skillPickerSubtitle": "只显示这个 Agent 已装的技能。选中后，对话会读取它的方法。",
   "chat.skillPickerSearch": "搜索技能",
@@ -89,7 +89,7 @@ const chat = {
   "chat.skillPickerSelected": "已选择 {count} 个技能",
   "chat.skillPickerConfirm": "确认",
   "chat.skillPickerDetail": "查看技能详情",
-  // —— 频道技能选择弹层：与 Agent 对话的技能选择同组件，文案按频道场景重写。
+  // —— 频道选择技能弹层：与 Agent 对话的选择技能同组件，文案按频道场景重写。
   "chat.channelSkillPickerTool": "选择技能",
   "chat.channelSkillPickerTitle": "选择技能",
   "chat.channelSkillPickerSubtitle": "只显示这个频道已添加的技能。选中后，成员会读取它的方法。",

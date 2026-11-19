@@ -79,6 +79,10 @@ const channels = {
   "channels.settingsTasks": "任务",
   "channels.settingsFiles": "资料",
   "channels.settingsMemory": "记忆",
+  "channels.settingsConnectors": "连接",
+  "channels.connectorsHint": "频道自己的连接，和成员各自的连接分开。添加后回答的成员可以在对话里使用。",
+  "channels.connectorsEmpty":
+    "这个频道还没有连接。点右上角「添加连接」从连接库挑选，添加后全体成员都能用。",
   "channels.filesEmpty": "这个频道还没有资料。在对话里附上文件后，会出现在这里。",
   "channels.memberCount": "{count} 位成员",
   "channels.skillsHint": "频道自己的技能，和成员各自的技能分开。要用的时候由回答的成员读取。",

@@ -59,6 +59,8 @@ type AgentSpaceContextValue = {
   deleteAgent: (id: string) => void;
   /** 置顶 / 取消置顶：只影响列表展示顺序，不改动 agents 的存储顺序。 */
   setAgentPinned: (id: string, pinned: boolean) => void;
+  /** 公开 / 取消公开：把用户自建的智能体发布到智能体市场，或撤回。 */
+  setAgentPublic: (id: string, isPublic: boolean) => void;
   markThreadUsed: (id: string) => void;
   setPreferences: (patch: Partial<AgentUserPreferences>) => void;
   resetPreferences: () => void;
@@ -325,6 +327,25 @@ export function AgentSpaceProvider({
     });
   }, []);
 
+  const setAgentPublic = useCallback((id: string, isPublic: boolean) => {
+    setState((value) => {
+      const target = value.agents.find((agent) => agent.id === id);
+      if (!target || target.system === true) return value;
+      if (!!target.public === isPublic) return value;
+      return {
+        ...value,
+        agents: value.agents.map((agent) => {
+          if (agent.id !== id) return agent;
+          // 取消公开时删掉字段，与归一化后的持久化形态保持一致。
+          const next = { ...agent };
+          if (isPublic) next.public = true;
+          else delete next.public;
+          return next;
+        }),
+      };
+    });
+  }, []);
+
   const markThreadUsed = useCallback((id: string) => {
     setState((value) => ({
       ...value,
@@ -527,6 +548,7 @@ export function AgentSpaceProvider({
       updateAgent,
       deleteAgent,
       setAgentPinned,
+      setAgentPublic,
       markThreadUsed,
       setPreferences,
       resetPreferences,
@@ -553,6 +575,7 @@ export function AgentSpaceProvider({
       updateAgent,
       deleteAgent,
       setAgentPinned,
+      setAgentPublic,
       markThreadUsed,
       setPreferences,
       resetPreferences,
