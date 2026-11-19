@@ -82,6 +82,11 @@ const channels = {
   "channels.settingsTasks": "Tasks",
   "channels.settingsFiles": "Library",
   "channels.settingsMemory": "Memory",
+  "channels.settingsConnectors": "Connections",
+  "channels.connectorsHint":
+    "Connections that belong to the channel, separate from each member's own. The member who answers can use one.",
+  "channels.connectorsEmpty":
+    'This channel has no connections yet. Use "Add connection" in the top right to pick from the library; every member can then use it.',
   "channels.filesEmpty":
     "This channel has no files yet. Attach one in the conversation and it will show up here.",
   "channels.memberCount": "{count} members",

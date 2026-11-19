@@ -385,6 +385,9 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
   if (model) agent.model = model;
   // 置顶同理：只在置顶时写入标记，未置顶的 Agent 不产出多余字段（幂等归一化不会多出 key）。
   if (value.pinned === true) agent.pinned = true;
+  // 连接同理：只在有挂载记录时写入，空的 Agent 不产出多余字段（幂等归一化不会多出 key）。
+  const installedConnectors = [...new Set(stringArray(value.installedConnectors))].slice(0, 20);
+  if (installedConnectors.length) agent.installedConnectors = installedConnectors;
   return agent;
 }
 

@@ -8,10 +8,11 @@ import { BotEditPage } from "./bot-pages/edit";
 import { BotGoalsMemoryPage } from "./bot-pages/goals-memory";
 import { BotHistoryPage } from "./bot-pages/history";
 import { BotInstructionsPage } from "./bot-pages/instructions";
+import { BotConnectorsPage } from "./bot-pages/connectors";
 import { BotLibraryPage } from "./bot-pages/library";
 import { BotSkillsPage } from "./bot-pages/skills";
 import { type TranslationKey, useTranslation } from "./i18n";
-import { Brain, Cpu, FolderOpen, Heart, ListChecks, Settings2, Terminal } from "./icons";
+import { Brain, Cpu, FolderOpen, Heart, Link2, ListChecks, Settings2, Terminal } from "./icons";
 import { ModelSelector } from "./model-selector";
 import { breakpoints, colors, radius, shadow, space, typography } from "./theme";
 import { HoverPressable, s } from "./ui";
@@ -22,6 +23,7 @@ export type AgentSettingsTab =
   | "profile"
   | "instructions"
   | "skills"
+  | "connectors"
   | "resources"
   | "history"
   | "goals"
@@ -38,6 +40,8 @@ const TABS: ReadonlyArray<{
   { id: "history", icon: ListChecks, labelKey: "agentSpace.analysisHistory" },
   { id: "instructions", icon: Terminal, labelKey: "agentSpace.instructions" },
   { id: "skills", icon: Brain, labelKey: "agentSpace.skills" },
+  // 「连接」紧跟「技能」：都是把账户里已有的能力挂到这个智能体上。
+  { id: "connectors", icon: Link2, labelKey: "agentSpace.connectors" },
   { id: "resources", icon: FolderOpen, labelKey: "agentSpace.library" },
   { id: "goals", icon: Heart, labelKey: "agent.memory" },
   { id: "model", icon: Cpu, labelKey: "modelSettings.model" },
@@ -90,6 +94,8 @@ export function AgentSettingsScreen({
         return <BotInstructionsPage embedded onClose={notifySaved} />;
       case "skills":
         return <BotSkillsPage embedded onClose={() => undefined} />;
+      case "connectors":
+        return <BotConnectorsPage embedded onClose={() => undefined} />;
       case "resources":
         return <BotLibraryPage embedded onClose={() => undefined} />;
       case "history":

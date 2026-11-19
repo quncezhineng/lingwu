@@ -61,6 +61,9 @@ const agentSchema = z
     installedSkills: z.array(identifier).max(60).optional(),
     // 自建技能按技能库 id 引用，不再复制。旧客户端不带该字段。
     skillRefs: z.array(identifier).max(60).optional(),
+    // 从「技能与连接库」分配给该智能体的连接 id。连接本身仍是账户级资产。
+    // 旧客户端不带该字段；agentSchema 是 .strict()，缺了它新版客户端的整次 PUT 会被 422 拒绝。
+    installedConnectors: z.array(identifier).max(20).optional(),
     customSkills: z.array(skillSchema).max(30),
   })
   .strict();

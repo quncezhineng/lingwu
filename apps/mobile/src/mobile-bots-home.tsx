@@ -19,7 +19,6 @@ import {
   ArrowUp,
   Bell,
   Bot,
-  Link2,
   MessageCircle,
   MoreHorizontal,
   Plus,
@@ -743,39 +742,37 @@ export function MobileBotsHome({
           </View>
         </Pressable>
         <Pressable
-          testID="mobile-bots-connections"
+          testID="mobile-bots-search"
           accessibilityRole="button"
-          accessibilityLabel={t("agentSpace.connectApps")}
-          onPress={onConnections}
+          accessibilityLabel={t("agentSpace.searchBots")}
+          onPress={() => setSearchOpen(true)}
           style={({ pressed }) => [
             mobileGlassStyle(pressed),
             floatingControl,
             { borderRadius: radius.full },
           ]}
         >
-          <Link2 size={20} color={colors.text} />
+          <Search size={18} color={colors.text} />
         </Pressable>
         <Pressable
-          testID="mobile-bots-search"
+          testID="mobile-bots-connections"
           accessibilityRole="button"
-          accessibilityLabel={t("agentSpace.searchBots")}
-          onPress={() => setSearchOpen(true)}
-          style={[
-            mobileGlassStyle(false),
+          accessibilityLabel={t("agentSpace.connectApps")}
+          onPress={onConnections}
+          style={({ pressed }) => [
+            mobileGlassStyle(pressed),
             {
               flex: 1,
               height: MOBILE_CONTROL,
               paddingHorizontal: 14,
               borderRadius: radius.full,
-              flexDirection: "row",
               alignItems: "center",
-              gap: 8,
+              justifyContent: "center",
             },
           ]}
         >
-          <Search size={18} color={colors.faint} />
-          <Text style={{ flex: 1, fontSize: 15, lineHeight: 22, color: colors.faint }}>
-            {t("agentSpace.searchBots")}
+          <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 20, fontWeight: "600" }}>
+            {t("agentSpace.connectApps")}
           </Text>
         </Pressable>
       </View>

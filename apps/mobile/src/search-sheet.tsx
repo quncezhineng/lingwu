@@ -112,6 +112,19 @@ function artifactDocument(artifact: AgentArtifact): SearchDocument {
   };
 }
 
+function memoryDocument(memory: { id: string; text: string; source?: string; createdAt: string }): SearchDocument {
+  const plainPreview = markdownExcerpt(memory.text, 80);
+  return {
+    id: memory.id,
+    kind: "memory",
+    title: memory.text,
+    displayTitle: plainPreview || memory.source || "Memory",
+    detail: memory.source || plainPreview,
+    detailMarkdown: memory.text.trim() || undefined,
+    updatedAt: memory.createdAt,
+  };
+}
+
 export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const { workspace, open, navigate } = useWorkspace();
@@ -183,13 +196,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
         keywords: `${event.description} ${event.attendees.join(" ")}`,
         updatedAt: event.start,
       })),
-      ...(data?.memories ?? []).map((memory) => ({
-        id: memory.id,
-        kind: "memory" as const,
-        title: memory.text,
-        detail: memory.source,
-        updatedAt: memory.createdAt,
-      })),
+      ...(data?.memories ?? []).map(memoryDocument),
       ...(data?.monitors ?? []).map((monitor) => ({
         id: monitor.id,
         kind: "monitor" as const,

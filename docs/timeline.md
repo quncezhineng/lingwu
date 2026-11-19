@@ -5,6 +5,63 @@
 
 ## 变更记录
 
+### 2026-11-19 · Agent / 频道详情页新增「连接」页签（技能与连接库）
+
+**背景**
+
+用户希望智能体详情页和频道详情页的左侧导航在「技能」与「资料」之间增加「连接」入口：点进去是一个与「技能」页结构类似的连接管理页面，支持从“技能与连接库”把已应用的连接添加/移除到某个智能体或某个频道。连接本身仍是账户级资产（如 browser / gmail / calendar / openbot 以及账户级应用连接器），这里只是“分配/挂载”关系。
+
+**处理**
+
+- [apps/mobile/src/bot-pages/connectors.tsx](../apps/mobile/src/bot-pages/connectors.tsx)：整页重写为智能体归属的「连接」页。主视图含引言（`agentSpace.connectorsHint`）、已装数量（`connectorCount`）、`Button primary icon={Plus}` 添加入口；卡片由 `CardGrid` 承载，展示连接品牌色图标、名称、说明与 `StatusBadge` 连接状态，并带 `ConnectorRemoveButton` 移除；空态用 `Link2` 图标 + `connectorsEmpty`。添加态通过 `BotInlineBack` 返回主视图，内嵌 `ConnectorLibraryPanel` 多选。读写通过 `useAgentSpace().updateAgent(id, { installedConnectors })` 持久化，toast 用 `agent.connectorInstalledToast / connectorUninstalledToast`。
+- [apps/mobile/src/connector-library-panel.tsx](../apps/mobile/src/connector-library-panel.tsx)：新增“技能与连接库”选择面板，接收 `{ installedIds, onToggle }`。内置连接器（`connectorOptions`）与账户级应用连接器（`useAppConnectors().items`）经 `allConnectorOptions` 合并、去重、已连接优先排序；带搜索（`agentSpace.addConnectorSearch`）；未连接的连接禁用并置灰、标“未连接”徽章；已连接未安装显示 `Plus`，已安装显示“已连接”。同时导出 `ConnectorRemoveButton`（红色“移除”胶囊，`event.stopPropagation()` 避免误触卡片）。
+- [apps/mobile/src/agent-settings-screen.tsx](../apps/mobile/src/agent-settings-screen.tsx)：`AgentSettingsTab` 增加 `"connectors"`；`TABS` 在 `skills` 之后、`resources` 之前插入「连接」；`switch` 分发到 `<BotConnectorsPage embedded />`。
+- [apps/mobile/src/channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx)：新增 `ChannelConnectorsPanel`（仿 `ChannelSkillsPanel`），写入 `channel.installedConnectors`；`ChannelSettingsTab` 增加 `"connectors"`，`TABS` 在 `skills` 与 `files` 之间插入「连接」。
+- [apps/mobile/src/agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)：`AgentDefinition` 增加 `installedConnectors?: string[]`；`normalizeAgent` 末尾做幂等归一化（去重、上限 20，空数组不产出多余字段）。
+- [packages/domain/src/channel.ts](../packages/domain/src/channel.ts)：`Channel` 接口与 `channelInputSchema` / `channelUpdateSchema` 增加 `installedConnectors: z.array(z.string().trim().min(1).max(40)).max(20).optional()`（频道自己的连接，与成员 Agent 各自连接互相独立，添加后对全体成员生效）。
+- [apps/server/src/agent-space.ts](../apps/server/src/agent-space.ts)：`agentSchema`（`.strict()`）在 `skillRefs` 之后补充 `installedConnectors: z.array(identifier).max(20).optional()`，否则前端 PUT `/api/agent-space` 携带该字段会被 zod 422 拒绝。
+- i18n：`zh-Hans` / `en` 的 `agent.ts` 增加 `agentSpace.addConnector / connectorCount / addConnectorHint / addConnectorSearch / addConnectorEmpty / removeConnector` 与 `agent.connectorInstalledToast / connectorUninstalledToast`；`channels.ts` 增加 `channels.settingsConnectors / connectorsHint / connectorsEmpty`。
+
+**验证**
+
+- 链路核对：Agent 侧 `updateAgent` 经 `enqueuePut` 全量 PUT `/api/agent-space`，服务端 `agentSpaceSchema.parse` 已放行新字段；频道侧 PATCH `/api/channels/:id` 直接 `{ ...existing, ...patch }` 透传，无需额外后端改动。
+- `git diff --check` 通过（沙箱限制 `.bin`，无法运行 tsc / biome，以源码级空白校验兜底）。
+
+### 2026-11-19 · 搜索页记忆结果补齐 Markdown 渲染
+
+**背景**
+
+用户进一步反馈，在搜索框页面里命中的“记忆”结果，标题区域仍会直接露出 Markdown 源码，尤其是 `#`、`**` 这类标记会原样显示，阅读体验不一致。
+
+**处理**
+
+- [apps/mobile/src/search-sheet.tsx](../apps/mobile/src/search-sheet.tsx)：为搜索页的记忆结果补充 `memoryDocument()` 映射，复用现有 `detailMarkdown` 渲染通道。
+- [apps/mobile/src/search-sheet.tsx](../apps/mobile/src/search-sheet.tsx)：记忆结果标题改为去掉 Markdown 标记后的短摘要，正文区域改为真实 Markdown 预览渲染。
+
+### 2026-11-19 · 三处记忆卡片正文统一支持 Markdown 渲染
+
+**背景**
+
+用户希望以下三处的记忆卡片正文，不再直接展示 Markdown 源码，而是按标题、列表、加粗、引用等语法真实渲染：全局记忆、智能体详情记忆、频道详情记忆。
+
+**处理**
+
+- [apps/mobile/src/preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：将共用 `MemoryCard` 组件里的记忆正文从纯文本 `Text` 改为 `Markdown` 渲染。
+- [apps/mobile/src/preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：为记忆卡片补充与现有卡片排版一致的 Markdown 样式、可复制文本规则和安全链接打开逻辑。
+- 智能体详情记忆页与频道详情记忆页均继续复用 `PreferencesScreen`，因此本次改动会同步覆盖这两个入口，无需再分别复制一套实现。
+
+### 2026-11-19 · 手机版左侧栏底部按钮改为 PC 同款顺序与形态
+
+**背景**
+
+用户希望手机版左侧栏底部的两个入口和 PC 端保持一致：搜索不再占用整条输入样式，而是改成小图标按钮；「技能与连接」则改成长条胶囊入口，同时把两者在底部栏中的顺序对调。
+
+**处理**
+
+- [apps/mobile/src/mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：将 `mobile-bots-search` 从长搜索框改为圆形图标按钮。
+- [apps/mobile/src/mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：将 `mobile-bots-connections` 改为与 PC 底部入口一致的长胶囊样式，并显示「技能与连接」文案。
+- [apps/mobile/src/mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)：调整底部按钮顺序为「通知」→「搜索」→「技能与连接」。
+
 ### 2026-11-19 · Agent 详情技能页数量文案移到技能区左侧
 
 **背景**
@@ -620,7 +677,7 @@ iPad 端左侧抽屉底部仍是“个人中心 + 设置”组合，和 PC 端�
 - `pnpm --filter @lingwu/mobile typecheck` 通过。
 - 请刷新页面确认：①新建弹窗贴靠按钮下方左侧；②新建按钮更大；③技能提示更短；④菜单顺序调换；⑤Agent 对话页首次进入时空状态位于页面正中间。
 
-### 2026-11-17 · 功能：频道对话输入框新增「频道技能」选择（与 Agent 对话技能选择同组件）
+### 2026-11-17 · 功能：频道对话输入框新增「频道技能」选择（与 Agent 对话选择技能同组件）
 
 **背景**
 
@@ -628,7 +685,7 @@ iPad 端左侧抽屉底部仍是“个人中心 + 设置”组合，和 PC 端�
 
 **处理**
 
-- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：输入区 `PromptComposer.tools` 在「连接器」前新增「频道技能」按钮（Brain 图标）；点击弹出 `SkillPickerSheet`，只列出**频道自己添加的技能**（目录技能 `channel.installedSkills` + 自建引用 `channel.skillRefs`，与频道详情「技能」分区同一读取口径）；选中后以 chip 显示在输入区、可移除；发送时把 `skillIds` 一起发给服务端，发送后清空。新增 `ChannelSkillInspectSheet`（频道技能只读详情：自建 → MySkillDetailSheet；目录 → SkillDetailSheet）。切换频道时清空技能选择。
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：输入区 `PromptComposer.tools` 在「连接器」前新增「频道技能」按钮（Brain 图标）；点击弹出 `SkillPickerSheet`，只列出**频道自己添加的技能**（目录技能 `channel.installedSkills` + 自建引用 `channel.skillRefs`，与频道详情「技能」分区同一读取口径）；选中后以 chip 显示在输入区、可移除；发送时把 `skillIds` 一起发给服务端，发送后清空。新增 `ChannelSkillInspectSheet`（频道技能只读详情：自建 → MySkillDetailSheet；目录 → SkillDetailSheet）。切换频道时清空选择技能。
 - [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx#L474-L507)：`SkillPickerSheet` 增加可选文案 props（`title`/`subtitle`/`mineHeading`/`emptyDetail`），Agent 对话不传保持原样，频道对话传入频道专属文案。
 - [i18n/locales/zh-Hans/chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts#L92-L97) 与 [en/chat.ts](../apps/mobile/src/i18n/locales/en/chat.ts#L100-L107)：新增 `chat.channelSkillPicker*` 文案（频道技能 / 选择频道技能 / 只显示这个频道已添加的技能…）。
 - [packages/domain/src/channel.ts](../packages/domain/src/channel.ts#L117-L126)：`ChannelMessage` 与 `channelMessageInputSchema` 增加 `skillIds?`（上限 60 个）。
@@ -638,7 +695,7 @@ iPad 端左侧抽屉底部仍是“个人中心 + 设置”组合，和 PC 端�
 **验证**
 
 - `pnpm typecheck` 通过（根 + apps/mobile 均无错）。
-- 请刷新频道对话页确认：输入框左侧弹出小窗口出现「频道技能」；选择后 chip 显示、发送后该轮回复会优先使用所选技能（成员可 `use_skill`）；Agent 对话页技能选择文案与行为不受影响。
+- 请刷新频道对话页确认：输入框左侧弹出小窗口出现「频道技能」；选择后 chip 显示、发送后该轮回复会优先使用所选技能（成员可 `use_skill`）；Agent 对话页选择技能文案与行为不受影响。
 
 ### 2026-11-17 · 界面：频道详情「记忆」页简介改为频道专属文案（Agent 详情页不变）
 
@@ -1215,7 +1272,7 @@ iPad 端左侧抽屉底部仍是“个人中心 + 设置”组合，和 PC 端�
 
 **背景**
 
-在智能体对话框里点「选择资料」（我的资料）与「选择连接器」会弹出两个弹窗，之前都是单列列表（整行 + 分隔线），显得空旷且与技能选择弹层的双列网格不统一，用户希望两者都改成双列布局。
+在智能体对话框里点「选择资料」（我的资料）与「选择连接器」会弹出两个弹窗，之前都是单列列表（整行 + 分隔线），显得空旷且与选择技能弹层的双列网格不统一，用户希望两者都改成双列布局。
 
 **处理**
 
@@ -2565,7 +2622,7 @@ Agent 详情页右上角「更多」菜单弹窗宽度 180px，超出项目下�
 - `apps/mobile/test/i18n.test.ts`：16 例全部通过（中英 key 对齐、占位符一致）。
 - `pnpm test` 全量 1027 例中 1016 通过；11 例失败均集中在服务端监控/任务生命周期（alerts、resume、milestone）测试，与本次文案改动无关，属存量问题。
 
-### 2026-11-07 · 交互：技能选择弹层卡片点击直接打勾，不再弹详情页
+### 2026-11-07 · 交互：选择技能弹层卡片点击直接打勾，不再弹详情页
 
 **背景**
 
@@ -2661,11 +2718,11 @@ Agent 详情页右上角「更多」菜单弹窗宽度 180px，超出项目下�
 - `pnpm biome check --write`（三个改动文件）：通过。
 - `npx tsc --noEmit`：本次改动文件无类型错误（`bot-pages/connectors.tsx` 报错为先存问题，与本次无关）。
 
-### 2026-11-07 · 交互：技能选择弹层点击卡片打开技能详情页
+### 2026-11-07 · 交互：选择技能弹层点击卡片打开技能详情页
 
 **背景**
 
-输入区「技能选择」弹层改为两列网格后，点击卡片直接切换勾选状态（`onToggle`），用户希望先看到技能详情再决定是否使用——与「更多能力」面板中卡片点击弹出详情的行为对齐。
+输入区「选择技能」弹层改为两列网格后，点击卡片直接切换勾选状态（`onToggle`），用户希望先看到技能详情再决定是否使用——与「更多能力」面板中卡片点击弹出详情的行为对齐。
 
 **处理**
 
@@ -2697,11 +2754,11 @@ Agent 详情页右上角「更多」菜单弹窗宽度 180px，超出项目下�
 - `npx biome check apps/mobile/src/capability-picker.tsx apps/mobile/src/chat.tsx apps/mobile/src/i18n/locales/zh-Hans/chat.ts apps/mobile/src/i18n/locales/en/chat.ts`：通过。
 - `npx tsc --noEmit`：全量通过。
 
-### 2026-11-07 · 交互：对话框「技能选择」弹层改为两列网格
+### 2026-11-07 · 交互：对话框「选择技能」弹层改为两列网格
 
 **背景**
 
-输入区左侧「+」菜单里的「技能选择」弹层，技能按整行列表排列（每行「图标 + 标题 + 描述 + 勾选框」，行间用分隔线）。技能目录有 180+ 条，单列时一次只能看到 10 条左右，滚动成本很高；右侧栏「更多能力」已是 2×2 卡片网格，两处视觉语言也不统一。
+输入区左侧「+」菜单里的「选择技能」弹层，技能按整行列表排列（每行「图标 + 标题 + 描述 + 勾选框」，行间用分隔线）。技能目录有 180+ 条，单列时一次只能看到 10 条左右，滚动成本很高；右侧栏「更多能力」已是 2×2 卡片网格，两处视觉语言也不统一。
 
 **处理**
 

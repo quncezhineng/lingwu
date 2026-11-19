@@ -1300,7 +1300,7 @@ export function ChatScreen({
           (agentWorkspace?.artifacts ?? []).some((artifact) => artifact.id === id),
       );
       if (ids.length) setAttachments(ids);
-      // 技能以 chip 形式带入输入区，与「技能选择」里的选中项合并。
+      // 技能以 chip 形式带入输入区，与「选择技能」里的选中项合并。
       const skillIds = (prompt.skillIds ?? []).filter((id) => id.trim());
       if (skillIds.length)
         setSelectedSkillIds((current) => [...new Set([...current, ...skillIds])]);

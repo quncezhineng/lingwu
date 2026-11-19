@@ -164,9 +164,9 @@ export function ChannelChatScreen({
   /** 灵感浮层：和智能体对话页同一个组件，模板点选后只填进本频道输入框。 */
   const [ideasOpen, setIdeasOpen] = useState(false);
   const [selectedConnectorIds, setSelectedConnectorIds] = useState<string[]>([]);
-  // 频道技能选择（与 Agent 对话的技能选择同组件）：勾选后进入本轮讨论上下文。
+  // 频道选择技能（与 Agent 对话的选择技能同组件）：勾选后进入本轮讨论上下文。
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
-  /** 技能选择弹层里正在查看的技能详情：作为兄弟节点挂载，避免与选择弹层嵌套 Modal。 */
+  /** 选择技能弹层里正在查看的技能详情：作为兄弟节点挂载，避免与选择弹层嵌套 Modal。 */
   const [inspectSkillId, setInspectSkillId] = useState<string | null>(null);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
 
@@ -925,7 +925,7 @@ export function ChannelChatScreen({
               onPress: openFilePicker,
             },
             {
-              // 频道技能：勾选频道共享技能进入本轮讨论，与 Agent 对话的技能选择同组件。
+              // 频道技能：勾选频道共享技能进入本轮讨论，与 Agent 对话的选择技能同组件。
               key: "skills",
               icon: Brain,
               label: t("chat.channelSkillPickerTool"),
