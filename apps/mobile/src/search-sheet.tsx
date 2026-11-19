@@ -112,7 +112,12 @@ function artifactDocument(artifact: AgentArtifact): SearchDocument {
   };
 }
 
-function memoryDocument(memory: { id: string; text: string; source?: string; createdAt: string }): SearchDocument {
+function memoryDocument(memory: {
+  id: string;
+  text: string;
+  source?: string;
+  createdAt: string;
+}): SearchDocument {
   const plainPreview = markdownExcerpt(memory.text, 80);
   return {
     id: memory.id,

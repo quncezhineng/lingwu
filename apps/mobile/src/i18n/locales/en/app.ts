@@ -165,7 +165,7 @@ const app = {
   "app.navGoals": "Scheduled",
   "app.navGoalsShort": "Scheduled",
   "app.navPreferences": "Memory",
-  "app.navApps": "Skills & connections",
+  "app.navApps": "Skills & connectors",
   "app.navAccount": "Account",
   "app.titleToday": "Workbench",
   "app.subtitleToday":
@@ -187,13 +187,13 @@ const app = {
   "app.titleMemories": "Memory",
   "app.subtitleMemories":
     "Keep your goals, risk preferences and focus areas as durable context for LingWu.",
-  "app.titleApps": "Skills & connections",
+  "app.titleApps": "Skills & connectors",
   "app.subtitleApps":
     "Extend how you work with plugins, complete specialist tasks with skills, and bring in external context through connectors.",
   "app.moreHeading": "More",
   "app.destFilesDetail": "Documents, insights and notes",
   "app.destPreferencesDetail": "Goals, risk preferences and focus areas",
-  "app.destAppsDetail": "Manage skills and account-level connections",
+  "app.destAppsDetail": "Manage skills and account-level connectors",
   "app.destGoalsDetail": "Research goals and automations",
   "app.titleAccount": "Account",
   "app.subtitleAccount": "Review your profile, sign-in status and workspace details.",

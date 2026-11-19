@@ -43,6 +43,10 @@ type CreateAgentInput = {
   role: string;
   persona: string;
   avatar: AgentAvatarId;
+  /** 创建时直接预置到该智能体的技能目录 id（如从市场导入内置智能体）。 */
+  installedSkills?: string[];
+  /** 创建时预置的系统指令（如从市场导入内置智能体的完整 system_message）。 */
+  instructions?: string;
 };
 
 type AgentSpaceContextValue = {
@@ -265,12 +269,16 @@ export function AgentSpaceProvider({
 
   const createAgent = useCallback((input: CreateAgentInput) => {
     const agent = createAgentFromTemplate(input.template, input);
+    const preset = input.installedSkills?.length
+      ? { ...agent, installedSkills: [...new Set(input.installedSkills)].slice(0, 60) }
+      : agent;
+    if (input.instructions?.trim()) preset.instructions = input.instructions.trim().slice(0, 4000);
     setState((value) => ({
       ...value,
-      currentAgentId: agent.id,
-      agents: [...value.agents, agent],
+      currentAgentId: preset.id,
+      agents: [...value.agents, preset],
     }));
-    return agent;
+    return preset;
   }, []);
 
   const updateAgent = useCallback((id: string, patch: Partial<AgentDefinition>) => {

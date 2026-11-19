@@ -21,7 +21,11 @@ import {
 import type { MarketDataService } from "../../../packages/integrations/src/market-data.ts";
 import { ActionService } from "./actions.ts";
 import { agentConfigured, makeRuntime } from "./agent.ts";
-import { agentSpaceSchema, type PersistedAgentSpace } from "./agent-space.ts";
+import {
+  agentSpaceSchema,
+  type MarketAgentRecord,
+  type PersistedAgentSpace,
+} from "./agent-space.ts";
 import { createAuth } from "./auth.ts";
 import { BrowserService } from "./browser.ts";
 import { ComputerService, type DockerRunner } from "./computer.ts";
@@ -59,9 +63,70 @@ import { createRateLimitStore, rateLimit } from "./rate-limit.ts";
 import type { SearchService } from "./search.ts";
 import { shareApiRoutes, sharePageRoutes } from "./share-routes.ts";
 import { createShareStore } from "./share-store.ts";
-import { createSupabaseAuth } from "./supabase-auth.ts";
+import { createSupabaseAuth, type SupabaseAuth } from "./supabase-auth.ts";
 import { createSupabaseData } from "./supabase-data.ts";
 import { WorkspaceService } from "./workspace.ts";
+
+/**
+ * 把 agent-space 里「已公开」的智能体同步到跨用户可见的智能体市场。
+ *
+ * - 公开：写入一条市场快照（含发布者昵称，供市场页显示「@昵称」）；
+ * - 撤回公开或删除智能体：同步移除对应快照；
+ * - 内容没有变化时不重复写入，保留首次发布时间。
+ *
+ * 市场记录挂在发布者自己的 owner 下（kind=market-agents），读取端用 `scan`
+ * 跨 owner 拉全量，因此这里不需要任何跨用户写权限。
+ */
+async function syncAgentMarket(
+  db: Store,
+  owner: string,
+  state: PersistedAgentSpace,
+  accounts: SupabaseAuth | undefined,
+) {
+  const published = state.agents.filter((agent) => !agent.system && agent.public === true);
+  const existing = await db.list<MarketAgentRecord>(owner, "market-agents");
+  const existingById = new Map(existing.map((record) => [record.id, record]));
+  const wantedIds = new Set<string>();
+  let ownerName: string | undefined;
+  if (published.length > 0 && accounts) {
+    const profile = await accounts.readProfile(owner);
+    ownerName = profile.displayName;
+  }
+  const now = new Date().toISOString();
+  for (const agent of published) {
+    const id = `${owner}:${agent.id}`;
+    wantedIds.add(id);
+    const previous = existingById.get(id);
+    const next: MarketAgentRecord = {
+      id,
+      owner,
+      ownerName,
+      agentId: agent.id,
+      name: agent.name,
+      role: agent.role,
+      persona: agent.persona,
+      avatar: agent.avatar,
+      skills: [...agent.skills],
+      instructions: agent.instructions,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+    };
+    const unchanged =
+      previous &&
+      previous.ownerName === next.ownerName &&
+      previous.name === next.name &&
+      previous.role === next.role &&
+      previous.persona === next.persona &&
+      previous.avatar === next.avatar &&
+      previous.instructions === next.instructions &&
+      previous.skills.length === next.skills.length &&
+      previous.skills.every((skill, index) => skill === next.skills[index]);
+    if (!unchanged) await db.put(owner, "market-agents", next);
+  }
+  for (const record of existingById.values()) {
+    if (!wantedIds.has(record.id)) await db.remove(owner, "market-agents", record.id);
+  }
+}
 
 export async function createApp(
   db: Store,
@@ -467,9 +532,18 @@ export async function createApp(
     return c.json(state);
   });
   app.put("/api/agent-space", async (c) => {
+    const owner = c.get("owner");
     const state = agentSpaceSchema.parse(await c.req.json());
-    await db.put(c.get("owner"), "agent-settings", { id: "space", ...state });
+    await db.put(owner, "agent-settings", { id: "space", ...state });
+    // 已公开到市场的智能体会随空间一并同步（公开/撤回/改名/删除都走这里）。
+    await syncAgentMarket(db, owner, state, accounts);
     return c.json({ ok: true });
+  });
+  // 智能体市场：任何登录用户都能读到所有人已公开的智能体（跨用户共享）。
+  app.get("/api/market-agents", async (c) => {
+    c.get("owner");
+    const records = await db.scan<MarketAgentRecord>("market-agents");
+    return c.json(records.map(({ value }) => value));
   });
   // ─── 多 Agent 群聊频道（M2）───
   app.get("/api/channels", async (c) => {

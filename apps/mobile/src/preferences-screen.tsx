@@ -17,8 +17,8 @@ import {
 } from "../../../packages/domain/src/agent";
 import { useAgentSpace } from "./agent-space";
 import { useAgentWorkspace } from "./agent-workspace";
-import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { Text } from "./app-text";
+import { assistantMarkdown, isSafeAssistantUrl } from "./assistant-markdown";
 import { useChannels } from "./channels";
 import { activeLocaleTag, type TranslationKey, useTranslation } from "./i18n";
 import {

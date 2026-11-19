@@ -40,12 +40,12 @@ const threads = {
   "threads.emptyActive": "创建一个 Agent 专注新的研究职责，系统默认 Agent 始终可用。",
   "threads.loadMore": "加载更多对话",
   "threads.sideChatFootnote": "每个 Agent 保留独立上下文，并共享用户明确保存的投资偏好。",
-  "threads.workspaceSavedNote": "你的对话保存在当前工作区中，可在「应用」里管理各种连接。",
+  "threads.workspaceSavedNote": "你的对话保存在当前工作区中，可在「应用」里管理各种连接器。",
   "threads.delegateTask": "任务",
   "threads.agentComputer": "智能体电脑",
   "threads.calendar": "日历",
   "threads.files": "资料",
-  "threads.appsAndSettings": "技能与连接",
+  "threads.appsAndSettings": "技能与连接器",
 } satisfies Dictionary;
 
 export default threads;

@@ -175,7 +175,7 @@ const screens = {
   "screens.connectionsNotifyFinish": "在浏览器中完成连接，然后刷新你的工作区。",
   "screens.connectionsNotifyLocalReady": "本地 Google 数据已就绪。",
   "screens.connectionsNotifyDisconnected": "已断开 Google 连接。",
-  "screens.connectionsYourConnections": "你的连接",
+  "screens.connectionsYourConnections": "你的连接器",
   "screens.connectionsConnected": "已连接",
   "screens.connectionsAvailable": "可用连接器",
   "screens.connectionsManage": "管理连接器 {name}",
@@ -209,7 +209,7 @@ const screens = {
   "screens.connectionsModelEmpty":
     "当前部署运行引导式示例工作流，没有可切换的模型。在服务端配置厂商密钥后即可在这里选择。",
   "screens.connectionsModelSwitched": "已切换到 {model}",
-  "screens.connectionsRefresh": "刷新连接",
+  "screens.connectionsRefresh": "刷新连接器",
   "screens.connectionsOpenBotNotice":
     "本项目已经提供了 OpenBot 适配器，但尚未配置可用的 OpenBot 后端。",
   "screens.connectionsOpenBotDetail":

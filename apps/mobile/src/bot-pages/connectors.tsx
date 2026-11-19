@@ -1,9 +1,9 @@
 import { type ReactNode, useState } from "react";
 import { View } from "react-native";
-import { useAppConnectors } from "../app-connectors";
 import { useAgentSpace } from "../agent-space";
+import { useAppConnectors } from "../app-connectors";
 import { Text } from "../app-text";
-import { allConnectorOptions, connectorOptions, type ConnectorOption } from "../capability-picker";
+import { allConnectorOptions, type ConnectorOption, connectorOptions } from "../capability-picker";
 import { CardGrid } from "../card-grid";
 import { ConnectorLibraryPanel, ConnectorRemoveButton } from "../connector-library-panel";
 import { useTranslation } from "../i18n";

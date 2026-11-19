@@ -16,7 +16,6 @@ import {
   channelHistoryPageSize,
   normalizeChannelAvatar,
 } from "../../../packages/domain/src/channel";
-import { appendMemberDelta } from "./channel-live-text";
 import { conversationColumnStyle } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
@@ -37,6 +36,7 @@ import {
   skillDisplayName,
 } from "./capability-picker";
 import { type ChannelChatStream, streamChannelChat } from "./channel-chat-stream";
+import { appendMemberDelta } from "./channel-live-text";
 import { useChannels } from "./channels";
 import { promptWithAttachments } from "./chat-content";
 import { ComposerDock } from "./composer-dock";

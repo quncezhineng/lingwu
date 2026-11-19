@@ -170,13 +170,7 @@ export function ConnectorLibraryPanel({
 }
 
 /** 已挂载连接卡片上的「移除」：只从当前归属摘掉，不影响连接本身与其它归属。 */
-export function ConnectorRemoveButton({
-  name,
-  onRemove,
-}: {
-  name: string;
-  onRemove: () => void;
-}) {
+export function ConnectorRemoveButton({ name, onRemove }: { name: string; onRemove: () => void }) {
   const { t } = useTranslation();
   return (
     <Pressable

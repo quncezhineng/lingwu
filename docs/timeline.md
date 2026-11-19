@@ -5,6 +5,195 @@
 
 ## 变更记录
 
+### 2026-11-20 · 「我的技能」标签下新增计数行（左「全部」右「N 个技能」）
+
+**背景**
+
+用户希望在技能市场的「我的技能」标签下，添加一行与「智能体市场 → 我的智能体」一致的标题计数行：左边显示「全部」，右边显示我的技能数量。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：在 `typeFilter === "skills" && skillTab === "mine"` 的内容区顶部，新增与市场「全部 / N 个智能体」同款的一行：左边 `agent.marketListHeading`（全部），右边 `agent.hubSkillCount`（{count} 个技能），复用 `s.between` 布局与市场计数行同样的字号/颜色样式。
+- 未新增 i18n 键：全部 / 技能计数复用已有 `agent.marketListHeading`、`agent.hubSkillCount`。
+
+**说明**
+
+纯 UI 增补，不影响技能列表、上传/创建、删除等逻辑；空态仍显示原有「我的技能」占位。
+
+### 2026-11-20 · 技能页简介由「投研方法库」改为「技能库」
+
+**背景**
+
+用户觉得「技能」标签页的简介「投研方法库。装到 Agent 后，在对话里按方法做事」把技能局限在了投研领域，实际这里是一个通用技能库，描述应与「技能库」的定位一致。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agent.hubSkillsDetail` 由「投研方法库。装到 Agent 后，在对话里按方法做事」改为「技能库。装到 Agent 后，在对话里按方法做事」。
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步 "Research methods. Install one on an agent…" 改为 "Skill library. Install one on an agent…"。
+- 影响位置：能力中心「技能」快捷卡简介。
+
+**说明**
+
+纯文案调整，不影响技能数据与安装/调用逻辑。
+
+### 2026-11-20 · 智能体市场标题由「市场」改为「智能体市场」
+
+**背景**
+
+用户觉得市场快捷卡/导航标题「市场」过于笼统，与页面内容（发现并导入公开的智能体）不够契合，要求改一个更能体现页面的标题。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agent.marketHeading` 由「市场」改为「智能体市场」。
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步 "Market" 改为 "Agent market"。
+- 影响位置：能力中心市场快捷卡标题与类型标签（均可正常显示 4 字中文）。
+
+**说明**
+
+纯文案调整，不影响数据结构与交互；新标题与市场页内「智能体市场 / 我的智能体」二级标签口径一致。
+
+### 2026-11-20 · 市场「复制」改「导入」：远程公开智能体操作文案统一为导入，导入后提示「导入成功」
+
+**背景**
+
+用户希望市场里其他用户公开的智能体，操作按钮与确认弹窗不再叫「复制」，统一叫「导入」；导入完成后如有提示，直接显示「导入成功」。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agent.marketRemoteImport`（复制→导入）、`marketRemoteImportTitle`（复制智能体→导入智能体）、`marketRemoteImportConfirm`（复制→导入）、`marketRemoteImportHint`（仅复制人设与指令…→仅导入人设与指令…）、`marketImportedToast`（已导入智能体…→导入成功！智能体「{name}」已添加到你的列表）。
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步 "Copy"→"Import"、"Copy agent"→"Import agent"、toast 改为 "Imported successfully! Agent “{name}” has been added to your list."。
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：更新 `MarketImportTarget` 注释中的「导入 / 复制」措辞为「导入」，保持与实际行为一致。
+
+**说明**
+
+纯文案统一，不改变导入逻辑：远程智能体依旧只导入人设与指令、不含技能，导入后切到该智能体并弹出「导入成功」提示。
+
+### 2026-11-20 · 市场智能体详情弹窗：「任务指令与技能连接器」拆分为「指令」「技能」「连接器」三个独立标签
+
+**背景**
+
+用户希望市场详情弹窗左侧的「任务指令与技能连接器」不再是一个混排的大标签，而是拆成三个独立标签放在左侧导航，分别介绍这个公开智能体的指令、技能与连接器信息。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - `MarketDetailTabId` 扩展为 `"persona" | "instructions" | "skills" | "connectors"`。
+  - 左侧导航改为 4 个分区：`职责与人设`、`指令`、`技能`、`连接器`，图标分别为 Target / Terminal / Puzzle / Link2。
+  - 原单一的 `instructionsContent` 拆为三个独立内容块：`instructionsContent`（仅指令 Markdown，含展开/收起）、`skillsContent`（技能列表）、`connectorsContent`（外部连接器说明）；`content` 的 switch 改为按 `skills` / `connectors` / `instructions` 分派。
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：新增 `agent.marketTabInstructions`（指令）、`agent.marketTabSkills`（技能）、`agent.marketTabConnectors`（连接器）。
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步新增 "Instructions" / "Skills" / "Connectors"。
+
+**说明**
+
+纯 UI 拆分，信息与数据逻辑不变：指令、技能、连接器各自独立展示，移动端窄屏下仍为顶部横向标签条。
+
+### 2026-11-20 · 智能体市场卡片详情弹窗改为 Agent 详情同款左右栏布局
+
+**背景**
+
+用户希望智能体市场里点击卡片后的详情弹窗，不再是「整页向下滚的三大段内容」，而要与 Agent 详情页保持同一套阅读结构：左侧是分区导航，右侧只展示当前分区内容，整体更像一个只读版的 Agent 详情。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：重构 `MarketAgentDetailSheet`。
+  - 弹窗宽度由 `medium` 调整为 `wide`，并改为 `scroll={false}`，由内部自管左右栏布局与内容滚动。
+  - 新增 `MarketDetailTabId` 与 `MarketDetailRailItem`，把原先顺序堆叠的 3 个板块改为分区切换：`职责与人设`、`任务指令与技能连接器`、`资料与记忆`。
+  - 桌面端采用与 `AgentSettingsScreen` 一致的「左侧身份卡 + 分区导航 / 右侧标题 + 内容卡」结构；窄宽度下自动退化为顶部横向标签条，保持移动端可用性。
+  - 左栏身份卡保留头像、名称、职责、分类徽标、来源徽标与内置标签；右栏一次只展示一个分区，减少长内容阅读压力。
+  - 保留原有的指令折叠/展开、技能卡片、连接器说明、资料与记忆说明，以及标题栏里的 `导入 / 复制 / 打开详情` 主操作。
+  - [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agent.marketDetailPersona` 由「基本人设与职责」改为「职责与人设」。
+
+**说明**
+
+这次调整是纯 UI / 交互结构改版，不改变市场数据来源、复制逻辑或公开机制；用户看到的信息没少，只是从“长页阅读”改成了“分区阅读”。
+
+### 2026-11-19 · 智能体市场支持跨用户共享（公开的智能体其他用户可见并可复制）
+
+**背景**
+
+用户 A 公开智能体后，用户 B 登录在同一智能体市场里看不到该智能体。根因：原「公开」只是单用户本地标记——移动端 `userMarketEntries()` 只读当前用户自己的 agents（`public === true`）、`setAgentPublic` 只改本地 state、服务端 `PUT /api/agent-space` 按 owner 隔离存储，**服务端没有任何跨用户市场共享接口**。
+
+**方案（用户确认：「可查看并复制成自己的智能体」）**
+
+服务端在保存智能体空间时把公开智能体同步为市场记录，并新增跨用户读取接口；移动端拉取远程公开智能体（过滤掉自己发布的），remote 条目支持「复制」为本地智能体（仅复制人设与指令，不含技能）。
+
+**处理**
+
+- [apps/server/src/agent-space.ts](../apps/server/src/agent-space.ts)：新增 `marketAgentRecordSchema` / `MarketAgentRecord`（id 为 `{owner}:{agentId}`，含发布者昵称 `ownerName`、agentId、name、role、persona、avatar、skills、instructions、createdAt、updatedAt）。
+- [apps/server/src/app.ts](../apps/server/src/app.ts)：
+  - `PUT /api/agent-space` 保存空间后调用新增的 `syncAgentMarket(db, owner, state, accounts)`：把该用户 `public === true` 的非系统智能体同步为 `owner/market-agents` 记录（字段变化才写库，保留 createdAt），并清理已撤回/删除的旧记录；发布者昵称经 `accounts.readProfile(owner)` 的 `displayName` 读取（Supabase 未配置时省略，前端回退通用文案）。
+  - 新增 `GET /api/market-agents`：`db.scan<MarketAgentRecord>("market-agents")` 跨 owner 读取所有公开智能体。
+- [apps/mobile/src/agent-market.ts](../apps/mobile/src/agent-market.ts)：`MarketAgentEntry` 新增 `remote?: boolean`；新增 `RemoteMarketAgent` 接口与 `remoteMarketEntries(records, ownPublicAgentIds, fallbackSource)` 转换函数（过滤掉自己公开的条目，source 显示 `@昵称`）。
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - 新增 `MarketImportTarget`（含 `remote?: boolean`）并改为持有该 state；挂载时请求 `GET /api/market-agents`（失败静默降级）。
+  - 市场「全部」列表组装为 `内置 + 远程公开 + 自己的公开`，「我的」仍只含自己的条目。
+  - 原 `importBuiltinAgent` 重构为 `importAgent(target)` + `toImportTarget(entry)`（内置返回技能与指令，remote 仅返回人设与指令）。
+  - 列表卡片与详情弹窗：remote 条目显示「复制」按钮（`marketRemoteImport`，Download 图标），来源徽标显示 `@昵称`；自己的公开条目才显示 ArrowUpRight 打开图标与「已公开」徽标。
+  - 确认弹窗按 `importingAgent.remote` 区分文案与按钮（复制/导入）。
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：新增 `marketRemoteImport`（复制/Copy）、`marketRemoteImportTitle`（复制智能体/Copy agent）、`marketRemoteImportConfirm`（复制/Copy）、`marketRemoteImportHint`（仅复制人设与指令、不含技能…/Only the persona and instructions are copied…）。
+
+**说明**：远程条目是新拉取的快照，不会自动随发布者更新；用户复制后成为自己的智能体，可继续调整。公开/撤回/改名/删除统一走 `PUT /api/agent-space` 的同步逻辑，无需额外接口。
+
+### 2026-11-19 · 能力中心连接器分类名改为「外部工具」
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts#L556)：`agent.hubCategoryConnections` 由「连接器」改为「外部工具」。
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts#L624)：同步英文 "Connectors" 改为 "External tools"。
+
+**说明**：该键是能力中心搜索/分类标签（连接器分组），用户不希望以「连接器」作为分类名，选用「外部工具」。
+
+### 2026-11-19 · 全局术语统一：名词性「连接」改为「连接器」
+
+**背景**
+
+用户要求全局扫描与「连接器」（connector）相关的术语，「连接」一律改为「连接器」。判定标准以英文键为基准：名词（Connectors/Connections、Search connectors、N connectors、Skills & connections、Manage connections 等）改「连接器」；动词/状态（已连接、未连接、重新连接、断开连接、连接 Google/OpenBot、测试连接、去连接、可连接等）保留「连接」。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：名词术语改为「连接器」——`searchConnectors`、`searchCapabilities`（搜索技能或连接器）、`hubCategoryConnections`、`hubConnectorNoMatchTitle`、`appsHeroEyebrow`（技能与连接器）、`appsHeroDetail`、`appsFilterConnectors`、`marketDetailConnectorBuiltin`（「连接器」里挂载）、`agentSpace` 系列（`connectors`/`connectorsHint`/`connectorsEmpty`/`addConnector`/`connectorCount`/`addConnectorHint`/`addConnectorSearch`/`addConnectorEmpty`/`connectApps`）；顺带修正 `appsFilterPlugins`（原误写为「连接」，英文是 "Plugins"）为「插件」。
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步英文——`searchCapabilities`（Search skills or connectors）、`hubCategoryConnections`、`appsHeroEyebrow`、`appsHeroDetail`、`marketDetailConnectorBuiltin`、`agentSpace` 系列（Connectors/Add connector/{count} connectors/Search connectors/No matching connectors/Skills & connectors）。
+- [apps/mobile/src/i18n/locales/zh-Hans/channels.ts](../apps/mobile/src/i18n/locales/zh-Hans/channels.ts) / [apps/mobile/src/i18n/locales/en/channels.ts](../apps/mobile/src/i18n/locales/en/channels.ts)：`settingsConnectors`、`connectorsHint`、`connectorsEmpty`（含「添加连接器」按钮文案）改为「连接器」/ "Connectors"。
+- [apps/mobile/src/i18n/locales/zh-Hans/app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts) / [apps/mobile/src/i18n/locales/en/app.ts](../apps/mobile/src/i18n/locales/en/app.ts)：`navApps`、`titleApps`（技能与连接器）、`destAppsDetail`（账户级的连接器）改为「连接器」/ "connectors"。
+- [apps/mobile/src/i18n/locales/zh-Hans/screens.ts](../apps/mobile/src/i18n/locales/zh-Hans/screens.ts) / [apps/mobile/src/i18n/locales/en/screens.ts](../apps/mobile/src/i18n/locales/en/screens.ts)：`connectionsYourConnections`（你的连接器）、`connectionsRefresh`（刷新连接器）按要求改写；`connectionsAvailable`/`connectionsNoMatch`/`connectionsGoogleTitle`/`connectionsManage` 原本已是「连接器」，未动。
+- [apps/mobile/src/i18n/locales/zh-Hans/details.ts](../apps/mobile/src/i18n/locales/zh-Hans/details.ts) / [apps/mobile/src/i18n/locales/en/details.ts](../apps/mobile/src/i18n/locales/en/details.ts)：`details.connections` 改为「连接器」/ "Connectors"。
+- [apps/mobile/src/i18n/locales/zh-Hans/threads.ts](../apps/mobile/src/i18n/locales/zh-Hans/threads.ts) / [apps/mobile/src/i18n/locales/en/threads.ts](../apps/mobile/src/i18n/locales/en/threads.ts)：`appsAndSettings`（技能与连接器）、`workspaceSavedNote`（管理各种连接器）改为「连接器」/ "connectors"。
+- [apps/mobile/src/i18n/locales/zh-Hans/chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts) / [apps/mobile/src/i18n/locales/en/chat.ts](../apps/mobile/src/i18n/locales/en/chat.ts)：`connectorPickerManage`（管理连接器）改为「连接器」/ "connectors"。
+
+**保留不动（动词/状态）**：已连接、未连接、重新连接、断开连接、连接服务、连接外部工具与服务、连接 Google/OpenBot/Gmail/日历、去连接、可连接、测试连接、模型连接、正在连接、连接中、重试连接、刷新连接（一键重连场景）等。
+
+### 2026-11-19 · 能力中心搜索框占位文案「搜索连接」改为「搜索连接器」
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts#L548)：`agent.hubSearchConnectors` 由「搜索连接」改为「搜索连接器」（英文键已是 "Search connectors"，无需改动）。
+
+### 2026-11-19 · 能力中心连接计数文案「N 个连接」改为「N 个连接器」
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts#L579)：`agent.hubConnectorCount` 由「{count} 个连接」改为「{count} 个连接器」（英文键已是 "connectors"，无需改动）。
+
+### 2026-11-19 · 能力中心「连接」标题改为「连接器」
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agent.connectorsHeading` 由「连接」/ "Connections" 改为「连接器」/ "Connectors"（该键同时用于快捷卡标题与搜索分组标签，语义一致）。
+
+### 2026-11-19 · 市场页列表标题「市场」改为「全部」
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：新增 `agent.marketListHeading`（「全部」/ "All"）。
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L2059)：市场列表标题改用 `agent.marketListHeading`，与首页快捷卡标题（仍用 `agent.marketHeading`「市场」）解耦。
+
+### 2026-11-19 · 移除能力中心连接页「已连接 N 个」提示
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：删除 `typeFilter === "connectors"` 时渲染的 `agent.hubConnectionsAccount` 提示文案块；`useAppConnectors` hook 仍用于连接库列表（items/refresh），予以保留。
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) 与 [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：删除不再使用的 `agent.hubConnectionsAccount` 翻译键。
+
 ### 2026-11-19 · 市场用户来源标签改为「@昵称」
 
 **处理**

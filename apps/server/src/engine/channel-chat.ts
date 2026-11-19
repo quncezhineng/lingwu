@@ -103,7 +103,12 @@ export function parseLeaderChange(raw: string) {
 
 /** 被圈的人要不要安排组员。只认 ASSIGN，其余都当成自己回答。 */
 export function parseMentionIntent(raw: string): "assign" | "answer" {
-  return raw.trim().toUpperCase().match(/[A-Z]+/)?.[0] === "ASSIGN" ? "assign" : "answer";
+  return raw
+    .trim()
+    .toUpperCase()
+    .match(/[A-Z]+/)?.[0] === "ASSIGN"
+    ? "assign"
+    : "answer";
 }
 
 /** 组长是频道里指定的那一位；没指定，或指定的人已经不在频道里，就用成员列表的第一位。 */
@@ -1278,8 +1283,10 @@ export async function runChannelChat(
     );
     const failed: string[] = [];
     if (!workers.length) failed.push("没有被圈到的成员");
-    const outcomes = await speakTogether(workers, "work", () =>
-      `Assignment from ${leader.name}:\n${planned.text}\n\nUser:\n${input.text}`,
+    const outcomes = await speakTogether(
+      workers,
+      "work",
+      () => `Assignment from ${leader.name}:\n${planned.text}\n\nUser:\n${input.text}`,
     );
     if (signal.aborted) return;
     const notes = outcomes

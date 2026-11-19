@@ -4,7 +4,7 @@ import type { Dictionary } from "../../types";
 const details = {
   // Workspace sheet.
   "details.workspaceSubtitle": "Your personal inverstment research agent.",
-  "details.connections": "Connections",
+  "details.connections": "Connectors",
   "details.settingsTitle": "Settings",
   "details.settingsSubtitle": "Configure your model, workspace and account.",
   "details.settingsModelHeading": "Model",

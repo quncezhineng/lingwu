@@ -60,7 +60,7 @@ const screens = {
   "screens.mailNoMatchTitle": "No matching messages",
   "screens.mailEmptyTitle": "Nothing in your inbox",
   "screens.mailNoMatchDetail": "Try a different name or subject.",
-  "screens.mailEmptyDetail": "Connect Google in Connections to read your mail here.",
+  "screens.mailEmptyDetail": "Connect Google in Connectors to read your mail here.",
 
   // Calendar 日历
   "screens.calendarPrevWeek": "Previous week",
@@ -180,7 +180,7 @@ const screens = {
     "Finish connecting in your browser, then refresh your workspace.",
   "screens.connectionsNotifyLocalReady": "Local Google data is ready.",
   "screens.connectionsNotifyDisconnected": "Google disconnected.",
-  "screens.connectionsYourConnections": "Your connections",
+  "screens.connectionsYourConnections": "Your connectors",
   "screens.connectionsConnected": "Connected",
   "screens.connectionsAvailable": "Available connectors",
   "screens.connectionsManage": "Manage connector {name}",
@@ -214,7 +214,7 @@ const screens = {
   "screens.connectionsModelEmpty":
     "This deployment runs guided sample workflows, so there is no model to switch. Set a provider key on the server to choose one here.",
   "screens.connectionsModelSwitched": "Now using {model}",
-  "screens.connectionsRefresh": "Refresh connections",
+  "screens.connectionsRefresh": "Refresh connectors",
   "screens.connectionsOpenBotNotice":
     "The OpenBot adapter is available in this project. A live OpenBot backend has not been configured.",
   "screens.connectionsOpenBotDetail":

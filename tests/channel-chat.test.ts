@@ -6,10 +6,10 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, type TestContext, test } from "node:test";
+import { appendMemberDelta } from "../apps/mobile/src/channel-live-text.ts";
 import { createApp } from "../apps/server/src/app.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
-import { appendMemberDelta } from "../apps/mobile/src/channel-live-text.ts";
 import {
   channelLeader,
   channelMemberTools,
@@ -607,14 +607,20 @@ test("channel chat replies with one member, keeps history, and a mention selects
   assert.equal(mentionAssign.status, 200);
   const mentionAssignEvents = await readSse(mentionAssign);
   assert.deepEqual(
-    mentionAssignEvents.filter((event) => event.event === "member_start").map((event) => event.data.agentId),
+    mentionAssignEvents
+      .filter((event) => event.event === "member_start")
+      .map((event) => event.data.agentId),
     ["agent-a", "agent-b", "agent-a"],
     "圈了甲且模型返回 ASSIGN 时走四拍",
   );
-  assert.equal(mentionAssignEvents.some((event) => event.event === "leader"), false);
+  assert.equal(
+    mentionAssignEvents.some((event) => event.event === "leader"),
+    false,
+  );
   const mentionAssignPrompts = prompts.slice(beforeMentionAssign);
   assert.ok(mentionAssignPrompts.some((prompt) => prompt.includes("MENTION_TURN")));
-  const mentionAssignOnly = mentionAssignPrompts.find((prompt) => prompt.includes("ASSIGN_ONLY")) ?? "";
+  const mentionAssignOnly =
+    mentionAssignPrompts.find((prompt) => prompt.includes("ASSIGN_ONLY")) ?? "";
   assert.ok(mentionAssignOnly.includes("no tools"));
   const afterMentionAssign = (await (
     await server.app.request("/api/channels", { headers: headers() })
@@ -629,14 +635,22 @@ test("channel chat replies with one member, keeps history, and a mention selects
   assert.equal(mentionAnswer.status, 200);
   const mentionAnswerEvents = await readSse(mentionAnswer);
   assert.deepEqual(
-    mentionAnswerEvents.filter((event) => event.event === "member_start").map((event) => event.data.agentId),
+    mentionAnswerEvents
+      .filter((event) => event.event === "member_start")
+      .map((event) => event.data.agentId),
     ["agent-b"],
     "圈了乙且模型返回 ANSWER 时只有乙说话",
   );
-  assert.equal(mentionAnswerEvents.some((event) => event.event === "leader"), false);
+  assert.equal(
+    mentionAnswerEvents.some((event) => event.event === "leader"),
+    false,
+  );
   const mentionAnswerPrompts = prompts.slice(beforeMentionAnswer);
   assert.ok(mentionAnswerPrompts.some((prompt) => prompt.includes("MENTION_TURN")));
-  assert.equal(mentionAnswerPrompts.some((prompt) => prompt.includes("ASSIGN_ONLY")), false);
+  assert.equal(
+    mentionAnswerPrompts.some((prompt) => prompt.includes("ASSIGN_ONLY")),
+    false,
+  );
   const afterMentionAnswer = (await (
     await server.app.request("/api/channels", { headers: headers() })
   ).json()) as Channel[];
@@ -693,7 +707,9 @@ test("channel chat replies with one member, keeps history, and a mention selects
   assert.equal(parallelChat.status, 200);
   const parallelEvents = await readSse(parallelChat);
   assert.deepEqual(
-    parallelEvents.filter((event) => event.event === "member_start").map((event) => event.data.agentId),
+    parallelEvents
+      .filter((event) => event.event === "member_start")
+      .map((event) => event.data.agentId),
     ["agent-a", "agent-b", "agent-c", "agent-a"],
     "分工说完后两个组员一起开始，汇总仍在最后",
   );

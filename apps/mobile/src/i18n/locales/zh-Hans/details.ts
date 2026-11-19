@@ -4,7 +4,7 @@ import type { Dictionary } from "../../types";
 const details = {
   // 工作区面板。
   "details.workspaceSubtitle": "给每件事都留一点空间。",
-  "details.connections": "连接",
+  "details.connections": "连接器",
   "details.settingsTitle": "设置",
   "details.settingsSubtitle": "调整模型、工作区与账号设置。",
   "details.settingsModelHeading": "模型",

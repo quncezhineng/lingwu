@@ -137,6 +137,33 @@ export const agentSpaceSchema = z
 export type PersistedAgentSpace = z.infer<typeof agentSpaceSchema>;
 
 /**
+ * 智能体市场里的一条公开记录（跨用户共享）。
+ *
+ * 服务端在每次保存 agent-space 时，把 `public === true` 的自建智能体同步
+ * 一份快照到这里；`id` 用 `${owner}:${agentId}` 保证全局唯一，读取端用 `scan`
+ * 跨 owner 拉全量，从而让「A 公开的智能体，B 也能在市场看到」。
+ */
+export const marketAgentRecordSchema = z
+  .object({
+    id: z.string().trim().min(1).max(300),
+    owner: identifier,
+    // 发布者昵称（来自 user_profiles）；读不到时省略，前端回退到通用文案。
+    ownerName: shortText(80).optional(),
+    agentId: identifier,
+    name: z.string().trim().min(1).max(20),
+    role: z.string().trim().min(1).max(30),
+    persona: z.string().trim().min(1).max(1000),
+    avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]),
+    skills: z.array(identifier).max(30),
+    instructions: z.string().max(4000).optional(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+  .strict();
+
+export type MarketAgentRecord = z.infer<typeof marketAgentRecordSchema>;
+
+/**
  * 线程所属 Agent 的专属模型。
  *
  * Agent 的模型选择随 Agent 空间一起保存，所以对话与任务只按 threadId 就能拿到；

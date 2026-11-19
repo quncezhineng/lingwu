@@ -43,12 +43,12 @@ const threads = {
   "threads.sideChatFootnote":
     "Each Agent keeps its own context and shares the investment preferences you explicitly save.",
   "threads.workspaceSavedNote":
-    "Your conversation is saved in this workspace. You can manage connections in Apps.",
+    "Your conversation is saved in this workspace. You can manage connectors in Apps.",
   "threads.delegateTask": "Tasks",
   "threads.agentComputer": "Agent computer",
   "threads.calendar": "Calendar",
   "threads.files": "Materials",
-  "threads.appsAndSettings": "Skills & connections",
+  "threads.appsAndSettings": "Skills & connectors",
 } satisfies Dictionary;
 
 export default threads;
