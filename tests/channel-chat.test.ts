@@ -12,6 +12,7 @@ import {
   channelMemberTools,
   circledMembers,
   parseLeaderChange,
+  parseMentionIntent,
   parseRelevance,
 } from "../apps/server/src/engine/channel-chat.ts";
 import { appointedLeaderId, channelHistoryPage } from "../packages/domain/src/channel.ts";
@@ -48,13 +49,18 @@ async function textModelFixture(t: TestContext) {
       response.write(`data: ${JSON.stringify({ type, ...value })}\n\n`);
     const base = { id: "response-fixture", created_at: 1000, model: "fixture" };
     const leaderChange = body.includes("LEADER_ONLY");
+    const mentionTurn = body.includes("MENTION_TURN");
     const relevance = body.includes("RELEVANCE_ONLY");
     const isJia = body.includes("You are 甲");
     const replyText = leaderChange
       ? body.includes("FORCE_LEAD")
         ? "LEAD"
         : "NO"
-      : relevance
+      : mentionTurn
+        ? body.includes("FORCE_MENTION_ASSIGN")
+          ? "ASSIGN"
+          : "ANSWER"
+        : relevance
       ? body.includes("FORCE_NONE")
         ? "NO"
         : body.includes("FORCE_ASSIGN")
@@ -562,7 +568,54 @@ test("channel chat replies with one member, keeps history, and a mention selects
   assert.deepEqual(
     namedAssignEvents.filter((e) => e.event === "member_start").map((e) => e.data.agentId),
     ["agent-b"],
-    "点名某一个时不走分工",
+    "点名后模型判断自己回答时，不走四拍",
+  );
+  const beforeMentionAssign = prompts.length;
+  const mentionAssign = await server.app.request(`/api/channels/${splitChannel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@甲 FORCE_MENTION_ASSIGN 全面看一下" }),
+  });
+  assert.equal(mentionAssign.status, 200);
+  const mentionAssignEvents = await readSse(mentionAssign);
+  assert.deepEqual(
+    mentionAssignEvents.filter((event) => event.event === "member_start").map((event) => event.data.agentId),
+    ["agent-a", "agent-b", "agent-a"],
+    "圈了甲且模型返回 ASSIGN 时走四拍",
+  );
+  assert.equal(mentionAssignEvents.some((event) => event.event === "leader"), false);
+  const mentionAssignPrompts = prompts.slice(beforeMentionAssign);
+  assert.ok(mentionAssignPrompts.some((prompt) => prompt.includes("MENTION_TURN")));
+  const mentionAssignOnly = mentionAssignPrompts.find((prompt) => prompt.includes("ASSIGN_ONLY")) ?? "";
+  assert.ok(mentionAssignOnly.includes("no tools"));
+  const afterMentionAssign = (await (
+    await server.app.request("/api/channels", { headers: headers() })
+  ).json()) as Channel[];
+  assert.equal(afterMentionAssign.find((item) => item.id === splitChannel.id)?.leaderId, "agent-a");
+  const beforeMentionAnswer = prompts.length;
+  const mentionAnswer = await server.app.request(`/api/channels/${splitChannel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ text: "@乙 只分析黄金" }),
+  });
+  assert.equal(mentionAnswer.status, 200);
+  const mentionAnswerEvents = await readSse(mentionAnswer);
+  assert.deepEqual(
+    mentionAnswerEvents.filter((event) => event.event === "member_start").map((event) => event.data.agentId),
+    ["agent-b"],
+    "圈了乙且模型返回 ANSWER 时只有乙说话",
+  );
+  assert.equal(mentionAnswerEvents.some((event) => event.event === "leader"), false);
+  const mentionAnswerPrompts = prompts.slice(beforeMentionAnswer);
+  assert.ok(mentionAnswerPrompts.some((prompt) => prompt.includes("MENTION_TURN")));
+  assert.equal(mentionAnswerPrompts.some((prompt) => prompt.includes("ASSIGN_ONLY")), false);
+  const afterMentionAnswer = (await (
+    await server.app.request("/api/channels", { headers: headers() })
+  ).json()) as Channel[];
+  assert.equal(
+    afterMentionAnswer.find((item) => item.id === splitChannel.id)?.leaderId,
+    "agent-a",
+    "只让被圈的人分析时，组长不变",
   );
 
   const arranged = await server.app.request("/api/channels", {
@@ -718,6 +771,10 @@ test("channel leader and circled ids stay inside the roster", () => {
   assert.equal(parseLeaderChange("NO"), false);
   assert.equal(parseLeaderChange("@乙 分析一下 PCB板块还能延续吗"), false);
   assert.equal(parseLeaderChange("@乙 你来当组长"), false);
+  assert.equal(parseMentionIntent("ASSIGN"), "assign");
+  assert.equal(parseMentionIntent("ANSWER"), "answer");
+  assert.equal(parseMentionIntent("请安排组员进行一轮详细分析"), "answer");
+  assert.equal(parseMentionIntent("LEAD"), "answer");
   const many = Array.from({ length: 45 }, (_, index) => ({
     id: `m${index}`,
     channelId: "c",

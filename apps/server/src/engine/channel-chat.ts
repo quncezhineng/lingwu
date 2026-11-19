@@ -99,6 +99,11 @@ export function parseLeaderChange(raw: string) {
   return raw.trim().toUpperCase().match(/[A-Z]+/)?.[0] === "LEAD";
 }
 
+/** 被圈的人要不要安排组员。只认 ASSIGN，其余都当成自己回答。 */
+export function parseMentionIntent(raw: string): "assign" | "answer" {
+  return raw.trim().toUpperCase().match(/[A-Z]+/)?.[0] === "ASSIGN" ? "assign" : "answer";
+}
+
 /** 组长是频道里指定的那一位；没指定，或指定的人已经不在频道里，就用成员列表的第一位。 */
 export function channelLeader<T extends { id: string }>(
   members: readonly T[],
@@ -722,10 +727,79 @@ async function judgeLeaderChange(
   return parseLeaderChange(decision);
 }
 
+const MENTION_MARK = "MENTION_TURN";
+
+/** 用户圈了人之后，再问一次：是要安排组员，还是只让被圈的人自己回答。 */
+async function judgeMentionIntent(
+  deps: ChannelChatDeps,
+  owner: string,
+  mentioned: PersistedAgentSpace["agents"][number],
+  text: string,
+  signal: AbortSignal,
+): Promise<"assign" | "answer"> {
+  const model = await deps.models.resolve(
+    owner,
+    await agentModelForThread(deps.db, owner, mentioned.threadId),
+  );
+  let decision = "";
+  const agent = tanstackAgent({
+    model: model.model ?? deps.config.model ?? "openai/unconfigured",
+    connection: model.connection,
+    maxSteps: 1,
+    tools: [],
+    prompt: [
+      MENTION_MARK,
+      `You are ${mentioned.name}. The user mentioned you.`,
+      "Decide whether they want you to organize the other members, or to answer this message yourself.",
+      "Reply with one word: ASSIGN or ANSWER.",
+      "ASSIGN when the work should be split among members and then summarized by you.",
+      "ANSWER when you should answer it yourself.",
+      "Judge the meaning of the message. Do not use a fixed word list.",
+    ].join("\n"),
+  });
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      agent.abortRun();
+      reject(new Error("Channel chat interrupted"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    agent
+      .run({
+        threadId: `mention:${randomUUID()}`,
+        runId: randomUUID(),
+        messages: [{ id: randomUUID(), role: "user", content: text }],
+        state: {},
+        tools: [],
+        context: [],
+        forwardedProps: {},
+      })
+      .subscribe({
+        next: (event) => {
+          if (
+            (event.type === EventType.TEXT_MESSAGE_CHUNK ||
+              event.type === EventType.TEXT_MESSAGE_CONTENT) &&
+            "delta" in event &&
+            typeof event.delta === "string"
+          )
+            decision += event.delta;
+        },
+        error: (error) => {
+          signal.removeEventListener("abort", onAbort);
+          reject(error);
+        },
+        complete: () => {
+          signal.removeEventListener("abort", onAbort);
+          resolve();
+        },
+      });
+  });
+  return parseMentionIntent(decision);
+}
+
 /**
- * 跑一轮频道群聊。点了名就只让被点到的人说。
- * 没点名时，每个成员先由模型判断是否与自己有关，有关才答复。
- * 组长要不要安排、成员要不要 @ 回、要不要总结，都由模型在回复里决定。
+ * 跑一轮频道群聊。点了名就先让被点到的人开口。
+ * 开口前再问一次模型：是安排组员，还是自己回答。没点名时，每个成员先判断是否与自己有关。
+ * 换组长是另一次判断，和要不要安排分开。
  *
  * 后续成员能看到前面成员已完成的回复（接话讨论）。每个成员用自己 threadId 的模型、
  * 技能、频道 + 自身记忆作用域。附件文本直接注入上下文；连接器的真实调用通过 use_connection。
@@ -803,7 +877,25 @@ export async function runChannelChat(
   }
   let assignRound = false;
   let speakers = named;
-  if (!named.length) {
+  let roundArranger = channelLeader(members, channel.leaderId);
+  if (named.length) {
+    const mentioned = named[0];
+    let intent: "assign" | "answer" = "answer";
+    if (mentioned) {
+      try {
+        intent = await judgeMentionIntent(deps, owner, mentioned, input.text, signal);
+      } catch (error) {
+        if (signal.aborted) return;
+        throw error;
+      }
+    }
+    if (signal.aborted) return;
+    if (intent === "assign" && mentioned) {
+      assignRound = true;
+      roundArranger = mentioned;
+      speakers = [];
+    } else speakers = named;
+  } else {
     const leader = channelLeader(members, channel.leaderId);
     const answers: PersistedAgentSpace["agents"] = [];
     try {
@@ -970,7 +1062,7 @@ export async function runChannelChat(
       ]
         .filter(Boolean)
         .join("\n\n");
-      const lead = channelLeader(members, channel.leaderId);
+      const lead = roundArranger ?? channelLeader(members, channel.leaderId);
       const prompt =
         mode === "assign"
           ? assignmentPrompt(member, members)
@@ -1132,7 +1224,7 @@ export async function runChannelChat(
         }
       }
       if (text.trim() && mode === "work") {
-        const leader = channelLeader(members, channel.leaderId);
+        const leader = roundArranger ?? channelLeader(members, channel.leaderId);
         if (leader && !mentionedMemberIds([leader], text).length) {
           const extra = `\n@${leader.name} 这一份做完了。`;
           text += extra;
@@ -1156,7 +1248,7 @@ export async function runChannelChat(
   };
 
   if (assignRound) {
-    const leader = channelLeader(members, channel.leaderId);
+    const leader = roundArranger ?? channelLeader(members, channel.leaderId);
     if (!leader) {
       emit({ type: "error", message: "This channel has no members." });
       return;
