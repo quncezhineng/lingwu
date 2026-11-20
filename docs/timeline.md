@@ -5,6 +5,21 @@
 
 ## 变更记录
 
+### 2026-11-20 · 顶部 Agent 胶囊可切换右侧栏开关（桌面三栏模式）
+
+**背景**
+
+用户反馈点击顶部 Agent 身份胶囊（`agent-management-capsule`）后只能展开右侧栏，希望再次点击能收起右侧栏，形成开/关切换。
+
+**处理**
+
+- [apps/mobile/src/agent-product.tsx](../apps/mobile/src/agent-product.tsx)：两处 `AgentHeader.onIdentity` 在桌面三栏模式下由 `expandRail()`（只展开）改为 `toggleRail()`（展开 / 收起切换），窄屏仍走 `setSidePage(true)` 打开整页侧栏。
+- `expandRail` 仍保留给「右侧栏收起时的头像入口」（`agent-rail-expand-avatar`）使用，保持其只展开的语义不变。
+
+**说明**
+
+桌面下点击顶部胶囊可在「展开右侧栏 ↔ 收起右侧栏」间切换；收起状态会持久化到本地存储。
+
 ### 2026-11-20 · 「我的技能」标签下新增计数行（左「全部」右「N 个技能」）
 
 **背景**
@@ -5360,3 +5375,155 @@ Render Blueprint 部署时若 `TOKEN_ENCRYPTION_KEY` 使用 `generateValue: true
 
 1. 停止后端后备份损坏目录：`mv .lingwu/postgres .lingwu/postgres.corrupt-$(date +%Y%m%d)`。
 2. 重新 `pnpm dev`，服务自动重建全新数据库，业务数据存于 Supabase，不受影响。
+
+### 2026-11-20 · 智能体首页「技能与连接器」入口文案调整为「能力与市场」
+
+**背景**
+
+智能体首页顶部的入口按钮文案为「技能与连接器」，点击后进入的能力中心实际包含 技能 / 连接器 / 智能体市场 三块内容，原名称未体现「智能体市场」，与页面实际内容不契合。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agentSpace.connectApps` 由「技能与连接器」/ "Skills & connectors" 改为「能力与市场」/ "Capabilities & market"（首页入口按钮文案）。
+- [apps/mobile/src/i18n/locales/zh-Hans/app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts) / [apps/mobile/src/i18n/locales/en/app.ts](../apps/mobile/src/i18n/locales/en/app.ts)：`app.titleApps` 同步改为「能力与市场」/ "Capabilities & market"（进入后能力中心页面的标题）。
+- [apps/mobile/src/i18n/locales/zh-Hans/app.ts](../apps/mobile/src/i18n/locales/zh-Hans/app.ts) / [apps/mobile/src/i18n/locales/en/app.ts](../apps/mobile/src/i18n/locales/en/app.ts)：`app.navApps` 由「技能与连接器」/ "Skills & connectors" 改为「能力与市场」/ "Capabilities & market"（桌面/侧栏 `skills-connections-entry` 入口按钮，见 [agent-product.tsx](../apps/mobile/src/agent-product.tsx)）。
+
+**未改动（如需统一可后续处理）**
+
+- `threads.appsAndSettings`、`details.settingsAppsDetail`、`agent.appsHeroEyebrow` 仍为「技能与连接器」，本次未在修改范围内。
+
+### 2026-11-20 · 能力中心「技能」快捷卡简介改为强调金融技能库
+
+**背景**
+
+能力中心「技能」快捷卡简介原为「技能库，装到 Agent 后，在对话里按方法做事」，用户认为「在对话里按方法做事」表述含糊、体验不佳，要求改为强调「金融技能库」。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agent.hubSkillsDetail` 由「技能库，装到 Agent 后，在对话里按方法做事」/ "Skill library, install one on an agent and it can follow it in chat" 改为「金融技能库，装到 Agent 后即可在对话中调用。」/ "Finance skill library — install on an agent and use it in chat"。
+
+**注意事项**
+
+- 与本文件早前「技能标签页简介去投研化」（由「投研方法库」改为「技能库」）的记录方向相反，本次按用户最新要求强调金融定位；如后续仍需回到通用技能库定位，请一并回退此处。
+
+### 2026-11-20 · 智能体市场内置来源标签去掉「官方」
+
+**背景**
+
+智能体市场卡片上的内置智能体来源标签为「@灵悟 · 官方」，用户要求去掉「官方」两字及中间分隔符「·」，只保留账号标识。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agent.marketSourceBuiltin` 由「@灵悟 · 官方」/ "@LingWu · Official" 改为「@灵悟」/ "@LingWu"。该文案同时用于市场列表来源标签与详情弹窗来源（见 [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)）。
+
+**注意事项**
+
+- 去掉「官方」后，内置来源与用户自公开来源（`agent.marketSourceUser`「@用户公开」/ 用户昵称 `@昵称`）在形态上趋于一致，仅靠名称区分归属，如需保留「官方」语义可在其余位置补充说明。
+
+### 2026-11-20 · 官方灵悟内置卡片作者名前增加绿色认证标
+
+**背景**
+
+「能力与市场」的技能 / 连接器卡片与「智能体市场」的智能体卡片，对官方灵悟内置能力缺少统一标识。需求：凡来源为官方灵悟的卡片，作者名前加一个绿色认证标（绿标），与用户公开来源区分。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - 新增 `OfficialMark` 组件——官方认证绿标，形态为绿色描边盾牌勾（复用 `ShieldCheck` 图标，`size=13`、`strokeWidth=2`、`color=colors.success`）。
+  - `CapabilityCard`（技能 / 连接器卡片）：来源标签等于官方标签 `agent.hubSourceLingwu` 时，在作者名前渲染 `OfficialMark`。
+  - `MarketAgentCard`（智能体市场卡片）：`entry.builtin` 为真（官方内置智能体）时，在作者名前渲染 `OfficialMark`。
+  - 作者行由单个 `Text` 改为「绿标 + `Text`」的水平容器，超长仍单行省略。
+- 复用现有图标 `ShieldCheck`（`./icons`）与主题色 `colors.success`，未新增图标资源或 i18n key。
+
+**注意事项**
+
+- 「能力与市场」的技能来源（`agent.hubSourceLingwu`）与工作区来源（`agent.hubSourceWorkspace`）当前文案同为「@灵悟」，因此判定采用与官方标签文案比对；若后续把工作区来源改成其他名称（如「@工作区」），该处将自动不再打绿标。
+- 详情弹窗（智能体详情来源 `DetailPill`、技能详情来源）未加绿标，保持原有展示；如需一并统一可后续处理。
+- 验证：`apps/mobile` 的 `tsc --noEmit` 通过；`pnpm test` 有 2 个失败（`mobile-bots` 预览文本、`computer-e2b-desktop`），与本次改动无关，为既有偶发失败。
+
+### 2026-11-20 · 智能体详情弹窗来源盾牌标改为绿色（官方来源）
+
+**背景**
+
+承接上一条绿标记录：智能体详情弹窗的来源徽标（`DetailPill`）中，盾牌图标原本为灰色（`colors.muted`），即使是官方来源也看不出认证语义。用户要求：盾牌代表官方，故官方来源时应显示为绿色，与卡片作者名前的绿标一致。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - `DetailPill` 新增可选属性 `official`（默认 `false`）：为真时图标颜色取 `colors.success`，否则沿用原逻辑（`primary` 取 `colors.primaryStrong`，普通取 `colors.muted`）；抽出 `tint` 变量复用，文字颜色逻辑不变。
+  - 智能体详情来源徽标调用处改为 `<DetailPill icon={ShieldCheck} label={sourceLabel} official={entry.builtin} />`，即官方内置智能体（`entry.builtin`）时盾牌转绿，远程 / 公开来源仍为灰色。
+
+**注意事项**
+
+- 本次只改图标颜色，弹窗来源文字（`@灵悟`）与外框描边保持灰色；如希望整枚徽标（文字 + 描边）都转为绿色认证样式，可后续调整。
+- 技能详情来源未使用 `DetailPill`，未受影响。
+- 验证：`apps/mobile` 的 `tsc --noEmit` 通过。
+
+### 2026-11-20 · 智能体详情弹窗去掉分类标签徽标
+
+**背景**
+
+智能体详情弹窗来源徽标上方原有一枚分类徽标（主色描边 + `Target` 图标 + 分类名，如「市场分析」）。用户认为该分类标签不需要展示，要求移除。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - 移除弹窗内的分类 `DetailPill`（`icon={Target} label={t(categoryOption.labelKey)}`）及其条件判断，仅保留来源徽标。
+  - 随之删除仅供该处使用的 `categoryOption` 局部变量。
+  - `DetailPill` 的 `primary` 属性失去调用方，一并删除（描边固定 `colors.line`、文字固定 `colors.muted`，`official` 时图标取 `colors.success`），组件注释同步收敛为「官方来源徽标」。
+
+**注意事项**
+
+- 分类信息在市场列表的筛选 / 分类切换处仍然保留，仅详情弹窗不再重复展示。
+- `MARKET_CATEGORY_OPTIONS` 与 `Target` 图标仍被列表筛选项与详情页签使用，未做调整。
+- 验证：`apps/mobile` 的 `tsc --noEmit` 通过。
+
+### 2026-11-20 · 删除 Agent 说明文案澄清「不删除本地技能」
+
+**背景**
+
+删除 Agent 确认弹窗的说明文案为「将移除这个 Agent 的入口与本地技能。系统默认 Agent 不可删除。」，与实际行为不符——删除 Agent 只会移除入口，不会删除本地技能。用户要求更正。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts) / [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：`agentSpace.deleteAgentNote` 由「将移除这个 Agent 的入口与本地技能。系统默认 Agent 不可删除。」/ "Removes this Agent entry and local skills. The system default Agent cannot be deleted." 改为「将移除这个 Agent 的入口，本地技能不会被删除。系统默认 Agent 不可删除。」/ "Removes this Agent entry; local skills are kept. The system default Agent cannot be deleted."。
+- 该文案共用于三处删除确认弹窗（[mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)、[agent-product.tsx](../apps/mobile/src/agent-product.tsx)、[bot-pages/edit.tsx](../apps/mobile/src/bot-pages/edit.tsx)），一处修改即全部生效。
+
+**注意事项**
+
+- 相邻文案 `agentSpace.chooseAgentDetail`「每个 Agent 保留自己的消息、草稿与技能。」用于选择 Agent，语义为「各自独立」，与本次「删除不影响本地技能」不冲突，未改动。
+- 验证：`apps/mobile` 的 `tsc --noEmit` 通过。
+
+### 2026-11-20 · 智能体市场详情弹窗去掉标题下副标题（角色 · 来源）
+
+**背景**
+
+智能体市场详情弹窗标题下方原有副标题「{角色} · {来源}」（如「基本面分析 · @灵悟」），与标题区的来源信息重复。用户要求直接删除该元素。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：市场详情 `Sheet` 移除 `subtitle={\`${entry.role} · ${entry.source}\`}`，标题区只保留智能体名称与右上主操作按钮。
+
+**注意事项**
+
+- 角色（`entry.role`）在列表卡片与详情左侧信息栏仍会展示，仅弹窗标题下方不再重复。
+- 验证：`apps/mobile` 的 `tsc --noEmit` 通过。
+
+### 2026-11-20 · 智能体市场详情弹窗左侧去掉作者（来源）徽标
+
+**背景**
+
+智能体市场详情弹窗左侧信息卡中，智能体名称 / 角色下方原有「盾牌 + @灵悟」的来源徽标。用户认为该元素无需展示，要求删除。上一轮已先行删除同区域的分类徽标，本次删除后该整行容器已无内容。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - 删除左侧信息栏中的来源徽标行（含其外层 `flexDirection: "row"` 容器），该卡片现只保留头像、名称与角色。
+  - 删除仅供该徽标使用的局部变量 `sourceLabel`。
+  - 删除已无调用方的 `DetailPill` 组件（上一轮已去掉其 `primary` 属性，本次来源徽标移除后组件整体成为死代码）。
+
+**注意事项**
+
+- 市场卡片（列表）作者名前方的绿色盾牌标（`OfficialMark`）保持不变，`ShieldCheck` 图标与官方判定逻辑仍在使用。
+- 相关 i18n key（`agent.marketSourceBuiltin`、`agent.marketPublicBadge`、`agent.hubSourceLingwu`）仍被列表卡片与数据构造使用，未删除。
+- 验证：`apps/mobile` 的 `tsc --noEmit` 通过。

@@ -148,7 +148,7 @@ const app = {
   "app.navGoals": "定时",
   "app.navGoalsShort": "定时",
   "app.navPreferences": "记忆",
-  "app.navApps": "技能与连接器",
+  "app.navApps": "能力与市场",
   "app.navAccount": "我的",
   "app.titleToday": "工作台",
   "app.subtitleToday": "从一个问题出发，跟踪关注标的，把研究过程与结果放在一起。",
@@ -166,7 +166,7 @@ const app = {
   "app.subtitleGoals": "管理研究目标与自动化，让灵悟持续跟进关键变化。",
   "app.titleMemories": "记忆",
   "app.subtitleMemories": "把目标、风险偏好与关注领域整理成灵悟长期可用的上下文。",
-  "app.titleApps": "技能与连接器",
+  "app.titleApps": "能力与市场",
   "app.subtitleApps":
     "用插件扩展工作方式，用技能完成专业任务，用连接器接入外部数据，组合成适合你的投研能力。",
   "app.moreHeading": "更多入口",

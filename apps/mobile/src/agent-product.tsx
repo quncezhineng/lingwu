@@ -2429,7 +2429,7 @@ export function AgentProductShell({
       <AgentHeader
         onMenu={() => setDrawer("agents")}
         onBack={phone ? requestPop : undefined}
-        onIdentity={() => (threeColumns ? expandRail() : setSidePage(true))}
+        onIdentity={() => (threeColumns ? toggleRail() : setSidePage(true))}
         persistentNavigation={threeColumns}
         railCollapsed={threeColumns && railCollapsed}
         onExpandRail={expandRail}
@@ -2551,7 +2551,7 @@ export function AgentProductShell({
               <>
                 <AgentHeader
                   onMenu={() => setDrawer("agents")}
-                  onIdentity={() => (threeColumns ? expandRail() : setSidePage(true))}
+                  onIdentity={() => (threeColumns ? toggleRail() : setSidePage(true))}
                   persistentNavigation={threeColumns}
                   railCollapsed={threeColumns && railCollapsed}
                   onExpandRail={expandRail}

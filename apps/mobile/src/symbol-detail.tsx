@@ -761,6 +761,33 @@ export function SymbolDetailSheet({
       noNews: t("research.noNews"),
       noPeers: t("research.noPeers"),
       noValuation: t("research.noValuation"),
+      toc: t("research.reportToc"),
+      print: t("research.reportPrint"),
+      copyMarkdown: t("research.reportCopy"),
+      copied: t("research.reportCopied"),
+      theme: t("research.reportTheme"),
+      summary: t("research.summary"),
+      assumptions: t("research.assumptions"),
+      caveat: t("research.reportCaveat"),
+      position: t("research.position"),
+      peerName: t("research.reportPeerName"),
+      symbolColumn: t("research.reportSymbol"),
+      fieldColumn: t("research.reportField"),
+      valueColumn: t("research.reportValue"),
+      colophon: t("research.reportColophon"),
+      summaryInRange: t("research.summaryInRange"),
+      summaryAboveHigh: t("research.summaryAboveHigh"),
+      summaryBelowLow: t("research.summaryBelowLow"),
+      summaryNoPrice: t("research.summaryNoPrice"),
+      summaryCoverage: t("research.summaryCoverage"),
+      summaryRisks: t("research.summaryRisks"),
+      coverageNews: t("research.coverageNews"),
+      coveragePeers: t("research.coveragePeers"),
+      coverageMissing: t("research.coverageMissing"),
+      // 财务字段沿用标的详情页的同一套本地化标题，避免报告与 App 里叫法不一致。
+      financialLabels: Object.fromEntries(
+        Object.entries(FIN_KEYS).map(([key, translationKey]) => [key, t(translationKey)]),
+      ),
     };
   }
 

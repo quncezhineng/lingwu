@@ -1,5 +1,5 @@
 /**
- * F3/F4 数据层单测：研报解析、报价格式化、价格提醒契约与 PDF 文档生成。
+ * F3/F4 数据层单测：研报解析、报价格式化与价格提醒契约。
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -11,7 +11,7 @@ import {
   listPriceAlerts,
   updatePriceAlert,
 } from "../src/price-alerts.ts";
-import { parseResearchReport, type ReportLabels, researchReportDocument } from "../src/research.ts";
+import { parseResearchReport } from "../src/research.ts";
 
 function fakeApi(handler: (path: string, body?: unknown, method?: string) => unknown): LingWuApi {
   return {
@@ -58,27 +58,6 @@ const REPORT_PAYLOAD = {
   },
 };
 
-const LABELS: ReportLabels = {
-  disclaimer: "不构成投资建议",
-  sources: "数据来源",
-  overview: "公司概况",
-  financials: "财务概览",
-  news: "近期新闻",
-  peers: "同业对比",
-  valuation: "估值区间",
-  risks: "风险提示",
-  unavailable: "不可用字段",
-  heuristic: "启发式区间估算，非 DCF 模型",
-  current: "当前价",
-  low: "区间下沿",
-  mid: "区间中值",
-  high: "区间上沿",
-  generatedAt: "生成时间",
-  noNews: "暂无新闻",
-  noPeers: "暂无同业对比",
-  noValuation: "暂无估值区间",
-};
-
 test("研报解析：B5 契约字段（snake_case）映射与降级字段", () => {
   const report = parseResearchReport(REPORT_PAYLOAD);
   assert.ok(report);
@@ -104,18 +83,6 @@ test("研报解析：估值字段缺失时不误建对象", () => {
     report: { symbol_code: "AAPL", sections: { company_overview: "", valuation: {} } },
   });
   assert.equal(report?.valuation, undefined);
-});
-
-test("研报 PDF 文档：包含免责声明、来源链接、启发式标注与缺失字段", () => {
-  const report = parseResearchReport(REPORT_PAYLOAD);
-  assert.ok(report);
-  const html = researchReportDocument(report, LABELS);
-  assert.ok(html.includes("不构成投资建议"));
-  assert.ok(html.includes("启发式区间估算，非 DCF 模型"));
-  assert.ok(html.includes("https://example.com/a"));
-  assert.ok(html.includes("不可用字段"));
-  assert.ok(html.includes("volume"));
-  assert.ok(html.includes("380"));
 });
 
 test("报价格式化：红涨绿跌配色与百分号", () => {

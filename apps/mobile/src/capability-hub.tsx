@@ -378,8 +378,19 @@ function ShortcutCard({
   );
 }
 
+/**
+ * 官方灵悟内置能力的绿色认证标：作者名前的绿色盾牌勾。
+ * 用于「能力与市场」里来源为灵悟官方的技能 / 连接器卡片，
+ * 以及「智能体市场」里内置（官方）智能体卡片。
+ */
+function OfficialMark() {
+  return <ShieldCheck size={13} strokeWidth={2} color={colors.success} />;
+}
+
 function CapabilityCard({ item }: { item: CatalogItem }) {
   const { t } = useTranslation();
+  /** 来源标签等于官方灵悟标签时，视为官方内置能力，作者名前打绿标。 */
+  const isOfficial = item.source === t("agent.hubSourceLingwu");
   /** 连接器卡片右下角展示真实连接状态，未接通时不暗示「可用」。 */
   // 已连接用品牌蓝（浅蓝底 + 深蓝字），未连接沿用中性灰。
   const connectorStatus =
@@ -478,19 +489,30 @@ function CapabilityCard({ item }: { item: CatalogItem }) {
             },
           ]}
         >
-          <Text
-            numberOfLines={1}
+          <View
             style={{
               flex: 1,
               minWidth: 0,
-              color: colors.faint,
-              fontSize: 11,
-              lineHeight: 16,
-              fontFamily: fonts.sans,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
             }}
           >
-            {item.source}
-          </Text>
+            {isOfficial ? <OfficialMark /> : null}
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                color: colors.faint,
+                fontSize: 11,
+                lineHeight: 16,
+                fontFamily: fonts.sans,
+              }}
+            >
+              {item.source}
+            </Text>
+          </View>
           {connectorStatus && (
             <StatusBadge
               tone={connectorStatus.tone}
@@ -559,38 +581,6 @@ function DetailField({ label, children }: { label: string; children: ReactNode }
 /** 字段正文：统一 15/24，行距比原先的 21 更松，长段落更好读。 */
 function DetailValue({ children }: { children: ReactNode }) {
   return <Text style={[s.text, { color: colors.text }]}>{children}</Text>;
-}
-
-/** 身份徽标：把「分类 / 官方来源」从正文里抽出来，作为弹窗的视觉锚点。 */
-function DetailPill({
-  icon: Icon,
-  label,
-  primary = false,
-}: {
-  icon: IconComponent;
-  label: string;
-  primary?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: space.xxs,
-        paddingHorizontal: space.xs,
-        paddingVertical: space.hairline,
-        borderRadius: radius.small,
-        borderWidth: 1,
-        borderColor: primary ? colors.accentLine : colors.line,
-        backgroundColor: colors.paper,
-      }}
-    >
-      <Icon size={12} strokeWidth={1.8} color={primary ? colors.primaryStrong : colors.muted} />
-      <Text style={[typography.caption, { color: primary ? colors.primaryStrong : colors.muted }]}>
-        {label}
-      </Text>
-    </View>
-  );
 }
 
 /** 说明性备注：图标 + 一段灰字，统一浅底，避免和正文抢层级。 */
@@ -703,7 +693,6 @@ function MarketAgentDetailSheet({
           detail: locale === "zh-Hans" ? item.descriptionZh : item.descriptionEn,
         }))
     : [];
-  const categoryOption = MARKET_CATEGORY_OPTIONS.find((option) => option.id === entry.category);
   // 用户公开智能体的 detail 直接取 persona，会与「人设描述」重复，此时省掉「核心职责」一栏。
   const showResponsibility = entry.builtin || entry.detail !== entry.persona;
   // 用户公开智能体的 tags 是内部能力键（无展示名），不展示，避免露出裸 id。
@@ -732,11 +721,6 @@ function MarketAgentDetailSheet({
     { id: "connectors", icon: Link2, title: t("agent.marketTabConnectors") },
   ];
   const active = tabs.find((item) => item.id === tab) ?? tabs[0];
-  const sourceLabel = entry.builtin
-    ? t("agent.marketSourceBuiltin")
-    : entry.remote
-      ? entry.source
-      : t("agent.marketPublicBadge");
   const personaContent = (
     <View
       style={{
@@ -901,7 +885,6 @@ function MarketAgentDetailSheet({
   return (
     <Sheet
       title={entry.name}
-      subtitle={`${entry.role} · ${entry.source}`}
       onClose={onClose}
       wide
       scroll={false}
@@ -986,19 +969,7 @@ function MarketAgentDetailSheet({
                     <Text numberOfLines={1} style={[s.text, { fontSize: 13, fontWeight: "600" }]}>
                       {entry.name}
                     </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={[s.small, { fontSize: 11, color: colors.faint }]}
-                    >
-                      {entry.role}
-                    </Text>
                   </View>
-                </View>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xxs }}>
-                  {categoryOption ? (
-                    <DetailPill icon={Target} label={t(categoryOption.labelKey)} primary />
-                  ) : null}
-                  <DetailPill icon={ShieldCheck} label={sourceLabel} />
                 </View>
                 {showTags ? (
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xxs }}>
@@ -1106,17 +1077,6 @@ function MarketAgentCard({
             >
               {entry.name}
             </Text>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: colors.faint,
-                fontSize: 11,
-                lineHeight: 16,
-                fontFamily: fonts.sans,
-              }}
-            >
-              {entry.role}
-            </Text>
           </View>
           {!entry.builtin && !entry.remote && (
             <ArrowUpRight size={14} strokeWidth={1.7} color={colors.disabled} />
@@ -1148,19 +1108,30 @@ function MarketAgentCard({
             },
           ]}
         >
-          <Text
-            numberOfLines={1}
+          <View
             style={{
               flex: 1,
               minWidth: 0,
-              color: colors.faint,
-              fontSize: 11,
-              lineHeight: 16,
-              fontFamily: fonts.sans,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
             }}
           >
-            {entry.source}
-          </Text>
+            {entry.builtin ? <OfficialMark /> : null}
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                color: colors.faint,
+                fontSize: 11,
+                lineHeight: 16,
+                fontFamily: fonts.sans,
+              }}
+            >
+              {entry.source}
+            </Text>
+          </View>
           {entry.builtin || entry.remote ? (
             onImport ? (
               <Pressable
