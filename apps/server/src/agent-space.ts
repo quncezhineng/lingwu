@@ -66,7 +66,9 @@ const agentSchema = z
     // 从「技能与连接库」分配给该智能体的连接 id。连接本身仍是账户级资产。
     // 旧客户端不带该字段；agentSchema 是 .strict()，缺了它新版客户端的整次 PUT 会被 422 拒绝。
     installedConnectors: z.array(identifier).max(20).optional(),
-    customSkills: z.array(skillSchema).max(30),
+    // 从市场导入的自建技能快照（≤60，与市场记录 customSkills 的上限一致）；
+    // 导入后才能与发布方保持完整一致的技能配置。
+    customSkills: z.array(skillSchema).max(60),
   })
   .strict();
 
@@ -154,7 +156,17 @@ export const marketAgentRecordSchema = z
     role: z.string().trim().min(1).max(30),
     persona: z.string().trim().min(1).max(1000),
     avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]),
-    skills: z.array(identifier).max(30),
+    // 模板预置的内部能力键，不再写入新公开快照（技能由 installedSkills/customSkills 承载）；
+    // 字段保留为可选，用于兼容历史公开记录。
+    skills: z.array(identifier).max(30).optional(),
+    // 公开时同步的技能目录技能 id（skillCatalog 里的 id）。导入方能按 id 在本地
+    // 技能目录中解析出标题与简介；跨用户时技能本身仍是项目方目录，无需复制内容。
+    installedSkills: z.array(identifier).max(60).optional(),
+    // 公开时同步的自建技能完整快照（skillRefs 解析自账户级技能库 + 残留副本）。
+    // 自建技能是账户级资产，导入方拿不到发布方的技能库，必须复制元数据才能展示。
+    customSkills: z.array(skillSchema).max(60).optional(),
+    // 公开时同步的连接器引用 id（账户级资产，导入方拿到的是 id 引用而非连接本体）。
+    connectors: z.array(identifier).max(20).optional(),
     instructions: z.string().max(4000).optional(),
     createdAt: timestamp,
     updatedAt: timestamp,

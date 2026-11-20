@@ -11,10 +11,12 @@ import {
   BUILTIN_MARKET_AGENTS,
   builtinMarketEntries,
   type MarketAgentCategory,
+  type RemoteMarketAgent,
+  remoteMarketEntries,
   userMarketEntries,
 } from "../src/agent-market.ts";
 import { BUILTIN_AGENT_INSTRUCTIONS } from "../src/agent-market-instructions.ts";
-import type { AgentDefinition } from "../src/agent-space-model.ts";
+import type { AgentDefinition, AgentSkill } from "../src/agent-space-model.ts";
 import { skillCatalog } from "../src/skill-catalog.ts";
 
 /** 服务端 `agentSchema` 的字段上限，超限会让 PUT 被 422 拒绝。 */
@@ -102,6 +104,9 @@ test("builtinMarketEntries：统一成卡片形态且字段透传", () => {
     assert.equal(entry.detail, source.detail);
     assert.equal(entry.category, source.category);
     assert.deepEqual(entry.skills, [...source.skills]);
+    // 内置条目的技能本身就是技能目录 id，导入时作为 installedSkills 预置。
+    assert.deepEqual(entry.installedSkills, [...source.skills]);
+    assert.deepEqual(entry.customSkills, []);
     assert.equal(entry.instructions, source.instructions);
     assert.equal(entry.source, "@灵悟 · 官方");
   }
@@ -130,6 +135,21 @@ function fakeAgent(patch: Partial<AgentDefinition> & { id: string }): AgentDefin
   };
 }
 
+/** 造一个最小的自建技能（AgentSkill 的必填字段）。 */
+function fakeSkill(patch: Partial<AgentSkill> & { id: string }): AgentSkill {
+  return {
+    name: patch.name ?? "自建技能",
+    purpose: patch.purpose ?? "一段用途",
+    instructions: patch.instructions ?? "一段指令",
+    outputFormat: patch.outputFormat ?? "一段输出格式",
+    enabled: patch.enabled ?? true,
+    version: patch.version ?? 1,
+    createdAt: patch.createdAt ?? "2026-01-01T00:00:00.000Z",
+    updatedAt: patch.updatedAt ?? "2026-01-01T00:00:00.000Z",
+    ...patch,
+  };
+}
+
 test("userMarketEntries：只收非系统且已公开的智能体", () => {
   const agents = [
     fakeAgent({ id: "public", public: true }),
@@ -143,4 +163,163 @@ test("userMarketEntries：只收非系统且已公开的智能体", () => {
   );
   assert.equal(entries[0].builtin, false);
   assert.equal(entries[0].key, "user:public");
+});
+
+test("userMarketEntries：公开后「核心职责 / 人设描述」原样映射到广场字段", () => {
+  const agent = fakeAgent({
+    id: "published",
+    public: true,
+    // 带前后空白与换行缩进：验证映射是逐字透传，不做 trim 或折行处理。
+    role: "  核心职责：投研分析  ",
+    persona: "人设描述第一行\n第二行\n  第三行带缩进",
+  });
+  const [entry] = userMarketEntries([agent], "@我");
+  // 广场「核心职责」取自 Agent 详情页「职责与人设」下的 role。
+  assert.equal(entry.role, agent.role);
+  // 广场「人设描述」取自 Agent 详情页「职责与人设」下的 persona，换行与缩进均保留。
+  assert.equal(entry.persona, agent.persona);
+  // 卡片正文：用户公开智能体以人设描述为正文，与详情弹窗「人设描述」同源。
+  assert.equal(entry.detail, agent.persona);
+});
+
+test("userMarketEntries：人设描述为空时卡片正文回退到核心职责", () => {
+  const agent = fakeAgent({ id: "fallback", public: true, role: "只有核心职责", persona: "" });
+  const [entry] = userMarketEntries([agent], "@我");
+  assert.equal(entry.role, "只有核心职责");
+  assert.equal(entry.persona, "");
+  assert.equal(entry.detail, "只有核心职责");
+});
+
+test("userMarketEntries：公开时同步技能与连接器引用到广场", () => {
+  const agent = fakeAgent({
+    id: "published-with-stuff",
+    public: true,
+    skills: ["portfolio", "risk"],
+    installedConnectors: ["browser", "gmail"],
+  });
+  const [entry] = userMarketEntries([agent], "@我");
+  // 内部能力键与连接器 id 引用逐字透传，供其他用户查看/导入；不做来源侧筛选。
+  assert.deepEqual(entry.skills, ["portfolio", "risk"]);
+  assert.deepEqual(entry.connectors, ["browser", "gmail"]);
+  // 未安装目录技能 / 没有自建技能时，对应字段为空数组（保证广场卡片不误报技能）。
+  assert.deepEqual(entry.installedSkills, []);
+  assert.deepEqual(entry.customSkills, []);
+});
+
+test("userMarketEntries：未挂连接器的公开智能体连接器为空数组", () => {
+  const agent = fakeAgent({ id: "no-connectors", public: true });
+  const [entry] = userMarketEntries([agent], "@我");
+  assert.deepEqual(entry.connectors, []);
+});
+
+test("remoteMarketEntries：透传发布方公开的技能与连接器引用，并过滤自己的", () => {
+  const records: RemoteMarketAgent[] = [
+    {
+      id: "alice:remote-a",
+      ownerName: "Alice",
+      agentId: "remote-a",
+      name: "远方的智能体",
+      role: "观察员",
+      persona: "一段人设",
+      avatar: "bloom",
+      skills: ["brief", "search"],
+      connectors: ["calendar"],
+      instructions: "",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "bob:my-agent",
+      ownerName: "Bob",
+      agentId: "my-agent",
+      name: "自己的智能体",
+      role: "自建",
+      persona: "人设",
+      avatar: "orb",
+      skills: ["quote"],
+      connectors: [],
+      instructions: "",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ];
+  const entries = remoteMarketEntries(records, new Set(["my-agent"]), "@某用户");
+  assert.deepEqual(
+    entries.map((entry) => entry.key),
+    ["remote:alice:remote-a"],
+  );
+  const [entry] = entries;
+  assert.deepEqual(entry.skills, ["brief", "search"]);
+  assert.deepEqual(entry.connectors, ["calendar"]);
+  assert.equal(entry.source, "@Alice");
+});
+
+test("userMarketEntries：公开时同步目录技能与自建技能（引用解析 + 残留去重）", () => {
+  const library = [fakeSkill({ id: "lib-1", name: "财报拆解", purpose: "拆解三张表" })];
+  const agent = fakeAgent({
+    id: "skills-synced",
+    public: true,
+    installedSkills: ["external-skill-a", "external-skill-b"],
+    skillRefs: ["lib-1"],
+    // 残留副本：内容与技能库引用不重复的保留；与引用同内容的副本丢弃（内容去重）。
+    customSkills: [
+      fakeSkill({ id: "legacy-copy", name: "历史副本" }),
+      fakeSkill({
+        id: "dup-of-lib-1",
+        name: "财报拆解",
+        purpose: "拆解三张表",
+        instructions: library[0].instructions,
+        outputFormat: library[0].outputFormat,
+      }),
+    ],
+  });
+  const [entry] = userMarketEntries([agent], "@我", library);
+  // 目录技能 id 逐字透传，广场卡片/详情页据此在本地技能目录解析标题。
+  assert.deepEqual(entry.installedSkills, ["external-skill-a", "external-skill-b"]);
+  // 自建技能 = 技能库引用解析（保持引用顺序）+ 未重复的残留副本；同内容副本被去重。
+  assert.deepEqual(
+    entry.customSkills.map((skill) => skill.id),
+    ["lib-1", "legacy-copy"],
+  );
+});
+
+test("userMarketEntries：未传技能库时自建技能只透传 Agent 上的副本", () => {
+  const agent = fakeAgent({
+    id: "no-library",
+    public: true,
+    skillRefs: ["lib-1"],
+    customSkills: [fakeSkill({ id: "legacy-only" })],
+  });
+  const [entry] = userMarketEntries([agent], "@我");
+  // 没有技能库可解析引用，只透传 Agent 上实际携带的自建技能副本。
+  assert.deepEqual(
+    entry.customSkills.map((skill) => skill.id),
+    ["legacy-only"],
+  );
+});
+
+test("remoteMarketEntries：透传发布方的目录技能与自建技能快照", () => {
+  const custom = fakeSkill({ id: "remote-cs", name: "远方自建", purpose: "远方用途" });
+  const records: RemoteMarketAgent[] = [
+    {
+      id: "alice:remote-b",
+      ownerName: "Alice",
+      agentId: "remote-b",
+      name: "远方的智能体",
+      role: "观察员",
+      persona: "一段人设",
+      avatar: "bloom",
+      skills: ["brief", "search"],
+      installedSkills: ["external-skill-x"],
+      customSkills: [custom],
+      connectors: ["calendar"],
+      instructions: "",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ];
+  const [entry] = remoteMarketEntries(records, new Set(), "@某用户");
+  // 其他用户公开的智能体：目录技能 id 与自建技能快照必须随卡片透传，供展示与导入。
+  assert.deepEqual(entry.installedSkills, ["external-skill-x"]);
+  assert.deepEqual(entry.customSkills, [custom]);
 });

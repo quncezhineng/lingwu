@@ -9,7 +9,7 @@ const channels = {
   "channels.emptyTitle": "还没有频道",
   "channels.emptyDetail": "创建一个频道，把几个智能体放在一起聊天。",
   "channels.nameLabel": "频道名称",
-  "channels.descriptionLabel": "频道说明（可选）",
+  "channels.descriptionLabel": "频道描述",
   "channels.descriptionPlaceholder": "例如：一起看新能源公司",
   "channels.membersLabel": "成员",
   "channels.leader": "组长",

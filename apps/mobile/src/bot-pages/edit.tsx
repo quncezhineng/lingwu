@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { AgentOrb } from "../agent-orb";
 import { useAgentSpace } from "../agent-space";
@@ -58,6 +58,18 @@ function PersonaChip({
   );
 }
 
+/** 人设表单的当前草稿：父级点「公开」时用它把未保存的编辑一并落盘。 */
+type PersonaDraft = {
+  name: string;
+  role: string;
+  tone: AgentTone;
+  communication: AgentCommunication;
+  persona: string;
+  avatar: AgentAvatarId;
+  /** 是否满足「保存人设」的可保存条件（姓名与人设都非空）。 */
+  valid: boolean;
+};
+
 /**
  * 人设表单。
  *
@@ -67,10 +79,13 @@ function PersonaChip({
 function PersonaEditor({
   onSaved,
   secondaryAction,
+  draftRef,
 }: {
   onSaved: () => void;
   /** 与保存按钮并排的次要操作；不传则保存按钮独占整行。 */
   secondaryAction?: ReactNode;
+  /** 每次渲染把最新草稿同步给父级，供父级的「公开」按钮落盘未保存的编辑。 */
+  draftRef?: { current: PersonaDraft | null };
 }) {
   const { t } = useTranslation();
   const { current, updateAgent } = useAgentSpace();
@@ -80,6 +95,19 @@ function PersonaEditor({
   const [communication, setCommunication] = useState<AgentCommunication>(current.communication);
   const [persona, setPersona] = useState(current.persona);
   const [avatar, setAvatar] = useState(current.avatar);
+  // 提交后再写 ref（不在渲染期产生副作用），保证父级点击时读到的是最新草稿。
+  useEffect(() => {
+    if (!draftRef) return;
+    draftRef.current = {
+      name,
+      role,
+      tone,
+      communication,
+      persona,
+      avatar,
+      valid: Boolean(name.trim() && persona.trim()),
+    };
+  });
   /** 主操作：保存人设。单独提出来，才能按需与次要操作并排或独占一行。 */
   const saveButton = (
     <Button
@@ -177,14 +205,17 @@ export function BotEditPage({
   embedded = false,
 }: BotPageProps & { onDeleted: () => void }) {
   const { t } = useTranslation();
-  const { current, deleteAgent, setAgentPublic } = useAgentSpace();
+  const { current, deleteAgent, setAgentPublic, updateAgent } = useAgentSpace();
   const { notify } = useWorkspace();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // 「公开」时要把 PersonaEditor 里未保存的编辑一并落盘，因此持有它的最新草稿。
+  const draftRef = useRef<PersonaDraft | null>(null);
   return (
     <BotPage title={t("agentSpace.editPersona")} onClose={onClose} embedded={embedded}>
       {/* 「保存人设」与「删除 Agent」双列并排：删除是不可恢复操作，等宽但用 danger 色区分。 */}
       <PersonaEditor
         onSaved={onClose}
+        draftRef={draftRef}
         secondaryAction={
           current.system ? undefined : (
             <Button danger onPress={() => setConfirmDelete(true)}>
@@ -231,11 +262,26 @@ export function BotEditPage({
               small
               primary={!current.public}
               onPress={() => {
+                // 先把当前编辑中的人设落盘，再发布：广场卡片与详情页的
+                // 「核心职责 / 人设描述」直接派生自 Agent，必须与详情页此刻
+                // 看到的内容一致，不能停留在上一次保存的旧值。
+                const draft = draftRef.current;
+                const canSave = Boolean(draft?.valid);
+                if (draft && canSave) {
+                  updateAgent(current.id, {
+                    name: draft.name,
+                    role: draft.role,
+                    tone: draft.tone,
+                    communication: draft.communication,
+                    persona: draft.persona,
+                    avatar: draft.avatar,
+                  });
+                }
                 const next = !current.public;
                 setAgentPublic(current.id, next);
                 notify(
                   t(next ? "agent.marketPublishedToast" : "agent.marketUnpublishedToast", {
-                    name: current.name,
+                    name: canSave && draft ? draft.name : current.name,
                   }),
                 );
               }}

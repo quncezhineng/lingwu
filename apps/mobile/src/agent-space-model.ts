@@ -138,7 +138,8 @@ export const AGENT_TEMPLATES: Record<
   asset: {
     name: "资产 Agent",
     role: "组合观察员",
-    persona: "关注手工组合的配置、风险与复盘。保留币种差异，不把模拟曲线当成账户实际收益。",
+    persona:
+      "盯住持仓结构与风险敞口，讲清每笔盈亏怎么来的。资产分开算，模拟组合不当成真实账户收益。",
     avatar: "planet",
     skills: ["portfolio", "risk", "goals", "notes", "files", "memory", "finance", "reminder"],
   },
@@ -550,12 +551,20 @@ export function createAgentFromTemplate(
     tone?: AgentTone;
     communication?: AgentCommunication;
     instructions?: string;
+    /** 内部能力键，与模板预置合并（如从市场导入时复制发布方的技能）。 */
+    skills?: string[];
+    /** 从技能目录安装到该 Agent 的技能 id（如从市场导入时预置目录技能）。 */
+    installedSkills?: string[];
+    /** 自建技能完整快照（如从市场导入时复制发布方的自建技能内容）。 */
+    customSkills?: AgentSkill[];
+    /** 预置分配给该智能体的连接器引用 id（账户级资产，仅存 id 引用）。 */
+    installedConnectors?: string[];
     now?: string;
   } = {},
 ): AgentDefinition {
   const preset = AGENT_TEMPLATES[template];
   const now = options.now ?? new Date().toISOString();
-  return {
+  const agent: AgentDefinition = {
     id: options.id ?? nextThreadId(),
     threadId: options.threadId ?? nextThreadId(),
     template,
@@ -569,11 +578,18 @@ export function createAgentFromTemplate(
     system: false,
     threadExists: false,
     createdAt: now,
-    skills: [...preset.skills],
-    installedSkills: [],
+    // 导入的技能键与模板预置去重合并，上限与服务端 skills（≤30）一致。
+    skills: [...new Set([...preset.skills, ...(options.skills ?? [])])].slice(0, 30),
+    // 从技能目录安装的技能 id（导入时预置），上限与服务端 installedSkills（≤60）一致。
+    installedSkills: [...new Set(options.installedSkills ?? [])].slice(0, 60),
     skillRefs: [],
-    customSkills: [],
+    // 自建技能快照（导入时复制发布方内容）；服务端 agentSchema 上限 60，与市场记录对齐。
+    customSkills: [...(options.customSkills ?? [])].slice(0, 60),
   };
+  // 连接器引用在导入时才会有值；空时不产出多余字段（幂等归一化不会多出 key）。
+  const installedConnectors = [...new Set(options.installedConnectors ?? [])].slice(0, 20);
+  if (installedConnectors.length) agent.installedConnectors = installedConnectors;
+  return agent;
 }
 
 export function createCustomSkill(
@@ -592,6 +608,57 @@ export function createCustomSkill(
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
+}
+
+/** 账户级技能库的记录上限，与服务端 `agentSpaceSchema.skillLibrary`（≤200）保持一致。 */
+const SKILL_LIBRARY_MAX = 200;
+
+/**
+ * 从智能体市场导入时，把发布方公开的自建技能快照复制成导入用户技能库里的独立记录。
+ *
+ * - 内容四项（名称/用途/工作提示词/输出格式）与 `enabled` 和发布方快照完全一致，
+ *   保证功能配置、参数定义、执行逻辑原样沿用；
+ * - 记录使用**全新 id 与当前时间戳**（version 从 1 重新起算），与创建者的技能彻底隔离，
+ *   导入后在「我的技能」里是一条独立的记录，可独立编辑 / 删除 / 管理；
+ * - 技能库里已有同内容记录时复用其 id（与 linkCopiedSkills / normalizeSkillLibrary 的
+ *   内容指纹去重口径一致），重复导入同一智能体不会在技能库里堆出重复记录；
+ * - 技能库已满（≥200，与服务端上限一致）时不再新增记录，避免整次保存被 422 拒绝；
+ *   未新增的记录不进入 refs，绝不挂悬空的引用。
+ *
+ * @param copies 发布方公开的自建技能快照（market 记录 customSkills，服务端已限 ≤60）
+ * @param library 导入用户当前的账户级技能库
+ * @returns 复制后（或复用后）的技能库，以及应按原顺序挂到导入 Agent 上的 `skillRefs`
+ */
+export function copySkillsIntoLibrary(
+  copies: readonly AgentSkill[],
+  library: readonly AgentSkill[],
+  now = new Date().toISOString(),
+): { skillLibrary: AgentSkill[]; refs: string[] } {
+  const next = [...library];
+  const refs: string[] = [];
+  for (const copy of copies) {
+    const key = skillContentKey(copy);
+    const match = next.find((skill) => skillContentKey(skill) === key);
+    if (match) {
+      refs.push(match.id);
+      continue;
+    }
+    if (next.length >= SKILL_LIBRARY_MAX) continue;
+    const record: AgentSkill = {
+      id: nextThreadId(),
+      name: copy.name.slice(0, 40),
+      purpose: copy.purpose.slice(0, 120),
+      instructions: copy.instructions.slice(0, 4000),
+      outputFormat: copy.outputFormat.slice(0, 800),
+      enabled: copy.enabled !== false,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    next.push(record);
+    refs.push(record.id);
+  }
+  return { skillLibrary: next, refs };
 }
 
 /**

@@ -96,7 +96,7 @@ const app = {
     "Cannot connect to the model service. Check BASE_URL and your network.",
   "modelSettings.modelUnavailable":
     "This model is unavailable. Choose another model or ask your administrator to update the catalogue.",
-  "app.webTitle": "LingWu — Your personal investment research agent",
+  "app.webTitle": "LingWu · Your personal investment research agent",
   "app.welcomeTitle": "Welcome to LingWu, your personal investment research agent.",
   "app.welcomeSubtitle": "Clear next steps for every research question.",
   "app.authConceptEyebrow": "Personal investment intelligence",

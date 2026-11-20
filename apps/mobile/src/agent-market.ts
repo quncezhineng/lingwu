@@ -10,7 +10,12 @@
  */
 
 import { BUILTIN_AGENT_INSTRUCTIONS } from "./agent-market-instructions";
-import type { AgentAvatarId, AgentDefinition } from "./agent-space-model";
+import {
+  type AgentAvatarId,
+  type AgentDefinition,
+  type AgentSkill,
+  heldCustomSkills,
+} from "./agent-space-model";
 
 /** 智能体市场的分类（与技能分类相区分，面向「智能体」这一粒度）。 */
 export const MARKET_AGENT_CATEGORIES = [
@@ -792,8 +797,14 @@ export interface MarketAgentEntry {
   tags: string[];
   /** 内置智能体的分类；用户公开智能体无固定分类，归入「全部」。 */
   category?: MarketAgentCategory;
-  /** 内置智能体导入时预置的技能 id。 */
+  /** 内置智能体导入时预置的技能 id；用户公开的智能体是发布方的内部能力键。 */
   skills: string[];
+  /** 从技能目录安装的技能 id（skillCatalog 里的 id）；内置条目与 skills 同源。 */
+  installedSkills: string[];
+  /** 自建技能完整快照；跨用户公开时必须复制内容，导入方才能正确展示。 */
+  customSkills: AgentSkill[];
+  /** 用户公开的智能体同步的连接器引用 id（账户级资产，仅复制 id 引用）。 */
+  connectors: string[];
   /** 内置智能体的完整系统指令。 */
   instructions: string;
   /** 来源标签：@灵悟（内置）或 @用户公开。 */
@@ -814,6 +825,10 @@ export function builtinMarketEntries(sourceLabel: string): MarketAgentEntry[] {
     tags: [...item.tags],
     category: item.category,
     skills: [...item.skills],
+    // 内置条目的 skills 本身就是技能目录 id，导入时作为 installedSkills 预置。
+    installedSkills: [...item.skills],
+    customSkills: [],
+    connectors: [],
     instructions: item.instructions,
     source: sourceLabel,
   }));
@@ -823,6 +838,7 @@ export function builtinMarketEntries(sourceLabel: string): MarketAgentEntry[] {
 export function userMarketEntries(
   agents: readonly AgentDefinition[],
   sourceLabel: string,
+  skillLibrary?: readonly AgentSkill[],
 ): MarketAgentEntry[] {
   return agents
     .filter((agent) => !agent.system && agent.public === true)
@@ -836,7 +852,12 @@ export function userMarketEntries(
       detail: agent.persona || agent.role,
       avatar: agent.avatar,
       tags: [...agent.skills].slice(0, 3),
-      skills: [],
+      // 公开的智能体把内部能力键、目录技能 id、自建技能快照与连接器引用一并带上市场：
+      // 自建技能经技能库解析成完整快照（跨用户时导入方才能展示内容）。
+      skills: [...agent.skills],
+      installedSkills: [...(agent.installedSkills ?? [])],
+      customSkills: heldCustomSkills(agent, skillLibrary ?? []),
+      connectors: [...(agent.installedConnectors ?? [])],
       instructions: "",
       source: sourceLabel,
     }));
@@ -853,7 +874,14 @@ export interface RemoteMarketAgent {
   role: string;
   persona: string;
   avatar: AgentAvatarId;
-  skills: string[];
+  /** 模板预置的内部能力键；新公开记录不再写入（技能由 installedSkills/customSkills 承载），历史记录可能仍有值。 */
+  skills?: string[];
+  /** 发布方同步的技能目录技能 id，导入方可在本地技能目录解析出标题与简介。 */
+  installedSkills?: string[];
+  /** 发布方同步的自建技能完整快照（跨用户时必须复制内容才能展示）。 */
+  customSkills?: AgentSkill[];
+  /** 发布方同步的连接器引用 id（账户级资产，导入方仅拿 id 引用）。 */
+  connectors: string[];
   instructions: string;
   createdAt: string;
   updatedAt: string;
@@ -882,8 +910,13 @@ export function remoteMarketEntries(
       persona: record.persona,
       detail: record.persona || record.role,
       avatar: record.avatar,
-      tags: record.skills.slice(0, 3),
-      skills: [],
+      tags: (record.skills ?? []).slice(0, 3),
+      // 远程快照公开的技能是目录技能 id、自建技能快照与连接器引用，一并透传，
+      // 供详情页展示与导入时复制；模板预置的内部能力键不参与展示。
+      skills: [...(record.skills ?? [])],
+      installedSkills: [...(record.installedSkills ?? [])],
+      customSkills: [...(record.customSkills ?? [])],
+      connectors: [...(record.connectors ?? [])],
       instructions: record.instructions || "",
       source: record.ownerName ? `@${record.ownerName}` : fallbackSource,
     }));

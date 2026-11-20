@@ -220,6 +220,85 @@ test("the account-level skill library is accepted and persisted", async () => {
   );
 });
 
+test("market listing repairs stale public Agent snapshots so imports receive customSkills", async () => {
+  const state = {
+    ...agentState("Public", "public-thread", "public-agent"),
+    agents: [
+      {
+        ...agentState("Public", "public-thread").agents[0],
+      },
+      {
+        ...agentState("Public", "public-thread").agents[1],
+        id: "public-agent",
+        threadId: "public-thread",
+        public: true,
+        installedSkills: ["financial-model"],
+        skillRefs: ["library-skill"],
+        customSkills: [],
+      },
+    ],
+    skillLibrary: [
+      {
+        id: "library-skill",
+        name: "估值复核",
+        purpose: "复核 DCF 关键假设",
+        instructions: "检查 WACC、终值增长率与收入 CAGR。",
+        outputFormat: "结论、假设、疑点",
+        enabled: true,
+        version: 1,
+        createdAt: "2026-11-08T00:00:00.000Z",
+        updatedAt: "2026-11-08T00:00:00.000Z",
+      },
+    ],
+  };
+  assert.equal(
+    (
+      await server.app.request("/api/agent-space", {
+        method: "PUT",
+        headers: headers(alice),
+        body: JSON.stringify(state),
+      })
+    ).status,
+    200,
+  );
+
+  // 模拟修复前的历史广场旧快照：只有基础字段，没有 installedSkills/customSkills。
+  await db.put("alice", "market-agents", {
+    id: "alice:public-agent",
+    owner: "alice",
+    agentId: "public-agent",
+    name: "研究 Agent",
+    role: "研究员",
+    persona: "只使用可核验的来源。",
+    avatar: "moon",
+    skills: ["research"],
+    connectors: [],
+    instructions: "",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  const records = (await (
+    await server.app.request("/api/market-agents", { headers: headers(bob) })
+  ).json()) as Array<{
+    id: string;
+    installedSkills?: string[];
+    customSkills?: Array<{ id: string; name: string }>;
+  }>;
+  const repaired = records.find((record) => record.id === "alice:public-agent");
+  assert.ok(repaired);
+  // 读取市场时会先按当前 agent-space 自愈旧快照：导入方拿到的是修正后的完整技能数据。
+  assert.deepEqual(repaired.installedSkills, ["financial-model"]);
+  assert.deepEqual(
+    repaired.customSkills?.map((skill) => skill.id),
+    ["library-skill"],
+  );
+  assert.deepEqual(
+    repaired.customSkills?.map((skill) => skill.name),
+    ["估值复核"],
+  );
+});
+
 test("the saved Agent space survives an application restart", async () => {
   const restartRoot = await mkdtemp(join(tmpdir(), "lingwu-agent-space-restart-"));
   try {

@@ -9,7 +9,7 @@ const channels = {
   "channels.emptyTitle": "No channels yet",
   "channels.emptyDetail": "Create a channel so a few agents can talk in one place.",
   "channels.nameLabel": "Channel name",
-  "channels.descriptionLabel": "Channel note (optional)",
+  "channels.descriptionLabel": "Channel description ",
   "channels.descriptionPlaceholder": "e.g. Look at new-energy companies together",
   "channels.membersLabel": "Members",
   "channels.leader": "Lead",

@@ -703,8 +703,9 @@ const agent = {
   "agent.marketRemoteImportTitle": "Import agent",
   "agent.marketRemoteImportConfirm": "Import",
   "agent.marketRemoteImportHint":
-    "Only the persona and instructions are imported; skills are not. The imported agent appears in your agent list, ready for further edits.",
-  "agent.marketImportedToast": "Imported successfully! Agent “{name}” has been added to your list.",
+    "Imports the basic info, persona, instructions, skills and connector. The imported agent appears in your agent chat list, ready for further edits.",
+  "agent.marketImportedToast":
+    "Imported successfully! Agent “{name}” has been added to your agent chat list.",
   "agent.marketEmptyTitle": "No public agents in the market yet",
   "agent.marketEmptyDetail":
     "Open an agent's detail page and tap “Publish” to share it to the market.",
@@ -741,13 +742,11 @@ const agent = {
   "agent.marketDetailCollapse": "Collapse",
   "agent.marketDetailSkills": "Skill connectors",
   "agent.marketDetailNoSkills": "This agent has no preset skills.",
-  "agent.marketDetailSkillsInDetail":
-    "View this agent's skills and capabilities on its detail page.",
+  "agent.marketDetailSkillsInDetail": "This agent does not expose any skills.",
   "agent.marketDetailConnectors": "External connectors",
   "agent.marketDetailConnectorBuiltin":
     "Built-in agents do not bind external connectors. After importing, attach them under “Connectors” on the agent detail page.",
-  "agent.marketDetailConnectorUser":
-    "View this agent's connectors, model and tasks on its detail page.",
+  "agent.marketDetailConnectorUser": "This agent does not expose any connectors.",
   "agent.marketTabInstructions": "Instructions",
   "agent.marketTabSkills": "Skills",
   "agent.marketTabConnectors": "Connectors",
@@ -977,10 +976,10 @@ const agent = {
   "agentSpace.workDateYesterday": "Yesterday",
   "agentSpace.savePersona": "Save persona",
   "agentSpace.agentName": "Agent name",
-  "agentSpace.agentRole": "Its responsibility",
+  "agentSpace.agentRole": "Core responsibility",
   "agentSpace.tone": "Tone",
   "agentSpace.verbosity": "Response length",
-  "agentSpace.agentPersona": "What else would you like it to become?",
+  "agentSpace.agentPersona": "Persona",
   "agentSpace.systemCannotDelete": "The system default Agent always remains available.",
   "agentSpace.createTitle": "Create a new Agent",
   "agentSpace.createSubtitle": "Let every Agent focus on what it does best.",

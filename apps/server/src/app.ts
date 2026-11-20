@@ -92,11 +92,45 @@ async function syncAgentMarket(
     const profile = await accounts.readProfile(owner);
     ownerName = profile.displayName;
   }
+  // 账户级自建技能库按 id 建索引，供下面解析 Agent 的 skillRefs 引用。
+  const libraryById = new Map((state.skillLibrary ?? []).map((skill) => [skill.id, skill]));
+  // 技能内容键与移动端 heldCustomSkills 的去重键保持一致（name/purpose/instructions/outputFormat）：
+  // 同一份内容的不同 id 算重复；内容可变而 id 不变，因此比较时不能只比 id。
+  const skillContentKey = (skill: {
+    name: string;
+    purpose: string;
+    instructions: string;
+    outputFormat: string;
+  }) => [skill.name, skill.purpose, skill.instructions, skill.outputFormat].join("\u0000");
+  // 完整签名再带上 enabled，用于判断某条技能记录相对于市场快照是否真的变了。
+  const skillSignature = (skill: { enabled: boolean } & Parameters<typeof skillContentKey>[0]) =>
+    `${skill.enabled ? "1" : "0"}\u0000${skillContentKey(skill)}`;
   const now = new Date().toISOString();
   for (const agent of published) {
     const id = `${owner}:${agent.id}`;
     wantedIds.add(id);
     const previous = existingById.get(id);
+    // 自建技能快照：先按 skillRefs 顺序从账户级技能库解析引用，再追加 agent.customSkills
+    // 里不在引用中的残留副本，最后按内容去重并截断到市场记录 schema 的上限（60）。
+    const customSkills: NonNullable<MarketAgentRecord["customSkills"]> = [];
+    const referencedIds = new Set(agent.skillRefs ?? []);
+    const seenKeys = new Set<string>();
+    const maxCustomSkills = 60;
+    const pushSkill = (skill: (typeof customSkills)[number]) => {
+      if (customSkills.length >= maxCustomSkills) return;
+      const key = skillContentKey(skill);
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      customSkills.push(skill);
+    };
+    for (const skillId of agent.skillRefs ?? []) {
+      const skill = libraryById.get(skillId);
+      if (skill) pushSkill(skill);
+    }
+    for (const skill of agent.customSkills ?? []) {
+      if (referencedIds.has(skill.id)) continue;
+      pushSkill(skill);
+    }
     const next: MarketAgentRecord = {
       id,
       owner,
@@ -106,7 +140,12 @@ async function syncAgentMarket(
       role: agent.role,
       persona: agent.persona,
       avatar: agent.avatar,
-      skills: [...agent.skills],
+      // 公开的技能只含「从技能库添加的技能」：目录技能 id + 自建技能快照，
+      // 模板预置的内部能力键（skills）不进入公开数据。
+      installedSkills: [...(agent.installedSkills ?? [])],
+      // 公开时同步自建技能完整快照（跨用户时对方看不到发布方的技能库，必须复制元数据）。
+      customSkills,
+      connectors: [...(agent.installedConnectors ?? [])],
       instructions: agent.instructions,
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
@@ -119,12 +158,47 @@ async function syncAgentMarket(
       previous.persona === next.persona &&
       previous.avatar === next.avatar &&
       previous.instructions === next.instructions &&
-      previous.skills.length === next.skills.length &&
-      previous.skills.every((skill, index) => skill === next.skills[index]);
+      (previous.installedSkills ?? []).length === (next.installedSkills ?? []).length &&
+      (previous.installedSkills ?? []).every(
+        (skillId, index) => skillId === (next.installedSkills ?? [])[index],
+      ) &&
+      (previous.customSkills ?? []).length === (next.customSkills ?? []).length &&
+      (previous.customSkills ?? []).every(
+        (skill, index) =>
+          skillSignature(skill) === skillSignature((next.customSkills ?? [])[index]),
+      ) &&
+      (previous.connectors ?? []).length === (next.connectors ?? []).length &&
+      (previous.connectors ?? []).every((id, index) => id === (next.connectors ?? [])[index]);
     if (!unchanged) await db.put(owner, "market-agents", next);
   }
   for (const record of existingById.values()) {
     if (!wantedIds.has(record.id)) await db.remove(owner, "market-agents", record.id);
+  }
+}
+
+/**
+ * 广场读取前的自愈同步：
+ *
+ * 早期公开记录可能只带内部能力键 `skills`，缺少后来补上的
+ * `installedSkills` / `customSkills` 快照。若只修「保存时同步」，历史上已经公开、
+ * 但发布者没有再次编辑/公开过的智能体会继续挂着旧快照，导入方仍然拿不到自建技能。
+ *
+ * 这里按 owner 读取当前 `agent-space`，用现有 `syncAgentMarket` 规则重建/修正广场快照。
+ * 这样市场列表天然具备“读时修复”能力：
+ * - 已公开但快照陈旧：补齐目录技能 / 自建技能 / 连接器；
+ * - 已公开但快照缺失：重新创建；
+ * - 已撤回公开但旧快照残留：顺手移除。
+ */
+async function repairAgentMarketOnRead(db: Store, accounts: SupabaseAuth | undefined) {
+  for (const owner of await db.owners("agent-settings")) {
+    const saved = await db.get<(PersistedAgentSpace & { id: string }) | null>(
+      owner,
+      "agent-settings",
+      "space",
+    );
+    if (!saved) continue;
+    const { id: _id, ...state } = saved;
+    await syncAgentMarket(db, owner, state, accounts);
   }
 }
 
@@ -542,6 +616,7 @@ export async function createApp(
   // 智能体市场：任何登录用户都能读到所有人已公开的智能体（跨用户共享）。
   app.get("/api/market-agents", async (c) => {
     c.get("owner");
+    await repairAgentMarketOnRead(db, accounts);
     const records = await db.scan<MarketAgentRecord>("market-agents");
     return c.json(records.map(({ value }) => value));
   });

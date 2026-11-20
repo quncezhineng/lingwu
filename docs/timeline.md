@@ -5,6 +5,202 @@
 
 ## 变更记录
 
+### 2026-11-21 · 智能体市场卡片标题下去掉作者行，仅在详情弹窗保留作者显示
+
+**背景**
+
+用户进一步明确了作者信息的展示位置：智能体市场卡片标题下方那条「绿色盾牌 + @灵悟 / @作者名」不需要显示；但详情弹窗里的作者信息仍然需要保留，不能一起删掉。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - `MarketAgentCard` 删除名称下方新增的 `MarketAgentAuthorLine`；
+  - `MarketAgentDetailSheet` 内的作者行保持不变，因此详情弹窗里仍会显示作者，官方作者也继续带绿色盾牌。
+
+**说明**
+
+这次改动只移除了市场卡片标题下方那条作者行，不影响卡片底部既有来源区、详情弹窗作者展示、官方标识逻辑、公开/导入逻辑与数据结构。验证：mobile typecheck 通过，`agent-market.test.ts` 通过。
+
+### 2026-11-21 · 官方内置智能体卡片职责行与详情弹窗对齐：显示详情里的“核心职责”内容
+
+**背景**
+
+用户进一步 уточ清了官方内置智能体卡片的职责行口径：卡片标题下方那一行，应该与详情弹窗里的「核心职责」完全一致，而不是显示另一套字段。此前卡片改成了统一展示 `role`，导致官方内置卡片出现了如「安全边际」这类短标签，与详情弹窗实际展示的职责摘要不一致。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - `MarketAgentCard` 新增 `responsibility` 计算，直接复用详情弹窗的同口径逻辑：
+    - 官方内置智能体：取 `entry.detail`；
+    - 用户公开 / 远程公开智能体：取 `entry.role`。
+  - 卡片标题下方这行改为渲染 `responsibility`，从而让官方内置卡片与详情弹窗里的「核心职责」严格一致。
+
+**说明**
+
+这次改动只修正官方内置智能体卡片职责行的字段来源，不影响正文摘要、人设摘录、详情弹窗、导入公开逻辑与市场数据结构。验证：mobile typecheck 通过，`agent-market.test.ts` 通过。
+
+### 2026-11-21 · 官方内置智能体卡片正文与用户公开卡片对齐：显示核心职责 + 人设描述摘录
+
+**背景**
+
+用户希望智能体广场里的官方内置智能体卡片，在正文信息结构上与用户公开的智能体保持一致：不要只显示一段面向市场的简介，而是像用户公开卡片一样，先显示「核心职责」，再显示人设描述内容的一部分，方便快速比较不同智能体的定位与风格。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - `MarketAgentCard` 新增 `summary` 计算：官方内置智能体优先取 `entry.persona` 作为卡片正文摘要，缺失时回退到原有 `entry.detail`；
+  - 卡片里原本只对非内置条目显示的「核心职责」行，改为只要 `entry.role` 有值就展示，因此官方内置卡片也会显示职责；
+  - 卡片正文文本与无障碍 `accessibilityLabel` 同步改为使用新的 `summary`，保持读屏与视觉内容一致。
+
+**说明**
+
+这次改动只影响智能体广场卡片的展示文案，不改动详情弹窗、市场数据结构、导入逻辑与公开逻辑。验证：mobile typecheck 通过，`agent-market.test.ts` 通过。
+
+### 2026-11-21 · 智能体市场作者信息前置：卡片标题下与详情弹窗信息卡补充作者行，官方灵悟带绿色盾牌
+
+**背景**
+
+用户希望在智能体市场中更直观看到作者归属：无论是市场卡片，还是「我的智能体」详情弹窗左侧信息卡，都需要在头像 / 名称区域下方直接显示作者 `@名字`。若作者是灵悟官方，则要在 `@灵悟` 前面加绿色盾牌认证标。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - 新增复用组件 `MarketAgentAuthorLine`，统一渲染作者行；
+  - `MarketAgentCard` 在卡片标题下方新增作者行，来源继续复用已有 `entry.source`；
+  - `MarketAgentDetailSheet` 在桌面端左侧信息卡名称下方新增作者行；窄屏时在右侧内容头部同步显示，避免不同尺寸下信息不一致；
+  - 官方内置智能体（`entry.builtin === true`）作者名前继续复用 `OfficialMark` 绿色盾牌，普通作者仅显示 `@名字` 文案。
+
+**说明**
+
+这次改动只调整作者信息的展示位置与可见性，不改动市场数据来源、公开 / 导入逻辑、来源字段生成方式或官方判定逻辑。验证：mobile typecheck 通过。
+
+### 2026-11-21 · 智能体市场「我的智能体」：把「已公开」标签改为「取消公开」按钮，并在详情弹窗右上角补充同款按钮
+
+**背景**
+
+用户希望在自己公开的智能体上直接完成撤回操作：卡片底部原本只是一个静态的「已公开」灰色小标签，无法点击；详情弹窗右上角也只有「打开详情」。两处都需要提供「取消公开」入口。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - `MarketAgentCard` 新增 `onUnpublish` 属性。当条目属于「自己公开的智能体」（非内置、非他人公开）时，底部原本的 `StatusBadge`「已公开」标签替换为可点击按钮，文案为「取消公开」。
+  - `MarketAgentDetailSheet` 新增 `onUnpublish` 属性，标题栏右上角在原「打开详情」按钮左侧补一个「取消公开」按钮。
+  - 新增 `unpublishAgent(entry)`：调用 `setAgentPublic(agent.id, false)` 撤回公开，并弹出既有 `agent.marketUnpublishedToast` 提示；撤回后条目不再满足 `public === true` 过滤，卡片会自动从市场列表消失。从详情弹窗触发时同时关闭弹窗。
+- 文案复用既有 i18n key `agent.marketUnpublish`（取消公开 / Unpublish）与 `agent.marketUnpublishedToast`，无需新增 key。
+
+**说明**
+
+这次改动只覆盖「自己的公开智能体」的分支，不改变内置智能体、他人公开智能体的导入/复制入口与详情弹窗其他内容；撤回动作仍走既有的 `setAgentPublic` 链路（取消公开即删除 `public` 字段），服务端 `syncAgentMarket` 会在下次保存时移除对应市场记录。验证：mobile typecheck 通过，`agent-market.test.ts` + `agent-skill-import.test.ts` 23/23 通过。
+
+### 2026-11-21 · 智能体广场卡片收敛：隐藏卡片内的技能胶囊，仅在详情弹窗展示技能
+
+**背景**
+
+用户希望智能体广场里的卡片更简洁，不再在卡片正文下方展示“技能”胶囊列表。当前卡片里会直接渲染目录技能 / 自建技能名称，导致卡片信息密度偏高；而这些技能在详情弹窗里本来就有完整展示，卡片层重复了。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：移除 `MarketAgentCard` 中用于渲染技能胶囊的 `cardSkills` / `visibleChips` / `overflowChips` 计算及其对应 JSX。现在广场卡片只保留头像、名称、核心职责、简介和底部操作区，不再展示技能板块。
+
+**说明**
+
+这次改动只影响“智能体广场卡片”的视觉呈现，不影响详情弹窗里的技能列表，也不影响公开、导入、技能复制或运行时技能解析逻辑。验证：mobile typecheck 通过，`agent-market.test.ts` 通过。
+
+### 2026-11-21 · 智能体广场历史快照自愈：读取市场时自动修复旧公开记录，补齐自建技能快照
+
+**背景**
+
+前一轮修复把“导入时复制自建技能到导入用户技能库”的逻辑补到了移动端创建链路里，但用户复测仍反馈无效。继续排查后确认：问题不在导入复制本身，而在**广场里的历史公开记录**。很多智能体是在修复前就已经公开的，`market-agents` 旧快照里只有基础字段/历史 `skills`，并没有后续补上的 `installedSkills` / `customSkills`。因此导入方 D 从广场导入时，拿到的仍是旧快照，自然复制不到自建技能；只有发布者 A 再次编辑并触发一次 `syncAgentMarket`，记录才会变新。
+
+**处理**
+
+- [apps/server/src/app.ts](../apps/server/src/app.ts)：新增 `repairAgentMarketOnRead(db, accounts)`。在读取 `/api/market-agents` 前，先遍历所有 `agent-settings` owner，读取其当前 `agent-space`，并复用既有 `syncAgentMarket` 规则对广场记录做一次“读时修复”：
+  - 已公开但快照陈旧：补齐 `installedSkills` / `customSkills` / `connectors`；
+  - 已公开但快照缺失：按当前 `agent-space` 重新创建；
+  - 已撤回公开但旧快照残留：顺手移除。
+- [tests/agent-space-api.test.ts](../tests/agent-space-api.test.ts)：新增服务端回归测试，显式构造“agent-space 已是新结构，但 market-agents 仍是旧快照”的场景，验证调用 `/api/market-agents` 后会返回修复后的记录，且 `customSkills` 与 `installedSkills` 都被自动补齐，供导入方复制。
+
+**说明**
+
+这次补的是**存量历史数据**场景：发布者不需要手动重新公开，广场在被任何登录用户读取时就会把旧快照自动修正。因此现在不管智能体是“新公开”还是“历史已公开”，导入方都能拿到完整的自建技能快照，后续移动端的导入复制链路即可正常把技能写入导入用户的 `skillLibrary`。验证：`tests/agent-space-api.test.ts` 6/6 通过，`agent-market.test.ts` + `agent-skill-import.test.ts` 23/23 通过，mobile 与 server typecheck 均通过。
+
+### 2026-11-21 · 智能体导入修复：导入时把自建技能完整复制进导入用户的账户级技能库，并挂 skillRefs 引用
+
+**背景**
+
+用户 A 公开了包含自建技能 C 的智能体 B 到智能体广场，其他用户 D 从广场导入 B 后，技能 C 没有同步复制为 D 的个人自建技能：D 在「我的技能」里看不到 C，也无法独立编辑、管理。根因：导入链路 `importAgent → createAgent → createAgentFromTemplate` 只把发布方快照写进 `agent.customSkills`，而 `skillRefs` 恒为 `[]`，技能从未进入导入用户的账户级 `skillLibrary`，只是 Agent 上的「孤儿副本」；即便 `normalizeSkillLibrary` 加载时按内容被动迁移，也是兜底而非导入时主动复制，且 id 为归一化新生成，归属语义不对。
+
+**处理**
+
+- [apps/mobile/src/agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)：新增纯函数 `copySkillsIntoLibrary(copies, library, now)`——把发布方公开的自建技能快照复制成导入用户技能库里的独立记录：内容四项（名称/用途/工作提示词/输出格式）与 `enabled` 和发布方完全一致（配置/参数/执行逻辑不变）；记录使用全新 id 与当前时间戳（version 从 1 重新起算），与创建者数据彻底隔离；库里已有同内容记录时按内容指纹复用其 id（与 `linkCopiedSkills`/`normalizeSkillLibrary` 去重口径一致），重复导入同一智能体不堆重复记录；技能库达到服务端上限（200）时不再新增，也不挂悬空引用。
+- [apps/mobile/src/agent-space.tsx](../apps/mobile/src/agent-space.tsx)：`createAgent` 在构建新 Agent 的同一个 setState 里原子完成「快照复制进 `skillLibrary` → 新 Agent 用 `skillRefs` 引用新记录 → 清空孤儿副本 `customSkills`」。只有确实有技能入库时才替换 `skillLibrary` 引用，无自建技能导入时行为不变。
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`importAgent` 透传 `customSkills` 的注释更新，说明快照会由 `createAgent` 复制进导入用户技能库；调用形态不变。
+- 服务端无需改动：`agentSpaceSchema` 已含 `skillLibrary`（≤200）与 `agents[].skillRefs`（≤60），发布侧 `syncAgentMarket` 已把自建技能快照写入市场记录的 `customSkills`，导入侧拿到的就是完整快照。
+- [apps/mobile/test/agent-skill-import.test.ts](../apps/mobile/test/agent-skill-import.test.ts)：新增 9 个测试覆盖——跨用户导入内容与 enabled 完全一致且 id/时间戳全新（数据隔离）；多技能一次入账且引用顺序与发布方一致；内容去重与重复导入幂等；同名不同内容各自成记录；导入方独立编辑技能库原件后导入智能体随之生效（引用语义）；与发布链路 `userMarketEntries` 全链路快照一致；导入组装后 `heldCustomSkills`/`normalizeAgentSpace` 可正常解析（可正常使用）；技能库上限不新增不挂悬空引用；空快照不改变技能库。
+
+**说明**
+
+修复后，D 导入含自建技能的智能体 B：技能 C 会作为 D 技能库里的独立记录出现在「我的技能」，D 可独立编辑/删除/管理，改原件时导入的智能体同步生效；A 的技能数据不受任何影响。验证：新增测试 9/9 通过；mobile 与 server typecheck 通过；`agent-market`/`agent-space`/`skill-sharing`/`skill-refs` 共 51 个回归测试全部通过（全量 410 个中唯一失败的是 `mobile-bots.test.ts`「bots home preview」陈旧断言，其源文件本次未改动、失败属修复前既存问题）。
+
+### 2026-11-21 · 智能体公开技能范围收敛：只同步「从技能库添加的技能」，不再携带模板预置的内部能力键
+
+**背景**
+
+用户确认：Agent 详情页点「公开」时，只需要把 Agent 从技能库添加的技能完整同步到智能体广场。此前广场卡片/详情弹窗的技能区把三类技能合并展示，其中混入了模板预置的内部能力键（`AGENT_CAPABILITY_LABELS` 映射），而详情页「技能」区从不展示这些内部能力键，造成「广场技能」与「详情页技能」不一致。范围最终定为：目录技能 + 自建技能。
+
+**处理**
+
+- [apps/server/src/agent-space.ts](../apps/server/src/agent-space.ts)：`marketAgentRecordSchema` 的 `skills` 字段由必填改为可选，新公开快照不再写入内部能力键（技能由 `installedSkills`/`customSkills` 承载），字段保留以兼容历史公开记录。
+- [apps/server/src/app.ts](../apps/server/src/app.ts)：`syncAgentMarket` 的 `next` 快照移除 `skills: [...agent.skills]` 写入，`unchanged` 一致性比较同步移除 skills 项。
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`resolveMarketEntrySkills` 收敛为只解析目录技能（`catalogItems(entry.installedSkills)`）+ 自建技能快照（`entry.customSkills.name/purpose`），删除内部能力键映射分支与 `AGENT_CAPABILITY_LABELS` 引用；`MarketImportTarget` 移除已无用的 `skills` 字段；`toImportTarget` 远程分支不再透传内部能力键，只透传 `installedSkills`/`customSkills`/`connectors`（导入不还原模板内部能力键，与公开对称）。
+- [apps/mobile/src/agent-market.ts](../apps/mobile/src/agent-market.ts)：`RemoteMarketAgent.skills` 改为可选，`remoteMarketEntries` 对 `skills` 做容错读取（`record.skills ?? []`），兼容新快照与历史记录。
+
+**说明**
+
+广场卡片与详情弹窗的技能区现在与 Agent 详情页「技能」区完全一致：只展示从技能库添加的技能（技能目录技能 + 自建技能）。新公开记录不再携带模板预置的内部能力键；历史记录残留的 `skills` 字段仍可被读取但不参与技能展示。验证：mobile 与 server typecheck 通过，`agent-market.test.ts` 14 个测试全部通过。
+
+### 2026-11-21 · 智能体公开同步全量技能：目录技能与自建技能随公开快照发布，广场卡片新增技能展示
+
+**背景**
+
+用户要求在 Agent 详情页点击「公开」时，把该 Agent 已添加的所有技能信息同步发布到智能体广场，并确保广场卡片上展示的技能与 Agent 详情页添加的技能配置完全一致。此前公开快照只携带内部能力键 `skills`，技能目录安装的 `installedSkills` 与账户级自建技能（`skillRefs`/`customSkills`）未进入快照，广场卡片也没有技能展示区。技能共有三种形态：内部能力键、技能目录安装、账户自建。
+
+**处理**
+
+- [apps/server/src/agent-space.ts](../apps/server/src/agent-space.ts)：`agentSchema.customSkills` 上限由 30 放宽到 60，与市场记录上限对齐，避免导入后首次保存 PUT 被 422 拒绝。
+- [apps/server/src/app.ts](../apps/server/src/app.ts)：`syncAgentMarket` 重写——构建 `state.skillLibrary` 的 `libraryById` 索引，内联 `skillContentKey`/`skillSignature` 内容签名（与移动端同口径）；对每个已公开 agent 计算 `customSkills` 快照：先按 `skillRefs` 顺序引用解析自建技能，再合并 `customSkills` 中未被引用的残留副本，按内容去重、截断 60；`next` 快照新增 `installedSkills`（目录技能 id 逐字同步）与 `customSkills`；`unchanged` 比较纳入 installedSkills 逐项比对与 customSkills 内容签名比对，避免无效写入。
+- [apps/mobile/src/agent-market.ts](../apps/mobile/src/agent-market.ts)：`MarketAgentEntry` 新增 `installedSkills`/`customSkills`；`builtinMarketEntries` 将内置 `skills` 作为目录技能 id 落到 `installedSkills`；`userMarketEntries` 新增 `skillLibrary` 参数，用 `heldCustomSkills(agent, skillLibrary)` 解析本地公开 Agent 的自建技能内容；`RemoteMarketAgent` 与 `remoteMarketEntries` 透传发布方快照中的 `installedSkills`/`customSkills`。
+- [apps/mobile/src/agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)：`createAgentFromTemplate` options 新增 `installedSkills?`/`customSkills?`，agent 构造体按去重与 60 上限切片写入。
+- [apps/mobile/src/agent-space.tsx](../apps/mobile/src/agent-space.tsx)：`CreateAgentInput` 新增 `customSkills?`（导入时复制发布方技能内容）。
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：新增共享函数 `resolveMarketEntrySkills(entry, locale)` 统一解析三类技能（内部能力键 `AGENT_CAPABILITY_LABELS` → 目录技能 `catalogItems(installedSkills)` → 自建技能快照 name/purpose，失效 id 静默跳过），详情弹窗与卡片共用同一函数保证展示一致；卡片在 detail 文本下方新增技能胶囊行（前 4 个 + 溢出「+N」胶囊）；`MarketImportTarget`/`toImportTarget`/`importAgent` 透传 `installedSkills`/`customSkills` 供导入还原。
+- [apps/mobile/src/bot-pages/edit.tsx](../apps/mobile/src/bot-pages/edit.tsx)：复核公开按钮交互——草稿落盘 → `setAgentPublic` → toast → 服务端保存触发 `syncAgentMarket`，技能随 Agent 状态自动持久化。
+- [apps/mobile/test/agent-market.test.ts](../apps/mobile/test/agent-market.test.ts)：新增 3 个测试覆盖公开时目录技能 + 自建技能同步（引用解析 + 残留去重）、未传技能库时透传副本、远程快照透传；共 14 个测试全部通过。
+
+**说明**
+
+自建技能是账户级资产，导入方拿不到发布方的技能库，因此公开快照把 `heldCustomSkills` 的解析结果作为 `customSkills` 元数据快照随记录携带。技能内容可变而 id 不变，一致性比较使用内容签名（`skillContentKey`/`skillSignature`）而非 id。验证：mobile 与 server typecheck 通过，`agent-market.test.ts` 14 个测试全部通过。
+
+### 2026-11-21 · 公开/导入范围限制：只公开职责与人设、指令、技能、连接器，不含资料、记忆、模型与任务
+
+**背景**
+
+用户希望智能体「公开到市场」时只同步职责与人设、指令、技能、连接器到广场卡片；资料、记忆、模型与任务不公开。其他用户导入该公开智能体时也只导入基本信息、职责与人设、指令、技能与连接器引用，资料、记忆、模型与任务不导入。技能与连接器信息此前未在公开快照中透传，详情弹窗里也只显示占位文案。
+
+**处理**
+
+- [apps/server/src/agent-space.ts](../apps/server/src/agent-space.ts)：`marketAgentRecordSchema`（strict）新增 `connectors` 字段（连接器引用 id，账户级资产，导入方仅拿 id 引用而非连接本体）。
+- [apps/server/src/app.ts](../apps/server/src/app.ts)：`syncAgentMarket` 的 `next` 快照新增 `connectors`（来自 `agent.installedConnectors`），并纳入 `unchanged` 比较，避免无效写入。
+- [apps/mobile/src/agent-market.ts](../apps/mobile/src/agent-market.ts)：`MarketAgentEntry` 新增 `connectors`；`userMarketEntries` 透传发布方内部能力键 `skills` 与 `connectors`；`RemoteMarketAgent` 与 `remoteMarketEntries` 透传发布方公开的 `skills`/`connectors`。
+- [apps/mobile/src/agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)：`createAgentFromTemplate` 的 options 新增 `skills?`（与模板预置去重合并、切片 30）与 `installedConnectors?`（去重切片 20，空时不写字段）。
+- [apps/mobile/src/agent-space.tsx](../apps/mobile/src/agent-space.tsx)：`CreateAgentInput` 新增 `skills?` 与 `installedConnectors?`，创建链路自动透传。
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`MarketImportTarget` 新增 `skills?`/`connectors?`；`toImportTarget` 远程分支复制；`importAgent` 透传 `skills` 与 `installedConnectors`；详情弹窗对非内置条目用 `AGENT_CAPABILITY_LABELS` + locale 渲染技能展示名，连接器 tab 通过父级 `connectorNames`（`allConnectorOptions(connectorOptions(workspace), appConnectors.items)`）解析 id → 名称并渲染列表，空时回退占位文案。
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)、[apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：同步 3 处文案——导入确认提示（仅导入基本信息、人设、指令、技能与连接器引用，资料/记忆/模型/任务不导入）、技能空态、连接器空态。
+- [apps/mobile/test/agent-market.test.ts](../apps/mobile/test/agent-market.test.ts)：新增 3 个测试覆盖公开时 skills/connectors 透传与远程快照解析。
+
+**说明**
+
+公开快照仍只含基本信息 + 职责与人设 + 指令 + 技能 + 连接器引用，资料、记忆、模型与任务天然不在快照中；导入方拿到技能内部能力键与连接器 id 引用，连接本体随导入方账户走。验证：mobile 与 server `pnpm typecheck` 通过，`agent-market.test.ts` 11 个测试全部通过。
+
 ### 2026-11-20 · 顶部 Agent 胶囊可切换右侧栏开关（桌面三栏模式）
 
 **背景**

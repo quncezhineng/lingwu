@@ -22,6 +22,7 @@ import {
   agentSpaceStorageKey,
   applySkillEdits,
   collapseSkillEdits,
+  copySkillsIntoLibrary,
   createAgentFromTemplate,
   createCustomSkill,
   DEFAULT_PREFERENCES,
@@ -45,8 +46,14 @@ type CreateAgentInput = {
   avatar: AgentAvatarId;
   /** 创建时直接预置到该智能体的技能目录 id（如从市场导入内置智能体）。 */
   installedSkills?: string[];
-  /** 创建时预置的系统指令（如从市场导入内置智能体的完整 system_message）。 */
+  /** 创建时直接预置的自建技能快照（如从市场导入时复制发布方技能内容）。 */
+  customSkills?: AgentSkill[];
+  /** 预置的系统指令（如从市场导入内置智能体的完整 system_message）。 */
   instructions?: string;
+  /** 内部能力键，与模板预置合并（如从市场导入时复制发布方的技能）。 */
+  skills?: string[];
+  /** 预置分配给该智能体的连接器引用 id（如从市场导入时复制发布方的连接器）。 */
+  installedConnectors?: string[];
 };
 
 type AgentSpaceContextValue = {
@@ -273,11 +280,23 @@ export function AgentSpaceProvider({
       ? { ...agent, installedSkills: [...new Set(input.installedSkills)].slice(0, 60) }
       : agent;
     if (input.instructions?.trim()) preset.instructions = input.instructions.trim().slice(0, 4000);
-    setState((value) => ({
-      ...value,
-      currentAgentId: preset.id,
-      agents: [...value.agents, preset],
-    }));
+    setState((value) => {
+      // 从市场导入的自建技能：复制成导入用户账户级技能库里的独立记录（新 id / 新时间戳），
+      // 新 Agent 用 skillRefs 引用这些记录而不是持有孤儿副本——这样导入用户能在
+      // 「我的技能」里看到、独立编辑和管理它们，改原件时导入的智能体同步生效。
+      const imported = copySkillsIntoLibrary(input.customSkills ?? [], value.skillLibrary);
+      const nextAgent: AgentDefinition =
+        imported.refs.length > 0
+          ? { ...preset, skillRefs: imported.refs.slice(0, 60), customSkills: [] }
+          : preset;
+      const next: AgentSpaceState = {
+        ...value,
+        currentAgentId: nextAgent.id,
+        agents: [...value.agents, nextAgent],
+      };
+      // 只在确实有技能写入技能库时替换引用：没有自建技能导入时保持原状，避免无谓的引用变化。
+      return imported.refs.length > 0 ? { ...next, skillLibrary: imported.skillLibrary } : next;
+    });
     return preset;
   }, []);
 

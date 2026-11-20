@@ -81,7 +81,7 @@ const app = {
   "modelSettings.rateLimited": "模型服务请求过于频繁，请稍后重试。",
   "modelSettings.connectionFailed": "无法连接模型服务，请检查 BASE_URL 和网络后重试。",
   "modelSettings.modelUnavailable": "所选模型暂不可用，请选择其他模型，或联系管理员更新模型目录。",
-  "app.webTitle": "灵悟 — 你的个人投研智能体",
+  "app.webTitle": "灵悟 · 你的个人投研智能体",
   "app.welcomeTitle": "欢迎使用灵悟，你的个人投研智能体。",
   "app.welcomeSubtitle": "让每一次研究，都有清晰的下一步。",
   "app.authConceptEyebrow": "个人投研智能体",
