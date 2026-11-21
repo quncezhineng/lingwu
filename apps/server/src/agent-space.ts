@@ -36,7 +36,9 @@ const agentSchema = z
       "custom",
     ]),
     name: z.string().trim().min(1).max(20),
-    role: z.string().trim().min(1).max(30),
+    // role ≤ 50：内置智能体导入时把面向市场的简介（detail，最长约 39 字）写进 role，
+    // 上限要比简介更长，否则导入后的首次保存会被 422 拒绝。
+    role: z.string().trim().min(1).max(50),
     persona: z.string().trim().min(1).max(1000),
     avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]),
     // 人设页的说话风格与「指令」提示词；旧客户端没有这些字段，保持可选。
@@ -153,7 +155,8 @@ export const marketAgentRecordSchema = z
     ownerName: shortText(80).optional(),
     agentId: identifier,
     name: z.string().trim().min(1).max(20),
-    role: z.string().trim().min(1).max(30),
+    // 与 agentSchema.role 同步放宽到 50，否则用长简介当 role 的智能体无法被公开。
+    role: z.string().trim().min(1).max(50),
     persona: z.string().trim().min(1).max(1000),
     avatar: z.enum(["orb", "bloom", "moon", "planet", "cat"]),
     // 模板预置的内部能力键，不再写入新公开快照（技能由 installedSkills/customSkills 承载）；

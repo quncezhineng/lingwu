@@ -2411,12 +2411,18 @@ export function AgentProductShell({
   );
   const sectionPane =
     section === "agent" ? (
+      // key 绑定当前智能体：在详情页内切换到另一个智能体时强制重挂载，
+      // 否则各分区子页面的本地编辑状态（useState(current.xxx)）会停留在上一个智能体。
       <AgentSettingsScreen
+        key={current.id}
         tabIntent={agentTabIntent}
         onTabIntentConsumed={() => setAgentTabIntent(null)}
       />
     ) : section === "channel" && activeChannel ? (
+      // key 绑定当前频道：与智能体详情页同理，切换频道时强制重挂载，
+      // 否则本地编辑状态（useState(channel.xxx)）会停留在上一个频道。
       <ChannelSettingsScreen
+        key={activeChannel.id}
         channel={activeChannel}
         tabIntent={channelTabIntent}
         onTabIntentConsumed={() => setChannelTabIntent(null)}

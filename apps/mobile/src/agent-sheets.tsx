@@ -465,7 +465,7 @@ function CreateAgentSheet({ onClose, onCreated }: { onClose: () => void; onCreat
         <AgentOrb avatar={avatar} size={68} />
       </View>
       <Field label={t("agentSpace.agentName")} value={name} onChangeText={setName} maxLength={20} />
-      <Field label={t("agentSpace.agentRole")} value={role} onChangeText={setRole} maxLength={30} />
+      <Field label={t("agentSpace.agentRole")} value={role} onChangeText={setRole} maxLength={50} />
       <Field
         label={t("agentSpace.agentPersona")}
         value={persona}

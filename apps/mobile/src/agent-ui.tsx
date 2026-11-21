@@ -31,7 +31,13 @@ import { CardGrid } from "./card-grid";
 import { useChannels } from "./channels";
 import { fileTypeName } from "./file-kind";
 import { activeLocaleTag, type TranslationFn, type TranslationKey, useTranslation } from "./i18n";
-import { runtimeLabel, runtimeLabelBilingual, statusLabel, tr } from "./i18n/translate";
+import {
+  artifactTitle,
+  runtimeLabel,
+  runtimeLabelBilingual,
+  statusLabel,
+  tr,
+} from "./i18n/translate";
 import {
   Activity,
   AlertTriangle,
@@ -1107,6 +1113,8 @@ export function ArtifactCard({
   const { t } = useTranslation();
   const { open } = useWorkspace();
   const Icon = artifact.kind === "finance" ? CircleDollarSign : FileText;
+  // 标题按当前界面语言展示（服务端对「每日市场简报」等标题硬编码了英文）。
+  const title = artifactTitle(artifact);
   // 产物卡：独立的「文件产物」视觉，与洞察卡（衬线标题）、计划卡（步骤）、审批卡区分开。
   // 分享 / 导出收纳在详情页工具栏里，卡片本身不重复放置动作按钮。
   return (
@@ -1126,9 +1134,7 @@ export function ArtifactCard({
         {onToggleSelect && (
           <Pressable
             accessibilityRole="checkbox"
-            accessibilityLabel={
-              selectLabel ?? t("screens.filesSelectLabel", { name: artifact.title })
-            }
+            accessibilityLabel={selectLabel ?? t("screens.filesSelectLabel", { name: title })}
             accessibilityState={{ checked: selected }}
             onPress={onToggleSelect}
             style={{ width: 32, minHeight: 40, alignItems: "center", justifyContent: "center" }}
@@ -1151,7 +1157,7 @@ export function ArtifactCard({
         )}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={artifact.title}
+          accessibilityLabel={title}
           onPress={() => open({ type: "artifact", artifact })}
           style={({ pressed }) => [
             { flex: 1, minWidth: 0, padding: onToggleSelect ? 0 : 12, gap: 6 },
@@ -1167,7 +1173,7 @@ export function ArtifactCard({
                 {`${statusLabel(artifact.kind)} · ${t("agent.artifactOpenDetail")}`}
               </Text>
               <Text numberOfLines={2} style={[s.heading, { fontSize: 15 }]}>
-                {artifact.title}
+                {title}
               </Text>
             </View>
             <ArrowUpRight size={15} color={colors.faint} />

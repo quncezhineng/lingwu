@@ -3,6 +3,7 @@ import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agen
 import type { AgentDefinition } from "./agent-space-model";
 import { type FileKind, fileKind } from "./file-kind";
 import type { TranslationKey } from "./i18n/locales/en";
+import { artifactTitle } from "./i18n/translate";
 
 type Dated = Pick<Artifact | AgentArtifact, "createdAt">;
 
@@ -126,12 +127,13 @@ export function groupArtifactsByAgent(
   });
 }
 
-/** 产物标题匹配搜索词；格式筛选对产物不适用，由调用方决定是否展示。 */
+/** 产物标题匹配搜索词（含本地化标题，保证中文界面下按中文仍能搜到）；
+ *  格式筛选对产物不适用，由调用方决定是否展示。 */
 export function filterArtifacts(
   artifacts: readonly AgentArtifact[],
   filters: { query: string },
 ): AgentArtifact[] {
   const query = filters.query.trim().toLowerCase();
   if (!query) return [...artifacts];
-  return artifacts.filter((artifact) => artifact.title.toLowerCase().includes(query));
+  return artifacts.filter((artifact) => artifactTitle(artifact).toLowerCase().includes(query));
 }

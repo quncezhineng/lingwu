@@ -361,7 +361,8 @@ function normalizeAgent(value: unknown, mainThreadId: string): AgentDefinition |
     threadId: system ? mainThreadId : stringValue(value.threadId) || id,
     template,
     name: stringValue(value.name, defaults.name).slice(0, 20) || defaults.name,
-    role: stringValue(value.role, defaults.role).slice(0, 30) || defaults.role,
+    // role ≤ 50，与服务端 agentSchema 对齐；内置智能体导入时 role 会是市场简介（最长约 39 字）。
+    role: stringValue(value.role, defaults.role).slice(0, 50) || defaults.role,
     persona: stringValue(value.persona, defaults.persona).slice(0, 1000) || defaults.persona,
     avatar: AVATARS.includes(value.avatar as AgentAvatarId)
       ? (value.avatar as AgentAvatarId)
@@ -569,7 +570,8 @@ export function createAgentFromTemplate(
     threadId: options.threadId ?? nextThreadId(),
     template,
     name: (options.name ?? preset.name).trim().slice(0, 20) || preset.name,
-    role: (options.role ?? preset.role).trim().slice(0, 30) || preset.role,
+    // role ≤ 50，与服务端 agentSchema 对齐（内置智能体导入时 role 会是市场简介）。
+    role: (options.role ?? preset.role).trim().slice(0, 50) || preset.role,
     persona: (options.persona ?? preset.persona).trim().slice(0, 1000) || preset.persona,
     avatar: options.avatar ?? preset.avatar,
     tone: options.tone ?? DEFAULT_AGENT_TONE,

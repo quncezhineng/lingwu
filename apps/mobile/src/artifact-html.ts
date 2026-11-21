@@ -20,7 +20,7 @@ import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import { assistantMarkdown } from "./assistant-markdown";
 import { webFontFamily } from "./font-family";
 import type { TranslationKey } from "./i18n/locales/en";
-import { activeLocaleTag, getActiveLocale, statusLabel, tr } from "./i18n/translate";
+import { activeLocaleTag, artifactTitle, getActiveLocale, statusLabel, tr } from "./i18n/translate";
 import { sandboxedDocument } from "./open-html-document";
 
 /** 转义为 HTML 安全文本。 */
@@ -831,6 +831,8 @@ export function renderArtifactHtml(
   options: { standalone?: boolean } = {},
 ): string {
   const standalone = options.standalone ?? true;
+  // 标题按当前界面语言展示（服务端对「每日市场简报」等标题硬编码了英文）。
+  const title = artifactTitle(artifact);
   const kind = statusLabel(artifact.kind);
   const stamp = formatStamp(artifact.createdAt);
   const rawSummary = artifact.summary.trim();
@@ -930,7 +932,7 @@ export function renderArtifactHtml(
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${escapeHtml(artifact.title)}</title>
+<title>${escapeHtml(title)}</title>
 <style>
   :root {
     color-scheme: light;
@@ -1218,11 +1220,11 @@ export function renderArtifactHtml(
 </style>
 </head>
 <body>
-  <main class="page" aria-label="${escapeHtml(artifact.title)}">
+  <main class="page" aria-label="${escapeHtml(title)}">
     ${
       standalone
-        ? `<h1 class="report-title">${escapeHtml(artifact.title)}</h1>`
-        : `<h1 class="sr-only">${escapeHtml(artifact.title)}</h1>`
+        ? `<h1 class="report-title">${escapeHtml(title)}</h1>`
+        : `<h1 class="sr-only">${escapeHtml(title)}</h1>`
     }
     ${
       standalone
@@ -1337,7 +1339,7 @@ function reportDateText(iso: string): string {
  * 表格与列表都走标准 GFM，粘到飞书、Notion、GitHub 都能直接排版。
  */
 export function renderArtifactMarkdown(artifact: AgentArtifact): string {
-  const parts: string[] = [`# ${artifact.title}`, ""];
+  const parts: string[] = [`# ${artifactTitle(artifact)}`, ""];
   const dateText = reportDateText(artifact.createdAt);
   const meta = [statusLabel(artifact.kind), dateText].filter(Boolean).join(" · ");
   if (meta) parts.push(`> ${meta}`, "");

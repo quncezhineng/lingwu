@@ -152,7 +152,7 @@ function PersonaEditor({
         ))}
       </View>
       <Field label={t("agentSpace.agentName")} value={name} onChangeText={setName} maxLength={20} />
-      <Field label={t("agentSpace.agentRole")} value={role} onChangeText={setRole} maxLength={30} />
+      <Field label={t("agentSpace.agentRole")} value={role} onChangeText={setRole} maxLength={50} />
       <Text style={[s.small, { color: colors.faint, marginBottom: 8 }]}>
         {t("agentSpace.tone")}
       </Text>

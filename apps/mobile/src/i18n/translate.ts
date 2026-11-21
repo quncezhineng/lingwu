@@ -195,6 +195,33 @@ export function runtimeLabelBilingual(value?: string | null): string {
   return zh === en ? en : `${zh} / ${en}`;
 }
 
+/** 服务端「每日市场简报」标题里日期部分的正则（用于从英文原文回读日期）。 */
+const BRIEFING_TITLE_DATE_PATTERN = /^Daily market briefing\s*·\s*(.+)$/;
+
+/**
+ * 产物标题的本地化展示。
+ *
+ * 服务端会把周期性产物的标题硬编码成英文并以
+ * `Daily market briefing · 2026-11-17` 的形式持久化，客户端语言包无法
+ * 覆盖原文；因此展示时按当前界面语言用标题模板重建，使其跟随全局语言
+ * 切换（中文「每日市场简报 · 日期」/ 英文「Daily market briefing · 日期」）。
+ * 其余标题为模型动态生成，原样返回。
+ */
+export function artifactTitle(artifact: {
+  title: string;
+  kind?: string;
+  data?: Record<string, unknown> | null;
+}): string {
+  if (artifact.kind !== "market_briefing") return artifact.title;
+  const rawDate = artifact.data?.date;
+  const date =
+    typeof rawDate === "string" && rawDate.trim()
+      ? rawDate.trim()
+      : BRIEFING_TITLE_DATE_PATTERN.exec(artifact.title)?.[1]?.trim();
+  const base = tr("agent.tplBriefingTitle");
+  return date ? `${base} · ${date}` : base;
+}
+
 /** 新旧版本使用过的默认智能体名称；这些值需要随界面语言自动本地化。 */
 const DEFAULT_AGENT_NAME_ALIASES = new Set([
   translate(FALLBACK_LOCALE, "common.assistantName"),

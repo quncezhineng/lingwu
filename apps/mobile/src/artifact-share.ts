@@ -16,7 +16,7 @@ import type { LingWuApi } from "./api";
 import { type ArtifactExportFormat, artifactExportText, artifactFileName } from "./artifact-export";
 import { renderArtifactMarkdown } from "./artifact-html";
 import { saveTextFile } from "./csv-file";
-import { statusLabel } from "./i18n/translate";
+import { artifactTitle, statusLabel } from "./i18n/translate";
 import { copyText } from "./message-share";
 import { publishShare } from "./share-page";
 
@@ -46,7 +46,7 @@ export async function shareArtifactLink(
   artifact: AgentArtifact,
 ): Promise<{ url: string; result: "copied" }> {
   const url = await publishShare(api, {
-    question: `${artifact.title} · ${statusLabel(artifact.kind)}`,
+    question: `${artifactTitle(artifact)} · ${statusLabel(artifact.kind)}`,
     answer: renderArtifactMarkdown(artifact),
   });
   await copyText(url);

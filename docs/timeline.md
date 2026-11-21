@@ -5,6 +5,326 @@
 
 ## 变更记录
 
+### 2026-11-21 · 界面：「所有技能与链接」的连接器分类不再显示「日历」入口
+
+**背景**
+
+「所有技能与链接」页的连接器分类里混入了一张「日历」卡片（id `calendar-workspace`）。它只是一个跳转「日历」页的快捷入口：没有连接流程、状态恒为「已连接」、点击只是打开页面，本质上不属于可连接的连接器，容易让人误以为它也是可用的连接能力。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：从 `items` 数组里删除 `calendar-workspace` 条目；同步更新 `HIDDEN_CAPABILITY_IDS` 上方的注释，说明连接器分类只放真正可连接的能力。
+
+**说明**
+
+删除后，连接器分类与左侧「选择连接器」弹窗的候选保持一致：内置的 Gmail、Google Calendar、OpenBot、智能体电脑，加上全部账户级应用连接器，不再包含页面快捷入口。验证：`pnpm --dir apps/mobile typecheck` 通过，`npx biome check` 无新增告警。
+
+### 2026-11-21 · 界面：「每日简报」标题跟随全局语言切换
+
+**背景**
+
+「每日简报」产物的标题在服务端被硬编码为英文（[service.ts](../apps/server/src/engine/service.ts) 里 `` `Daily market briefing · ${briefing.date}` ``），并作为 `artifact.title` 持久化下发。客户端各处只原样渲染这个标题，导致界面切成中文后，简报标题仍是英文，与其他文案不一致。
+
+**处理**
+
+- [translate.ts](../apps/mobile/src/i18n/translate.ts#L198-L223)：新增产物标题本地化纯函数 `artifactTitle()`。当 `artifact.kind === "market_briefing"` 时，用现成 key `agent.tplBriefingTitle`（en「Daily market briefing」/ zh-Hans「每日市场简报」）拼接日期重建标题，日期优先取 `artifact.data.date`，缺失时用正则从英文原文回读；其余标题为模型动态生成，原样返回。
+- 接入各渲染 / 搜索 / 分享点，使其随全局语言自动切换：
+  - [details.tsx](../apps/mobile/src/details.tsx)（产物详情弹层标题与预览标题）
+  - [agent-ui.tsx](../apps/mobile/src/agent-ui.tsx)（产物卡片标题与无障碍标签）
+  - [chat.tsx](../apps/mobile/src/chat.tsx)（侧栏「研究产物」行）
+  - [artifact-html.ts](../apps/mobile/src/artifact-html.ts)（HTML / Markdown 文档的 `<title>`、`aria-label`、`<h1>`）
+  - [search-sheet.tsx](../apps/mobile/src/search-sheet.tsx) 与 [file-library.ts](../apps/mobile/src/file-library.ts)（搜索关键词改用本地化标题，中文界面下按中文可搜到）
+  - [artifact-share.ts](../apps/mobile/src/artifact-share.ts)（分享链接的标题字段）
+
+**说明**
+
+标题不再依赖服务端原文，切换全局语言即时变中文 / 英文。导出文件名（[artifact-export.ts](../apps/mobile/src/artifact-export.ts)）有意保留服务端原始英文标题，以保证导出文件命名稳定、不随界面语言漂移。验证：`pnpm --dir apps/mobile typecheck` 通过，`npx biome check`（8 个改动文件）无告警。
+
+### 2026-11-21 · 界面：切换频道时详情页不再残留上一个频道的内容
+
+**背景**
+
+频道设置页存在与智能体详情页同样的状态残留问题：`ChannelSettingsScreen` 用 `useState(channel.avatar/name/description/instructions)` 初始化本地编辑字段，在右侧栏于 `channel` 分区内切换频道时，组件实例被复用、`useState` 不会重新取值，名称/描述/指令等会停留在上一个频道。
+
+**处理**
+
+- [apps/mobile/src/agent-product.tsx](../apps/mobile/src/agent-product.tsx#L2421-L2429)：给 `ChannelSettingsScreen` 加 `key={activeChannel.id}`，与 `AgentSettingsScreen` 的 `key={current.id}` 同一套路，切换频道时强制重挂载并重新初始化本地状态。
+
+**说明**
+
+上一轮修复智能体详情页时遗留的频道侧同类问题，本次一并补齐。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 界面：智能体对话页内容块宽度与输入对话框对齐
+
+**背景**
+
+关闭全局页面右侧栏（主列变宽）后，智能体对话页的消息内容块比底部输入对话框窄一截，左右各差 8px：消息列用的是 `messageColumnStyle`（最大 952），输入框用的是 `conversationColumnStyle`（最大 968）。频道对话页此前已统一到 968，智能体对话页仍是 952，两页设计宽度不一致。
+
+**处理**
+
+- [apps/mobile/src/chat.tsx](../apps/mobile/src/chat.tsx#L1594-L1600)：消息列表容器（`chat-message-viewport`）的列样式由 `messageColumnStyle` 改为 `conversationColumnStyle`，与底部输入框取自同一条常量；同步移除 `messageColumnStyle` 导入。
+- [apps/mobile/src/agent-layout.ts](../apps/mobile/src/agent-layout.ts)：删除已无引用的 `messageColumnStyle` 导出与 `agentLayout.messageMaxWidth: 952`，并把注释明确为「标题、消息列表、输入框等『整列』元素共用这一条宽度」。
+
+**说明**
+
+改后智能体对话页与频道对话页共用同一条内容列（968），消息内容块与输入对话框左右边缘完全对齐。验证：`pnpm --dir apps/mobile typecheck` 通过，`npx biome check` 无告警。
+
+### 2026-11-21 · 界面：切换智能体时详情页不再残留上一个智能体的内容
+
+**背景**
+
+在左侧栏依次点击智能体 A、B 的「设置」后，右侧详情页仍停留显示 A 的内容，没有切到 B。根因有两层：①已处于 agent 分区时 `navigate("agent")` 是 no-op，不会触发重渲染；②详情页及其各分区子页面用 `useState(current.xxx)` 初始化本地编辑状态，`useState` 只在首次挂载时取值，切换智能体（`current` 变了但组件没重建）不会同步。
+
+**处理**
+
+- [apps/mobile/src/agent-product.tsx](../apps/mobile/src/agent-product.tsx#L2416-L2419)：给 `AgentSettingsScreen` 加 `key={current.id}`。`key` 绑定当前智能体 id，切换智能体时 React 视为不同组件而强制重挂载，各子页面的本地状态随新智能体重新初始化。
+
+**说明**
+
+从详情页内切换到另一个智能体即刷新为后者内容。频道设置页 `ChannelSettingsScreen` 结构相同、可能存在同类问题，本次未改动。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 界面：搜索弹窗建议列表改为纯文本标题 + 简介
+
+**背景**
+
+搜索弹窗的建议列表中，每条命中会渲染整段 Markdown 富文本预览（标题、表格、来源链接等），行高参差、噪音大。用户希望列表只显示建议的标题和一句简介。
+
+**处理**
+
+- [apps/mobile/src/search-sheet.tsx](../apps/mobile/src/search-sheet.tsx#L266-L280)：`renderDocumentRow` 去掉 `detailMarkdown` 的富文本渲染通道，统一使用纯文本 `detail` 交给 `LinkRow`；同步移除不再使用的 `Text` 与 `AssistantResponse` 导入（改为只从 `./app-text` 取 `TextInput`）。
+
+**说明**
+
+`detailMarkdown` 字段仍保留在 `SearchDocument` 数据模型与记忆/产物映射处，只是列表不再消费它。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 市场详情弹窗「技能」图标统一为大脑图标
+
+**背景**
+
+用户发现智能体市场详情弹窗里「技能」相关图标是拼图（`Puzzle`），而 Agent 详情页的「技能」用的是大脑（`Brain`）图标，两处观感不一致，要求把市场详情弹窗的这两处图标改成和 Agent 详情页一致。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：把「技能」语义的三处 `Puzzle` 全部换成 `Brain`——左侧页签图标（`tabs` 里 `id: "skills"`）、技能卡片前的小图标、技能为空时的备注图标；`Puzzle` 已无引用，同步从图标导入里移除。
+
+**说明**
+
+`Brain` 原本已在该文件导入，仅替换图标组件，尺寸 / 颜色沿用原值（页签 16、卡片 14、备注 14），不改布局与文案。验证：`pnpm --dir apps/mobile typecheck` 通过，`icons.test.ts` 与 `agent-market.test.ts` 合计 20/20 通过。
+
+### 2026-11-21 · 指「平台提供智能体」的文案由「内置」改为「官方」
+
+**背景**
+
+用户希望把项目里「内置」这个术语统一改成「官方」，中英文都要改。全量扫描后发现项目里的「内置」其实有两种含义：①指平台官方提供的智能体（如「内置智能体」）；②指内嵌功能或数据（如「内置模型」「内置可用性页面」「内置数据」「内置目录」）。用户确认只替换第①类文案，第②类保留；代码标识符（`BUILTIN_MARKET_AGENTS` / `builtin` / `groupBuiltin` 等）也不动，只改显示文字。
+
+逐条核对后，真正展示给用户且指代「官方智能体」的文案只有一处（中英各一条）：智能体市场详情弹窗里「外部连接器」页签的空态提示。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agent.marketDetailConnectorBuiltin` 由「这个内置智能体现在没有添加连接器…」改为「这个官方智能体现在没有添加连接器；导入后可在智能体详情页的「连接器」里自行添加。」。
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：对应英文由内置措辞改为 `This official agent has no connectors added right now. …`。
+
+**说明**
+
+市场来源标签（`agent.marketSourceBuiltin` = `@灵悟` / `@LingWu`）已是官方口径，无需改动。其余含「内置」的文案均属「内嵌功能 / 数据」含义（内置模型、内置可用性页面、内置数据、内置目录）或代码注释，按用户选择保留。验证：`pnpm --dir apps/mobile typecheck` 通过，`i18n.test.ts` 16/16 通过。
+
+### 2026-11-21 · 精简删除 Agent 的提示文案
+
+**背景**
+
+用户认为删除确认弹窗里的提示「将移除这个 Agent 的入口。系统默认 Agent 不可删除。」表述拗口，且「入口」的说法不准确——删除是移除整个 Agent。改为「将移除这个 Agent，系统默认 Agent 不可删除。」
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agentSpace.deleteAgentNote` 文案由「将移除这个 Agent 的入口。系统默认 Agent 不可删除。」改为「将移除这个 Agent，系统默认 Agent 不可删除。」。
+
+**说明**
+
+仅改中文文案，措辞与语义不变（英文 `en/agent.ts` 保持原译）。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 内置智能体导入后内容与市场展示一一对应
+
+**背景**
+
+用户要求：内置智能体被「导入」成自己的智能体后，其内容要和市场里看到的严格一一对应——卡片里的「核心职责」变成自己智能体的核心职责、「人设描述」变成自己的人设描述，指令、技能、连接器也一一对应。
+
+核对后发现只有「核心职责」对不上：市场卡片与详情弹窗展示的是面向市场的简介（`detail`，最长约 39 字），而导入时写入新 Agent 的 `role` 是内置条目更短的「角色定位」（如「并购与资本市场」）。人设、指令、技能、连接器本就一致（内置条目未挂连接器，`connectors` 本就为空）。用户确认统一口径为「市场里的较长简介」。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`toImportTarget` 内置分支把 `role: builtin.role` 改为 `role: builtin.detail`，导入后新 Agent 的「核心职责」= 市场展示的简介。
+- `role` 上限由 30 放宽到 50（容纳最长 39 字的简介）：
+  - [apps/server/src/agent-space.ts](../apps/server/src/agent-space.ts)：`agentSchema.role` 与 `marketAgentRecordSchema.role` 均改为 `max(50)`（否则导入后首次保存 / 公开会被 422 拒绝）。
+  - [apps/mobile/src/agent-space-model.ts](../apps/mobile/src/agent-space-model.ts)：归一化与 `createAgent` 的 `slice(0, 30)` 改为 `slice(0, 50)`。
+  - [apps/mobile/src/agent-space.tsx](../apps/mobile/src/agent-space.tsx)：`updateAgent` 打补丁时的 `slice(0, 30)` 改为 `slice(0, 50)`。
+  - [apps/mobile/src/agent-sheets.tsx](../apps/mobile/src/agent-sheets.tsx) 与 [apps/mobile/src/bot-pages/edit.tsx](../apps/mobile/src/bot-pages/edit.tsx)：职责输入框 `maxLength={30}` 改为 `50`。
+- [apps/mobile/test/agent-market.test.ts](../apps/mobile/test/agent-market.test.ts)：新增 `ROLE_MAX = 50`，`role` 断言改用该上限，并补充「`detail` 不得超过 role 上限」的断言（因为它会写进 `role`）。
+
+**说明**
+
+改后内置智能体导入前后的「核心职责 / 人设描述 / 指令 / 技能 / 连接器」全部一一对应；人设、指令、技能、连接器无需改动。验证：`pnpm typecheck`（含移动端）通过，`agent-market.test.ts` 14/14 通过。
+
+### 2026-11-21 · 导入弹窗改为更窄更高
+
+**背景**
+
+导入确认弹窗内容变少后显得又宽又扁，用户希望宽度改小、高度改大。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：导入弹窗 `Sheet` 由 `narrow`（桌面最宽 560）改为 `small`（桌面最宽 440）；内容区加 `minHeight: 220` 并用 `justifyContent: "space-between"`，让导入说明置顶、按钮贴底，整窗更高。
+
+**说明**
+
+仅调整弹窗尺寸与内部排布，文案与逻辑不变（移动端仍为上拉整屏弹窗）。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 导入说明文字调大
+
+**背景**
+
+导入确认弹窗删去简介与人设后，仅剩的导入说明使用 `s.label`（眉标 10/14 大写），字号偏小，用户希望改大一点。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：导入说明文字由 `s.label`（眉标 10/14）改为 `s.muted`（正文 14/25），并去掉大写变换。
+
+**说明**
+
+仅调整字号与样式，文案与逻辑不变。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 导入确认弹窗去掉市场简介与人设展示
+
+**背景**
+
+用户发现「导入市场智能体」确认弹窗里，市场简介与人设内容是同一段文字（远程智能体的 `detail` 取的就是其 `persona`），相邻重复展示；用户认为该区域无需展示内容，直接删除。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：删除 `{importingAgent && (<Sheet>…)}` 内展示 `importingAgent.detail` 与 `importingAgent.persona` 的包裹区块，仅保留顶部导入说明与底部操作按钮。
+
+**说明**
+
+仅移除展示，`MarketImportTarget.persona` / `detail` 仍照常参与导入逻辑（`importAgent` 写入人设）。该改动对内置与远程智能体的导入弹窗同时生效。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 调整导入确认弹窗的区块顺序
+
+**背景**
+
+用户认为「导入市场智能体」确认弹窗里，导入说明（「将导入基本信息、人设、指令、技能与连接器…」）应放在最上方，先讲清导入会带来什么，再展示市场简介与人设内容，而不是夹在中间。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：`{importingAgent && (<Sheet>…)}` 内的顺序由「市场简介 → 导入说明 + 人设」改为「导入说明 → 市场简介 → 人设」；文案与样式（`s.label` / `s.muted` / `s.small`）不变。
+
+**说明**
+
+仅调整渲染顺序，不影响导入逻辑与文案。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 修正内置智能体「连接器」页签的空态文案
+
+**背景**
+
+用户指出原文案「内置智能体不绑定外部连接器；导入后可在智能体详情页的「连接器」里挂载」表述不准确：内置智能体并非**不能**绑定外部连接器，只是**当下这个内置智能体没有挂载连接器**而已。
+
+**处理**
+
+- [apps/mobile/src/i18n/locales/zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts)：`agent.marketDetailConnectorBuiltin` 改为「这个内置智能体现在没有挂载连接器；导入后可在智能体详情页的「连接器」里自行挂载。」
+- [apps/mobile/src/i18n/locales/en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts)：英文文案同步改为 “This built-in agent has no connectors attached right now. After importing, you can attach your own under “Connectors” on the agent detail page.”
+
+**说明**
+
+只改文案，中文与英文 key 集合保持一致，不涉及逻辑。验证：`apps/mobile/test/i18n.test.ts` 16/16 通过。
+
+### 2026-11-21 · 智能体市场详情弹窗连接器列表改为双列布局
+
+**背景**
+
+技能页签改为双列后，用户希望「连接器」页签保持同样排布，避免两个页签观感不一致。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：详情弹窗 `connectorsContent` 的连接器列表容器由单列改为 `flexDirection: "row" + flexWrap: "wrap"`；每张连接器卡片加 `flexBasis: "48%"`、`flexGrow: 1`、`minWidth: 0`，与技能卡片同一套双列规则。卡片内容（图标、名称、来自连接器市场的两行详情）不变。
+
+**说明**
+
+验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 智能体市场详情弹窗技能列表改为双列布局
+
+**背景**
+
+用户在智能体市场详情弹窗的「技能」页签看到，技能卡片是一列一张竖排的，列表较长时需要滚动很久，希望改成双列布局，一屏能看到更多技能。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：把详情弹窗 `skillsContent` 的技能列表容器由单列（仅 `gap: space.xs`）改为 `flexDirection: "row" + flexWrap: "wrap"` 的换行行容器；每张技能卡片加 `flexBasis: "48%"`、`flexGrow: 1`、`minWidth: 0`，两列平分内容区宽度铺满，技能多时滚动长度减半。卡片内部结构（图标、标题、两行详情截取）保持不变。
+
+**说明**
+
+这次只影响详情弹窗「技能」页签的排布，不改变技能数据、公开同步或导入逻辑。验证：`pnpm --dir apps/mobile typecheck` 通过。
+
+### 2026-11-21 · 智能体市场详情弹窗连接器卡片补充来自连接器市场的详情
+
+**背景**
+
+用户在智能体市场详情弹窗的“连接器”页签里看到，每个连接器小卡片只有一个名称（如“用户文件”），信息太少。用户希望这些小卡片能带出该连接器在连接器市场里的详情说明，让浏览者知道这个连接器能做什么。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - `CapabilityHubScreen` 里把原来的 `marketConnectorNames`（只存展示名）升级为 `marketConnectorMeta`（`Record<string, { name; detail? }>`）：数据源仍是内置工作区连接器（`connectorOptions(workspace)`）与账户级应用连接器（`appConnectorOptions(appConnectors.items)`）合并后的 `allConnectorOptions(...)`，同时取 `name` 与连接器市场里的 `detail`（账户级连接器即 `AppConnectorView.summary`）；
+  - 详情弹窗 `MarketAgentDetailSheet` 的入参由 `connectorNames` 改为 `connectorMeta`，内部 `connectorItems` 相应改为 `{ id, ...connectorMeta[id] }`，未登记（卸载/失效）的 id 仍按无名称跳过；
+  - 连接器卡片在名称下方新增一行灰字详情（`detail`），限制 2 行，改用 `alignItems: "flex-start"` 让图标在双行卡片里顶部对齐。
+
+**说明**
+
+这次只影响详情弹窗“连接器”页签的卡片信息量，不改变公开同步（仍只传连接器 id 引用）、连接器数据或导入逻辑；详情文案直接来自连接器市场，无需新增 i18n key。验证：`pnpm --dir apps/mobile typecheck` 通过，`agent-market.test.ts` 14/14 通过。
+
+### 2026-11-21 · 智能体市场详情弹窗隐藏“任务指令”标题，仅保留指令内容区
+
+**背景**
+
+继续按同一口径精简智能体市场详情弹窗：删除“任务指令”这一行标题文案，保留指令正文（Markdown 渲染）与无指令时的空状态说明。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：把 `instructionsContent` 里原来的 `DetailField`（带“任务指令”标签标题）改为纯内容容器 `View`，删掉标题行；指令 Markdown 块与 `marketDetailNoInstructions` 空状态文案均保持不变。i18n 的 `agent.marketDetailInstructions` key 仍保留在中英文语言包里。
+
+**说明**
+
+这次只影响详情弹窗“任务指令”页签的标题呈现，不改变指令数据或运行时行为。验证：mobile typecheck 通过。
+
+### 2026-11-21 · 智能体市场详情弹窗隐藏“技能连接器”标题，仅保留技能列表内容区
+
+**背景**
+
+用户希望继续精简智能体市场详情弹窗：删除“技能连接器”这一行标题文案，但保留技能列表本身与空状态说明。这与上一条“外部连接器”标题的处理口径一致——只去掉标题元素，不动技能功能区。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：把 `skillsContent` 里原来的 `DetailField`（带“技能连接器”标签标题）改为纯内容容器 `View`，删掉标题行；技能列表渲染与 `builtin` / 非 builtin 的空状态文案均保持不变。i18n 的 `agent.marketDetailSkills` key 仍保留在中英文语言包里（key 集合对齐不受影响）。
+
+**说明**
+
+这次只影响详情弹窗“技能”页签的标题呈现，不改变技能数据、公开同步或导入复制逻辑。验证：mobile typecheck 通过。
+
+### 2026-11-21 · 智能体市场详情弹窗隐藏“外部连接器”标题，仅保留连接器内容区
+
+**背景**
+
+用户希望删除智能体市场详情弹窗里的“外部连接器”这一行标题文案，但不希望连带删掉连接器列表或空状态说明。也就是说，这里要去掉的是标题元素本身，而不是连接器功能区。
+
+**处理**
+
+- [apps/mobile/src/capability-hub.tsx](../apps/mobile/src/capability-hub.tsx)：
+  - 将详情弹窗 `connectorsContent` 从带 `DetailField` 标题的结构，调整为仅保留内容容器；
+  - 删除 `agent.marketDetailConnectors` 在该处的渲染，因此“外部连接器”标题不再显示；
+  - 连接器列表、内置智能体说明、普通智能体空态说明都保持不变。
+
+**说明**
+
+这次改动只影响市场详情弹窗里连接器区块的标题显示，不影响连接器数据、导入公开逻辑、空态文案或其他详情页分区。验证：mobile typecheck 通过，`agent-market.test.ts` 通过。
+
 ### 2026-11-21 · 智能体市场卡片标题下去掉作者行，仅在详情弹窗保留作者显示
 
 **背景**

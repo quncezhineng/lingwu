@@ -3,8 +3,7 @@ import { useMemo, useState } from "react";
 import { Platform, type TextStyle, View } from "react-native";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import { useAgentWorkspace } from "./agent-workspace";
-import { Text, TextInput } from "./app-text";
-import { AssistantResponse } from "./assistant-response";
+import { TextInput } from "./app-text";
 import { fileSourceLabel, markdownExcerpt } from "./file-library";
 import {
   type GlobalSearchKind,
@@ -13,7 +12,7 @@ import {
   type SearchDocument,
 } from "./global-search";
 import { type TranslationKey, useTranslation } from "./i18n";
-import { statusLabel } from "./i18n/translate";
+import { artifactTitle, statusLabel } from "./i18n/translate";
 import {
   Bell,
   CalendarDays,
@@ -98,16 +97,18 @@ function taskDocument(task: AgentTask): SearchDocument {
 }
 
 function artifactDocument(artifact: AgentArtifact): SearchDocument {
-  const headline = splitArtifactHeadline(artifact.title);
+  // 标题按当前界面语言展示（服务端对「每日市场简报」等标题硬编码了英文）。
+  const title = artifactTitle(artifact);
+  const headline = splitArtifactHeadline(title);
   const markdownPreview = headline.markdown || artifact.summary.trim();
   return {
     id: artifact.id,
     kind: "artifact",
-    title: artifact.title,
+    title,
     displayTitle: headline.displayTitle,
     detail: markdownExcerpt(markdownPreview || statusLabel(artifact.kind), 160),
     detailMarkdown: markdownPreview || undefined,
-    keywords: `${statusLabel(artifact.kind)} ${artifact.summary}`,
+    keywords: `${title} ${statusLabel(artifact.kind)} ${artifact.summary}`,
     updatedAt: artifact.createdAt,
   };
 }
@@ -274,19 +275,7 @@ export function GlobalSearchSheet({ onClose }: { onClose: () => void }) {
         key={`${document.kind}-${document.id}`}
         icon={KIND_ICONS[document.kind]}
         title={title}
-        detail={document.detailMarkdown ? undefined : detail}
-        detailNode={
-          document.detailMarkdown ? (
-            <View style={{ gap: 4 }}>
-              {recent ? (
-                <Text style={[s.small, { color: colors.faint }]}>
-                  {t(KIND_LABELS[document.kind])}
-                </Text>
-              ) : null}
-              <AssistantResponse content={document.detailMarkdown} compact />
-            </View>
-          ) : undefined
-        }
+        detail={detail}
         onPress={() => choose(document)}
       />
     );

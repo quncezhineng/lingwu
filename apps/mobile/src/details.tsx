@@ -39,7 +39,7 @@ import { fileExtension, fileKind, fileMimeType } from "./file-kind";
 import HtmlPreview from "./HtmlPreview";
 import { activeLocaleTag, useTranslation } from "./i18n";
 import { LanguagePicker } from "./i18n/LanguageSwitcher";
-import { statusLabel } from "./i18n/translate";
+import { artifactTitle, statusLabel } from "./i18n/translate";
 import { LOCALE_LABELS } from "./i18n/types";
 import {
   CalendarDays,
@@ -1635,7 +1635,7 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
 
   return (
     <Sheet
-      title={artifact.title}
+      title={artifactTitle(artifact)}
       // 版头收到整个页面顶部：类型 Chip + 生成时间放在标题正下方，与正文阅读列对齐；
       // 文档内部（standalone: false）不再重复渲染 report-head。
       subtitle={
@@ -1703,7 +1703,7 @@ function ArtifactDetail({ artifact }: { artifact: AgentArtifact }) {
           )}
         </View>
         {/* 报告铺满整宽：内部 `.page` 自身 880 居中，滚动条出现在弹窗最右侧。 */}
-        <HtmlPreview html={html} title={artifact.title} interactive={hasHtmlPreview} />
+        <HtmlPreview html={html} title={artifactTitle(artifact)} interactive={hasHtmlPreview} />
       </View>
     </Sheet>
   );

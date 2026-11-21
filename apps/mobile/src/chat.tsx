@@ -35,7 +35,7 @@ import { z } from "zod";
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
 import type { OrchestrationNode } from "../../../packages/domain/src/orchestration";
-import { conversationColumnStyle, messageColumnStyle } from "./agent-layout";
+import { conversationColumnStyle } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { AgentSkillInspectSheet } from "./agent-sheets";
 import { useAgentSpace } from "./agent-space";
@@ -105,7 +105,7 @@ import { DesktopToolCard } from "./desktop-tool-card";
 import { ComposerAttachments, FilePickerSheet } from "./file-picker";
 import { pickAndUploadFile } from "./file-upload";
 import { type TranslationKey, useTranslation } from "./i18n";
-import { statusLabel } from "./i18n/translate";
+import { artifactTitle, statusLabel } from "./i18n/translate";
 import {
   ArrowDown,
   ArrowUpRight,
@@ -1595,7 +1595,8 @@ export function ChatScreen({
           testID="chat-message-viewport"
           ref={list}
           style={[
-            messageColumnStyle,
+            // 消息列与输入框共用 conversationColumnStyle：内容块宽度与底部输入对话框完全一致。
+            conversationColumnStyle,
             { flex: 1, opacity: historyPositioned ? 1 : 0 },
             phoneChatFade && edgeFadeMask(contentTopInset, contentBottomInset),
           ]}
@@ -2779,7 +2780,7 @@ function ArtifactsPanel({
                   <Pressable
                     key={artifact.id}
                     accessibilityRole="button"
-                    accessibilityLabel={t("chat.artifactRow", { name: artifact.title })}
+                    accessibilityLabel={t("chat.artifactRow", { name: artifactTitle(artifact) })}
                     onPress={() => onOpenArtifact(artifact)}
                     style={listRowStyle}
                   >
@@ -2804,7 +2805,7 @@ function ArtifactsPanel({
                         numberOfLines={1}
                         style={{ fontSize: 14, fontWeight: "600", color: colors.text }}
                       >
-                        {artifact.title}
+                        {artifactTitle(artifact)}
                       </Text>
                       <Text style={s.small}>
                         {statusLabel(artifact.kind)} · {dateLabel(artifact.createdAt)}

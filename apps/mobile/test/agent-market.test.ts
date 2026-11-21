@@ -22,6 +22,8 @@ import { skillCatalog } from "../src/skill-catalog.ts";
 /** 服务端 `agentSchema` 的字段上限，超限会让 PUT 被 422 拒绝。 */
 const PERSONA_MAX = 1000;
 const INSTRUCTIONS_MAX = 4000;
+/** role ≤ 50：导入时会把市场简介（detail）写进新 Agent 的 role。 */
+const ROLE_MAX = 50;
 
 const skillIds = new Set(skillCatalog.map((skill) => skill.id));
 const categories = new Set<MarketAgentCategory>([
@@ -43,10 +45,18 @@ test("内置智能体：id 唯一且必填展示字段齐全", () => {
   );
   for (const item of BUILTIN_MARKET_AGENTS) {
     assert.ok(item.id.trim(), "缺少 id");
-    // 服务端 name ≤ 20、role ≤ 30，超限同样会让导入后的首次保存失败。
+    // 服务端 name ≤ 20、role ≤ 50，超限同样会让导入后的首次保存失败。
     assert.ok(item.name.trim() && item.name.length <= 20, `${item.id} 的 name 缺失或超过 20 字`);
-    assert.ok(item.role.trim() && item.role.length <= 30, `${item.id} 的 role 缺失或超过 30 字`);
+    assert.ok(
+      item.role.trim() && item.role.length <= ROLE_MAX,
+      `${item.id} 的 role 缺失或超过 ${ROLE_MAX} 字`,
+    );
     assert.ok(item.detail.trim(), `${item.id} 缺少 detail（卡片简介）`);
+    // 导入内置智能体时 detail 会写进新 Agent 的 role，必须同样落在 role 上限内。
+    assert.ok(
+      item.detail.length <= ROLE_MAX,
+      `${item.id} 的 detail 超过 role 上限（${item.detail.length} > ${ROLE_MAX}）`,
+    );
     assert.ok(item.persona.trim(), `${item.id} 缺少 persona（人设）`);
     assert.ok(item.instructions.trim(), `${item.id} 缺少 instructions（系统指令）`);
     assert.ok(categories.has(item.category), `${item.id} 的分类非法：${item.category}`);

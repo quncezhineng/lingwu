@@ -38,7 +38,6 @@ import {
   Link2,
   Mail,
   Plus,
-  Puzzle,
   Search,
   ShieldCheck,
   Sparkles,
@@ -391,13 +390,7 @@ function OfficialMark() {
 }
 
 /** 智能体作者展示：统一复用 @作者名；官方灵悟前加绿色认证标。 */
-function MarketAgentAuthorLine({
-  source,
-  official,
-}: {
-  source: string;
-  official?: boolean;
-}) {
+function MarketAgentAuthorLine({ source, official }: { source: string; official?: boolean }) {
   return (
     <View
       style={{
@@ -726,15 +719,15 @@ function resolveMarketEntrySkills(
  */
 function MarketAgentDetailSheet({
   entry,
-  connectorNames,
+  connectorMeta,
   onClose,
   onImport,
   onUnpublish,
   onOpenAgent,
 }: {
   entry: MarketAgentEntry;
-  /** 连接器 id → 展示名；公开的智能体只带 id 引用，靠这里渲染成可读名称。 */
-  connectorNames: Record<string, string>;
+  /** 连接器 id → { 展示名, 简介 }；公开的智能体只带 id 引用，靠这里渲染成可读信息。 */
+  connectorMeta: Record<string, { name: string; detail?: string }>;
   onClose: () => void;
   /** 内置智能体 / 其他用户公开的智能体：导入（复制）为我的智能体。 */
   onImport?: () => void;
@@ -755,10 +748,11 @@ function MarketAgentDetailSheet({
   // 用户公开的智能体带发布方同步的两类技能（技能目录技能 id + 自建技能快照），
   // 统一解析后再渲染；模板预置的内部能力键不展示（详情页技能区同样不展示）。
   const skills = resolveMarketEntrySkills(entry, locale);
-  // 公开的智能体只带连接器 id 引用，映射成本地化名称；未登记（卸载/失效）的 id 跳过。
+  // 公开的智能体只带连接器 id 引用，映射成本地化的名称与简介（来自连接器市场）；
+  // 未登记（卸载/失效）的 id 跳过。
   const connectorItems = entry.connectors
-    .map((id) => ({ id, name: connectorNames[id] }))
-    .filter((item): item is { id: string; name: string } => Boolean(item.name));
+    .map((id) => ({ id, ...connectorMeta[id] }))
+    .filter((item): item is { id: string; name: string; detail?: string } => Boolean(item.name));
   // 「核心职责」的取值：内置智能体取面向市场的简介（detail）；
   // 用户公开的智能体没有市场简介，直接用它自己的职责（role），
   // 与 Agent 详情页「职责与人设」下的「核心职责」保持一一对应。
@@ -814,7 +808,7 @@ function MarketAgentDetailSheet({
   }> = [
     { id: "persona", icon: Target, title: t("agent.marketDetailPersona") },
     { id: "instructions", icon: Terminal, title: t("agent.marketTabInstructions") },
-    { id: "skills", icon: Puzzle, title: t("agent.marketTabSkills") },
+    { id: "skills", icon: Brain, title: t("agent.marketTabSkills") },
     { id: "connectors", icon: Link2, title: t("agent.marketTabConnectors") },
   ];
   const active = tabs.find((item) => item.id === tab) ?? tabs[0];
@@ -844,7 +838,7 @@ function MarketAgentDetailSheet({
   );
   const instructionsContent = (
     <View style={{ gap: space.lg }}>
-      <DetailField label={t("agent.marketDetailInstructions")}>
+      <View style={{ gap: space.compact }}>
         {instructions ? (
           <View
             style={{
@@ -864,19 +858,24 @@ function MarketAgentDetailSheet({
         ) : (
           <DetailNote icon={Terminal}>{t("agent.marketDetailNoInstructions")}</DetailNote>
         )}
-      </DetailField>
+      </View>
     </View>
   );
 
   const skillsContent = (
     <View style={{ gap: space.lg }}>
-      <DetailField label={t("agent.marketDetailSkills")}>
+      <View style={{ gap: space.compact }}>
         {skills.length ? (
-          <View style={{ gap: space.xs }}>
+          // 技能卡片双列排布：48% 基础宽度 + flexGrow 平分剩余空间，
+          // 两列铺满内容区；技能数量多时也只需一半的滚动长度。
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
             {skills.map((skill) => (
               <View
                 key={skill.id}
                 style={{
+                  flexBasis: "48%",
+                  flexGrow: 1,
+                  minWidth: 0,
                   flexDirection: "row",
                   alignItems: "flex-start",
                   gap: space.xs,
@@ -897,7 +896,7 @@ function MarketAgentDetailSheet({
                     backgroundColor: colors.sky,
                   }}
                 >
-                  <Puzzle size={14} strokeWidth={1.8} color={colors.primaryStrong} />
+                  <Brain size={14} strokeWidth={1.8} color={colors.primaryStrong} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0, gap: space.hairline }}>
                   <Text style={[textScale.markMedium, { color: colors.text, fontWeight: "600" }]}>
@@ -913,27 +912,32 @@ function MarketAgentDetailSheet({
             ))}
           </View>
         ) : (
-          <DetailNote icon={Puzzle}>
+          <DetailNote icon={Brain}>
             {entry.builtin
               ? t("agent.marketDetailNoSkills")
               : t("agent.marketDetailSkillsInDetail")}
           </DetailNote>
         )}
-      </DetailField>
+      </View>
     </View>
   );
 
   const connectorsContent = (
     <View style={{ gap: space.lg }}>
-      <DetailField label={t("agent.marketDetailConnectors")}>
+      <View style={{ gap: space.compact }}>
         {connectorItems.length ? (
-          <View style={{ gap: space.xs }}>
+          // 连接器卡片双列排布：48% 基础宽度 + flexGrow 平分剩余空间，
+          // 两列铺满内容区，与「技能」页签的排布保持一致。
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
             {connectorItems.map((item) => (
               <View
                 key={item.id}
                 style={{
+                  flexBasis: "48%",
+                  flexGrow: 1,
+                  minWidth: 0,
                   flexDirection: "row",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   gap: space.xs,
                   padding: space.sm,
                   borderRadius: radius.control,
@@ -954,10 +958,15 @@ function MarketAgentDetailSheet({
                 >
                   <Link2 size={14} strokeWidth={1.8} color={colors.primaryStrong} />
                 </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flex: 1, minWidth: 0, gap: space.xxs }}>
                   <Text style={[textScale.markMedium, { color: colors.text, fontWeight: "600" }]}>
                     {item.name}
                   </Text>
+                  {item.detail ? (
+                    <Text numberOfLines={2} style={[textScale.bodySmall, { color: colors.muted }]}>
+                      {item.detail}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
             ))}
@@ -969,7 +978,7 @@ function MarketAgentDetailSheet({
               : t("agent.marketDetailConnectorUser")}
           </DetailNote>
         )}
-      </DetailField>
+      </View>
     </View>
   );
   const content = (() => {
@@ -2146,14 +2155,14 @@ export function CapabilityHubScreen() {
   const { width } = useWindowDimensions();
   const { navigate, workspace, api, refresh, notify, open, prefillPrompt } = useWorkspace();
   const appConnectors = useAppConnectors(api);
-  // 连接器 id → 展示名 的映射（内置工作区连接器 + 账户级应用连接器），
-  // 供市场详情弹窗把发布方公开的连接器 id 引用渲染成名称。
-  const marketConnectorNames = useMemo(() => {
-    const names: Record<string, string> = {};
+  // 连接器 id → 展示名 / 简介 的映射（内置工作区连接器 + 账户级应用连接器），
+  // 供市场详情弹窗把发布方公开的连接器 id 引用渲染成可读名称与说明。
+  const marketConnectorMeta = useMemo(() => {
+    const meta: Record<string, { name: string; detail?: string }> = {};
     for (const option of allConnectorOptions(connectorOptions(workspace), appConnectors.items)) {
-      names[option.id] = option.name;
+      meta[option.id] = { name: option.name, detail: option.detail };
     }
-    return names;
+    return meta;
   }, [workspace, appConnectors.items]);
   const [appSlug, setAppSlug] = useState<string | null>(null);
   const {
@@ -2428,19 +2437,6 @@ export function CapabilityHubScreen() {
       onPress: () => navigate("mail"),
     },
     {
-      id: "calendar-workspace",
-      type: "connectors",
-      tags: ["workspace", "connections"],
-      title: t("app.titleCalendar"),
-      detail: t("agent.shortcutCalendarDetail"),
-      icon: CalendarDays,
-      iconColor: serviceBrands.googleCalendar.fg,
-      iconSurface: serviceBrands.googleCalendar.surface,
-      source: workspaceSource,
-      state: "connected",
-      onPress: () => navigate("calendar"),
-    },
-    {
       id: "browser",
       type: "connectors",
       tags: ["connections", "research"],
@@ -2591,7 +2587,10 @@ export function CapabilityHubScreen() {
       if (!builtin) return undefined;
       return {
         name: builtin.name,
-        role: builtin.role,
+        // 「核心职责」在市场卡片与详情弹窗里展示的是面向市场的简介（detail），
+        // 导入成自己的智能体后要一字不差地对应上，所以这里把 detail 直接写进 role；
+        // role 的上限（服务端 agentSchema + 移动端归一化）已同步放宽以容纳这份简介。
+        role: builtin.detail,
         persona: builtin.persona,
         avatar: builtin.avatar,
         detail: builtin.detail,
@@ -2651,8 +2650,8 @@ export function CapabilityHubScreen() {
     contentWidth >= 1000 ? 4 : contentWidth >= 680 ? 3 : 2,
   );
 
-  // 连接页展示 Gmail、Google Calendar、OpenBot 和智能体电脑。
-  // 日历工作区入口已恢复；邮件快捷卡仍隐藏。
+  // 连接器只放真正可连接的能力：Gmail、Google Calendar、OpenBot、智能体电脑，以及账户级应用连接器。
+  // 邮件是工作区页面快捷入口，不属于连接器，隐藏。
   const HIDDEN_CAPABILITY_IDS: Partial<Record<CapabilityType, readonly string[]>> = {
     plugins: ["mail"],
   };
@@ -3078,7 +3077,7 @@ export function CapabilityHubScreen() {
       {detailEntry && (
         <MarketAgentDetailSheet
           entry={detailEntry}
-          connectorNames={marketConnectorNames}
+          connectorMeta={marketConnectorMeta}
           onClose={() => setDetailEntry(undefined)}
           onImport={
             detailEntry.builtin || detailEntry.remote
@@ -3119,18 +3118,14 @@ export function CapabilityHubScreen() {
           )}
           subtitle={importingAgent.name}
           onClose={() => setImportingAgent(undefined)}
-          narrow
+          small
         >
-          <View style={{ gap: 16 }}>
-            <Text style={s.muted}>{importingAgent.detail}</Text>
-            <View style={{ gap: 6 }}>
-              <Text style={s.label}>
-                {t(
-                  importingAgent.remote ? "agent.marketRemoteImportHint" : "agent.marketImportHint",
-                )}
-              </Text>
-              <Text style={s.small}>{importingAgent.persona}</Text>
-            </View>
+          {/* 导入说明置顶，按钮贴底：整窗收窄（small）并抬高（minHeight），避免又宽又扁。 */}
+          <View style={{ gap: 16, justifyContent: "space-between", minHeight: 100 }}>
+            {/* 导入说明：只讲清「导入会带来什么」，用正文档（14/25）显示，便于阅读。 */}
+            <Text style={s.muted}>
+              {t(importingAgent.remote ? "agent.marketRemoteImportHint" : "agent.marketImportHint")}
+            </Text>
             <View style={[s.row, { gap: 10, marginTop: 4 }]}>
               <Button style={{ flex: 1 }} onPress={() => setImportingAgent(undefined)}>
                 {t("common.cancel")}

@@ -698,7 +698,7 @@ const agent = {
   "agent.marketImportTitle": "Import agent",
   "agent.marketImportConfirm": "Import",
   "agent.marketImportHint":
-    "Importing copies the agent to a new agent in your agent dialog list, which you can further customize.",
+    "Imports the basic info, persona, instructions, skills and connector. The imported agent appears in your agent chat list, ready for further edits.",
   "agent.marketRemoteImport": "Import",
   "agent.marketRemoteImportTitle": "Import agent",
   "agent.marketRemoteImportConfirm": "Import",
@@ -742,11 +742,11 @@ const agent = {
   "agent.marketDetailCollapse": "Collapse",
   "agent.marketDetailSkills": "Skill connectors",
   "agent.marketDetailNoSkills": "This agent has no preset skills.",
-  "agent.marketDetailSkillsInDetail": "This agent does not expose any skills.",
+  "agent.marketDetailSkillsInDetail": "This agent does not added any skills.",
   "agent.marketDetailConnectors": "External connectors",
   "agent.marketDetailConnectorBuiltin":
-    "Built-in agents do not bind external connectors. After importing, attach them under “Connectors” on the agent detail page.",
-  "agent.marketDetailConnectorUser": "This agent does not expose any connectors.",
+    "This official agent has no connectors added right now. After importing, you can add your own under “Connectors” on the agent detail page.",
+  "agent.marketDetailConnectorUser": "This agent does not added any connectors.",
   "agent.marketTabInstructions": "Instructions",
   "agent.marketTabSkills": "Skills",
   "agent.marketTabConnectors": "Connectors",
