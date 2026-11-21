@@ -5,6 +5,102 @@
 
 ## 变更记录
 
+### 2026-11-21 · 频道：每轮对话结束自动把这一轮的结论沉淀进频道记忆
+
+**背景**
+
+频道详情里的「记忆」板块只看不写：它展示 `agentId === channel.id` 的记忆，但除了用户手动说「记住：……」/「remember …」这一条路径，频道每完成一轮对话并不会自动积淀内容。用户希望「每次频道对话都自动总结几条沉淀进频道记忆」，这样频道越聊越有上下文。
+
+**处理**
+
+- [channel-chat.ts](../apps/server/src/engine/channel-chat.ts#L1345-L1462)：新增 `settleChannelMemories()` 与配套常量、纯函数。
+  - 常量：`CHANNEL_MEMORY_LIMIT = 3`（一轮最多沉淀 3 条，避免淹掉记忆板块）、`CHANNEL_MEMORY_MIN_CHARS = 80`（用户消息 + 成员回复太短就不值得占位，例如寒暄）、`CHANNEL_MEMORY_TRANSCRIPT_LIMIT = 12000`（送入整理提示词的正文上限）。
+  - `parseMemoryCandidates(raw)`（已 export，便于单测）：从模型输出里取第一段 `[...]` 做 `JSON.parse`，容错接受字符串或 `{text, category}` 对象，单条截断到 400 字，`category` 只认 `MEMORY_CATEGORIES` 词表（越界回退「关注领域」），最多取 `CHANNEL_MEMORY_LIMIT` 条。
+  - 流程：取组长（`channelLeader`，回退首位成员）的模型跑一次单轮文本补全（`completeText`，不挂工具、不进线程），把「用户这轮说的 + 成员回复」整理成 JSON 数组；按归一化文本（忽略大小写 / 空白 / 标点符号）对该频道已有记忆去重；写入 `agentId = channel.id`、`kind = "fact"`、`source = "Channel chat"`、id = `sha256("${channel.id}:auto:${归一化文本}")`（`insertIfAbsent` 幂等）。
+  - 触发点：四拍（分工）分支与普通分支都在 `emit({ type: "done" })` 之后、`signal` 未 abort 时才调用——先把气泡推给界面定稿，再补写记忆；无成员发言的早退分支不沉淀。
+  - 整体包在 `try/catch` 里静默失败，且不接 `signal`：沉淀只是锦上添花，任何异常都不该影响已经完成的这一轮对话。
+
+**说明**
+
+- 手动「记住：……」路径保持不变（`memoryToKeep`，id 前缀 `:fact:`），自动沉淀用 `:auto:` 前缀，两者互不覆盖。
+- 记忆分类沿用既有词表（投资目标 / 风险偏好 / 关注领域 / 分析习惯 / 关注标的 / 复盘教训），频道记忆板块会按分类展示新条目。
+- 测试：[tests/channel-chat.test.ts](../tests/channel-chat.test.ts#L24-L52) 的模型 fixture 增加「沉淀记忆」分支（识别到整理提示词时回一段合法 JSON，且不进入 `prompts` 下标断言），并在主流程里用一轮长消息断言「`agentId === channel.id`、`source === "Channel chat"` 的自动记忆真的落库」。`npx tsx --import ./tests/setup.ts --test tests/channel-chat.test.ts` 连跑 3 次均 `pass 5 / fail 0`；`pnpm typecheck`、`npx biome check` 通过。
+
+### 2026-11-21 · 界面：连接器「隐藏名单」抽成公共名单，对话弹层与连接库一并生效
+
+**背景**
+
+上一步只在「能力与市场」页把 15 个连接器隐藏了，隐藏名单写在该页文件里的局部常量，而且注释明说「其他入口不受影响」。用户在智能体 / 频道对话底部的「选择连接器」弹层里仍然能看到 Gmail、Google Calendar、OpenBot、PandaData 等已隐藏的连接器，觉得「隐藏没生效」。根因是三处连接器列表各自取值、口径不一致。
+
+**处理**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx#L64-L100)：新增公共的 `VISIBLE_CONNECTOR_IDS`（保留的 11 个：智能体电脑、Tushare、Tavily、FMP、盈米基金、钉钉办公、钉钉文档、钉钉 AI 表格、用户文件、持仓台账、GitHub）、`isVisibleConnectorId()`（兼容 `browser` 与 `app:<slug>` 两种写法）与 `visibleConnectorOptions()`。
+- [chat.tsx](../apps/mobile/src/chat.tsx#L832-L836) 与 [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx#L176-L184)：对话底部「选择连接器」弹层的候选改为经 `visibleConnectorOptions(...)` 过滤，只列保留的连接器。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L2653-L2665)：「能力与市场」页的连接器过滤改为复用同一份名单（`isVisibleConnectorId`），不再维护局部硬编码列表。
+- [connector-library-panel.tsx](../apps/mobile/src/connector-library-panel.tsx#L39-L48)：智能体 / 频道详情页「连接库」的候选列表同样过滤（已挂载的现有连接仍正常显示、可移除，`bot-pages/connectors.tsx` 与 `channel-settings-screen.tsx` 里的 `assigned` 仍用全量 options 解析，故未改动）。
+
+**说明**
+
+隐藏只作用于展示层，不改动连接器数据，也不影响已建立的连接。三个入口（能力与市场、对话选择弹层、连接库）现在共用同一份保留名单，日后要恢复某个连接器，只需把它的 id 加回 `VISIBLE_CONNECTOR_IDS`。验证：`pnpm --dir apps/mobile typecheck` 通过，`npx biome check`（5 个文件）无新增告警。
+
+### 2026-11-21 · 界面：对话选连接器的弹层把「智能体电脑」显示为已连接、可直接勾选
+
+**背景**
+
+智能体 / 频道对话底部的「选择连接器」弹层里，「智能体电脑」显示成灰色的「未连接」，右侧写着「去连接」，整卡不可勾选。原因是同一个能力在两处的状态口径不一致：`capability-hub` 里它固定是 `state: "connected"`，而选择器按「浏览器 worker（`workerUrl`/`workerToken`）是否配置」来算，本机没配 worker，于是判成未连接。服务端的对话与频道对话其实是无条件挂载智能体电脑工具集的，它属于官方默认常开的能力。
+
+**处理**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx#L71-L88)：`connectorOptions` 里「智能体电脑」（`id: "browser"`）的 `connected` 由「按 worker 状态判断」改为固定 `true`，并同步更新函数注释；同一函数里 Gmail / Calendar / OpenBot 仍按服务端快照判断。
+
+**说明**
+
+只改了选择器里的展示状态，没有动任何连接、工具或服务端逻辑。改完后智能体电脑在选择弹层里显示「已连接」并带勾选框，可直接选中带入对话；因为 `allConnectorOptions` 会把已连接的排在前面，它也会出现在列表靠前位置。验证：`pnpm --dir apps/mobile typecheck`、`npx biome check apps/mobile/src/capability-picker.tsx` 通过。
+
+### 2026-11-21 · 界面：已连接的连接器弹窗不再显示「连接」按钮
+
+**背景**
+
+连接器弹窗底部的按钮组里，「断开连接」和「连接」是按两个互不相干的判断分别渲染的：只要没被 `blocked`，就一定会画出「连接」。于是一个已经连上的连接器，弹窗里会同时出现「断开连接」和「连接」，后者此时没有意义，也容易让用户误点。
+
+**处理**
+
+- [app-connectors.tsx](../apps/mobile/src/app-connectors.tsx#L153)：`AppConnectorSheet` 的按钮组里，把「连接」的显示条件由 `blocked` 改为 `blocked || item.connected`，即已连接时不再渲染「连接」按钮；未连接时行为不变。
+
+**说明**
+
+只改了渲染条件，连接 / 断开接口与提交逻辑都没动。已连接时弹窗只留「断开连接」一个按钮；未连接且未被 `blocked` 时，仍只有「连接」。`item.connected` 由服务端目录接口返回，无需额外请求。验证：`pnpm --dir apps/mobile typecheck`、`npx biome check apps/mobile/src/app-connectors.tsx` 通过。
+
+### 2026-11-21 · 文案：钉钉连接器的说明去掉术语，改成普通用户看得懂的说法
+
+**背景**
+
+钉钉办公连接弹窗里有两段说明写着「带 ?key= 的个人 MCP 地址」「登录授权还要对方接受本站回调」，其中一段还是运行时拼出来的，直接把 `http://localhost:8787/api/app-connectors/oauth/callback` 这样的内网回调地址暴露给用户。钉钉文档、钉钉 AI 表格的卡片简介与提示同样夹着「MCP 地址」「Streamable HTTP 地址（含 ?key=）」「回调登记」等术语；输入框标签也叫「个人 MCP 地址」。
+
+**处理**
+
+- [catalog.ts](../apps/server/src/connectors/catalog.ts#L137-L172)：重写钉钉办公 / 钉钉文档 / 钉钉 AI 表格三个条目的 `summary` 与 `hint`，统一为「连接你的钉钉…，在对话里…。只读。」＋「登录钉钉账号，或直接粘贴钉钉给你的个人地址。」
+- [service.ts](../apps/server/src/connectors/service.ts#L83-L86)：`auth === "url"` 分支的提示改为「钉钉的登录授权还没接上，暂时可以直接粘贴钉钉给你的个人地址。」，不再拼接回调地址。
+- [zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts#L567) 与 [en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts#L634)：输入框标签由「个人 MCP 地址」/「Personal MCP URL」改为「个人地址」/「Personal URL」。
+
+**说明**
+
+钉钉一族从卡片简介到弹窗提示、输入框标签都不再出现 MCP / 回调 / ?key= / localhost 这类词，只说「登录钉钉账号」或「粘贴钉钉给你的个人地址」。`missing` 只作展示文案，不参与连接可用性判断，因此改文案不影响功能。验证：`tsc --noEmit`、`pnpm --dir apps/mobile typecheck` 通过，`npx biome check`（4 个文件）无告警，`tests/app-connectors.test.ts` + `apps/mobile/test/i18n.test.ts` 共 21 项通过。
+
+### 2026-11-21 · 界面：「能力与市场」连接器分类只保留 11 个，其余暂时隐藏
+
+**背景**
+
+「能力与市场」页的连接器分类会把内置连接器与全部账户级应用连接器铺满展示。当前阶段只想对外呈现少数已经准备好的连接器，其余的（Gmail、Google Calendar、OpenBot、PandaData、Google Drive、Google Sheets、Docling、各类邮箱连接、Gmail 官方 MCP、Notion）先不展示在前台。
+
+**处理**
+
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L2653-L2678)：在「能力与市场」页的 `HIDDEN_CAPABILITY_IDS` 中新增 `connectors` 隐藏名单，列出上述 15 个 id（3 个内置 `gmail`/`calendar`/`openbot` + 12 个账户级应用 `app:<slug>`）。只从本页列表过滤，不改动 `items` 数据本身，左侧「选择连接器」弹窗、连接库、频道/智能体设置等入口不受影响。
+
+**说明**
+
+本页连接器只保留：智能体电脑、Tushare、Tavily、FMP、盈米基金、钉钉办公、钉钉文档、钉钉 AI 表格、用户文件、持仓台账、GitHub（「全部」计数随之从 26 变为 11）。因为是隐藏而非删除，后续想恢复只需从名单里移除对应 id。验证：`pnpm --dir apps/mobile typecheck` 通过，`npx biome check` 无新增告警。
+
 ### 2026-11-21 · 界面：「所有技能与链接」的连接器分类不再显示「日历」入口
 
 **背景**

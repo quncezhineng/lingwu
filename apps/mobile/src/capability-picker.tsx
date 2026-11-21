@@ -62,9 +62,48 @@ export type ConnectorOption = {
 };
 
 /**
+ * 连接器当前保留展示的名单（内置连接器 id 与账户级应用连接器 slug 混排）。
+ *
+ * 「能力与市场 · 连接器」、对话底部的「选择连接器」弹层、Agent / 频道详情的「连接库」
+ * 共用这一份名单：名单之外的连接器一律隐藏。隐藏只作用于展示层，不改动连接器数据，
+ * 已建立的连接也不受影响，日后需要时把 slug 加回名单即可恢复。
+ * 保留：智能体电脑、Tushare、Tavily、FMP、盈米基金、钉钉办公、钉钉文档、
+ * 钉钉 AI 表格、用户文件、持仓台账、GitHub。
+ */
+export const VISIBLE_CONNECTOR_IDS: readonly string[] = [
+  "browser",
+  "tushare",
+  "tavily",
+  "fmp",
+  "yingmi",
+  "dingtalk",
+  "dingdoc",
+  "dingtable",
+  "files",
+  "ledger",
+  "github",
+];
+
+/**
+ * 连接器 id 是否属于保留展示范围。
+ * 兼容两种写法：内置连接器（如 `browser`）与账户级应用连接器（如 `pandadata`，
+ * 在「能力与市场」的条目里写成 `app:<slug>`）。
+ */
+export function isVisibleConnectorId(id: string): boolean {
+  const slug = id.startsWith("app:") ? id.slice("app:".length) : id;
+  return VISIBLE_CONNECTOR_IDS.includes(slug);
+}
+
+/** 过滤掉已隐藏的连接器：连接器选择弹层与「连接库」列表统一走这里。 */
+export function visibleConnectorOptions(options: readonly ConnectorOption[]): ConnectorOption[] {
+  return options.filter((option) => isVisibleConnectorId(option.id));
+}
+
+/**
  * 工作区内置的连接器（不来自账户级「应用连接器」目录）。
  *
- * 状态取自服务端快照，未连接的连接器在选择弹层里显示为不可勾选并给出「去连接」，
+ * 智能体电脑是官方默认常开的能力，固定视为已连接；Gmail / Calendar / OpenBot
+ * 的状态取自服务端快照。未连接的连接器在选择弹层里显示为不可勾选并给出「去连接」，
  * 保证带进对话的始终是真正可用的能力。
  */
 export function connectorOptions(workspace: Workspace): ConnectorOption[] {
@@ -73,15 +112,15 @@ export function connectorOptions(workspace: Workspace): ConnectorOption[] {
       connection.id === "google" &&
       (connection.status === "connected" || connection.status === "sample"),
   );
-  const browserConnected = workspace.connections.some(
-    (connection) => connection.id === "browser" && connection.status === "connected",
-  );
   const options: ConnectorOption[] = [
     {
+      // 智能体电脑是系统官方默认常开的能力：服务端的对话与频道对话都无条件挂载它的
+      // 工具集，所以这里固定视为已连接，与「能力与市场」里同名卡片的口径一致，
+      // 让用户在选连接器时可以直接勾选它。
       id: "browser",
       name: tr("threads.agentComputer"),
       detail: tr("agent.hubBrowserDetail"),
-      connected: browserConnected,
+      connected: true,
       icon: Globe2,
       iconColor: serviceBrands.browser.fg,
       iconSurface: serviceBrands.browser.surface,

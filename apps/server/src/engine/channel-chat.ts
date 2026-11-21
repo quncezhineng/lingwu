@@ -2,7 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { EventType, type RunAgentInput } from "@ag-ui/core";
 import { defineTool } from "@copilotkit/runtime/v2";
 import { z } from "zod";
-import type { AgentMemoryV2, MemoryKind } from "../../../../packages/domain/src/agent.ts";
+import type {
+  AgentMemoryV2,
+  MemoryCategory,
+  MemoryKind,
+} from "../../../../packages/domain/src/agent.ts";
 import { createTaskSchema, MEMORY_CATEGORIES } from "../../../../packages/domain/src/agent.ts";
 import {
   appointedLeaderId,
@@ -39,7 +43,7 @@ import {
 import { formatQuoteToolResult } from "./conversation.ts";
 import { extractPdfText } from "./financials.ts";
 import { recallMemories } from "./memory-recall.ts";
-import { filterMemoriesForScope } from "./memory-scope.ts";
+import { filterMemoriesForScope, memoryAgentKey } from "./memory-scope.ts";
 import type { AgentService } from "./service.ts";
 import { completeText, tanstackAgent } from "./tanstack-agent.ts";
 
@@ -1304,12 +1308,19 @@ export async function runChannelChat(
       "summarize",
       `User:\n${input.text}\n\nAssignment:\n${planned.text}\n\nReplies:\n${notes || "(none)"}\n\nMissing: ${failed.join("、") || "none"}`,
     );
-    if (!signal.aborted) emit({ type: "done" });
+    if (!signal.aborted) {
+      // 先把 done 推给界面（成员气泡立刻定稿），再补写这一轮的频道记忆。
+      emit({ type: "done" });
+      await settleChannelMemories(deps, owner, channel, members, input.text, priorReplies);
+    }
     return;
   }
 
   await speakTogether(speakers, "reply", () => input.text);
-  if (!signal.aborted) emit({ type: "done" });
+  if (!signal.aborted) {
+    emit({ type: "done" });
+    await settleChannelMemories(deps, owner, channel, members, input.text, priorReplies);
+  }
 
   async function speakTogether(
     group: (typeof members)[number][],
@@ -1327,6 +1338,122 @@ export async function runChannelChat(
     } finally {
       frozenPrior = undefined;
     }
+  }
+}
+
+/** 一轮频道对话最多沉淀几条记忆；再多会淹掉频道记忆板块。 */
+const CHANNEL_MEMORY_LIMIT = 3;
+/** 用户消息 + 成员回复太短时，这一轮不值得占用记忆位（寒暄、单字确认）。 */
+const CHANNEL_MEMORY_MIN_CHARS = 80;
+/** 送入整理提示词的对话正文上限，避免长报告把上下文撑爆。 */
+const CHANNEL_MEMORY_TRANSCRIPT_LIMIT = 12_000;
+
+/** 记忆去重用的归一化文本：忽略大小写、空白、标点与符号。 */
+function normalizeMemoryText(text: string): string {
+  return text.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
+}
+
+/**
+ * 从模型输出里取出记忆候选。
+ *
+ * 模型偶尔会带上解释或 ```json 包裹，这里只认第一段 `[...]`，并用固定的分类词表校正
+ * category，越界时回退到「关注领域」，保证写进库的记忆分类始终合法。
+ */
+export function parseMemoryCandidates(raw: string): { text: string; category: MemoryCategory }[] {
+  const start = raw.indexOf("[");
+  const end = raw.lastIndexOf("]");
+  if (start < 0 || end <= start) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.slice(start, end + 1));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const candidates: { text: string; category: MemoryCategory }[] = [];
+  for (const item of parsed) {
+    const source =
+      typeof item === "string"
+        ? { text: item, category: undefined }
+        : item && typeof item === "object"
+          ? (item as { text?: unknown; category?: unknown })
+          : undefined;
+    if (!source) continue;
+    const text = typeof source.text === "string" ? source.text.trim().slice(0, 400) : "";
+    if (!text) continue;
+    const category = MEMORY_CATEGORIES.includes(source.category as MemoryCategory)
+      ? (source.category as MemoryCategory)
+      : "关注领域";
+    candidates.push({ text, category });
+    if (candidates.length >= CHANNEL_MEMORY_LIMIT) break;
+  }
+  return candidates;
+}
+
+/**
+ * 一轮频道对话结束后，把这一轮里值得长期复用的内容沉淀进「频道记忆」。
+ *
+ * 归属键固定为 `channel.id`，与手动「记住……」写入的记忆同一口径：会直接显示在频道详情
+ * 的记忆板块，并被该频道成员召回。内容相同的记忆不会重复累积（按归一化文本去重）。
+ *
+ * 属于尽力而为的加分项：出错只丢弃本轮沉淀，不影响已经完成的对话；这里刻意不接
+ * `signal`，避免用户回落页面时把已经开始的整理一并取消。
+ */
+async function settleChannelMemories(
+  deps: ChannelChatDeps,
+  owner: string,
+  channel: Channel,
+  members: readonly PersistedAgentSpace["agents"][number][],
+  userText: string,
+  replies: readonly { name: string; role: string; text: string }[],
+): Promise<void> {
+  const transcript = replies
+    .map((reply) => `${reply.name}（${reply.role}）：${reply.text}`)
+    .join("\n\n")
+    .slice(0, CHANNEL_MEMORY_TRANSCRIPT_LIMIT);
+  if (!transcript || userText.length + transcript.length < CHANNEL_MEMORY_MIN_CHARS) return;
+  const speaker = channelLeader(members, channel.leaderId) ?? members[0];
+  if (!speaker) return;
+  try {
+    const model = await deps.models.resolve(
+      owner,
+      await agentModelForThread(deps.db, owner, speaker.threadId),
+    );
+    const known = await deps.db.list<AgentMemoryV2>(owner, "memories");
+    const seen = new Set(
+      known
+        .filter((memory) => memoryAgentKey(memory) === channel.id)
+        .map((memory) => normalizeMemoryText(memory.text)),
+    );
+    const raw = await completeText({
+      model: model.model ?? deps.config.model ?? "openai/unconfigured",
+      connection: model.connection,
+      system: [
+        "你在维护一个多人协作频道（群聊）的长期记忆。",
+        "只记录这一轮里值得长期复用的事实、偏好、结论或决策；一次性寒暄、过程性讨论、被否决的选项都不要记。",
+        "每条不超过 60 字，用陈述句，保留关键数字与标的名称，不要写「用户说」这类套话。",
+        `category 只能从这些里选：${MEMORY_CATEGORIES.join("、")}。`,
+        `最多 ${CHANNEL_MEMORY_LIMIT} 条；没有值得记的就输出 []。`,
+        '只输出 JSON 数组，形如 [{"text":"...","category":"关注领域"}]，不要任何解释。',
+      ].join("\n"),
+      prompt: `用户这一轮说：\n${userText}\n\n成员回复：\n${transcript}`,
+    });
+    for (const candidate of parseMemoryCandidates(raw)) {
+      const key = normalizeMemoryText(candidate.text);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      await deps.db.insertIfAbsent(owner, "memories", {
+        id: createHash("sha256").update(`${channel.id}:auto:${key}`).digest("hex"),
+        agentId: channel.id,
+        kind: "fact",
+        text: candidate.text,
+        source: "Channel chat",
+        category: candidate.category,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  } catch {
+    // 沉淀失败不打扰用户：已经完成的这一轮对话照常保留。
   }
 }
 

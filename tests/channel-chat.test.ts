@@ -21,6 +21,11 @@ import {
 import type { Channel, ChannelMessage } from "../packages/domain/src/channel.ts";
 import { appointedLeaderId, channelHistoryPage } from "../packages/domain/src/channel.ts";
 
+/** 频道对话结束后的「沉淀记忆」整理请求，用它给 fixture 一个只回 JSON 的开关。 */
+const MEMORY_TURN_MARK = "你在维护一个多人协作频道";
+/** fixture 假装整理出的这条记忆，供断言「自动沉淀真的落进了频道」。 */
+const AUTO_MEMORY_TEXT = "继续跟踪 AI 芯片需求，风险偏好保持中等";
+
 /** 最小 OpenAI Responses 协议 fixture：每个请求回一段逐字文本，验证流式链路。 */
 async function textModelFixture(t: TestContext) {
   const prompts: string[] & { maxWorkOverlap: number } = Object.assign([], { maxWorkOverlap: 0 });
@@ -43,7 +48,8 @@ async function textModelFixture(t: TestContext) {
         }
         return "";
       };
-      prompts.push(collect(parsed));
+      // 沉淀记忆是每轮对话结束后的额外整理请求，不参与 prompts 的下标断言。
+      if (!body.includes(MEMORY_TURN_MARK)) prompts.push(collect(parsed));
     } catch {
       // ignore non-JSON bodies
     }
@@ -51,43 +57,46 @@ async function textModelFixture(t: TestContext) {
     const emit = (type: string, value: object) =>
       response.write(`data: ${JSON.stringify({ type, ...value })}\n\n`);
     const base = { id: "response-fixture", created_at: 1000, model: "fixture" };
+    const memoryTurn = body.includes(MEMORY_TURN_MARK);
     const leaderChange = body.includes("LEADER_ONLY");
     const mentionTurn = body.includes("MENTION_TURN");
     const relevance = body.includes("RELEVANCE_ONLY");
     const isJia = body.includes("You are 甲");
-    const replyText = leaderChange
-      ? body.includes("FORCE_LEAD")
-        ? "LEAD"
-        : "NO"
-      : mentionTurn
-        ? body.includes("FORCE_MENTION_ASSIGN")
-          ? "ASSIGN"
-          : "ANSWER"
-        : relevance
-          ? body.includes("FORCE_NONE")
-            ? "NO"
-            : body.includes("FORCE_ASSIGN")
-              ? isJia
-                ? "ASSIGN"
-                : "NO"
-              : body.includes("FORCE_BOTH")
-                ? "ANSWER"
-                : body.includes("FORCE_SPECIALIST")
-                  ? isJia
-                    ? "NO"
-                    : "ANSWER"
-                  : isJia
-                    ? "ANSWER"
-                    : "NO"
-          : body.includes("SUMMARIZE_ONLY")
-            ? "两边都看完了。"
-            : body.includes("WORK_PART")
-              ? "@甲 这一份做完了。"
-              : body.includes("ASSIGN_ONLY")
-                ? body.includes("FORCE_PARALLEL")
-                  ? "@乙 看港股。\n@丙 看美股。"
-                  : "@乙 看港股。"
-                : "先看需求，再给结论。";
+    const replyText = memoryTurn
+      ? JSON.stringify([{ text: AUTO_MEMORY_TEXT, category: "关注领域" }])
+      : leaderChange
+        ? body.includes("FORCE_LEAD")
+          ? "LEAD"
+          : "NO"
+        : mentionTurn
+          ? body.includes("FORCE_MENTION_ASSIGN")
+            ? "ASSIGN"
+            : "ANSWER"
+          : relevance
+            ? body.includes("FORCE_NONE")
+              ? "NO"
+              : body.includes("FORCE_ASSIGN")
+                ? isJia
+                  ? "ASSIGN"
+                  : "NO"
+                : body.includes("FORCE_BOTH")
+                  ? "ANSWER"
+                  : body.includes("FORCE_SPECIALIST")
+                    ? isJia
+                      ? "NO"
+                      : "ANSWER"
+                    : isJia
+                      ? "ANSWER"
+                      : "NO"
+            : body.includes("SUMMARIZE_ONLY")
+              ? "两边都看完了。"
+              : body.includes("WORK_PART")
+                ? "@甲 这一份做完了。"
+                : body.includes("ASSIGN_ONLY")
+                  ? body.includes("FORCE_PARALLEL")
+                    ? "@乙 看港股。\n@丙 看美股。"
+                    : "@乙 看港股。"
+                  : "先看需求，再给结论。";
     if (body.includes("WORK_PART") && body.includes("FORCE_PARALLEL")) {
       parallelWorkInFlight += 1;
       prompts.maxWorkOverlap = Math.max(prompts.maxWorkOverlap, parallelWorkInFlight);
@@ -203,6 +212,14 @@ function config(dataDir: string): Config {
 }
 function headers() {
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+}
+/** 读一个频道的消息列表（测试里多处使用，供轮询等待落库）。 */
+async function listMessages(channelId: string): Promise<ChannelMessage[]> {
+  const response = await server.app.request(`/api/channels/${channelId}/messages`, {
+    headers: headers(),
+  });
+  assert.equal(response.status, 200, "读取频道消息要成功");
+  return (await response.json()) as ChannelMessage[];
 }
 
 before(async () => {
@@ -456,6 +473,30 @@ test("channel chat replies with one member, keeps history, and a mention selects
   assert.equal(
     afterForget.some((memory) => memory.text.includes("这句不该留下")),
     false,
+  );
+
+  // 每轮对话结束后会自动把这一轮值得长期复用的内容沉淀进频道记忆（agentId = channel.id）。
+  const settled = await server.app.request(`/api/channels/${channel.id}/chat`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      text: "把今天这轮讨论的长期结论记下来：我们继续跟踪 AI 芯片需求，风险偏好保持中等，遇到回撤再评估是否加仓，任何时候都不要追高杀跌；另外把港股互联网龙头也放进观察名单，每周固定复盘一次，仓位变化及时同步。",
+    }),
+  });
+  assert.equal(settled.status, 200);
+  await readSse(settled);
+  const autoMemories = await db.list<{ agentId?: string; source?: string; text: string }>(
+    "alice",
+    "memories",
+  );
+  assert.ok(
+    autoMemories.some(
+      (memory) =>
+        memory.agentId === channel.id &&
+        memory.source === "Channel chat" &&
+        memory.text.includes("继续跟踪 AI 芯片需求"),
+    ),
+    "频道对话结束后自动沉淀的记忆要落在频道里",
   );
 
   const form = new FormData();
@@ -753,12 +794,10 @@ test("channel chat replies with one member, keeps history, and a mention selects
     slow.closeAllConnections();
     await new Promise<void>((resolve) => slow.close(() => resolve()));
   });
-  const controller = new AbortController();
   const interrupted = await server.app.request(`/api/channels/${channel.id}/chat`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ text: "@甲 说到一半" }),
-    signal: controller.signal,
   });
   assert.equal(interrupted.status, 200);
   const reader = interrupted.body?.getReader();
@@ -769,15 +808,22 @@ test("channel chat replies with one member, keeps history, and a mention selects
     const chunk = await reader.read();
     if (chunk.done) break;
     seen += decoder.decode(chunk.value, { stream: true });
-    if (seen.includes("已经说到这里")) {
-      controller.abort();
-      break;
-    }
+    if (seen.includes("已经说到这里")) break;
   }
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  const kept = (await (
-    await server.app.request(`/api/channels/${channel.id}/messages`, { headers: headers() })
-  ).json()) as ChannelMessage[];
+  assert.ok(seen.includes("已经说到这里"), "成员说出的第一段先到了界面");
+  // 用户中途离开页面 = 客户端不再读响应体。取消读取会走到响应流的 cancel()，
+  // 服务端据此中止这一轮（在 app 的 request 里 abort 不保证送达，取消响应体才是可靠路径）。
+  await reader.cancel();
+  // 落库是在取消之后才走 catch 完成的，这里做有上限的低频轮询等它（别打太快，服务端限流是 120 次/分钟）。
+  const deadline = Date.now() + 5_000;
+  let kept = await listMessages(channel.id);
+  while (
+    Date.now() < deadline &&
+    !kept.some((message) => message.role === "member" && message.text.includes("已经说到这里"))
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    kept = await listMessages(channel.id);
+  }
   assert.ok(
     kept.some((message) => message.role === "member" && message.text.includes("已经说到这里")),
     "断开后已经说出的内容要留下",

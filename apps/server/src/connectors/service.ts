@@ -82,7 +82,7 @@ export function missingConfig(entry: CatalogEntry, config: Config): string[] {
     return ["平台需要设置 DOCLING_SERVE_URL，指向已托管的 Docling Serve。"];
   if (entry.transport !== "oauth") {
     if (entry.auth === "url")
-      return [`登录授权还需要对方接受回调 ${callback}。现在可以粘贴带 ?key= 的个人 MCP 地址。`];
+      return ["钉钉的登录授权还没接上，暂时可以直接粘贴钉钉给你的个人地址。"];
     return [];
   }
   if (entry.slug === "notion")

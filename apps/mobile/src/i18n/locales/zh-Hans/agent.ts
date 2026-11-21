@@ -564,7 +564,7 @@ const agent = {
   "agent.hubCategoryDevelopment": "研发协作",
   "agent.hubConnectorEmail": "邮箱地址",
   "agent.hubConnectorCode": "授权码",
-  "agent.hubConnectorUrl": "个人 MCP 地址",
+  "agent.hubConnectorUrl": "个人地址",
   "agent.hubConnectorConnect": "连接",
   "agent.hubConnectorDisconnect": "断开连接",
   "agent.hubSkillCategoryMarketMacro": "市场与宏观",

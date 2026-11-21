@@ -34,6 +34,7 @@ import {
   connectorOptions,
   SkillPickerSheet,
   skillDisplayName,
+  visibleConnectorOptions,
 } from "./capability-picker";
 import { type ChannelChatStream, streamChannelChat } from "./channel-chat-stream";
 import { appendMemberDelta } from "./channel-live-text";
@@ -174,8 +175,12 @@ export function ChannelChatScreen({
   // 频道连接器候选：内置连接器（智能体电脑 / Google 系 / OpenBot）+ 账户级应用连接器，
   // 与「所有技能与链接」模块同源，让弹层里列出全部连接器。
   const appConnectors = useAppConnectors(api);
+  // 只列出当前保留展示的连接器，隐藏名单与「能力与市场」连接器页保持一致。
   const connectorChoices: ConnectorOption[] = useMemo(
-    () => allConnectorOptions(connectorOptions(workspace), appConnectors.items),
+    () =>
+      visibleConnectorOptions(
+        allConnectorOptions(connectorOptions(workspace), appConnectors.items),
+      ),
     [workspace, appConnectors.items],
   );
   const selectedConnectors: ComposerSelection[] = connectorChoices

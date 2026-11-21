@@ -60,6 +60,7 @@ import {
   connectorOptions,
   SkillPickerSheet,
   skillDisplayName,
+  visibleConnectorOptions,
 } from "./capability-picker";
 import {
   displayUserMessage,
@@ -829,8 +830,9 @@ export function ChatScreen({
   // 连接器候选：内置连接器（智能体电脑 / Google 系 / OpenBot）+ 账户级应用连接器，
   // 让弹层里列出「技能与连接」页的全部连接器，而不只是智能体电脑。
   const appConnectors = useAppConnectors(api);
+  // 只列出当前保留展示的连接器，隐藏名单与「能力与市场」连接器页保持一致。
   const connectorChoices = useMemo(
-    () => allConnectorOptions(connectorOptions(w), appConnectors.items),
+    () => visibleConnectorOptions(allConnectorOptions(connectorOptions(w), appConnectors.items)),
     [w, appConnectors.items],
   );
   const selectedSkills: ComposerSelection[] = selectedSkillIds.map((id) => ({

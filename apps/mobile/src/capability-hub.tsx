@@ -17,7 +17,7 @@ import type { AgentAvatarId, AgentDefinition, AgentSkill } from "./agent-space-m
 import { AppConnectorSheet, type AppConnectorView, useAppConnectors } from "./app-connectors";
 import { Text, TextInput } from "./app-text";
 import { assistantMarkdown } from "./assistant-markdown";
-import { allConnectorOptions, connectorOptions } from "./capability-picker";
+import { allConnectorOptions, connectorOptions, isVisibleConnectorId } from "./capability-picker";
 import { useChannels } from "./channels";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
@@ -2650,15 +2650,19 @@ export function CapabilityHubScreen() {
     contentWidth >= 1000 ? 4 : contentWidth >= 680 ? 3 : 2,
   );
 
-  // 连接器只放真正可连接的能力：Gmail、Google Calendar、OpenBot、智能体电脑，以及账户级应用连接器。
-  // 邮件是工作区页面快捷入口，不属于连接器，隐藏。
-  const HIDDEN_CAPABILITY_IDS: Partial<Record<CapabilityType, readonly string[]>> = {
-    plugins: ["mail"],
-  };
-  const hiddenIdsForType = HIDDEN_CAPABILITY_IDS[typeFilter] ?? [];
-  const scopedItems = items.filter(
-    (item) => item.type === typeFilter && !hiddenIdsForType.includes(item.id),
-  );
+  // 按类型隐藏部分条目（只从「能力与市场」页隐藏，不改动 items 本身，其他入口仍可见）。
+  // - 邮件是工作区页面快捷入口，不属于连接器，隐藏。
+  // - 连接器统一走 capability-picker 的保留名单（智能体电脑、Tushare、Tavily、FMP、盈米基金、
+  //   钉钉办公、钉钉文档、钉钉 AI 表格、用户文件、持仓台账、GitHub）；名单之外的连接器
+  //   （含 Gmail、Google Calendar、OpenBot 等）一律不在本页展示，与对话底部的
+  //   「选择连接器」弹层保持同一口径。
+  const hiddenPluginIds: readonly string[] = ["mail"];
+  const scopedItems = items.filter((item) => {
+    if (item.type !== typeFilter) return false;
+    if (typeFilter === "plugins") return !hiddenPluginIds.includes(item.id);
+    if (typeFilter === "connectors") return isVisibleConnectorId(item.id);
+    return true;
+  });
   const cardsForCategory = (item: CatalogItem, nextCategory: CategoryId) =>
     nextCategory === "all" || item.tags.includes(nextCategory as CatalogTag);
   const baseCategoryOptions = CATEGORY_OPTIONS_BY_TYPE[typeFilter];

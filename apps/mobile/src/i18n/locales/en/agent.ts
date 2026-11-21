@@ -631,7 +631,7 @@ const agent = {
   "agent.hubCategoryDevelopment": "Development",
   "agent.hubConnectorEmail": "Email address",
   "agent.hubConnectorCode": "App password",
-  "agent.hubConnectorUrl": "Personal MCP URL",
+  "agent.hubConnectorUrl": "Personal URL",
   "agent.hubConnectorConnect": "Connect",
   "agent.hubConnectorDisconnect": "Disconnect",
   "agent.hubSkillCategoryMarketMacro": "Market & Macro",

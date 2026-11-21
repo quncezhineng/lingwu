@@ -2,7 +2,11 @@ import { useMemo, useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import { useAppConnectors } from "./app-connectors";
 import { Text, TextInput } from "./app-text";
-import { allConnectorOptions, connectorOptions } from "./capability-picker";
+import {
+  allConnectorOptions,
+  connectorOptions,
+  visibleConnectorOptions,
+} from "./capability-picker";
 import { useTranslation } from "./i18n";
 import { Plus, Search } from "./icons";
 import { StatusBadge } from "./status-badge";
@@ -37,7 +41,11 @@ export function ConnectorLibraryPanel({
   const { workspace, api } = useWorkspace();
   const appConnectors = useAppConnectors(api);
   const options = useMemo(
-    () => allConnectorOptions(connectorOptions(workspace), appConnectors.items),
+    // 只列出当前保留展示的连接器，与「能力与市场」连接器页、对话底部的「选择连接器」同口径。
+    () =>
+      visibleConnectorOptions(
+        allConnectorOptions(connectorOptions(workspace), appConnectors.items),
+      ),
     [workspace, appConnectors.items],
   );
   // 三栏布局下列宽远小于窗口宽，用 onLayout 的真实列宽决定单双列。

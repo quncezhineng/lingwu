@@ -150,7 +150,7 @@ export function AppConnectorSheet({
               {t("agent.hubConnectorDisconnect")}
             </Button>
           ) : null}
-          {blocked ? null : (
+          {blocked || item.connected ? null : (
             <Button style={{ flex: 1 }} disabled={busy} onPress={() => void submit()}>
               {t("agent.hubConnectorConnect")}
             </Button>
