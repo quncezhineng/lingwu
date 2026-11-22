@@ -8,7 +8,7 @@ import { skillCatalog, skillCategories } from "../src/skill-catalog.ts";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 test("LingWu 技能目录完整且标识唯一", () => {
-  assert.equal(skillCatalog.length, 184);
+  assert.equal(skillCatalog.length, 185);
   assert.equal(new Set(skillCatalog.map((skill) => skill.id)).size, skillCatalog.length);
   assert.equal(new Set(skillCatalog.map((skill) => skill.sourceFolder)).size, skillCatalog.length);
 });

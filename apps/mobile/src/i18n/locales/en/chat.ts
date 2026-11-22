@@ -42,6 +42,8 @@ const chat = {
   "chat.hideRecentResults": "Hide recent results",
   "chat.recentResults": "Recent results",
   "chat.agentWorking": "Agent is working",
+  "chat.taskAnalysisInProgress": "Task analysis in progress…",
+  "chat.taskAnalysisSteps": "{done}/{total} steps",
   "chat.retryResponse": "Retry response",
   "chat.streamingReply": "LingWu is writing a reply",
   "chat.streamReplyComplete": "Reply complete",

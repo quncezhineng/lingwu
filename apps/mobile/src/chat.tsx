@@ -140,6 +140,8 @@ import { ReminderToolCard } from "./reminder-tool-card";
 import { ReportBriefCard } from "./report-brief-card";
 import { SearchToolCard } from "./search-tool-card";
 import { publishShare } from "./share-page";
+import { TaskAnalysisCard } from "./task-analysis-card";
+import { TASK_ANALYSIS_ACTIVE, taskStepCount } from "./task-analysis-logic";
 import { serverToolOutcome } from "./task-presentation";
 import { breakpoints, typography } from "./theme";
 import { FileThreadCard, TaskThreadCard } from "./thread-artifacts";
@@ -1430,6 +1432,11 @@ export function ChatScreen({
     }
   }
   const threadTasks = (agentWorkspace?.tasks || []).filter((task) => task.threadId === threadId);
+  // 对话内交后台的任务（delegate_task 创建）是否仍在分析：不依赖 SSE 流，
+  // 由工作区轮询驱动，直到任务进入终态才消失。
+  const analysisTask = threadTasks.find((task) => TASK_ANALYSIS_ACTIVE.has(task.status));
+  const analysisInProgress = analysisTask !== undefined;
+  const analysisStepProgress = analysisTask ? taskStepCount(analysisTask) : null;
   // 这版之前产生的消息没有真实时间记录。用对话里更早的真实记录（任务创建时间）
   // 当上界，在真实时间之间按顺序插值，历史对话才不会整片留白。
   const knownMessageTimes: Record<string, number> = {};
@@ -1507,7 +1514,7 @@ export function ChatScreen({
       ? "working"
       : stream.state.phase === "reconnecting"
         ? "reconnecting"
-        : replying || stream.state.phase === "connecting"
+        : replying || stream.state.phase === "connecting" || analysisInProgress
           ? "working"
           : "ready";
   const headerStatus =
@@ -2093,6 +2100,19 @@ export function ChatScreen({
                 </View>
               );
             })
+          )}
+          {analysisInProgress && analysisTask && (
+            <View key="task-analysis-card" style={{ width: "100%" }}>
+              <TaskAnalysisCard
+                label={t("chat.taskAnalysisInProgress")}
+                title={analysisTask.title}
+                progress={
+                  analysisStepProgress
+                    ? t("chat.taskAnalysisSteps", analysisStepProgress)
+                    : undefined
+                }
+              />
+            </View>
           )}
           {extraDrafts.map((draft) => (
             <View key={`live-${draft.id}`} style={{ alignSelf: "flex-start", width: "100%" }}>

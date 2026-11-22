@@ -69,6 +69,8 @@ import { PromptComposer } from "./prompt-composer";
 import { QuoteToolCard } from "./quote-tool-card";
 import { publishShare } from "./share-page";
 import { skillCatalog } from "./skill-catalog";
+import { TaskAnalysisCard } from "./task-analysis-card";
+import { TASK_ANALYSIS_ACTIVE, taskStepCount } from "./task-analysis-logic";
 import { ToolStep } from "./tool-step";
 import { Button, colors, fonts, radius, Sheet, s, shadow } from "./ui";
 import { UserMessageMeta } from "./user-message-meta";
@@ -120,6 +122,14 @@ export function ChannelChatScreen({
   const { t } = useTranslation();
   const { agents, skillLibrary } = useAgentSpace();
   const { data: agentWorkspace } = useAgentWorkspace();
+  // 频道关联的后台任务（input.channelId 关联）是否仍在分析：不依赖 SSE 流，
+  // 由工作区轮询驱动，频道提问交后台后再对话流里持续出现，直到任务进入终态。
+  const channelTasks = (agentWorkspace?.tasks ?? []).filter(
+    (task) => task.input?.channelId === channel.id,
+  );
+  const analysisTask = channelTasks.find((task) => TASK_ANALYSIS_ACTIVE.has(task.status));
+  const analysisInProgress = analysisTask !== undefined;
+  const analysisStepProgress = analysisTask ? taskStepCount(analysisTask) : null;
   const { notify, api, refresh, workspace, navigate, open } = useWorkspace();
   const { noteLeader } = useChannels();
   const [draft, setDraft] = useState("");
@@ -807,6 +817,18 @@ export function ChannelChatScreen({
               />
             ),
           )
+        )}
+
+        {analysisInProgress && analysisTask && (
+          <View style={{ paddingVertical: 4 }}>
+            <TaskAnalysisCard
+              label={t("chat.taskAnalysisInProgress")}
+              title={analysisTask.title}
+              progress={
+                analysisStepProgress ? t("chat.taskAnalysisSteps", analysisStepProgress) : undefined
+              }
+            />
+          </View>
         )}
 
         {busy && streamingIds.size === 0 && (

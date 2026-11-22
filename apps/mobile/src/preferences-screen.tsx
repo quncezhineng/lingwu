@@ -132,6 +132,7 @@ function memoryDate(memory: AgentMemory) {
 
 function MemoryCard({
   memory,
+  owner,
   onEdit,
   onDelete,
   busy,
@@ -140,6 +141,8 @@ function MemoryCard({
   onCancelConfirm,
 }: {
   memory: AgentMemory;
+  /** 记忆归属显示名：智能体名 / 频道名 / 账户级。仅用作卡片右下角标注。 */
+  owner: string;
   onEdit: () => void;
   onDelete: () => void;
   busy: boolean;
@@ -252,9 +255,23 @@ function MemoryCard({
           </View>
         </View>
       ) : (
-        <Text style={[s.small, { paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.line }]}>
-          {t("preferences.toldOn", { date: memoryDate(memory) })}
-        </Text>
+        <View
+          style={[
+            s.between,
+            {
+              gap: 12,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: colors.line,
+            },
+          ]}
+        >
+          <Text style={s.small}>{t("preferences.toldOn", { date: memoryDate(memory) })}</Text>
+          {/* 卡片右下角标注记忆来源：哪个智能体 / 频道产生的。 */}
+          <Text style={[s.small, { color: colors.muted }]}>
+            {t("preferences.memoryOwner", { owner })}
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -449,6 +466,12 @@ export function PreferencesScreen({
   // 全局模式下按 Agent / 频道聚合，作为可点击的分类筛选（每个分类带记忆条数）。
   const { agents } = useAgentSpace();
   const { channels } = useChannels();
+  // 记忆归属 id → 显示名：优先智能体名，其次频道名（频道记忆以频道 id 为作用域键），
+  // 都没有匹配则回退到「账户级」/原始 id，避免界面出现裸 uuid。筛选与卡片标注共用。
+  const memoryOwnerName = (id: string): string =>
+    agents.find((agent) => agent.id === id)?.name ??
+    channels.find((channel) => channel.id === id)?.name ??
+    (id === "default" ? t("preferences.scopeAccount") : id);
   const byAgent = agentId
     ? null
     : (() => {
@@ -459,12 +482,7 @@ export function PreferencesScreen({
         }
         return [...counts.entries()].map(([id, count]) => ({
           id,
-          // 归属可能指向 Agent，也可能是频道（频道记忆以频道 id 为作用域键），
-          // 都没有匹配则回退到「账户级」/原始 id，避免界面出现裸 uuid。
-          name:
-            agents.find((agent) => agent.id === id)?.name ??
-            channels.find((channel) => channel.id === id)?.name ??
-            (id === "default" ? t("preferences.scopeAccount") : id),
+          name: memoryOwnerName(id),
           count,
         }));
       })();
@@ -598,6 +616,7 @@ export function PreferencesScreen({
             <View key={memory.id} style={{ width: cardWidth }}>
               <MemoryCard
                 memory={memory}
+                owner={memoryOwnerName(memoryAgentId(memory))}
                 onEdit={() => {
                   setConfirmId(undefined);
                   setEditor({ memory });

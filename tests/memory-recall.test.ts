@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
+import { createServer } from "node:http";
 import test from "node:test";
 import { EventSchemas, EventType, type RunAgentInput } from "@ag-ui/core";
 import { lastValueFrom, toArray } from "rxjs";
@@ -88,6 +90,150 @@ test("the conversation recalls only its owner's matching memories", async (t) =>
     ],
   });
   assert.match(requests[0]?.body ?? "", /recall_memory/);
+});
+
+test("Hindsight semantic recall surfaces a memory keywords alone would miss", async (t) => {
+  // 假 Hindsight：记录请求，recall 固定回「房东」那条语义命中。
+  const requests: { path: string; body: Record<string, unknown> }[] = [];
+  const hindsight = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    requests.push({ path: request.url ?? "", body: body ? JSON.parse(body) : {} });
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(
+      request.url?.includes("/memories/recall")
+        ? JSON.stringify({ memories: [{ id: "landlord", text: "The landlord is Bob Li." }] })
+        : "{}",
+    );
+  });
+  hindsight.listen(0, "127.0.0.1");
+  await once(hindsight, "listening");
+  const address = hindsight.address();
+  assert.ok(address && typeof address !== "string");
+  t.after(async () => {
+    hindsight.closeAllConnections();
+    await new Promise<void>((resolve) => hindsight.close(() => resolve()));
+  });
+
+  // 查询词与记忆没有任何共同关键词：关键词召回会返回空，只有语义召回能命中。
+  await modelFixture(t, (index) =>
+    index === 0
+      ? { name: "recall_memory", arguments: { query: "who collects my payment", limit: 10 } }
+      : undefined,
+  );
+  const f = await browserFixture(t, () => ({ data: {} }));
+  const config = {
+    ...f.config,
+    agentBackend: "model" as const,
+    model: "openai/fixture",
+    hindsightBaseUrl: `http://127.0.0.1:${address.port}`,
+  };
+  const server = await createApp(f.db, config);
+  t.after(() => server.agent.stop());
+
+  await f.db.put(
+    "local-user",
+    "memories",
+    memory("landlord", "The landlord is Bob Li.", "2026-10-25T03:00:00.000Z"),
+  );
+
+  const conversation = new ConversationAgent(config, server.agent, "local-user");
+  const events = (
+    await lastValueFrom(
+      conversation
+        .run({
+          threadId: "semantic-recall",
+          runId: randomUUID(),
+          messages: [{ id: randomUUID(), role: "user", content: "Who do I pay rent to?" }],
+          tools: [],
+          context: [],
+          state: {},
+        })
+        .pipe(toArray()),
+    )
+  ).map((event) => EventSchemas.parse(event));
+  const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT);
+  assert.ok(result && result.type === EventType.TOOL_CALL_RESULT);
+  assert.deepEqual(JSON.parse(result.content), {
+    query: "who collects my payment",
+    memories: [
+      {
+        id: "landlord",
+        text: "The landlord is Bob Li.",
+        source: "User confirmed in chat",
+        createdAt: "2026-10-25T03:00:00.000Z",
+      },
+    ],
+  });
+  assert.ok(
+    requests.some((item) => item.path === "/v1/default/banks/local-user:default/memories/recall"),
+    "召回要真的打到 Hindsight 的 default bank",
+  );
+});
+
+test("semantic recall degrades to keyword search when Hindsight fails", async (t) => {
+  const hindsight = createServer((_request, response) => {
+    response.writeHead(500, { "Content-Type": "application/json" });
+    response.end("{}");
+  });
+  hindsight.listen(0, "127.0.0.1");
+  await once(hindsight, "listening");
+  const address = hindsight.address();
+  assert.ok(address && typeof address !== "string");
+  t.after(async () => {
+    hindsight.closeAllConnections();
+    await new Promise<void>((resolve) => hindsight.close(() => resolve()));
+  });
+
+  await modelFixture(t, (index) =>
+    index === 0
+      ? { name: "recall_memory", arguments: { query: "landlord", limit: 10 } }
+      : undefined,
+  );
+  const f = await browserFixture(t, () => ({ data: {} }));
+  const config = {
+    ...f.config,
+    agentBackend: "model" as const,
+    model: "openai/fixture",
+    hindsightBaseUrl: `http://127.0.0.1:${address.port}`,
+  };
+  const server = await createApp(f.db, config);
+  t.after(() => server.agent.stop());
+
+  await f.db.put(
+    "local-user",
+    "memories",
+    memory("landlord", "The landlord is Bob Li.", "2026-10-25T03:00:00.000Z"),
+  );
+
+  const conversation = new ConversationAgent(config, server.agent, "local-user");
+  const events = (
+    await lastValueFrom(
+      conversation
+        .run({
+          threadId: "degraded-recall",
+          runId: randomUUID(),
+          messages: [{ id: randomUUID(), role: "user", content: "Who is my landlord?" }],
+          tools: [],
+          context: [],
+          state: {},
+        })
+        .pipe(toArray()),
+    )
+  ).map((event) => EventSchemas.parse(event));
+  const result = events.find((event) => event.type === EventType.TOOL_CALL_RESULT);
+  assert.ok(result && result.type === EventType.TOOL_CALL_RESULT);
+  assert.deepEqual(JSON.parse(result.content), {
+    query: "landlord",
+    memories: [
+      {
+        id: "landlord",
+        text: "The landlord is Bob Li.",
+        source: "User confirmed in chat",
+        createdAt: "2026-10-25T03:00:00.000Z",
+      },
+    ],
+  });
 });
 
 test("preferences confirmed in chat persist with a category", async (t) => {

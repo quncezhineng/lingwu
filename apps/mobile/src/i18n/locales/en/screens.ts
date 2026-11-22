@@ -111,6 +111,7 @@ const screens = {
   "screens.filesResearchBadge": "RESEARCH",
   "screens.filesGeneratedByAgent": "Created by agent",
   "screens.filesAgentUnassigned": "Unassigned agent",
+  "screens.filesAgentChannel": "Channel",
   "screens.filesOpenResearchArtifact": "Open research output: {name}",
   "screens.filesPage": "page",
   "screens.filesPages": "pages",

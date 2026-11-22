@@ -39,6 +39,8 @@ const chat = {
   "chat.hideRecentResults": "隐藏最近结果",
   "chat.recentResults": "最近结果",
   "chat.agentWorking": "智能体正在工作",
+  "chat.taskAnalysisInProgress": "正在进行任务分析…",
+  "chat.taskAnalysisSteps": "{done}/{total} 步",
   "chat.retryResponse": "重试回复",
   "chat.streamingReply": "灵悟正在撰写回复",
   "chat.streamReplyComplete": "回复已完成",

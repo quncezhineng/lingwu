@@ -19,6 +19,7 @@ import { useAgentWorkspace } from "./agent-workspace";
 import { Text, TextInput } from "./app-text";
 import { MarketBriefingCard } from "./briefing-card";
 import { browserAddress } from "./browser-address";
+import { useChannels } from "./channels";
 import { localDateTime, startOfZonedDay, zonedInstant } from "./date-time";
 import { saveRemoteFile } from "./file-export";
 import { fileBadge, fileExtension, fileKind } from "./file-kind";
@@ -1087,13 +1088,17 @@ export function FilesScreen({
   const { workspace: w, api, refresh, open, prefillPrompt, notify } = useWorkspace();
   const { data: agent, error: agentError } = useAgentWorkspace();
   const { agents: agentList } = useAgentSpace();
+  const { channels } = useChannels();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [section, setSection] = useState<LibrarySection>(initialSection);
-  const [sourceFilter, setSourceFilter] = useState<FileSourceFilter>("all");
+  // 默认落在「分析生成」：顶部来源筛选已隐藏「全部」胶囊（见下），再无「全部」可选。
+  const [sourceFilter, setSourceFilter] = useState<FileSourceFilter>("analysis");
   const [formatFilter, setFormatFilter] = useState<FileFormatFilter>("all");
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  // 分析产物按「智能体/频道」的胶囊标签：null = 全部（沿用分组展示），选中组号只显示该组。
+  const [agentGroup, setAgentGroup] = useState<string | null>(null);
   // 格式筛选默认收起：首屏只留「所有格式」按钮，避免十几个胶囊把工具栏撑满。
   const [formatsOpen, setFormatsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1122,9 +1127,14 @@ export function FilesScreen({
     [library.files, sourceFilter, formatFilter, query],
   );
   /**
-   * 分析生成的产物按「生成它的智能体」分组展示。
+   * 分析生成的产物按「生成它的智能体」分组展示；频道（多 Agent 群聊）产出的
+   * 产物单独按频道分组，分组标题用频道名。
    * 「我的上传」只看上传件；格式筛选针对文件扩展名，产物没有扩展名，一并隐藏以免误读。
    */
+  const channelLabels = useMemo(
+    () => new Map(channels.map((channel) => [channel.id, channel.name])),
+    [channels],
+  );
   const artifactGroups = useMemo(() => {
     if (sourceFilter === "upload" || formatFilter !== "all") return [];
     return groupArtifactsByAgent(
@@ -1132,9 +1142,46 @@ export function FilesScreen({
       agent?.tasks ?? [],
       agentList,
       t("screens.filesAgentUnassigned"),
+      channelLabels,
+      t("screens.filesAgentChannel"),
     );
-  }, [sourceFilter, formatFilter, query, library.artifacts, agent?.tasks, agentList, t]);
+  }, [
+    sourceFilter,
+    formatFilter,
+    query,
+    library.artifacts,
+    agent?.tasks,
+    agentList,
+    channelLabels,
+    t,
+  ]);
   const visibleArtifactCount = artifactGroups.reduce(
+    (total, group) => total + group.artifacts.length,
+    0,
+  );
+  // 智能体/频道标签：落在来源筛选和格式筛选之外的产物上，点击切换只显示该组；
+  // 选中组若因筛选条件变化已不存在（如切到「我的上传」或改了格式），自动退回「全部」。
+  const agentTabs = useMemo(() => {
+    if (sourceFilter === "upload" || formatFilter !== "all" || !artifactGroups.length) return [];
+    return [
+      { id: null as string | null, name: t("agent.filterAll"), count: visibleArtifactCount },
+      ...artifactGroups.map((group) => ({
+        id: group.agentId,
+        name: group.agentName,
+        count: group.artifacts.length,
+      })),
+    ];
+  }, [sourceFilter, formatFilter, artifactGroups, visibleArtifactCount, t]);
+  const activeAgentGroup =
+    agentGroup !== null && agentTabs.some((tab) => tab.id === agentGroup) ? agentGroup : null;
+  const visibleGroups = useMemo(
+    () =>
+      activeAgentGroup === null
+        ? artifactGroups
+        : artifactGroups.filter((group) => group.agentId === activeAgentGroup),
+    [artifactGroups, activeAgentGroup],
+  );
+  const visibleGroupCount = visibleGroups.reduce(
     (total, group) => total + group.artifacts.length,
     0,
   );
@@ -1353,43 +1400,47 @@ export function FilesScreen({
                   backgroundColor: colors.surface,
                 }}
               >
-                {sourceFilters.map((item) => {
-                  const active = item.id === sourceFilter;
-                  return (
-                    <Pressable
-                      key={item.id}
-                      accessibilityRole="tab"
-                      accessibilityState={{ selected: active }}
-                      onPress={() => setSourceFilter(item.id)}
-                      style={{
-                        minHeight: compact ? 36 : 32,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 6,
-                        paddingHorizontal: 12,
-                        borderRadius: radius.full,
-                        backgroundColor: active ? colors.paper : "transparent",
-                        borderWidth: 1,
-                        borderColor: active ? colors.line : "transparent",
-                      }}
-                    >
-                      <Text
+                {/* 「全部」来源标签暂时隐藏（逻辑保留在 sourceFilters 里），只留「分析生成」「我的上传」；
+                    需要恢复时去掉下面这个 filter、并把初始 sourceFilter 改回 "all" 即可。 */}
+                {sourceFilters
+                  .filter((item) => item.id !== "all")
+                  .map((item) => {
+                    const active = item.id === sourceFilter;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: active }}
+                        onPress={() => setSourceFilter(item.id)}
                         style={{
-                          fontSize: 12,
-                          fontWeight: active ? "600" : "500",
-                          color: active ? colors.text : colors.muted,
+                          minHeight: compact ? 36 : 32,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                          paddingHorizontal: 12,
+                          borderRadius: radius.full,
+                          backgroundColor: active ? colors.paper : "transparent",
+                          borderWidth: 1,
+                          borderColor: active ? colors.line : "transparent",
                         }}
                       >
-                        {item.label}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: colors.faint }}>{item.count}</Text>
-                    </Pressable>
-                  );
-                })}
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: active ? "600" : "500",
+                            color: active ? colors.text : colors.muted,
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.faint }}>{item.count}</Text>
+                      </Pressable>
+                    );
+                  })}
               </View>
               <Text style={[s.small, { marginLeft: "auto", color: colors.faint }]}>
                 {t("screens.filesVisibleCount", {
-                  count: visibleFiles.length + visibleArtifactCount,
+                  count: visibleFiles.length + visibleGroupCount,
                 })}
               </Text>
             </View>
@@ -1506,42 +1557,45 @@ export function FilesScreen({
             )}
           </View>
 
-          {/* 上传入口放在筛选卡之后、文件列表之前：上传是文件库的主入口，放页面底部会被长列表淹没，用户难以发现 */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("screens.filesUploadAreaTitle")}
-            disabled={busy}
-            onPress={() => void upload()}
-            style={({ pressed }) => [
-              s.row,
-              {
-                gap: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                borderWidth: 1,
-                borderStyle: "dashed",
-                borderColor: colors.lineStrong,
-                borderRadius: radius.field,
-                backgroundColor: pressed ? colors.surface : "transparent",
-                opacity: busy ? 0.7 : 1,
-              },
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : (
-              <Upload size={18} color={colors.muted} />
-            )}
-            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-              <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>
-                {t("screens.filesUploadAreaTitle")}
-              </Text>
-              <Text numberOfLines={compact ? 2 : 1} style={[s.small, { color: colors.faint }]}>
-                {t("screens.filesUploadAreaDetail")}
-              </Text>
-            </View>
-            {!compact && <Plus size={15} color={colors.faint} />}
-          </Pressable>
+          {/* 上传入口放在筛选卡之后、文件列表之前：上传是文件库的主入口，放页面底部会被长列表淹没，用户难以发现。
+              「分析生成」标签看的是智能体/频道产出的报告，不是上传件，这里隐藏上传入口；「全部」「我的上传」仍显示。 */}
+          {sourceFilter !== "analysis" && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("screens.filesUploadAreaTitle")}
+              disabled={busy}
+              onPress={() => void upload()}
+              style={({ pressed }) => [
+                s.row,
+                {
+                  gap: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  borderWidth: 1,
+                  borderStyle: "dashed",
+                  borderColor: colors.lineStrong,
+                  borderRadius: radius.field,
+                  backgroundColor: pressed ? colors.surface : "transparent",
+                  opacity: busy ? 0.7 : 1,
+                },
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                <Upload size={18} color={colors.muted} />
+              )}
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text style={[s.text, { fontSize: 12, fontWeight: "600" }]}>
+                  {t("screens.filesUploadAreaTitle")}
+                </Text>
+                <Text numberOfLines={compact ? 2 : 1} style={[s.small, { color: colors.faint }]}>
+                  {t("screens.filesUploadAreaDetail")}
+                </Text>
+              </View>
+              {!compact && <Plus size={15} color={colors.faint} />}
+            </Pressable>
+          )}
 
           {selectedCount > 0 && (
             <View
@@ -1736,8 +1790,52 @@ export function FilesScreen({
             </View>
           )}
 
-          {/* 分析产物按智能体分组：同一张卡里先给智能体名，再列它产出的报告 */}
-          {artifactGroups.map((group) => (
+          {/* 分析产物按智能体/频道分组：同「全局记忆」一样用胶囊标签切换，只看某组或全部 */}
+          {agentTabs.length > 0 && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {agentTabs.map((entry) => {
+                const active = activeAgentGroup === entry.id;
+                return (
+                  <Pressable
+                    key={entry.id ?? "all"}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${entry.name} · ${entry.count}`}
+                    accessibilityState={{ selected: active }}
+                    // 再点一次已选中的分组回到「全部」。
+                    onPress={() => setAgentGroup(active ? null : entry.id)}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 7,
+                        paddingHorizontal: 11,
+                        paddingVertical: 7,
+                        borderRadius: radius.full,
+                        borderWidth: 1,
+                        borderColor: active ? colors.primary : colors.line,
+                        backgroundColor: active
+                          ? colors.sky
+                          : pressed
+                            ? colors.surface
+                            : colors.paper,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.small,
+                        { fontWeight: "600", color: active ? colors.primary : colors.text },
+                      ]}
+                    >
+                      {entry.name}
+                    </Text>
+                    <Text style={[s.small, { color: colors.muted }]}>{entry.count}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+          {visibleGroups.map((group) => (
             <View key={group.agentId} style={{ gap: space.xs }}>
               <View style={[s.between, { gap: space.xs, flexWrap: "wrap" }]}>
                 <Text style={[s.label, { fontSize: 11, letterSpacing: 1 }]}>{group.agentName}</Text>
@@ -1763,7 +1861,7 @@ export function FilesScreen({
             </View>
           ))}
 
-          {!visibleFiles.length && visibleArtifactCount === 0 && (
+          {!visibleFiles.length && visibleGroupCount === 0 && (
             <Card>
               <Empty
                 icon={

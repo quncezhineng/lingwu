@@ -1,6 +1,6 @@
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
-import type { AgentDefinition } from "./agent-space-model";
+import { type AgentDefinition, SYSTEM_AGENT_ID } from "./agent-space-model";
 import { type FileKind, fileKind } from "./file-kind";
 import type { TranslationKey } from "./i18n/locales/en";
 import { artifactTitle } from "./i18n/translate";
@@ -92,28 +92,77 @@ export interface AgentArtifactGroup {
 export const UNASSIGNED_AGENT_ID = "unassigned";
 
 /**
- * 把智能体生成的分析产物按「生成它的智能体」归类。
- *
- * 归属链路是 artifact.taskId → task.threadId → agent.threadId → agent：
- * AgentArtifact 本身只记任务 id，任务只在由对话发起时才带 threadId，
- * 因此后台定时任务（如市场简报）产出的结果会落到「未归属」分组。
+ * 任务没有发起对话线程（threadId 为空）但属于系统智能体统筹完成的产出：
+ * 后台定时生成的每日市场简报、计划类任务、以及多 Agent 编排的根任务。
+ * 这些任务创建时不带 threadId（只有对话内 delegate 才有），
+ * 但产物实际由系统智能体「小悟」统筹完成，分组时兜底归入小悟名下。
  */
+function isSystemProducedTask(
+  task: { kind?: AgentTask["kind"]; orchestrationId?: string } | undefined,
+): boolean {
+  if (!task) return false;
+  return task.orchestrationId != null || task.kind === "market_briefing" || task.kind === "plan";
+}
+
+/**
+ * 把智能体生成的分析产物按「生成它的智能体」归类，频道（多 Agent 群聊）产物独立分组。
+ *
+ * 归属优先级：
+ * 1. 任务 input 里带 channelId 的，是频道发起/编排的产物，一律归入独立的「频道」分组
+ *    （即使该任务的 threadId 碰巧匹配某个成员 Agent 的线程，也不划归那个智能体）；
+ * 2. 其余按 artifact.taskId → task.threadId → agent.threadId → agent 归属；
+ * 3. 不带 threadId 但由系统能力产出的任务（定时简报、计划任务、编排根任务）
+ *    兜底归入系统智能体「小悟」；
+ * 4. 完全无法溯源的产物归「未归属」分组。
+ *
+ * 频道分组名取自 channelLabels（channelId → 频道名），查不到的频道用 channelFallbackLabel 兜底。
+ * 任务对象至少需要 id 与 threadId；kind/orchestrationId 仅在兜底判断时可选。
+ */
+type GroupableTask = Pick<AgentTask, "id" | "threadId"> &
+  Partial<Pick<AgentTask, "kind" | "orchestrationId">> & {
+    /** 频道（多 Agent 群聊）发起的任务会把 channelId 写进 input，产物按频道归类。 */
+    input?: { channelId?: unknown };
+  };
+
 export function groupArtifactsByAgent(
   artifacts: readonly AgentArtifact[],
-  tasks: readonly Pick<AgentTask, "id" | "threadId">[],
+  tasks: readonly GroupableTask[],
   agents: readonly Pick<AgentDefinition, "id" | "name" | "threadId">[],
   unassignedLabel: string,
+  channelLabels: ReadonlyMap<string, string> = new Map(),
+  channelFallbackLabel = "",
 ): AgentArtifactGroup[] {
-  const threadByTask = new Map(tasks.map((task) => [task.id, task.threadId]));
+  const taskById = new Map(tasks.map((task) => [task.id, task] as const));
   const agentByThread = new Map(agents.map((agent) => [agent.threadId, agent]));
+  const systemAgent = agents.find((agent) => agent.id === SYSTEM_AGENT_ID);
   const groups = new Map<string, AgentArtifactGroup>();
   for (const artifact of newestFirst(artifacts)) {
-    const threadId = threadByTask.get(artifact.taskId);
-    const owner = threadId ? agentByThread.get(threadId) : undefined;
-    const agentId = owner?.id ?? UNASSIGNED_AGENT_ID;
+    const task = taskById.get(artifact.taskId);
+    const channelId =
+      typeof task?.input?.channelId === "string" && task.input.channelId.length > 0
+        ? task.input.channelId
+        : undefined;
+    let agentId: string;
+    let agentName: string;
+    if (channelId) {
+      agentId = `channel:${channelId}`;
+      agentName = channelLabels.get(channelId) ?? channelFallbackLabel;
+    } else {
+      const owner = task?.threadId ? agentByThread.get(task.threadId) : undefined;
+      if (owner) {
+        agentId = owner.id;
+        agentName = owner.name;
+      } else if (systemAgent && !task?.threadId && isSystemProducedTask(task)) {
+        agentId = SYSTEM_AGENT_ID;
+        agentName = systemAgent.name;
+      } else {
+        agentId = UNASSIGNED_AGENT_ID;
+        agentName = unassignedLabel;
+      }
+    }
     const group = groups.get(agentId) ?? {
       agentId,
-      agentName: owner?.name ?? unassignedLabel,
+      agentName,
       artifacts: [],
     };
     group.artifacts.push(artifact);

@@ -31,11 +31,17 @@ import type { ResolvedModel } from "../model-settings.ts";
 import { searchDescription, searchInputSchema, searchInstructions } from "../search.ts";
 import { agentIdentityGuidance } from "./agent-persona.ts";
 import { readInstalledSkill, skillGuidanceForThread } from "./bot-skills.ts";
-import { recallMemories } from "./memory-recall.ts";
-import { filterMemoriesForScope } from "./memory-scope.ts";
+import { filterMemoriesForScope, memoryAgentKey, memoryScopeKeys } from "./memory-scope.ts";
+import {
+  MEMORY_SETTLE_LIMIT,
+  MEMORY_SETTLE_MIN_CHARS,
+  MEMORY_SETTLE_TRANSCRIPT_LIMIT,
+  normalizeMemoryText,
+  parseMemoryCandidates,
+} from "./memory-settle.ts";
 import { reminderList } from "./reminder-list.ts";
 import type { AgentService } from "./service.ts";
-import { tanstackAgent } from "./tanstack-agent.ts";
+import { completeText, tanstackAgent } from "./tanstack-agent.ts";
 
 /**
  * Shape returned by the `get_quote` tool: inline quote cards read `quotes[]`,
@@ -630,10 +636,17 @@ export class ConversationAgent extends AbstractAgent {
           // 与执行侧（executeModelTask）同一口径：账户级共享 + 当前 Agent 私有。
           // 对话线程不隶属任何频道，所以这里不带 channelId。
           const agentId = await agentIdForThread(this.service.db, this.owner, input.threadId);
+          const scope = { agentId };
           const memories = await this.service.db.list<AgentMemoryV2>(this.owner, "memories");
-          const mine = filterMemoriesForScope(memories, { agentId });
-          // 关键词召回为兜底（本地、零成本）；语义召回由 service.memory 提供（M0 已接 Hindsight）。
-          return { query, memories: recallMemories(mine, query, limit) };
+          const mine = filterMemoriesForScope(memories, scope);
+          // 语义召回优先（Hindsight），关键词兜底；作用域仍由本地过滤保证。
+          const recalled = await this.service.recallMemories(this.owner, {
+            bankIds: memoryScopeKeys(scope),
+            query,
+            candidates: mine,
+            limit,
+          });
+          return { query, memories: recalled };
         },
       }),
       defineTool({
@@ -707,17 +720,38 @@ export class ConversationAgent extends AbstractAgent {
           return;
         }
         let stopped = false;
+        const replyChunks: string[] = [];
         const subscription = agent
           .run({ ...input, tools: input.tools.filter((t) => t.name === "open_workspace") })
           .subscribe({
             next: (event) => {
+              // 累积本轮助手回复的文本增量，供对话正常结束后的记忆自动沉淀使用。
+              if (
+                event.type === EventType.TEXT_MESSAGE_CHUNK ||
+                event.type === EventType.TEXT_MESSAGE_CONTENT
+              ) {
+                const delta = (event as { delta?: unknown }).delta;
+                if (typeof delta === "string") replyChunks.push(delta);
+              }
               if (!stopped) subscriber.next(event);
             },
             error: (error) => {
               if (!stopped) subscriber.error(error);
             },
             complete: () => {
-              if (!stopped) subscriber.complete();
+              if (!stopped) {
+                subscriber.complete();
+                // 对话正常结束：把这一轮值得长期复用的内容自动沉淀进记忆（尽力而为，
+                // 失败只丢本轮沉淀，不打断这一轮对话；示例后端 model 未解析，跳过）。
+                if (model) {
+                  void this.settleConversationMemories(
+                    model,
+                    input.threadId,
+                    latestText,
+                    replyChunks.join(""),
+                  );
+                }
+              }
             },
           });
         const stop = () => {
@@ -744,6 +778,68 @@ export class ConversationAgent extends AbstractAgent {
       !choiceContinuation,
     );
   }
+
+  /**
+   * 一轮单聊对话结束后，把这一轮里值得长期复用的内容沉淀进记忆。
+   *
+   * 与频道 `settleChannelMemories`（channel-chat.ts）同一模式：用本轮模型把
+   * 「用户消息 + 助手回复」总结成最多 MEMORY_SETTLE_LIMIT 条 JSON 候选。归属键用
+   * threadId 反查的 Agent id（无映射回退 "default"，与 remember_fact / write_memory
+   * 同一口径），走 service.saveMemory 双写 Hindsight：本地权威存储 + 语义索引，
+   * 同一 Agent 下内容相同的记忆按归一化文本去重，不会重复累积。
+   *
+   * 尽力而为的后置动作：整理失败只丢弃本轮沉淀，不打断已经完成的对话；刻意不接
+   * signal，避免用户回落页面时把已经开始的整理一并取消。
+   */
+  private settleConversationMemories(
+    model: ResolvedModel,
+    threadId: string,
+    userText: string,
+    replyText: string,
+  ): Promise<void> {
+    const transcript = replyText.trim().slice(0, MEMORY_SETTLE_TRANSCRIPT_LIMIT);
+    if (!transcript || userText.length + transcript.length < MEMORY_SETTLE_MIN_CHARS) {
+      return Promise.resolve();
+    }
+    return (async () => {
+      const agentId = (await agentIdForThread(this.service.db, this.owner, threadId)) ?? "default";
+      const known = await this.service.db.list<AgentMemoryV2>(this.owner, "memories");
+      const seen = new Set(
+        known
+          .filter((memory) => memoryAgentKey(memory) === agentId)
+          .map((memory) => normalizeMemoryText(memory.text)),
+      );
+      const raw = await completeText({
+        model: model.model ?? this.config.model ?? "openai/unconfigured",
+        connection: model.connection,
+        system: [
+          "你在维护一个投研智能体的长期记忆。",
+          "只记录这一轮对话里值得长期复用的事实、偏好、结论或决策；一次性寒暄、过程性讨论、被否决的选项都不要记。",
+          "每条不超过 60 字，用陈述句，保留关键数字与标的名称，不要写「用户说」这类套话。",
+          `category 只能从这些里选：${MEMORY_CATEGORIES.join("、")}。`,
+          `最多 ${MEMORY_SETTLE_LIMIT} 条；没有值得记的就输出 []。`,
+          '只输出 JSON 数组，形如 [{"text":"...","category":"关注领域"}]，不要任何解释。',
+        ].join("\n"),
+        prompt: `用户这一轮说：\n${userText}\n\n助手回复：\n${transcript}`,
+      });
+      for (const candidate of parseMemoryCandidates(raw)) {
+        const key = normalizeMemoryText(candidate.text);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        await this.service.saveMemory(this.owner, {
+          agentId,
+          kind: "fact",
+          text: candidate.text,
+          source: "Conversation summary",
+          category: candidate.category,
+          threadId,
+        });
+      }
+    })().catch((error) => {
+      backgroundFailure("conversation.settleMemories", error);
+    });
+  }
+
   private finishStopped(
     subscriber: { next(event: BaseEvent): void; complete(): void },
     input: RunAgentInput,

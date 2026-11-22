@@ -5,6 +5,216 @@
 
 ## 变更记录
 
+### 2026-11-22 · 技能：安装同花顺 `hithink-finance` 技能并在「能力与市场 · 技能」上架卡片
+
+**背景**
+
+前面把同花顺接成了连接器，但连接器只能调 MCP 工具，回答「这个接口的参数怎么写」「批量导出怎么落盘」「CLI 怎么首次登录」这类契约问题时不够用。同花顺官方在 [Financial-API](https://github.com/Hithink-Tech-Org/Financial-API) 的 `skills/hithink-finance` 里发布了 Agent Skill（REST API Wiki + Router + `references/api/**` 逐接口契约），需要随项目一起落地，并在前端技能板块可见、可装。
+
+**处理**
+
+- 安装：`npx --yes skills add HiThink-Tech/Financial-API --skill hithink-finance -g --yes` 成功，落到 `~/.agents/skills/hithink-finance`（并对 19 个客户端做了软链）。再整包复制到仓库的 [skills/hithink-finance](../skills/hithink-finance)（80 个文件 / 548K：`SKILL.md` + `references/api/**` + `agents/openai.yaml`），与既有 184 个技能同处 `skills/`。
+- [SKILL.md](../skills/hithink-finance/SKILL.md)：frontmatter 从 skills CLI 的 `name` / `description` 改成本仓库约定的 `name_en` / `description_en` / `name_zh` / `description_zh`。这一步是必须的——`parseSkillMarkdown()` 只认这四个字段，沿用上游写法会让运行时把名字和简介都退化成 id（`- hithink-finance: hithink-finance — hithink-finance`）。正文与 `references/` 未改。
+- [skill-catalog.ts](../apps/mobile/src/skill-catalog.ts#L1140-L1155)：按目录既定结构新增条目——`id: "hithink-finance"`、`titleZh: 同花顺金融数据`、`titleEn: Hithink Finance Data`、中英文简介、`categories: ["research-tools"]`、`sourceFolder: "skills/hithink-finance"`，位置按 id 字典序插在 `gl-recon` 与 `ib-check-deck` 之间。文件头注释同步为「184 个由迁移生成 + 后续按同结构手工补条目」。
+- 卡片无需新代码：「能力与市场 · 技能」的卡片是 `skillCatalog.map(...)` 直出（[capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L2242-L2266)），标题 / 简介按语言取 `titleZh` / `titleEn`，图标配色由 `research-tools` 分类映射，搜索命中 `id` 与中英文标题简介。「研究工具」分类与其中文标签已存在，无新增 i18n。
+
+**说明**
+
+- 运行时链路已验证：`loadBuiltinSkills()` 扫 `skills/` 一层目录读取 `SKILL.md`，该技能返回 `name = 同花顺金融数据`、中文简介、正文 2664 字符，说明 `use_skill` 能取到方法正文，不只是「显示已安装」。
+- 卡片来源标签沿用 `agent.hubSourceLingwu`（与其它随仓库分发的技能一致）；技能正文属第三方内容，运行时只作为提示材料读取，不执行其脚本。
+- 测试：[apps/mobile/test/skill-catalog.test.ts](../apps/mobile/test/skill-catalog.test.ts#L10-L14) 的目录总数断言 184 → 185；「每个技能都有中英文信息 + 本地 `SKILL.md` 存在 + 分类合法」三条用例覆盖新条目，`pass 3 / fail 0`。`pnpm --dir apps/mobile typecheck`、`npx biome check`（2 个文件）通过。
+
+### 2026-11-22 · 记忆：单聊（Agent 对话）每轮结束自动把结论沉淀进记忆
+
+**背景**
+
+频道每轮对话已有自动沉淀（见下 2026-11-21 记录），但单聊（div 智能体对话）只有两条落记忆的口子：模型主动调用 `remember_fact` / `write_memory`，以及任务结果的 `deal-signal` 规则兜底。普通长文分析回复（如同花顺连接器行情解读）聊完即沉淀为普通消息、不进记忆库，用户要求「智能体对话的回复内容也自动总结几条沉淀进 hindsight」。
+
+**处理**
+
+- [memory-settle.ts](../apps/server/src/engine/memory-settle.ts)（新增共享模块）：把频道的 `parseMemoryCandidates` / `normalizeMemoryText` / 阈值常量（`MEMORY_SETTLE_LIMIT = 3`、`MEMORY_SETTLE_MIN_CHARS = 80`、`MEMORY_SETTLE_TRANSCRIPT_LIMIT = 12000`）抽成独立模块。单聊与频道共用，避免 `conversation.ts` 反向导入 `channel-chat.ts` 与既有的 `channel-chat → conversation`（`formatQuoteToolResult`）形成循环依赖。
+- [channel-chat.ts](../apps/server/src/engine/channel-chat.ts)：删除本地常量与两个纯函数的定义，改为从 `memory-settle.ts` 导入（`CHANNEL_*` 原名用 import 别名保留），`export { parseMemoryCandidates }` 保持原有对外导出契约；`settleChannelMemories` 行为不变。
+- [conversation.ts](../apps/server/src/engine/conversation.ts)：新增 `ConversationAgent.settleConversationMemories(model, threadId, userText, replyText)`。
+  - 挂载点：`agent.run(...).subscribe` 的 `complete` 回调，对话**正常结束**时触发；订阅 `next` 里累积 `TEXT_MESSAGE_CHUNK` / `TEXT_MESSAGE_CONTENT` 的 `delta` 拼成助手回复全文。用户点停 / 页面离开（`stopped`）时不沉淀；示例后端（`agentBackend === "sample"`，`model` 未解析）跳过。
+  - 语料门槛：用户消息 + 回复不足 80 字直接返回；正文截断 12000 字送入提示词。
+  - 总结：用本轮 `ResolvedModel` 调 `completeText`（不挂工具、不进线程）把「用户这一轮说 + 助手回复」整理成最多 3 条 JSON 候选，`category` 只认 `MEMORY_CATEGORIES` 词表（越界回退「关注领域」）。
+  - 落库：归属 `agentId = agentIdForThread(threadId)`（无映射回退 `"default"`，与 `remember_fact` / `write_memory` 同一口径），走 `service.saveMemory`（`kind = "fact"`、`source = "Conversation summary"`）→ 本地权威存储 + Hindsight 双写；同一 Agent 下按归一化文本去重，`sha256(agentId:fact:text)` 幂等 id 保证不重复累积。
+  - 尽力而为：整体 `try/catch` + `backgroundFailure("conversation.settleMemories")`，整理失败只丢弃本轮沉淀，不打断已经完成的对话。
+
+**说明**
+
+- 单聊与频道自动沉淀共用同一套「模型总结 → 候选解析 → 归一化去重 → `saveMemory` 双写 Hindsight」管道，唯一差异是归属键（Agent id vs `channel.id`）与场景提示词。
+- 验证：`pnpm typecheck` 通过；`npx biome check` 对改动文件无告警；`tests/channel-chat`、`tests/conversation-stream`、`tests/conversation-stop`、`tests/memory-scope`、`tests/memory-recall` 共 36 用例全绿。
+- 设计文档 [记忆系统技术架构.md](./记忆系统技术架构.md) 新增 §5.6（单聊记忆：每轮对话结束自动沉淀）。
+
+### 2026-11-22 · 全局记忆：记忆卡片右下角标注它由哪个智能体 / 频道产生
+
+**背景**
+
+用户在全局记忆页发现记忆卡片没有来源标注，看不出某条记忆是哪个智能体或频道沉淀的。
+
+**处理**
+
+- [preferences-screen.tsx](../apps/mobile/src/preferences-screen.tsx)：
+  - 新增 `memoryOwnerName(id)` 归一名解析：优先智能体名，其次频道名（频道记忆以频道 id 为作用域键），兜底「账户级」/原始 id；与顶部分类筛选同口径。
+  - `MemoryCard` 新增 `owner` 属性（归属显示名），卡片底部「你在 X 告诉我」改为左右两栏：左侧保留时间文案，右侧用 `preferences.memoryOwner`（「来自 {owner}」）标注来源智能体 / 频道。
+- i18n：新增 `preferences.memoryOwner`（中「来自 {owner}」/ 英「From {owner}」）。
+
+**说明**
+
+- 仅界面标注，不改数据与归属链路；全局模式、智能体专属记忆页、频道记忆页均显示，归属为「账户级」时显示「来自 账户级」以保持一致性。
+- 验证：`pnpm typecheck` 通过；`npx biome check` 对改动文件无告警。
+
+### 2026-11-22 · 资料库：分析产物从「按智能体/频道纵向铺开」改为「胶囊标签点击切换」，参考全局记忆界面
+
+**背景**
+
+资料库「文件」区目前的来源筛选（全部/分析生成/我的上传）之上没有细分手段，分析产物按智能体/频道逐个分组、从上往下铺开，组数一多（研究 Agent 4 条、小悟 38 条、频道若干），页面很长、找特定一组的产物要靠滚动。用户要求：参考「全局记忆」界面的分类胶囊，改成标签页点击切换——点某个智能体/频道标签只显示该组的产物，点「全部」回到分组铺开。
+
+**处理**
+
+- [screens.tsx](../apps/mobile/src/screens.tsx) `FilesScreen`：
+  - 新增状态 `agentGroup`（当前选中的智能体/频道分组 id，`null` 为「全部」）。
+  - 新增派生数据：`agentTabs`（`[{ id: null, name: "全部", count }, ...分组]`，来源筛选为「我的上传」或改了格式筛选时不展示该行，因为产物此时本就不显示）、`activeAgentGroup`（选中的组因筛选条件变化而消失时自动退回「全部」，与记忆页同一模式）、`visibleGroups`（过滤后的可见分组）、`visibleGroupCount`。
+  - 渲染：产物区上方插入胶囊标签行（样式与全局记忆页一致：选中态主色边框、浅蓝底、计数灰字；`accessibilityLabel` 为「组名 · 数量」；再点一次已选中的组回到「全部」）；产物渲染改用 `visibleGroups.map`；顶部「显示 N 个文件」计数与空态判断改用 `visibleGroupCount`。
+
+**说明**
+
+- 只是交互形态的调整：分组、归属、频道分类逻辑（需求 17）全部沿用，未动数据与归属链路。
+- 验证：`pnpm typecheck` 通过；`npx biome check` 对 screens.tsx 无告警（仓库级 13 条警告均为其他文件既有问题）。
+
+### 2026-11-22 · 资料库：频道（多 Agent 群聊）产出的文件独立按频道分类，不再并入系统智能体「小悟」
+
+**背景**
+
+需求 16 把「未归属」里的系统产出兜底归入「小悟」后，用户在资料库发现「AI 产业研究」等**频道（多 Agent 群聊）编排出来的报告**也堆在了「小悟」名下。用户要求：频道产生的文件资料单独分类，不应划归到小悟等智能体下面。
+
+**根因**
+
+频道工具 `delegate_task` / `research_stock` 在频道里建任务时把 `channelId` 写进 `task.input`，threadId 传的是频道虚拟线程（库里恰好等于小悟 / 资产 Agent 的线程；编排根任务则没有 threadId）。于是归属链路把它们当普通任务处理：子任务产物误归小悟 / 资产 Agent，编排根任务产物落「未归属」。查库取证确认：7 个频道任务（channelId=`93d121df-…`）共产出 23 个产物，全部源自该频道。
+
+**处理**
+
+- [file-library.ts](../apps/mobile/src/file-library.ts) `groupArtifactsByAgent` 增加最高优先级判断：任务 `input.channelId` 存在即归入独立「频道」分组（分组 key 为 `channel:<channelId>`），即使该任务 threadId 命中成员智能体线程也一样；只有真正无 channelId 的任务才继续走「线程→智能体 → 系统兜底（小悟）→ 未归属」。`GroupableTask` 相应扩展可选 `input`。
+- [screens.tsx](../apps/mobile/src/screens.tsx) `FilesScreen` 通过 `useChannels()` 取频道列表，构造 `channelId → 频道名` 映射传入分组函数，分组标题直接显示频道名；频道名查不到时兜底显示「频道」占位（新增 i18n `screens.filesAgentChannel`）。
+- 测试 [file-library.test.ts](../apps/mobile/test/file-library.test.ts) 新增「频道产物按频道分组、不进小悟/未归属」用例，覆盖三种情况：子任务 threadId 命中成员线程、编排根任务无 threadId、未知频道占位名。
+
+**说明**
+
+- 对历史数据立即生效：频道任务的 `input.channelId` 一直存在，本次只改前端归类、不动数据；个人对话、定时简报、计划任务等非频道任务的归属行为不变，仍按需求 16 链路归小悟。
+- 验证：`pnpm typecheck`、`npx biome check`、file-library 8 条用例全部通过。
+
+### 2026-11-22 · 资料库：未被对话线程归属的系统产出不再堆在「未归属智能体」，归入系统智能体「小悟」
+
+**背景**
+
+用户在资料库（全局资料页）看到大量报告 / 简报落在「未归属智能体」分组下：每日市场简报（11-14~11-22 共 9 份）、计划类任务（整理央行决策、利率政策跟踪、政策初步判断等）、多 Agent 编排的根任务（「AI 产业研究 · Anthropic 估值」「AI 产业研究 · 可比同业」等）。用户指出其中一部分实际是系统智能体「小悟」分析的，不应该全堆在「未归属」。
+
+**根因**
+
+资料库的归属链路是 `artifact.taskId → task.threadId → agent.threadId → agent`，而 `AgentArtifact` 只记任务 id。查库取证（复制 `.lingwu/postgres` 到临时副本只读查询，33 个任务 / 68 条产物）确认：所有落「未归属」的产物，其任务都**没有 threadId**——
+- 后台定时生成的 `market_briefing`（简报调度器 enqueue 不传 threadId）；
+- 计划类 `plan` 任务（goal 计划卡 delegate 不传 threadId）；
+- 多 Agent 编排的**根任务**（`submit_orchestration` 只写 `orchestrationId`，未把编排发起线程写回任务），而它们拆出的子任务都带 threadId，已正确归属到小悟 / 资产 Agent。
+
+带 threadId 的任务全部正确归属（小悟 / 资产 Agent / 研究 Agent），进一步印证漏项只发生在无 threadId 的任务上。
+
+**处理**
+
+- [file-library.ts](../apps/mobile/src/file-library.ts) `groupArtifactsByAgent` 增加兜底：任务无 threadId 时，若 `kind === "market_briefing"`、`kind === "plan"` 或存在 `orchestrationId`，则归入系统智能体「小悟」（`agent-space-model` 的 `SYSTEM_AGENT_ID`）；仍无法追溯的才归「未归属」。`tasks` 类型扩为 `GroupableTask`（id/threadId 必填，kind/orchestrationId 可选）。
+- 前端兜底对**历史数据立即生效**（`useAgentWorkspace` 轮询返回完整任务对象，含 `kind`/`orchestrationId`，无需服务端改动、不需迁移）；未来服务端若补写 threadId 也不会与现有链路冲突（有 threadId 时仍优先走 threadId）。
+- 测试 [file-library.test.ts](../apps/mobile/test/file-library.test.ts) 新增「系统产出任务归小悟」用例；原「无标记任务仍归未归属」用例保留。
+
+**说明**
+
+- 每日市场简报、计划任务、编排根任务及其汇总产物现归入「小悟」分组；彻底无法识别归属的条目仍留在「未归属智能体」（兜底分组，避免条目凭空消失）。
+- 验证：`pnpm typecheck`、`npx biome check`、file-library 7 条用例全部通过。
+
+### 2026-11-22 · 修复：research 任务缺 symbol 时不再反复失败，降级为通用模型执行
+
+**背景**
+
+用户自建的「研究 Agent」被分配「A股高股息+现金流稳健 候选标的筛选」这类开放式研究任务后一直停在「未完成 0/4 步」，点「再试一次」仍失败。查库取证确认那条任务 `kind=research`、`status=failed`、`attempts=3`，`error` 为 zod 校验错误（`too_small` / `invalid_format`），且 `input` 只有 `market/universe/thresholds` 调查条件、**没有 `symbol` 字段**。
+
+**根因**
+
+模型在对话里经 `delegate_task` 创建 `research` 任务时只给了屏幕上的调查条件，没给股票代码；`createTaskSchema.input` 是自由 `z.record`，并不强制 `symbol`。而 `research` 执行分支直接 `researchSymbolSchema.parse(String(task.input.symbol ?? ""))`，空值抛错 → worker 记 failed，重试无限次仍失败。
+
+**处理**
+
+- [service.ts](../apps/server/src/engine/service.ts) `research` 分支改为 `safeParse`：symbol 缺失 / 非法时不抛错，降级为 `executeModelTask`（与通用 `agent` 任务同一执行路径），让模型按 prompt 用自己的知识与工具完成开放式研究；symbol 合法时仍走 `generateResearchReport` 股票数据管道，行为不变。
+
+**说明**
+
+- 服务以 `tsx watch` 运行，改动已热重载；原失败任务点「再试一次」即可恢复（「研究 Agent」未单独配置模型，回落用户默认 `deepseek/deepseek-flash`，可正常执行）。
+- 验证：`pnpm typecheck`、`npx biome check`、`tests/research.test.ts` + `tests/orchestration.test.ts` 14 条用例全部通过。
+
+### 2026-11-22 · 对话：任务后台执行期间，对话流里持续显示「正在进行任务分析」
+
+**背景**
+
+对智能体 / 频道提问触发 `delegate_task` 后，工具执行结束、SSE 流（`RUN_FINISHED`）一完成，任务仍然在后台排队 / 运行，但对话页没有任何提示——只有右侧栏「任务」区能看到。用户要求「在回复流程中，对话页面需要有一个正在进行任务分析的提示，而不仅仅是在右侧栏的 Tasks 区域显示」。
+
+**处理**
+
+- 新增 [task-analysis-logic.ts](../apps/mobile/src/task-analysis-logic.ts)：`TASK_ANALYSIS_ACTIVE`（queued / running / waiting_approval / waiting_input 视为分析中）与 `taskStepCount`（取 `task.plan` 里已完成步骤 / 总数）。
+- 新增 [task-analysis-card.tsx](../apps/mobile/src/task-analysis-card.tsx)：带 spinner 的提示卡（主文案 + 任务标题 + 步骤进度），由工作区轮询驱动、不依赖 SSE 流，任务进入终态才消失。
+- [chat.tsx](../apps/mobile/src/chat.tsx)：用已有 `threadTasks`（按 threadId 过滤）推导 `analysisTask`，在消息列表末尾渲染分析中卡片；`ConversationHeader` 在有后台任务期间保持「智能体正在工作」状态点。
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：按 `task.input.channelId` 关联频道任务，同样在消息列表渲染分析中卡片，与既有「正在回复…」（SSE 流期间）并存。
+- i18n：`chat.taskAnalysisInProgress`（正在进行任务分析…）/ `chat.taskAnalysisSteps`（`{done}/{total}` 步）新增中英文文案。
+
+**说明**
+
+- 数据源是 `useAgentWorkspace` 的 3 秒轮询（`agentWorkspace.tasks`），无需新接口；任务初建时（流内工具卡）与后台执行期（本卡片）衔接自然。
+- 测试 [task-analysis-card.test.ts](../apps/mobile/test/task-analysis-card.test.ts)：状态集合与步骤计数共 4 条用例，与 i18n 用例合计 20 pass。`pnpm typecheck` 与 `npx biome check` 通过。
+
+### 2026-11-22 · 记忆：Agent 与频道真正接入 Hindsight（语义召回 + 频道双写）
+
+**背景**
+
+此前 Hindsight 只覆盖「写入 / 删除 / 迁移」：`recall_memory` 仍走本地关键词评分，频道记忆还有两条落库路径（手动「记住……」与每轮自动沉淀）绕过 `saveMemory` 直接写本地，只进 `records`、不进 Hindsight。用户要求「智能体以及频道都要真正用上 Hindsight」，把召回侧与频道路径补齐。
+
+**处理**
+
+- [service.ts](../apps/server/src/engine/service.ts)：新增统一召回入口 `AgentService.recallMemories(owner, { bankIds, query, candidates, limit })`。
+  - 语义优先、关键词兜底：未配置 Hindsight（`memory.enabled === false`）或请求失败/超时直接返回本地关键词结果，不打扰这一轮对话。
+  - 多 bank 并发查询（`bankIds` 来自 `memoryScopeKeys(scope)`：账户级 `default` + 本 Agent + 本频道），Hindsight 只在候选集内排序。
+  - 作用域仍由本地权威存储保证：调用方传进来的 `candidates` 是已按作用域过滤的本地记忆，命中按 `document_id`（= 本地幂等 id）优先、退化按归一化文本（`normalizeMemoryText` 去大小写 / 空白 / 标点）对齐，再去重补齐关键词结果。
+- [conversation.ts](../apps/server/src/engine/conversation.ts)：单聊 `recall_memory` 改调 `service.recallMemories`（不带 channelId，对话线程不隶属频道）。
+- [channel-chat.ts](../apps/server/src/engine/channel-chat.ts)：
+  - 频道 `recall_memory` 同样走 `service.recallMemories`（作用域 = 成员 Agent + 当前频道）；没有 `service` 的轻量调用回退本地关键词。
+  - 新增统一落库口 `saveChannelMemory()`：有 `service` 走 `saveMemory`（本地权威存储 + 双写 Hindsight `retain`，`agentId = channel.id`），没有 `service` 退回本地直写。手动「记住……」与 `settleChannelMemories` 自动沉淀两条路径都改走它。
+- [memory-recall.ts](../apps/server/src/engine/memory-recall.ts)：`recallMemories` 改成泛型 `T extends AgentMemory`，返回保留具体记忆类型，供 `AgentMemoryV2` 复用。
+
+**说明**
+
+- 未配置 `HINDSIGHT_BASE_URL` 时全链路静默降级为本地关键词召回，行为与改动前一致。
+- 测试：[tests/memory-recall.test.ts](../tests/memory-recall.test.ts) 新增「语义命中关键词召不回的记忆」与「Hindsight 失败降级关键词」两条用例；[tests/channel-chat.test.ts](../tests/channel-chat.test.ts) 起一个假 Hindsight（`startHindsight`），断言频道手动「记住……」与自动沉淀都 `retain` 到 `alice:<channel.id>` bank、频道 `recall_memory` 打到该 bank 的 `recall` 并返回只可能来自语义命中的记忆。`tsc --noEmit`、`pnpm --dir apps/mobile typecheck`、`npx biome check` 均通过；`tests/memory-recall`、`tests/channel-chat`、`tests/hindsight` 及全部 memory-* 用例全绿。
+- 设计文档 [记忆系统技术架构.md](./记忆系统技术架构.md) 的 §5.3（召回）按实际实现重写，并新增 §5.5（频道记忆统一落库口）。
+
+### 2026-11-22 · 连接器：新增同花顺（Hithink）金融数据，一个 Key 打通八个数据域
+
+**背景**
+
+「应用与能力 · 连接器」里的 A 股数据源只有 Tushare（补缺口）和 PandaData（OAuth 未接通），财务、指数成分、期货期权、资讯、港股新股这些内置数据没有的板块缺入口。同花顺官方开放了 [Financial-API](https://github.com/Hithink-Tech-Org/Financial-API)：一套 API Key、`X-api-key` 请求头，按数据域拆成八个 HTTP MCP 端点（a-share / a-share-index / meta / fund / futures / options / hk-share / news）。按数据域拆成八张卡片会让用户把同一个 Key 粘八遍，所以新增一种「一个 Key 对多个端点」的连接方式。
+
+**处理**
+
+- [catalog.ts](../apps/server/src/connectors/catalog.ts)：`ConnectorTransport` 新增 `mcp-multi`，`CatalogEntry` 新增 `endpoints`（多域端点清单，`endpoint` 仍指主端点 a-share）。新增 `hithink` 条目：`category: "research-data"`、`featured: true`、`auth: "api_key"`、`transport: "mcp-multi"`、`sort: 19`（紧跟 PandaData），hint 指向 fuyao.aicubes.cn/admin 创建 Key。
+- [service.ts](../apps/server/src/connectors/service.ts)：
+  - `connectReady` 的新分支逐个端点 `initialize → tools/list`，把工具按「工具名 → 所属端点」写进 `Saved.routes` 一并加密落库；工具清单上限从 24 提到 `MULTI_TOOL_LIMIT = 120`（八个域去掉重叠后约 99 个工具）。
+  - `dispatch` 的新分支按 `routes[tool]` 回到原端点调用；工具名不在表里时直接返回「这条连接里没有 X，不带 tool 再调一次可以看可用工具清单」，不外发请求。
+  - 容错：某个域没开权限（同花顺按 Key 逐 capability 授权）不影响整张卡片，任一个域拉到工具就算连上；但 `invalid_token` 命中时立刻停，不再打剩下七个端点。
+  - `requireToken` 增加同花顺专用校验 `HITHINK_RE`：官方没有公开 Key 的格式，只挡空白与控制字符，避免用 Tushare 那套 16 位字母数字规则误杀。
+  - `overlapsBuiltin` 增加 `HITHINK_OVERLAP`：`prices_snapshot` / `prices_historical` / `performance_nav` / `market_snapshot` / `market_historical` 这类行情与基金净值工具在连接时就被挡掉，保持「行情、日线、基金净值只走内置数据」的口径；`connectionGuidance` 的提示语把同花顺并进「只补缺口」那一句。
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx#L64-L88)：`VISIBLE_CONNECTOR_IDS` 加入 `hithink`（保留名单由 11 个变 12 个），「能力与市场 · 连接器」、对话底部「选择连接器」弹层、智能体 / 频道「连接库」三个入口同步可见；[capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L2653-L2665) 的相关注释一并对齐。连接卡片本身走既有 `AppConnectorSheet` 的 `api_key` 输入框，无需前端新增表单。
+
+**说明**
+
+- Key 只以 `X-api-key` 出现在请求头里，落库走 `encryptSecret`，错误信息经 `redactMessage` 抹掉 Key；`listConnectors` 的响应不含任何凭据。
+- 未做「连接时打一次真实数据探针」：`tools/list` 本身已是带 Key 的授权请求，认证失败会以 401 直接返回；省掉一次额外调用，也避免个别工具没权限时误判整条连接失败。
+- 测试：[tests/app-connectors.test.ts](../tests/app-connectors.test.ts#L66-L94) 的目录断言加入 `hithink`；新增两条用例——一条用按路径分发的 fetcher 验证「八个端点合并工具、行情工具被挡掉、调用回到工具所属端点（`/mcp/fund`）」，一条验证「Key 无效时只请求 a-share 一个端点就失败」。`npx tsx --import ./tests/setup.ts --test tests/app-connectors.test.ts` 为 `pass 7 / fail 0`，`pnpm typecheck`、`pnpm --dir apps/mobile typecheck`、`npx biome check` 均通过（`capability-hub.tsx` 的 `sizing` 未使用告警为改动前既有）。
+
 ### 2026-11-21 · 频道：每轮对话结束自动把这一轮的结论沉淀进频道记忆
 
 **背景**

@@ -189,14 +189,50 @@ async function textModelFixture(t: TestContext) {
   return prompts;
 }
 
+/**
+ * 假 Hindsight 服务：记录每个请求，让测试验证频道记忆真的走了 retain / recall。
+ * recall 返回 `hits()`（默认空数组 = 「Hindsight 里没有记忆」，走关键词兜底）。
+ */
+async function startHindsight() {
+  const requests: { method: string; path: string; body: Record<string, unknown> }[] = [];
+  let hits: unknown[] = [];
+  const server = createServer(async (request, response) => {
+    let raw = "";
+    for await (const chunk of request) raw += chunk;
+    const body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    requests.push({ method: request.method ?? "", path: request.url ?? "", body });
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(
+      JSON.stringify(request.url?.includes("/recall") ? { memories: hits } : { ok: true }),
+    );
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests,
+    /** 设定 recall 返回的语义命中（模拟 Hindsight 里已有的记忆）。 */
+    setHits(value: unknown[]) {
+      hits = value;
+    },
+    async close() {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    },
+  };
+}
+
 type App = Awaited<ReturnType<typeof createApp>>;
 
 let directory: string;
 let db: Store;
 let server: App;
 let token: string;
+let hindsight: Awaited<ReturnType<typeof startHindsight>>;
 
-function config(dataDir: string): Config {
+function config(dataDir: string, hindsightBaseUrl?: string): Config {
   return {
     mode: "sample",
     port: 8787,
@@ -208,6 +244,7 @@ function config(dataDir: string): Config {
     intelligenceApiKey: "test-project-key-never-sent",
     googleRedirectUri: "http://localhost:8787/api/google/callback",
     allowedOrigins: [],
+    ...(hindsightBaseUrl ? { hindsightBaseUrl } : {}),
   };
 }
 function headers() {
@@ -224,13 +261,16 @@ async function listMessages(channelId: string): Promise<ChannelMessage[]> {
 
 before(async () => {
   directory = await mkdtemp(join(tmpdir(), "lingwu-channel-chat-"));
+  // 频道记忆要真的接入 Hindsight：这里起一个假 Hindsight，让 retain / recall 都发真实请求。
+  hindsight = await startHindsight();
   db = await createStore({ dataDir: join(directory, "db") });
-  server = await createApp(db, config(directory));
+  server = await createApp(db, config(directory, hindsight.baseUrl));
   token = (await server.auth.issue("alice")).token;
 });
 after(async () => {
   await server.agent.stop();
   await db.close();
+  await hindsight.close();
   await rm(directory, { recursive: true, force: true });
 });
 
@@ -498,6 +538,58 @@ test("channel chat replies with one member, keeps history, and a mention selects
     ),
     "频道对话结束后自动沉淀的记忆要落在频道里",
   );
+
+  // 频道记忆的两条写入路径（手动「记住……」与每轮自动沉淀）都要双写 Hindsight，
+  // bank 是 alice:<channel.id>，document_id 用本地幂等 id，保证跨库一一对应。
+  const channelBank = `/v1/default/banks/alice:${channel.id}`;
+  const retains = hindsight.requests.filter(
+    (request) => request.path === `${channelBank}/memories/retain`,
+  );
+  assert.ok(
+    retains.some((request) => request.body.content === "茅台按消费股来看"),
+    "手动「记住……」要 retain 到频道的 Hindsight bank",
+  );
+  assert.ok(
+    retains.some((request) => request.body.content === AUTO_MEMORY_TEXT),
+    "每轮自动沉淀也要 retain 到频道的 Hindsight bank",
+  );
+
+  // 频道召回：语义命中考前、关键词兜底，作用域仍由本地权威存储保证。
+  const recallTool = channelMemberTools(
+    { db, config: { webSearchEnabled: false }, service: server.agent } as never,
+    "alice",
+    "agent-a-thread",
+    new AbortController().signal,
+    channel.id,
+  ).find((tool) => tool.name === "recall_memory") as
+    | {
+        execute: (args: {
+          query: string;
+          limit: number;
+        }) => Promise<{ memories: { text: string }[] }>;
+      }
+    | undefined;
+  assert.ok(recallTool);
+  const semanticText = "房东是李先生，每月一号收租";
+  await server.agent.saveMemory("alice", {
+    agentId: channel.id,
+    kind: "fact",
+    text: semanticText,
+    source: "Channel chat",
+    category: "关注领域",
+  });
+  // Hindsight 只按语义命中返回这条记忆：问句和记忆没有共同关键词。
+  hindsight.setHits([{ id: "semantic-hit", text: semanticText }]);
+  const semantic = await recallTool.execute({ query: "who collects my payment", limit: 5 });
+  assert.ok(
+    semantic.memories.some((memory) => memory.text === semanticText),
+    "频道召回要用上 Hindsight 的语义命中（关键词召回对这句话命中不了）",
+  );
+  assert.ok(
+    hindsight.requests.some((request) => request.path === `${channelBank}/memories/recall`),
+    "频道召回要打到频道的 Hindsight bank",
+  );
+  hindsight.setHits([]);
 
   const form = new FormData();
   form.set("file", new File(["营收同比增长百分之十二"], "note.txt", { type: "text/plain" }));

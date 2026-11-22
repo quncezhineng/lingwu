@@ -1,7 +1,8 @@
 /**
  * LingWu 技能目录。
  *
- * 由迁移至 `skills` 的 184 个 SKILL.md frontmatter 生成。
+ * 由迁移至 `skills` 的 SKILL.md frontmatter 生成，后续新增技能按同一结构手工补条目
+ * （同花顺 `hithink-finance` 即由 `npx skills add` 安装后按此格式补入）。
  * 技能文件随项目保存；运行时不执行第三方技能脚本。
  * 中英文名称与简介均来自各技能的本地元数据。
  */
@@ -1136,6 +1137,17 @@ export const skillCatalog: readonly SkillCatalogEntry[] = [
       "Reconcile general ledger to subledger for a trade date or period — match at the position or transaction level, surface breaks, and classify each break by likely cause. Use for daily or month-end recon runs across asset classes.",
     categories: ["valuation-modeling"],
     sourceFolder: "skills/gl-recon",
+  },
+  {
+    id: "hithink-finance",
+    titleZh: "同花顺金融数据",
+    titleEn: "Hithink Finance Data",
+    descriptionZh:
+      "同花顺官方金融数据服务的接口手册与路由。当需要研究个股走势、分析财报与营收利润、比较估值、研究行业或概念板块及指数成分、分析基金净值与持仓、查询期货期权行情、跟踪新股与金融资讯，或为量化回测准备历史数据时使用，即使用户未提及同花顺。负责按意图定位 REST 接口、核对参数与返回字段、处理错误码，并指导批量下载与导出。",
+    descriptionEn:
+      "API wiki and router for the official Hithink (同花顺) financial data service. Use when a task needs to study a stock's trend, analyse filings and revenue/profit, compare valuations, research an industry, theme or index constituents, analyse fund NAV and holdings, query futures and options quotes, track new listings and financial news, or prepare historical data for backtesting — even if the user never mentions Hithink. Locates the right REST endpoint, checks parameters and response fields, handles error codes, and guides bulk downloads and exports.",
+    categories: ["research-tools"],
+    sourceFolder: "skills/hithink-finance",
   },
   {
     id: "ib-check-deck",

@@ -43,9 +43,19 @@ import {
 import { formatQuoteToolResult } from "./conversation.ts";
 import { extractPdfText } from "./financials.ts";
 import { recallMemories } from "./memory-recall.ts";
-import { filterMemoriesForScope, memoryAgentKey } from "./memory-scope.ts";
+import { filterMemoriesForScope, memoryAgentKey, memoryScopeKeys } from "./memory-scope.ts";
+import {
+  MEMORY_SETTLE_LIMIT as CHANNEL_MEMORY_LIMIT,
+  MEMORY_SETTLE_MIN_CHARS as CHANNEL_MEMORY_MIN_CHARS,
+  MEMORY_SETTLE_TRANSCRIPT_LIMIT as CHANNEL_MEMORY_TRANSCRIPT_LIMIT,
+  normalizeMemoryText,
+  parseMemoryCandidates,
+} from "./memory-settle.ts";
 import type { AgentService } from "./service.ts";
 import { completeText, tanstackAgent } from "./tanstack-agent.ts";
+
+// 单聊（conversation.ts）与频道共用同一套记忆候选解析；保持原有对外导出契约。
+export { parseMemoryCandidates };
 
 /** SSE 推送给频道对话页的事件。 */
 export type ChannelChatEvent =
@@ -149,6 +159,40 @@ export function memoryToKeep(text: string): string | undefined {
   if (/[不别]|don't|do not/i.test(before)) return undefined;
   const value = match[1]?.trim();
   return value || undefined;
+}
+
+/**
+ * 频道记忆的统一落库口（归属 agentId = channel.id）。
+ *
+ * 有 AgentService 时走 saveMemory：本地权威存储 + 双写 Hindsight（retain），
+ * 让频道记忆和单聊记忆一样能被语义召回；没有 service 的轻量调用（部分单测）
+ * 退回本地直写，保持可用。
+ */
+async function saveChannelMemory(
+  deps: ChannelChatDeps,
+  owner: string,
+  channelId: string,
+  input: { text: string; category: MemoryCategory },
+): Promise<void> {
+  if (deps.service) {
+    await deps.service.saveMemory(owner, {
+      agentId: channelId,
+      kind: "fact",
+      text: input.text,
+      source: "Channel chat",
+      category: input.category,
+    });
+    return;
+  }
+  await deps.db.insertIfAbsent(owner, "memories", {
+    id: createHash("sha256").update(`${channelId}:fact:${input.text}`).digest("hex"),
+    agentId: channelId,
+    kind: "fact",
+    text: input.text,
+    source: "Channel chat",
+    category: input.category,
+    createdAt: new Date().toISOString(),
+  });
 }
 
 function memberPrompt(member: PersistedAgentSpace["agents"][number]): string {
@@ -487,12 +531,22 @@ function channelParityTools(
       }),
       execute: async ({ query, limit }) => {
         const agentId = await agentIdForThread(deps.db, owner, threadId);
-        const memories = await deps.db.list<AgentMemoryV2>(owner, "memories");
-        const mine = filterMemoriesForScope(memories, {
+        const scope = {
           ...(agentId ? { agentId } : {}),
           ...(channelId ? { channelId } : {}),
-        });
-        return { query, memories: recallMemories(mine, query, limit) };
+        };
+        const memories = await deps.db.list<AgentMemoryV2>(owner, "memories");
+        const mine = filterMemoriesForScope(memories, scope);
+        // 语义召回优先（Hindsight），关键词兜底；作用域仍由本地过滤保证。
+        const recalled = deps.service
+          ? await deps.service.recallMemories(owner, {
+              bankIds: memoryScopeKeys(scope),
+              query,
+              candidates: mine,
+              limit,
+            })
+          : recallMemories(mine, query, limit);
+        return { query, memories: recalled };
       },
     }),
   ];
@@ -849,17 +903,7 @@ export async function runChannelChat(
   await db.put(owner, "channel_messages", userMessage);
 
   const kept = memoryToKeep(input.text);
-  if (kept) {
-    await db.insertIfAbsent(owner, "memories", {
-      id: createHash("sha256").update(`${channel.id}:fact:${kept}`).digest("hex"),
-      agentId: channel.id,
-      kind: "fact",
-      text: kept,
-      source: "Channel chat",
-      category: "关注领域",
-      createdAt: now(),
-    });
-  }
+  if (kept) await saveChannelMemory(deps, owner, channel.id, { text: kept, category: "关注领域" });
 
   const space = await db.get<PersistedAgentSpace>(owner, "agent-settings", "space");
   const members = channel.agentIds
@@ -1341,55 +1385,6 @@ export async function runChannelChat(
   }
 }
 
-/** 一轮频道对话最多沉淀几条记忆；再多会淹掉频道记忆板块。 */
-const CHANNEL_MEMORY_LIMIT = 3;
-/** 用户消息 + 成员回复太短时，这一轮不值得占用记忆位（寒暄、单字确认）。 */
-const CHANNEL_MEMORY_MIN_CHARS = 80;
-/** 送入整理提示词的对话正文上限，避免长报告把上下文撑爆。 */
-const CHANNEL_MEMORY_TRANSCRIPT_LIMIT = 12_000;
-
-/** 记忆去重用的归一化文本：忽略大小写、空白、标点与符号。 */
-function normalizeMemoryText(text: string): string {
-  return text.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
-}
-
-/**
- * 从模型输出里取出记忆候选。
- *
- * 模型偶尔会带上解释或 ```json 包裹，这里只认第一段 `[...]`，并用固定的分类词表校正
- * category，越界时回退到「关注领域」，保证写进库的记忆分类始终合法。
- */
-export function parseMemoryCandidates(raw: string): { text: string; category: MemoryCategory }[] {
-  const start = raw.indexOf("[");
-  const end = raw.lastIndexOf("]");
-  if (start < 0 || end <= start) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw.slice(start, end + 1));
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) return [];
-  const candidates: { text: string; category: MemoryCategory }[] = [];
-  for (const item of parsed) {
-    const source =
-      typeof item === "string"
-        ? { text: item, category: undefined }
-        : item && typeof item === "object"
-          ? (item as { text?: unknown; category?: unknown })
-          : undefined;
-    if (!source) continue;
-    const text = typeof source.text === "string" ? source.text.trim().slice(0, 400) : "";
-    if (!text) continue;
-    const category = MEMORY_CATEGORIES.includes(source.category as MemoryCategory)
-      ? (source.category as MemoryCategory)
-      : "关注领域";
-    candidates.push({ text, category });
-    if (candidates.length >= CHANNEL_MEMORY_LIMIT) break;
-  }
-  return candidates;
-}
-
 /**
  * 一轮频道对话结束后，把这一轮里值得长期复用的内容沉淀进「频道记忆」。
  *
@@ -1442,14 +1437,9 @@ async function settleChannelMemories(
       const key = normalizeMemoryText(candidate.text);
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      await deps.db.insertIfAbsent(owner, "memories", {
-        id: createHash("sha256").update(`${channel.id}:auto:${key}`).digest("hex"),
-        agentId: channel.id,
-        kind: "fact",
+      await saveChannelMemory(deps, owner, channel.id, {
         text: candidate.text,
-        source: "Channel chat",
         category: candidate.category,
-        createdAt: new Date().toISOString(),
       });
     }
   } catch {

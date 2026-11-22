@@ -54,8 +54,10 @@ import { createBriefingScheduler } from "./briefing-scheduler.ts";
 import { detectDealSignals } from "./deal-signal.ts";
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
-import { HindsightClient } from "./hindsight.ts";
+import { HindsightClient, type RecallMemory } from "./hindsight.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
+import { recallMemories } from "./memory-recall.ts";
+import { SHARED_MEMORY_KEY } from "./memory-scope.ts";
 import { executeModelTask } from "./model.ts";
 import { readMonitoredPrice } from "./monitor-price.ts";
 import { NotesService } from "./notes.ts";
@@ -81,6 +83,14 @@ const date = () => new Date().toISOString();
 const terminal = new Set(["succeeded", "failed", "cancelled"]);
 /** 存量记忆迁移每批处理的条数，控制单次 maintain tick 的耗时与内存。 */
 const MIGRATION_BATCH_SIZE = 200;
+
+/**
+ * 归一化记忆文本：忽略大小写、空白与标点，用于把 Hindsight 的语义命中
+ * 回填到本地记忆记录（Hindsight 抽取的事实可能与原文有出入，需要模糊对齐）。
+ */
+function normalizeMemoryText(text: string): string {
+  return text.toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
+}
 
 /**
  * 计算下一次监控时间。每日/每周提醒按中国市场常用时区 Asia/Shanghai
@@ -625,6 +635,73 @@ export class AgentService {
     // 双写 Hindsight：document_id = value.id 让 retain 幂等（同 id 重写覆盖，天然去重）。
     await this.memory.retain(owner, agentId, text, value.id).catch(() => {});
     return value;
+  }
+
+  /**
+   * 召回记忆：语义优先（Hindsight recall），关键词兜底。
+   *
+   * 「作用域」始终由调用方传入的 candidates 决定（本地 DB 是权威，不跨 Agent、
+   * 不跨频道串味）；Hindsight 只在这个候选集内做语义排序，因此不会把别的
+   * Agent / 频道的记忆串进来。bankIds 与 candidates 同源（都用 memoryScopeKeys），
+   * 保证「查哪个 bank」和「本地筛哪些记忆」严格一致。
+   *
+   * 命中回填：写入时用了 document_id = 本地记忆 id，所以优先按 id 对齐；抽取过
+   * 的事实可能与原文有出入，再退一步按归一化文本对齐。模型最终拿到的仍是本地
+   * 那批带完整元数据（kind/source/category）的权威记忆。
+   *
+   * Hindsight 未配置、超时、失败或没有命中时，直接返回本地关键词结果，行为与
+   * 接入前完全一致。
+   */
+  async recallMemories(
+    owner: string,
+    options: {
+      /** 本次要查询的 Hindsight bank，通常来自 memoryScopeKeys(scope)。 */
+      bankIds: readonly string[];
+      query: string;
+      /** 已按作用域过滤好的本地候选记忆（权威存储）。 */
+      candidates: readonly AgentMemoryV2[];
+      limit?: number;
+    },
+  ): Promise<AgentMemoryV2[]> {
+    const limit = Math.max(1, Math.min(20, Math.trunc(options.limit ?? 10)));
+    // 关键词召回既是最兜底结果，也是语义命中不足时的补齐来源。
+    const fallback = recallMemories(options.candidates, options.query, limit);
+    if (!this.memory.enabled) return fallback;
+
+    const banks = [...new Set(options.bankIds.map((id) => id.trim() || SHARED_MEMORY_KEY))];
+    if (!banks.length) return fallback;
+
+    let hits: RecallMemory[];
+    try {
+      const results = await Promise.all(
+        banks.map((bank) => this.memory.recall(owner, bank, options.query)),
+      );
+      hits = results.flatMap((result) => result.memories);
+    } catch {
+      // Hindsight 不可用（超时 / 报错）：静默降级为关键词召回，不影响这一轮对话。
+      return fallback;
+    }
+    if (!hits.length) return fallback;
+
+    const byId = new Map(options.candidates.map((memory) => [memory.id, memory]));
+    const byText = new Map(
+      options.candidates.map((memory) => [normalizeMemoryText(memory.text), memory]),
+    );
+    const picked: AgentMemoryV2[] = [];
+    const seen = new Set<string>();
+    for (const hit of hits) {
+      const match =
+        (hit.id ? byId.get(hit.id) : undefined) ?? byText.get(normalizeMemoryText(hit.text ?? ""));
+      if (!match || seen.has(match.id)) continue;
+      seen.add(match.id);
+      picked.push(match);
+    }
+    for (const memory of fallback) {
+      if (seen.has(memory.id)) continue;
+      seen.add(memory.id);
+      picked.push(memory);
+    }
+    return picked.slice(0, limit);
   }
 
   /**
@@ -1422,10 +1499,17 @@ export class AgentService {
       }
     }
     if (task.kind === "research") {
-      const symbol = researchSymbolSchema.parse(String(task.input.symbol ?? ""));
+      // 模型经 delegate_task 创建 research 任务时并不强制携带 symbol（createTaskSchema.input
+      // 是自由对象）。缺 symbol 时直接 parse 抛错会让任务反复 failed；此时降级为通用模型执行，
+      // 让模型按 prompt 用知识/工具完成开放式研究，而不是卡死在股票数据管道上。
+      const symbol = researchSymbolSchema.safeParse(String(task.input.symbol ?? ""));
+      if (!symbol.success) {
+        await context.event("step", "Researching with available knowledge and tools");
+        return executeModelTask(this, owner, task, context);
+      }
       const report = await generateResearchReport(
         owner,
-        symbol,
+        symbol.data,
         { db: this.db, market: this.market, search: this.search },
         (step, detail) => context.event("step", step, detail),
       );

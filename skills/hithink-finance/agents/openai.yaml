@@ -1,0 +1,4 @@
+interface:
+  display_name: "同花顺金融数据服务"
+  short_description: "为个股、财报、估值、板块、基金与量化研究选取数据接口，提供参数契约和 CLI 首次接入指引"
+  default_prompt: "使用 $hithink-finance 根据本次金融研究或取数需求选择 REST API，核对参数与返回字段，并按需获取数据或给出调用示例。"

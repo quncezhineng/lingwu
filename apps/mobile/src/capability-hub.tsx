@@ -2653,7 +2653,7 @@ export function CapabilityHubScreen() {
   // 按类型隐藏部分条目（只从「能力与市场」页隐藏，不改动 items 本身，其他入口仍可见）。
   // - 邮件是工作区页面快捷入口，不属于连接器，隐藏。
   // - 连接器统一走 capability-picker 的保留名单（智能体电脑、Tushare、Tavily、FMP、盈米基金、
-  //   钉钉办公、钉钉文档、钉钉 AI 表格、用户文件、持仓台账、GitHub）；名单之外的连接器
+  //   同花顺、钉钉办公、钉钉文档、钉钉 AI 表格、用户文件、持仓台账、GitHub）；名单之外的连接器
   //   （含 Gmail、Google Calendar、OpenBot 等）一律不在本页展示，与对话底部的
   //   「选择连接器」弹层保持同一口径。
   const hiddenPluginIds: readonly string[] = ["mail"];

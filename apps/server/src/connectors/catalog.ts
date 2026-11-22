@@ -15,6 +15,8 @@ export type ConnectorTransport =
   | "mcp-bearer"
   | "mcp-header"
   | "mcp-url"
+  /** 一个 Key 对应多个 MCP 端点（同花顺按数据域拆了八个服务），连接时合并工具并按工具名回路由。 */
+  | "mcp-multi"
   | "fmp"
   | "mail"
   | "files"
@@ -30,7 +32,10 @@ export type CatalogEntry = {
   featured: boolean;
   auth: ConnectorAuth;
   transport: ConnectorTransport;
+  /** 主端点。`mcp-multi` 只是其中一个域，真正的端点清单看 `endpoints`。 */
   endpoint?: string;
+  /** `mcp-multi` 专用：共用同一个 Key 的全部端点，连接时逐个拉工具清单。 */
+  endpoints?: readonly string[];
   hint: string;
   docsUrl?: string;
   mailDomains?: readonly string[];
@@ -133,6 +138,30 @@ export const APP_CONNECTORS: readonly CatalogEntry[] = [
     hint: "点「登录授权」，用你的 PandaAI 账号连接。不需要在这里粘贴密钥。",
     docsUrl: "https://www.pandaaiquant.com/docs/data",
     sort: 18,
+  },
+  {
+    slug: "hithink",
+    name: "同花顺",
+    summary:
+      "同花顺官方金融数据 MCP。一个 Key 打通 A 股财务、估值、指数成分、基金、期货期权、资讯与港股新股；行情、日线和基金净值仍走内置数据。",
+    category: "research-data",
+    featured: true,
+    auth: "api_key",
+    transport: "mcp-multi",
+    endpoint: "https://fuyao.aicubes.cn/mcp/a-share",
+    endpoints: [
+      "https://fuyao.aicubes.cn/mcp/a-share",
+      "https://fuyao.aicubes.cn/mcp/a-share-index",
+      "https://fuyao.aicubes.cn/mcp/meta",
+      "https://fuyao.aicubes.cn/mcp/fund",
+      "https://fuyao.aicubes.cn/mcp/futures",
+      "https://fuyao.aicubes.cn/mcp/options",
+      "https://fuyao.aicubes.cn/mcp/hk-share",
+      "https://fuyao.aicubes.cn/mcp/news",
+    ],
+    hint: "打开 fuyao.aicubes.cn/admin/ 创建 API Key 后粘贴。八个数据域共用这一个 Key，只放在请求头里。",
+    docsUrl: "https://github.com/Hithink-Tech-Org/Financial-API",
+    sort: 19,
   },
   {
     slug: "dingtalk",

@@ -108,6 +108,7 @@ const screens = {
   "screens.filesResearchBadge": "研究文件",
   "screens.filesGeneratedByAgent": "智能体生成",
   "screens.filesAgentUnassigned": "未归属智能体",
+  "screens.filesAgentChannel": "频道",
   "screens.filesOpenResearchArtifact": "打开研究产物：{name}",
   "screens.filesPage": "页",
   "screens.filesPages": "页",

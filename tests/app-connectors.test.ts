@@ -71,6 +71,7 @@ test("the catalog ports every mybots connection and keeps slugs unique", () => {
     "tavily",
     "fmp",
     "yingmi",
+    "hithink",
     "pandadata",
     "dingtalk",
     "dingdoc",
@@ -192,4 +193,76 @@ test("mailbox cards reject a mismatched address before contacting the server", a
   );
   assert.equal(called, false);
   setMailTransport(null);
+});
+
+/**
+ * 同花顺一个 Key 覆盖八个按数据域拆开的 MCP 端点。这个 fetcher 只给 a-share 与 fund
+ * 两个域配工具，其余域回空清单，并把每次请求的路径记下来，用来核对调用落在哪个端点。
+ */
+function hithinkFetch(paths: string[]): typeof fetch {
+  const toolsByPath: Record<string, { name: string; description: string }[]> = {
+    "/mcp/a-share": [
+      { name: "get_a_share_financials_income_statements", description: "利润表" },
+      { name: "get_a_share_prices_snapshot", description: "行情快照，与内置行情重叠" },
+    ],
+    "/mcp/fund": [{ name: "get_fund_profile_detail", description: "基金资料" }],
+  };
+  return (async (url, init) => {
+    const path = new URL(String(url)).pathname;
+    paths.push(path);
+    const body = JSON.parse(String(init?.body ?? "{}")) as {
+      method?: string;
+      params?: { name?: string };
+    };
+    const result =
+      body.method === "tools/list"
+        ? { tools: toolsByPath[path] ?? [] }
+        : body.method === "tools/call"
+          ? { content: [{ type: "text", text: `${path} ${body.params?.name ?? ""}` }] }
+          : {};
+    return new Response(JSON.stringify({ result }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+}
+
+test("hithink joins eight domains on one key and calls each tool on its own endpoint", async () => {
+  const { db } = memoryDb();
+  const paths: string[] = [];
+  const deps = { db, config, fetcher: hithinkFetch(paths) };
+  const token = "hithinkkey123456";
+  const connected = await connectConnector(deps, "owner-1", "hithink", { token });
+  assert.equal(connected.connected, true);
+  // 行情快照和内置行情重叠，连接时就被挡掉；财务与基金工具留下。
+  assert.equal(connected.toolCount, 2);
+  paths.length = 0;
+  const fund = await invokeConnection(deps, "owner-1", "hithink", "get_fund_profile_detail", {});
+  assert.match(JSON.stringify(fund), /\/mcp\/fund get_fund_profile_detail/);
+  assert.deepEqual([...new Set(paths)], ["/mcp/fund"]);
+  const blocked = await invokeConnection(
+    deps,
+    "owner-1",
+    "hithink",
+    "get_a_share_prices_snapshot",
+    {},
+  );
+  assert.match(JSON.stringify(blocked), /没有 get_a_share_prices_snapshot/);
+});
+
+test("hithink stops at the first invalid key instead of probing all eight endpoints", async () => {
+  const { db } = memoryDb();
+  const paths: string[] = [];
+  const fetcher = (async (url: string | URL | Request) => {
+    paths.push(new URL(String(url)).pathname);
+    return new Response(JSON.stringify({ error: "Invalid or revoked API key" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+  await assert.rejects(
+    () => connectConnector({ db, config, fetcher }, "owner-1", "hithink", { token: "badkey1234" }),
+    /Invalid or revoked API key/,
+  );
+  assert.deepEqual(paths, ["/mcp/a-share"]);
 });

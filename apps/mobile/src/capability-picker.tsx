@@ -67,7 +67,7 @@ export type ConnectorOption = {
  * 「能力与市场 · 连接器」、对话底部的「选择连接器」弹层、Agent / 频道详情的「连接库」
  * 共用这一份名单：名单之外的连接器一律隐藏。隐藏只作用于展示层，不改动连接器数据，
  * 已建立的连接也不受影响，日后需要时把 slug 加回名单即可恢复。
- * 保留：智能体电脑、Tushare、Tavily、FMP、盈米基金、钉钉办公、钉钉文档、
+ * 保留：智能体电脑、Tushare、Tavily、FMP、盈米基金、同花顺、钉钉办公、钉钉文档、
  * 钉钉 AI 表格、用户文件、持仓台账、GitHub。
  */
 export const VISIBLE_CONNECTOR_IDS: readonly string[] = [
@@ -76,6 +76,7 @@ export const VISIBLE_CONNECTOR_IDS: readonly string[] = [
   "tavily",
   "fmp",
   "yingmi",
+  "hithink",
   "dingtalk",
   "dingdoc",
   "dingtable",

@@ -16,11 +16,11 @@ function score(text: string, query: string, words: readonly string[]): number {
 }
 
 /** Keyword recall over the owner's saved memories, ordered by relevance then recency. */
-export function recallMemories(
-  memories: readonly AgentMemory[],
+export function recallMemories<T extends AgentMemory>(
+  memories: readonly T[],
   query: string,
   limit = 10,
-): AgentMemory[] {
+): T[] {
   const words = terms(query.trim());
   if (!words.length) return [];
   const count = Math.max(1, Math.min(20, Math.trunc(limit)));
