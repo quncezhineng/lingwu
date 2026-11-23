@@ -50,7 +50,7 @@ export function makeRuntime(
               url: config.agentUrl ?? "http://127.0.0.1:1/unconfigured",
               headers: config.agentToken ? { Authorization: `Bearer ${config.agentToken}` } : {},
             })
-          : new ConversationAgent(config, service, owner, sharedJevAdapter());
+          : new ConversationAgent(config, service, owner, sharedJevAdapter(), stream);
     // Mirror the exact events the runtime is about to transport into the app-owned
     // ledger. This is a tap, not a second model call: ordering and errors are preserved.
     agent.use((input, next) => {

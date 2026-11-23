@@ -43,6 +43,20 @@ services:
       # right before the A-share open and after the US close (~20:00 ET).
       - key: BRIEFING_SCHEDULE_UTC_HOUR
         value: "0"
+      # Second-level event triage (PRD R2 / Open Question).
+      # rules  = rule scoring only (recommended for first deploy; behaviour unchanged)
+      # shadow = rules still decide; the model only records a comparison verdict,
+      #          run it for a few days and compare push acceptance via
+      #          GET /api/investor/feed/stats before switching to model
+      # model  = the model sets the 0..100 score; rule result is kept in `shadow`
+      # Failure, timeout (8s) or an unconfigured model always falls back to rules
+      # and is marked judgedBy=rules_fallback, so an event is never dropped.
+      - key: EVENT_JUDGE
+        value: rules
+      # Blank (below) = the model the user picked in the app. To pin a dedicated
+      # lightweight judge model instead, uncomment and set it, e.g.:
+      # - key: EVENT_JUDGE_MODEL
+      #   value: deepseek/deepseek-flash
       # AKShare self-check cache surfaced by GET /api/health as
       # market_data.akshare.status. Keep long enough to avoid spawning python3
       # on every health poll; python3 + akshare must be preinstalled for live

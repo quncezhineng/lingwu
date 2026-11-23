@@ -249,7 +249,13 @@
 
 ### 9.2 Open Questions
 
-- [ ] 两级判级中的"低成本 agent"是否复用交互侧轻量模型，还是固定专用模型？
+- [x] 两级判级中的"低成本 agent"是否复用交互侧轻量模型，还是固定专用模型？
+  - 结论：**默认复用用户当前选中的模型**，另留 `EVENT_JUDGE_MODEL` 可指定专用小模型。
+    实现见 `apps/server/src/engine/event-judge-model.ts`：模型只产出 0..100 的分与理由，
+    分档（push/feed/silent）、"显式提醒优先"、"静默时段只进信息流"仍由
+    `applyDecisionPolicy` 决定，所以 `reasons/score/decision` 与规则版同形，A/B 可直接比。
+    `EVENT_JUDGE=rules|model|shadow` 三档切换（默认 rules），`shadow` 让模型空跑攒对照样本；
+    `GET /api/investor/feed/stats` 按 `judgedBy` 给出推送接收率与规则/模型分歧率。
 - [ ] 交易日历先覆盖哪些市场（A股/港股/美股三市场节假日），维护机制是配置驱动还是数据源？
 - [ ] 投研画像是否允许用户导出（可携带性）？
 - [ ] 效果反馈回流的第一优先级：研报质量评分 vs 判级准确性评分？

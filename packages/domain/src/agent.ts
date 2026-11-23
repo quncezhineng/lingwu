@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { thesisSignalSchema } from "./investor.ts";
 import { CURRENCY_CODES, type MonitorCurrency } from "./monitor-currency.ts";
 
 export { CURRENCY_CODES, type MonitorCurrency } from "./monitor-currency.ts";
@@ -407,6 +408,8 @@ export const noteCheckSchema = z.object({
   source: z.enum(["automated", "manual"]),
   checked_at: z.string().datetime(),
   note: z.string().max(500).optional(),
+  /** 自动判定的逐条依据（绑定的信号 + 观测值），界面标注"自动判定，可修正"。 */
+  reasons: z.array(z.string().max(300)).max(6).optional(),
 });
 export type NoteCheck = z.infer<typeof noteCheckSchema>;
 
@@ -423,6 +426,8 @@ export const investmentNoteSchema = z.object({
   status: z.enum(["ACTIVE", "VALIDATED", "INVALIDATED", "EXPIRED"]).optional(),
   /** 最近一次检验；无模型时 outcome=pending_confirmation，绝不伪造结论。 */
   check: noteCheckSchema.optional(),
+  /** 绑定的可观测信号（PRD R3）：周检据此自动判定，缺数据时明说缺数据。 */
+  evidence: z.array(thesisSignalSchema).max(6).optional(),
   last_checked_at: z.string().datetime().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),

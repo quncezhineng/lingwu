@@ -22,6 +22,7 @@ import {
   monitorInputSchema,
   type RunEvent,
 } from "../../../../packages/domain/src/agent.ts";
+import type { AgentActionLogEntry } from "../../../../packages/domain/src/audit.ts";
 import { goalsEnabled } from "../../../../packages/domain/src/features.ts";
 import type {
   ActionProposal,
@@ -30,6 +31,7 @@ import type {
   Mail,
   ProposalInput,
 } from "../../../../packages/domain/src/index.ts";
+import type { EventCandidateInput } from "../../../../packages/domain/src/investor.ts";
 import { resolveMonitorCurrency } from "../../../../packages/domain/src/monitor-currency.ts";
 import type { OrchestrationPlan } from "../../../../packages/domain/src/orchestration.ts";
 import { MarketDataService } from "../../../../packages/integrations/src/market-data.ts";
@@ -50,8 +52,17 @@ import { backgroundFailure } from "../log.ts";
 import { resolveTaskNotifications } from "../notifications.ts";
 import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
+import { ActionLogService } from "./action-log.ts";
 import { createBriefingScheduler } from "./briefing-scheduler.ts";
 import { detectDealSignals } from "./deal-signal.ts";
+import { judgeEventWithModel } from "./event-judge-model.ts";
+import {
+  EventTriageService,
+  isMarketClosed,
+  type JudgeHookResult,
+  type JudgeResult,
+  type TriageContext,
+} from "./event-triage.ts";
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
 import { HindsightClient, type RecallMemory } from "./hindsight.ts";
@@ -73,6 +84,8 @@ import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
 import { summarizeReport, synthesizeResearch } from "./report-brief.ts";
 import { generateResearchReport, researchSymbolSchema } from "./research.ts";
+import { ThesisEvidenceService } from "./thesis-evidence.ts";
+import { TrackingPlanService } from "./tracking-plan.ts";
 import { WatchlistsService } from "./watchlists.ts";
 import { LostLeaseError, type TaskContext, TaskWorker } from "./worker.ts";
 
@@ -140,6 +153,14 @@ export class AgentService {
   readonly orchestrator: OrchestratorService;
   /** 多 Agent 记忆引擎（Hindsight），未配置时降级为本地关键词召回。 */
   readonly memory: HindsightClient;
+  /** 事件两级判级 + 信息流（R2）：push 进通知收件箱，其余进信息流。 */
+  readonly events: EventTriageService;
+  /** 研报 → 跟踪计划（R4）。 */
+  readonly trackingPlans: TrackingPlanService;
+  /** 论点证据判定（R3）：绑定信号才判定，缺数据明说缺数据。 */
+  readonly thesisEvidence: ThesisEvidenceService;
+  /** Agent 动作审计（R6）：做过什么、能不能撤。 */
+  readonly actionLog: ActionLogService;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
   private maintenance?: ReturnType<typeof setInterval>;
   private refreshing = false;
@@ -165,6 +186,48 @@ export class AgentService {
     this.memory = new HindsightClient({
       baseUrl: config.hindsightBaseUrl,
       apiKey: config.hindsightApiKey,
+    });
+    this.thesisEvidence = new ThesisEvidenceService({ db, market, search: this.search });
+    this.events = new EventTriageService({
+      db,
+      notify: (owner, title, body, key) => this.notify(owner, title, body, undefined, key),
+      quiet: (_owner, now) => isMarketClosed(now),
+      judge: (owner, candidate, context, rules) =>
+        this.judgeEvent(owner, candidate, context, rules),
+    });
+    this.actionLog = new ActionLogService({
+      db,
+      undo: (owner, entry) => this.undoAction(owner, entry),
+    });
+    this.trackingPlans = new TrackingPlanService({
+      db,
+      createAlert: (owner, input) => this.priceAlerts.create(owner, { ...input, enabled: true }),
+      createThesis: (owner, input) =>
+        this.notes.create(owner, {
+          symbol_code: input.symbol_code,
+          type: "THESIS",
+          title: input.title,
+          content: input.content,
+          status: "ACTIVE",
+        }),
+      audit: (owner, input) =>
+        this.actionLog
+          .record(owner, {
+            kind: "plan",
+            action: `跟踪计划落地：${input.plan.name ?? input.plan.symbol}`,
+            target: {
+              symbol: input.plan.symbol,
+              ...(input.plan.name ? { resource: input.plan.name } : {}),
+            },
+            refs: {
+              planId: input.plan.id,
+              ...(input.alertIds[0] ? { alertId: input.alertIds[0] } : {}),
+              ...(input.noteIds[0] ? { noteId: input.noteIds[0] } : {}),
+            },
+            detail: `建了 ${input.alertIds.length} 条价格提醒和 ${input.noteIds.length} 条跟踪论点`,
+            key: `plan:${input.plan.id}`,
+          })
+          .then(() => undefined),
     });
     this.worker = new TaskWorker(db, (owner, task, context) => this.execute(owner, task, context), {
       settled: (owner, task) => this.onTaskSettled(owner, task),
@@ -235,6 +298,38 @@ export class AgentService {
         await this.notes
           .runThesisCheck(owner, {
             notify: async (title, body, key) => this.notify(owner, title, body, undefined, key),
+            // 绑定了可观测信号的论点走自动判定；没绑定的仍按"待人工确认"处理。
+            evaluate: (note) => this.thesisEvidence.evaluateCheck(owner, note),
+            // 论点状态变化也由判级层决定要不要打扰。
+            onVerdict: async (note, check) => {
+              if (check.outcome === "valid") return;
+              // R6 审计：论点被自动改判是"agent 自己动了你的结论"，必须留痕。
+              // 不可撤销——证据变化是事实，撤销一条审计不会让论点重新成立。
+              if (check.outcome === "invalid")
+                await this.actionLog
+                  .record(owner, {
+                    kind: "thesis",
+                    action: `论点被判失效：${note.title}`,
+                    actor: "worker",
+                    target: { symbol: note.symbol_code },
+                    refs: { noteId: note.id },
+                    detail: check.reasons?.join("；") || check.note || "绑定证据触发失效条件",
+                    key: `thesis:${note.id}:${check.checked_at}`,
+                  })
+                  .catch((error) => backgroundFailure("action log: thesis", error));
+              await this.events
+                .ingest(owner, {
+                  type: "thesis_risk",
+                  symbol: note.symbol_code,
+                  title:
+                    check.outcome === "invalid"
+                      ? `${note.symbol_code} 论点不再成立`
+                      : `${note.symbol_code} 论点受威胁`,
+                  body: check.note ?? "",
+                  source: "thesis_check",
+                })
+                .catch((error) => backgroundFailure("thesis event", error));
+            },
           })
           .catch((error) => backgroundFailure("thesis check", error));
       for (const { owner, value } of await this.db.scan<Idea>("ideas"))
@@ -459,6 +554,23 @@ export class AgentService {
           assignedAgent: task.assignedAgent,
         })
         .catch((error) => backgroundFailure("append task event", error));
+    // R6 审计：任务派发是 agent 主动替你做的事，必须能在审计日志里看到并撤销。
+    if (inserted)
+      await this.actionLog
+        .record(owner, {
+          kind: "task",
+          action: `派发${input.kind === "research" ? "个股研究" : "托管任务"}：${task.title}`,
+          actor: threadId ? "assistant" : "user",
+          outcome: task.status === "paused" ? "pending" : "ok",
+          ...(input.input?.symbol && typeof input.input.symbol === "string"
+            ? { target: { symbol: input.input.symbol } }
+            : {}),
+          refs: { taskId: id },
+          detail: `执行计划 ${task.plan.length} 步；${task.status === "paused" ? "当前暂停，等你确认后开始" : "已进入队列"}`,
+          ...(threadId ? { threadId } : {}),
+          key: `task:${id}`,
+        })
+        .catch((error) => backgroundFailure("action log: task", error));
     return (await this.db.get<AgentTask>(owner, "tasks", id)) ?? task;
   }
   async control(owner: string, id: string, action: "pause" | "resume" | "cancel" | "retry") {
@@ -568,7 +680,11 @@ export class AgentService {
         owner,
         "task",
         id,
-        action === "pause" ? "task_paused" : action === "cancel" ? "task_cancelled" : "task_resumed",
+        action === "pause"
+          ? "task_paused"
+          : action === "cancel"
+            ? "task_cancelled"
+            : "task_resumed",
         { status, ...(task.enqueuedAt ? { enqueuedAt: task.enqueuedAt } : {}) },
       )
       .catch((error) => backgroundFailure("append task event", error));
@@ -1338,10 +1454,109 @@ export class AgentService {
     );
     return this.db.get<Idea>(owner, "ideas", id);
   }
+  /**
+   * 价格提醒不再直接写通知：先过两级判级，只有判为"重要"才进通知收件箱，
+   * 其余落到信息流（PRD R2）。用户为该标的显式设过提醒时判级会尊重这个意图。
+   */
+  /**
+   * 撤销一条审计记录背后的真实动作（R6）。
+   *
+   * 原则：能撤的撤干净（取消任务、删提醒、删论点），撤不了的说清原因。
+   * 任务只在还没结束时可撤——已经跑完的任务，"撤销"应当表述为"结果留在那里，
+   * 你自己删"，不能假装抹掉。
+   */
+  private async undoAction(
+    owner: string,
+    entry: AgentActionLogEntry,
+  ): Promise<{ undone: boolean; note: string }> {
+    const refs = entry.refs ?? {};
+    const done: string[] = [];
+    if (refs.taskId) {
+      const task = await this.db.get<AgentTask>(owner, "tasks", refs.taskId);
+      if (!task) return { undone: false, note: "这条任务已经不存在了。" };
+      if (terminal.has(task.status))
+        return {
+          undone: false,
+          note:
+            task.status === "succeeded"
+              ? "任务已经完成，结果留在这儿，可以直接删。"
+              : "任务已经结束，撤不回来了。",
+        };
+      await this.control(owner, refs.taskId, "cancel");
+      done.push("任务已取消");
+    }
+    if (refs.alertId) {
+      await this.priceAlerts.remove(owner, refs.alertId);
+      done.push("价格提醒已删除");
+    }
+    if (refs.noteId) {
+      await this.notes.remove(owner, refs.noteId);
+      done.push("论点已删除");
+    }
+    if (done.length === 0) return { undone: false, note: "这条动作没有可撤销的对象。" };
+    return { undone: true, note: done.join("，") };
+  }
+  /**
+   * 二级判级的可替换实现：EVENT_JUDGE=rules 时直接交回规则结论。
+   *
+   * model 模式：模型给分，规则结论塞进 shadow 留痕；
+   * shadow 模式：行为仍由规则决定，模型结论塞进 shadow，用来先验证再切换；
+   * 模型未配置 / 超时 / 输出不合规：返回 null，事件服务自动降级并标记 rules_fallback。
+   */
+  private async judgeEvent(
+    owner: string,
+    candidate: EventCandidateInput,
+    context: TriageContext,
+    rules: JudgeResult,
+  ): Promise<JudgeHookResult | null> {
+    const mode = this.config.eventJudge ?? "rules";
+    if (mode === "rules") return null;
+    const resolved = await this.workspace.models.resolve(owner, this.config.eventJudgeModel);
+    if (!resolved.configured || !resolved.model) return null;
+    const judged = await judgeEventWithModel({
+      model: resolved.model,
+      connection: resolved.connection,
+      candidate,
+      context,
+      rules,
+    });
+    if (!judged) return null;
+    const rulesShadow = {
+      source: "rules" as const,
+      decision: rules.decision,
+      score: rules.score,
+    };
+    const modelShadow = {
+      source: "model" as const,
+      decision: judged.decision,
+      score: judged.score,
+    };
+    // shadow 模式：先让模型空跑一段时间，攒够对照样本再切 model，避免直接上线掉接收率。
+    return mode === "shadow"
+      ? { result: rules, source: "rules", shadow: modelShadow, model: resolved.model }
+      : { result: judged, source: "model", shadow: rulesShadow, model: resolved.model };
+  }
   private alertNotifier(owner: string): AlertNotifier {
-    return async (title, body, key) => {
-      const notification = await this.notify(owner, title, body, undefined, key);
-      return { id: notification.id, title, body };
+    return async (title, body, key, context) => {
+      if (!context?.symbol) {
+        const notification = await this.notify(owner, title, body, undefined, key);
+        return { id: notification.id, title, body, notified: true };
+      }
+      const item = await this.events.ingest(owner, {
+        type: "price_level",
+        symbol: context.symbol,
+        title,
+        body,
+        thresholdValue: context.thresholdValue,
+        magnitudePercent: Math.abs(context.changePercent),
+        source: "price_alert",
+      });
+      return {
+        id: item.notificationId ?? item.id,
+        title,
+        body,
+        notified: Boolean(item.notificationId),
+      };
     };
   }
   async notify(
@@ -1562,7 +1777,23 @@ export class AgentService {
         report as unknown as Record<string, unknown>,
       );
       task = await context.checkpoint({ artifactIds: [artifact.id] });
-      return this.finish(task, context, `${report.title}\n\n${report.sections.company_overview}`);
+      // 研报不是一次性交付：立刻派生跟踪计划草稿（R4），用户确认后落地为提醒与论点。
+      const plan = await this.trackingPlans
+        .derive(owner, report, { name: report.title.replace(/\s*深度研究\s*$/, "").trim() })
+        .catch((error) => {
+          backgroundFailure("tracking plan", error);
+          return null;
+        });
+      const planLine = plan
+        ? `已派生跟踪计划（${plan.items.length} 条、建议 ${plan.suggestedMonitors.length} 个价格提醒），在跟踪计划里确认后生效。`
+        : "";
+      return this.finish(
+        task,
+        context,
+        [report.title, "", report.sections.company_overview, "", planLine]
+          .filter(Boolean)
+          .join("\n"),
+      );
     }
     if (task.kind === "market_briefing") {
       await context.event("step", "Collecting overnight market data and watchlist moves");

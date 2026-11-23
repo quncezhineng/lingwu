@@ -253,7 +253,14 @@ export class NotesService {
    */
   async runThesisCheck(
     owner: string,
-    options: { now?: Date; notify?: NoteNotifier } = {},
+    options: {
+      now?: Date;
+      notify?: NoteNotifier;
+      /** 绑定了可观测信号的论点走自动判定；返回 null 表示没有证据、仍待人工确认。 */
+      evaluate?: (note: InvestmentNote) => Promise<NoteCheck | null>;
+      /** 判定完成后的回调：状态变化据此进入事件判级，而不是无条件推送。 */
+      onVerdict?: (note: InvestmentNote, check: NoteCheck) => Promise<void> | void;
+    } = {},
   ): Promise<ThesisCheckRecord> {
     const now = options.now ?? new Date();
     const week = isoWeekKey(now);
@@ -289,28 +296,39 @@ export class NotesService {
         });
         continue;
       }
-      pending++;
-      const check: NoteCheck = {
+      // 有证据就让证据说话；没证据才回落到"待人工确认"，绝不凭研报文字猜结论。
+      const evaluated = options.evaluate ? await options.evaluate(note).catch(() => null) : null;
+      const check: NoteCheck = evaluated ?? {
         outcome: "pending_confirmation",
         source: "automated",
         checked_at: checkedAt,
-        note: "未配置模型，未生成结论；请人工确认。",
+        note: "论点未绑定可观测信号，未生成结论；请人工确认或绑定信号。",
       };
+      if (check.outcome === "pending_confirmation") pending++;
+      const status =
+        check.outcome === "invalid"
+          ? ("INVALIDATED" as const)
+          : check.outcome === "valid" && note.status === "INVALIDATED"
+            ? ("VALIDATED" as const)
+            : note.status;
       await this.db.put(owner, NOTE_KIND, {
         ...note,
         check,
+        ...(status ? { status } : {}),
         last_checked_at: checkedAt,
         updated_at: checkedAt,
       });
       items.push({
         note_id: note.id,
         symbol_code: note.symbol_code,
-        ...(note.status ? { status: note.status } : {}),
+        ...(status ? { status } : {}),
+        ...(note.status && note.status !== status ? { previous_status: note.status } : {}),
         outcome: check.outcome,
         source: check.source,
         check_status: "ok",
         note: check.note,
       });
+      if (evaluated && options.onVerdict) await options.onVerdict(note, evaluated);
     }
 
     const record: ThesisCheckRecord = {
@@ -322,8 +340,10 @@ export class NotesService {
       manual_updates: manualUpdates,
       note:
         pending > 0
-          ? `本周有 ${pending} 条论点待人工确认（未配置模型，未生成结论）。`
-          : "本周没有需要检验的论点。",
+          ? `本周有 ${pending} 条论点待人工确认（其中未绑定证据的不会自动判定）。`
+          : notes.length > 0
+            ? `本周 ${notes.length} 条论点已按绑定证据完成判定。`
+            : "本周没有需要检验的论点。",
     };
     await this.db.put(owner, CHECK_KIND, record);
     if (options.notify && pending > 0)

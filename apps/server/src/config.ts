@@ -48,6 +48,15 @@ export interface Config {
   jevMode?: "off" | "sample" | "live";
   typesafeApiKey?: string;
   jevModel?: string;
+  /**
+   * 事件二级判级的实现：
+   *   rules（默认）= 纯规则打分，行为不变；
+   *   model        = 轻量模型给分，规则结论进 shadow 供对照；
+   *   shadow       = 规则决定行为，模型只跑一份对照结论，用来先验证再切换。
+   */
+  eventJudge?: "rules" | "model" | "shadow";
+  /** 判级专用模型；留空则用用户当前选中的模型。 */
+  eventJudgeModel?: string;
   agentBackend: "sample" | "model" | "agui";
   agentUrl?: string;
   agentToken?: string;
@@ -149,6 +158,9 @@ export function readConfig(): Config {
   const typesafeApiKey = process.env.TYPESAFE_API_KEY?.trim();
   if (jevMode === "live" && !typesafeApiKey)
     throw new Error("JEV_MODE=live requires a nonblank TYPESAFE_API_KEY");
+  const eventJudge = process.env.EVENT_JUDGE ?? "rules";
+  if (eventJudge !== "rules" && eventJudge !== "model" && eventJudge !== "shadow")
+    throw new Error("EVENT_JUDGE must be rules, model or shadow");
   const computerProvider = process.env.COMPUTER_PROVIDER?.trim() || "docker";
   if (computerProvider !== "docker" && computerProvider !== "e2b-desktop")
     throw new Error("COMPUTER_PROVIDER must be docker or e2b-desktop");
@@ -192,6 +204,8 @@ export function readConfig(): Config {
     jevMode,
     typesafeApiKey,
     jevModel: process.env.JEV_MODEL?.trim() || defaultJevModel,
+    eventJudge,
+    eventJudgeModel: process.env.EVENT_JUDGE_MODEL?.trim(),
     agentBackend: backend,
     agentUrl: process.env.AGENT_URL,
     agentToken: process.env.AGENT_TOKEN,

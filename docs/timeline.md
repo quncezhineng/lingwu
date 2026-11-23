@@ -5,6 +5,79 @@
 
 ## 变更记录
 
+### 2026-11-23 · 判级换轻量模型 + R1 秒回回执 + R6 动作审计
+
+**背景**
+
+PRD §9.2 的第一个 Open Question（两级判级的低成本 agent 用哪个模型）需要落地，同时补两个"改动小、体验差距大"的缺口：长任务派发时用户盯着空白输入框等模型开口（R1），以及 agent 替你做的事没有统一的"做过什么、能不能撤"清单（R6）。
+
+**处理**
+
+- 新增 [event-judge-model.ts](../apps/server/src/engine/event-judge-model.ts)：轻量模型只产出 `{score, reasons}`，分档与死策略仍由 `applyDecisionPolicy` 决定，因此 `reasons/score/decision` 与规则版完全同形，A/B 可直接比较。解析失败、超时（8s）、模型未配置一律返回 null 由调用方降级。
+- [event-triage.ts](../apps/server/src/engine/event-triage.ts)：抽出 `applyDecisionPolicy`（分档 + 显式提醒优先 + 静默降级）与 `hasExplicitAlert`，供规则与模型共用；`TriageDeps` 新增 `judge` 钩子；`EventFeedItem` 新增 `judgedBy` / `judgeModel` / `shadow`；新增 `stats()` 按 `judgedBy` 统计推送接收率与规则/模型分歧率。
+- [config.ts](../apps/server/src/config.ts)：新增 `EVENT_JUDGE=rules|model|shadow`（默认 rules）与 `EVENT_JUDGE_MODEL`。`shadow` 让模型空跑攒对照样本，行为仍按规则走。
+- [investor-routes.ts](../apps/server/src/engine/investor-routes.ts)：新增 `GET /api/investor/feed/stats`。
+- 新增 [receipt.ts](../apps/server/src/engine/receipt.ts)：`receiptForTask` 生成「好，我去办：{标题}。{类型}分 N 步跑，出结果我在这儿叫你。」，`publishReceipt` 直接往会话账本补一条独立文本消息（START → CONTENT → END），不等模型输出。
+- [conversation.ts](../apps/server/src/engine/conversation.ts)：`delegate_task` / `research_stock` 改为走 `dispatchTask`，派发成功即发回执，同一任务只发一次；构造函数与 `clone()` 带上 `stream`（基类用 `Object.create` 克隆，字段初始化器不会执行，`receipted` 需显式重建）。
+- 新增 [action-log.ts](../apps/server/src/engine/action-log.ts) + [audit.ts](../packages/domain/src/audit.ts)：`agent_action_log` 记录 `kind/action/actor/outcome/revocable/target/refs/detail`，`revoke()` 调注入的 `undo` 真正回滚（取消任务、删提醒、删论点），审计条目本身只标记不删除。
+- 接入点：[service.ts](../apps/server/src/engine/service.ts) 的 `createTask`（kind=task）、论点自动判失效（kind=thesis，不可撤销）、[tracking-plan.ts](../apps/server/src/engine/tracking-plan.ts) 落地回调（kind=plan）；新增 [audit-routes.ts](../apps/server/src/engine/audit-routes.ts) 挂载 `/api/audit/actions`、`/actions/:id`、`/actions/:id/revoke`。
+- 新增测试：`tests/event-judge-model.test.ts`（8）、`tests/receipt.test.ts`（5）、`tests/action-log.test.ts`（7）、`tests/audit-api.test.ts`（2，含真撤销任务）；`tests/tracking-plan.test.ts` 补 1 条审计回调用例。
+
+**注意事项**
+
+- 回执只进会话账本、不写线程正文：它是即时确认，不是结论；客户端按 `extraDrafts` 渲染成独立气泡，刷新后消失（任务真实状态在任务卡里）。
+- 模型判级失败会写 `judgedBy: "rules_fallback"` 并在 reasons 里说明，事件照常入库，不会丢。
+- `stats()` 的「已读」只统计没有表态的条目：点「少推点」也会顺手把 `read` 置真，否则负面反馈会被算成接收。
+
+### 2026-11-23 · 移除移动端「今日信号」卡片与投研画像（含后端）
+
+**背景**
+
+上线后确认：今日页右栏的「今日信号」卡片与画像摘要不适合当前界面，决定整体撤掉；用户要求连后端画像一起删除，只保留事件判级、研报→跟踪计划与论点证据判定。
+
+**处理**
+
+- 删除文件：`apps/server/src/engine/investor-profile.ts`、`apps/mobile/src/investor-feed.ts`、`apps/mobile/src/investor-feed-card.tsx`、`apps/mobile/src/i18n/locales/{en,zh-Hans}/investor.ts`、`tests/investor-profile.test.ts`、`apps/mobile/test/investor-feed.test.ts`。
+- [event-triage.ts](../apps/server/src/engine/event-triage.ts)：降噪偏好改为自己存（`event-mutes` 记录），新增 `activeMutes` / `mute` / `unmute` 与 `muteTopicForEvent`；`TriageDeps` 去掉 `mutes` / `mute` / `unmute` 三个注入点，判级模块不再依赖画像。
+- [investor-routes.ts](../apps/server/src/engine/investor-routes.ts)：删除 `/profile` 系列接口，降噪接口改为 `/mutes`、`DELETE /mutes/:topic`；保留 feed、events、tracking-plans、notes 相关接口。
+- [service.ts](../apps/server/src/engine/service.ts)：移除 `investorProfile` 字段与实例化；[conversation.ts](../apps/server/src/engine/conversation.ts) 与 [model.ts](../apps/server/src/engine/model.ts) 移除画像摘要注入（对话与任务的提示词恢复原样）。
+- [investor.ts](../packages/domain/src/investor.ts)：删除 `InvestorProfile`、`ProfileWeight`、`InvestorFocusSymbol`、`InvestorProfileOverrides`、`investorOverridesSchema`、`RISK_LEVELS` 等画像类型，仅保留 `InvestorMutedTopic`（降噪偏好，判级与信息流共用）。
+- [workbench.tsx](../apps/mobile/src/workbench.tsx)：右栏恢复为自选 / 审批 / 偏好三块。
+
+**注意事项**
+
+- 事件判级、研报→跟踪计划、论点证据判定的能力与接口不变；「这类少推点」的冷却闭环保留，只是偏好改存 `event-mutes`。
+- 上一条 2026-11-23「投研闭环 P0」记录中的画像与「今日信号」部分已被本次移除，其余内容仍有效。
+- 验证：`tsc --noEmit`（root + mobile）通过；受影响测试 `event-triage` / `investor-api` / `tracking-plan` / `thesis-evidence` 共 36 用例通过。
+
+### 2026-11-23 · 投研闭环 P0：投研画像 + 事件两级判级/信息流 + 研报→跟踪计划 + 论点证据判定
+
+**背景**
+
+按 [PRD-灵悟-个人投研智能体-8P进化.md](PRD-灵悟-个人投研智能体-8P进化.md) 的体检结论落地 P0 三条主线：R2「克制的主动」、R3「懂你 + 论点回检」、R4「研报→跟踪」闭环。落地前盘点：记忆召回只作为 `recall_memory` 工具、对话首轮不带画像；价格提醒/监控触发即无条件写通知，没有"值不值得打扰"这一层；论点周检在未配置模型时只会把全部论点标为 `pending_confirmation`（等于不判定）；研报是一次性交付，没有派生跟踪计划。本次只扩展现有模块（TaskWorker / 记录表 / 通知收件箱 / 产物体系），未引入新基础设施。
+
+**处理**
+
+- 领域模型 [investor.ts](../packages/domain/src/investor.ts)（新）：`InvestorProfile` / `EventFeedItem` / `TrackingPlan` / `ThesisSignal`、`ThesisVerdict` 四组类型 + zod 输入 schema；[agent.ts](../packages/domain/src/agent.ts) 的 `InvestmentNote` 增加可选 `evidence`，`noteCheckSchema` 增加 `reasons`（均为向后兼容的可选字段）。
+- 投研画像 `investor-profile.ts`（新，已删除）：`deriveInvestorProfile` 纯函数从持仓（成本口径权重）/自选/论点/提醒/研报/记忆推导市场与赛道分布、集中度、风险偏好、风格关键词、重点标的权重与降噪偏好；显式 `overrides` 优先于推导值（PRD §7.3），空账户回落中性并写清原因，`confidence` 随数据完整度上升；`profileBrief()` 产出 ≤400 字提示词摘要。`InvestorProfileService` 快照 15 分钟 TTL 重算，用户偏好与降噪项单独存 `investor-preferences`，重算不覆盖用户输入。
+- 事件判级 [event-triage.ts](../apps/server/src/engine/event-triage.ts)（新）：一级规则过滤（相关性 / 用户降噪 / 2% 异动地板 / 24h 同标题去重）+ 二级可解释打分（类型基准分、持仓权重、论点关联、异动幅度、阈值、时效），`≥60` 推送、`≥35` 进信息流、其余只记日志；周末静默把推送降级为信息流；推送通道失败降级为信息流（PRD §7.2）。用户显式为某标的设过价格提醒时，价格类事件优先推送到人；「这类少推点」写进画像偏好并冷却 14 天。
+- 跟踪计划 [tracking-plan.ts](../apps/server/src/engine/tracking-plan.ts)（新）：从研报派生关键假设 / 关键指标 / 催化剂 / 估值区间与估值上下沿提醒；研报没写的（财报日、ROE 净利率）明确标 `placeholder`，不伪装成结论；`materialize` 幂等落地为价格提醒 + 论点笔记，并给论点绑定"跌破估值下沿 = 受威胁"的跟踪信号。
+- 论点证据 [thesis-evidence.ts](../apps/server/src/engine/thesis-evidence.ts)（新）：支持价格阈值 / 涨跌幅 / 关键词 / 财务字段四类信号，逐条判 `holds / at_risk / broken / unknown`，聚合为 `valid / inconclusive / invalid / pending_confirmation`；`onBreach="threat"` 的信号破了只算"受威胁"不判死；缺行情/新闻时判 `pending` 并列出缺什么；`source=manual` 的论点永不被自动覆盖，只有明确"不成立"才落 `INVALIDATED`。
+- 接线：
+  - [service.ts](../apps/server/src/engine/service.ts)：实例化四个服务；价格提醒经 `alertNotifier` 先进判级再决定是否写通知（`PriceAlertsService` 的 notifier 增加触发上下文与 `notified` 回执）；论点周检传入 `evaluate`/`onVerdict`，状态变化经判级决定是否打扰；研报生成后自动派生跟踪计划草稿并在任务回执里说明。
+  - [conversation.ts](../apps/server/src/engine/conversation.ts) / [model.ts](../apps/server/src/engine/model.ts)：画像摘要进入对话提示词与任务上下文（R3 首轮即带画像）。
+  - [investor-routes.ts](../apps/server/src/engine/investor-routes.ts)（新）挂载 `/api/investor`：`profile`、`profile/preferences`、`profile/mutes`、`feed`、`feed/counts`、`feed/:id/read`、`feed/:id/feedback`、`events`、`tracking-plans`（derive / materialize）、`notes/:id/evidence`、`notes/:id/check`。
+- 移动端：今日页右栏新增 `investor-feed-card.tsx`（已删除）「今日信号」——画像摘要 + push/feed 两级事件 + 判级依据 + 「这类少推点」；数据层 `investor-feed.ts`（已删除）；新增 `investor.*` 中英文案（`en/investor.ts` / `zh-Hans/investor.ts`，已删除）。
+
+**注意事项**
+
+- 二级判级目前是**可解释的规则打分**，不是模型判断：PRD 里"低成本 agent 判级"仍是 Open Question，替换点集中在 `judgeEvent`，reasons 契约不变，替换后判级依据仍可追溯。
+- 只有绑定了证据的论点才会自动判定；没绑定的仍走 `pending_confirmation`，界面应标注"自动判定，可修正"。
+- 休市判断 P0 只做周末静默；节假日与各市场盘中时段留给 P1 的交易日历（PRD R5）。
+- 未覆盖：R1 秒回回执、R5 设备推送/时区调度、R6 敏感动作确认与操作审计、R7 标的中心知识图谱。
+- 后续调整：投研画像与移动端「今日信号」卡片已在同日的后续变更中移除（见上一条），事件判级 / 跟踪计划 / 论点判定保留。
+- 验证：新增 6 个测试文件共 45 个用例（画像 6、判级 13、跟踪计划 4、论点判定 12、投研接口 7、移动端信息流 3），`tsc --noEmit` 与 `biome check` 通过；仓库既有 `apps/mobile/test/mobile-bots.test.ts` 中 1 个用例失败与本次改动无关（该模块未改动）。
+
 ### 2026-11-23 · 任务引擎 P0：FIFO 任务队列 + 断点恢复（事件日志 + SQL 租约）
 
 **背景**

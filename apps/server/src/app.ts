@@ -39,9 +39,11 @@ import {
   withMessageTimes,
 } from "./conversation-history.ts";
 import type { Store } from "./db.ts";
+import { auditRoutes } from "./engine/audit-routes.ts";
 import { briefingRoutes } from "./engine/briefing-routes.ts";
 import { listChannelMessages, runChannelChat } from "./engine/channel-chat.ts";
 import { financialRoutes } from "./engine/financial-routes.ts";
+import { investorRoutes } from "./engine/investor-routes.ts";
 import { marketRoutes } from "./engine/market-routes.ts";
 import { noteRoutes } from "./engine/notes-routes.ts";
 import { portfolioRoutes } from "./engine/portfolio-routes.ts";
@@ -874,6 +876,8 @@ export async function createApp(
   app.route("/api/price-alerts", priceAlertRoutes(agent));
   app.route("/api/portfolios", portfolioRoutes(agent));
   app.route("/api/notes", noteRoutes(agent));
+  app.route("/api/investor", investorRoutes(agent));
+  app.route("/api/audit", auditRoutes(agent));
   app.route("/api/financials", financialRoutes(agent));
   app.route("/api/market", marketRoutes(agent));
   app.route("/api/conversation/stream", conversationStreamRoutes(conversationStream));

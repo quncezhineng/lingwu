@@ -73,11 +73,25 @@ export interface AlertCheckResult {
   notification?: { id: string; title: string; body: string };
 }
 
+/** 触发上下文：让判级层知道"哪只标的、什么阈值、当前价多少"，而不是只拿到一段文案。 */
+export interface AlertNotifyContext {
+  symbol: string;
+  thresholdType: PriceAlert["threshold_type"];
+  thresholdValue: number;
+  price: number;
+  changePercent: number;
+}
+
+/**
+ * 提醒出口。`notified=false` 表示这次触发没有真正推送（例如被判级为"进信息流"），
+ * 调用方据此不写入 last_notified_at，下一轮仍会重新判级。
+ */
 export type AlertNotifier = (
   title: string,
   body: string,
   key: string,
-) => Promise<{ id: string; title: string; body: string }>;
+  context?: AlertNotifyContext,
+) => Promise<{ id: string; title: string; body: string; notified?: boolean }>;
 
 function thresholdLabel(alert: PriceAlertRecord): string {
   switch (alert.threshold_type) {
@@ -206,7 +220,7 @@ export class PriceAlertsService {
     const triggered = isTriggered(alert, quote);
     let notified = false;
     let deduplicated = false;
-    let notification: { id: string; title: string; body: string } | undefined;
+    let notification: { id: string; title: string; body: string; notified?: boolean } | undefined;
     let notificationKey: string | undefined;
 
     if (triggered && notify) {
@@ -218,8 +232,14 @@ export class PriceAlertsService {
         const label = thresholdLabel(alert);
         const title = `${alert.symbol_code} 价格提醒`;
         const body = `${alert.symbol_code} 当前 ${quote.price}（${label}），日内 ${quote.changePercent.toFixed(2)}%。`;
-        notification = await notify(title, body, notificationKey);
-        notified = true;
+        notification = await notify(title, body, notificationKey, {
+          symbol: alert.symbol_code,
+          thresholdType: alert.threshold_type,
+          thresholdValue: alert.threshold_value,
+          price: quote.price,
+          changePercent: quote.changePercent,
+        });
+        notified = notification.notified !== false;
       }
     }
 

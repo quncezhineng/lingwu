@@ -9,6 +9,7 @@ import {
   type AgentIdentity,
   type AgentMemoryV2,
   type AgentNotification,
+  type AgentTask,
   createTaskSchema,
   goalInputSchema,
   MEMORY_CATEGORIES,
@@ -39,8 +40,10 @@ import {
   normalizeMemoryText,
   parseMemoryCandidates,
 } from "./memory-settle.ts";
+import { publishReceipt, receiptForTask } from "./receipt.ts";
 import { reminderList } from "./reminder-list.ts";
 import type { AgentService } from "./service.ts";
+import type { ConversationStream } from "./stream.ts";
 import { completeText, tanstackAgent } from "./tanstack-agent.ts";
 
 /**
@@ -64,13 +67,35 @@ export class ConversationAgent extends AbstractAgent {
   private stopped = false;
   private activeAbort: (() => void) | null = null;
   private activeThreadId: string | undefined;
+  /** 本轮已经回过执的任务 id，避免同一任务重复刷气泡。 */
+  private receipted = new Set<string>();
   constructor(
     private readonly config: Config,
     private readonly service: AgentService,
     private readonly owner: string,
     private readonly jevAdapter: JevAdapter | undefined = createJevAdapter(config),
+    /** 会话账本：长任务派发时用来补「秒回回执」（R1）。 */
+    private readonly stream?: ConversationStream,
   ) {
     super({ agentId: "default" });
+  }
+  /**
+   * 派发一个长任务，并在派发成功的那一刻先回一句「好，我去办」（R1）。
+   *
+   * 回执由服务端直接补进会话流，不占用模型的输出：用户不用等模型想完一整段话
+   * 才知道任务已经接住了。同一个任务只回一次（工具重试、模型重复调用都不刷屏）。
+   */
+  private async dispatchTask(input: RunAgentInput, task: AgentTask): Promise<AgentTask> {
+    if (this.receipted.has(task.id)) return task;
+    this.receipted.add(task.id);
+    await publishReceipt({
+      stream: this.stream,
+      owner: this.owner,
+      threadId: input.threadId,
+      runId: input.runId,
+      text: receiptForTask(task),
+    });
+    return task;
   }
   clone(): ConversationAgent {
     // CopilotKit clones the registered agent for every request. Reusing the
@@ -80,6 +105,9 @@ export class ConversationAgent extends AbstractAgent {
       service: this.service,
       owner: this.owner,
       jevAdapter: this.jevAdapter,
+      stream: this.stream,
+      // 基类用 Object.create 克隆，字段初始化器不会跑，这里必须显式重建。
+      receipted: new Set<string>(),
       stopped: false,
       activeAbort: null,
       activeThreadId: undefined,
@@ -448,7 +476,16 @@ export class ConversationAgent extends AbstractAgent {
             .default("agent"),
         }),
         execute: async (args) =>
-          this.service.createTask(this.owner, args, key("task", args), false, input.threadId),
+          this.dispatchTask(
+            input,
+            await this.service.createTask(
+              this.owner,
+              args,
+              key("task", args),
+              false,
+              input.threadId,
+            ),
+          ),
       }),
       defineTool({
         name: "research_stock",
@@ -459,17 +496,20 @@ export class ConversationAgent extends AbstractAgent {
           title: z.string().trim().min(1).max(160).optional(),
         }),
         execute: async ({ symbol, title }) =>
-          this.service.createTask(
-            this.owner,
-            {
-              title: title ?? `研究 ${symbol}`,
-              prompt: `研究 ${symbol}`,
-              kind: "research",
-              input: { symbol },
-            },
-            key("research", { symbol, title }),
-            false,
-            input.threadId,
+          this.dispatchTask(
+            input,
+            await this.service.createTask(
+              this.owner,
+              {
+                title: title ?? `研究 ${symbol}`,
+                prompt: `研究 ${symbol}`,
+                kind: "research",
+                input: { symbol },
+              },
+              key("research", { symbol, title }),
+              false,
+              input.threadId,
+            ),
           ),
       }),
       defineTool({

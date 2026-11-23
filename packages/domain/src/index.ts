@@ -228,6 +228,16 @@ export interface ExecutionBackend {
 }
 
 export type {
+  AgentActionActor,
+  AgentActionKind,
+  AgentActionLogEntry,
+  AgentActionOutcome,
+  AgentActionQuery,
+  AgentActionRefs,
+  AgentActionTarget,
+} from "./audit.ts";
+export { AGENT_ACTION_KINDS, AGENT_ACTION_LABELS, agentActionQuerySchema } from "./audit.ts";
+export type {
   Channel,
   ChannelAvatarId,
   ChannelHistoryPage,
@@ -248,6 +258,34 @@ export {
   normalizeChannelAvatar,
 } from "./channel.ts";
 export type { ComputerCommand, ComputerDirectory, ComputerSnapshot } from "./computer.ts";
+export type {
+  EventCandidateInput,
+  EventDecision,
+  EventFeedItem,
+  EventPrefilter,
+  EventType,
+  FeedFeedbackInput,
+  InvestorMutedTopic,
+  SignalBreach,
+  SuggestedMonitor,
+  ThesisEvidenceInput,
+  ThesisSignal,
+  ThesisSignalResult,
+  ThesisSignalState,
+  ThesisSnapshot,
+  ThesisVerdict,
+  TrackingItemKind,
+  TrackingPlan,
+  TrackingPlanItem,
+} from "./investor.ts";
+export {
+  EVENT_TYPE_LABELS,
+  EVENT_TYPES,
+  eventCandidateSchema,
+  feedFeedbackSchema,
+  thesisEvidenceInputSchema,
+  thesisSignalSchema,
+} from "./investor.ts";
 export type {
   OrchestrationNode,
   OrchestrationNodeStatus,
