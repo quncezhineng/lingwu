@@ -4,7 +4,8 @@ import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
 import { backgroundFailure } from "./log.ts";
 
-type Row = { data: Record<string, unknown> };
+/** 统一的行类型：records 的 data 列与 events 的自定义列都走它；字段用 `as`/`as unknown as` 取用。 */
+type Row = { data?: unknown };
 interface Database {
   query: (sql: string, params?: unknown[]) => Promise<{ rows: Row[] }>;
   close: () => Promise<void>;
@@ -223,6 +224,116 @@ export class Store {
     );
     return (result.rows[0]?.data as T | undefined) ?? null;
   }
+  /**
+   * 向事件日志追加一条事件（追加式，只进不出，P0「事件日志」基础设施）。
+   *
+   * 事件的版本号是该 stream 内从上一位+1 而来，用 `INSERT ... SELECT` 原子算出，
+   * 两个并发追加会撞出相同的 version，靠 UNIQUE(stream_kind,stream_id,version)
+   * 约束让后到者失败并重试——与 tasks 的 SQL 租约 CAS 同一套乐观并发哲学。
+   *
+   * 事件日志是旁路审计（append-only），不参与任务主状态的事务，写入失败仅记日志
+   * 不影响任务执行——符合 PRD §7「并行双写灰度切换」的第一步。
+   */
+  async appendEvent(
+    owner: string,
+    streamKind: string,
+    streamId: string,
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): Promise<{ seq: string; version: number }> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const result = await this.db.query(
+          `INSERT INTO events(owner,stream_kind,stream_id,version,event_type,payload)
+           SELECT $1,$2,$3,COALESCE(MAX(version),0)+1,$4,$5::jsonb
+           FROM events WHERE stream_kind=$2 AND stream_id=$3
+           RETURNING seq,version`,
+          [owner, streamKind, streamId, eventType, JSON.stringify(payload)],
+        );
+        const row = result.rows[0] as unknown as { seq?: string; version?: number };
+        // 注意：INSERT...SELECT 某些实现里 max 没法拿到？不会——RETURNING 一定带版本号。
+        return { seq: String(row.seq ?? ""), version: row.version ?? 0 };
+      } catch (error) {
+        // 唯一约束冲突（23505）= 并发追加撞了版本号，重算重试；其余错误原样抛出。
+        if ((error as { code?: string }).code === "23505") continue;
+        throw error;
+      }
+    }
+    throw new Error("Could not append event: version conflicts exhausted");
+  }
+  /**
+   * 按版本升序读回某个 stream 的完整事件流，用于审计与「读投影」重放。
+   */
+  async readEvents<
+    T = Record<string, unknown>,
+  >(streamKind: string, streamId: string): Promise<
+    {
+      owner: string;
+      version: number;
+      eventType: string;
+      payload: T;
+      occurredAt: string;
+    }[]
+  > {
+    const result = await this.db.query(
+      `SELECT owner,version,event_type as "eventType",payload,occurred_at as "occurredAt"
+       FROM events WHERE stream_kind=$1 AND stream_id=$2 ORDER BY version ASC`,
+      [streamKind, streamId],
+    );
+    return result.rows.map(
+      (row) => row as unknown as {
+        owner: string;
+        version: number;
+        eventType: string;
+        payload: T;
+        occurredAt: string;
+      },
+    );
+  }
+  /**
+   * 「读投影」重建：把任务的事件流按顺序重放，合成当前状态（校验/恢复工具）。
+   * records 表仍是任务的主读模型，本方法不写任何东西——用于排查与人工恢复。
+   * 未知事件类型被忽略，保证向后兼容。返回 null 表示该任务没有事件。
+   */
+  async rebuildTask(owner: string, taskId: string): Promise<Record<string, unknown> | null> {
+    const events = await this.readEvents("task", taskId);
+    if (events.length === 0) return null;
+    const state: Record<string, unknown> = {};
+    for (const event of events) {
+      const patch = event.payload as Record<string, unknown>;
+      switch (event.eventType) {
+        case "task_created":
+          Object.assign(state, patch);
+          break;
+        case "task_claimed":
+          Object.assign(state, {
+            status: "running",
+            leaseId: patch.leaseId,
+            leaseUntil: patch.leaseUntil,
+            attempts: patch.attempts,
+          });
+          break;
+        case "task_checkpointed":
+          Object.assign(state, patch);
+          break;
+        case "task_completed":
+          Object.assign(state, { status: "succeeded", leaseId: null, leaseUntil: null }, patch);
+          break;
+        case "task_failed":
+          Object.assign(state, { status: "failed", leaseId: null, leaseUntil: null }, patch);
+          break;
+        case "task_cancelled":
+        case "task_paused":
+        case "task_resumed":
+        case "task_re_enqueued":
+          Object.assign(state, { status: event.eventType === "task_paused" ? "paused" : "queued", leaseId: null, leaseUntil: null }, patch);
+          break;
+        default:
+          break;
+      }
+    }
+    return state;
+  }
   close(): Promise<void> {
     return this.db.close();
   }
@@ -260,6 +371,11 @@ export async function createStore(
   }
   await database.query(
     "CREATE TABLE IF NOT EXISTS records(owner text NOT NULL,kind text NOT NULL,id text NOT NULL,data jsonb NOT NULL,updated_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(owner,kind,id))",
+  );
+  // P0「事件日志」：追加式事件流，version 是每个 stream 内的单调序号。
+  // 唯一约束 (stream_kind,stream_id,version) 兜住并发追加，和 records 的 CAS 同一哲学。
+  await database.query(
+    "CREATE TABLE IF NOT EXISTS events(seq BIGSERIAL PRIMARY KEY,owner text NOT NULL,stream_kind text NOT NULL,stream_id text NOT NULL,version integer NOT NULL,event_type text NOT NULL,payload jsonb NOT NULL,occurred_at timestamptz NOT NULL DEFAULT now(),UNIQUE(stream_kind,stream_id,version))",
   );
   return new Store(database);
 }

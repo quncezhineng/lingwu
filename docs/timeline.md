@@ -5,6 +5,32 @@
 
 ## 变更记录
 
+### 2026-11-23 · 任务引擎 P0：FIFO 任务队列 + 断点恢复（事件日志 + SQL 租约）
+
+**背景**
+
+按 [PRD-LingWu-openbot对标借鉴.md](PRD-LingWu-openbot对标借鉴.md) §3.2 P0「FIFO 任务队列 + 断点恢复」立项：消息排队、暂停/恢复/取消、崩溃安全持久化；借鉴 openbot 的「事件日志 + SQLite 投影 + SQL 租约」。盘点现状：SQL 租约抢占/续约、checkpoint 断点续跑、暂停/恢复/取消、PGlite/PG 持久化此前已具备；真正缺失的是——① 严格 FIFO 排队顺序（原按 `updated_at ASC` 拾取，任务被暂停/恢复后 `updated_at` 变化会被后来的任务插队）；② 追加式事件日志（无 events 表、无重放/审计能力）。
+
+**处理**
+
+- [db.ts](../apps/server/src/db.ts)：新增 `events` 事件日志表（`seq/owner/stream_kind/stream_id/version/event_type/payload/occurred_at`，`UNIQUE(stream_kind,stream_id,version)`）。`Store` 新增三个方法：
+  - `appendEvent(owner, streamKind, streamId, eventType, payload)`——`INSERT ... SELECT` 原子算出 `MAX(version)+1`，并发追加撞唯一约束（23505）自动重试，与 tasks 租约 CAS 同一套乐观并发哲学；事件是旁路审计，失败只记日志、不中断任务（PRD §7「并行双写灰度」第一步的落地）。
+  - `readEvents(streamKind, streamId)`——按 version 升序读回完整事件流（审计 / 重放）。
+  - `rebuildTask(owner, taskId)`——「读投影」重建：把任务事件流按顺序重放合成当前状态，未知事件忽略（向后兼容）；records 仍是主读模型，本方法只用于排查与恢复，不写库。
+- [agent.ts](../packages/domain/src/agent.ts)：`AgentTask` 新增 `enqueuedAt?`（首次入队时间，不可变）。暂停/恢复不修改它，恢复后的任务仍守原队列位置。
+- [worker.ts](../apps/server/src/engine/worker.ts)：
+  - 拾取改严格 FIFO：按 `enqueuedAt`（缺省回退 `createdAt`）升序稳定排序，同键任务保持原有相对顺序；`(db, execute)` 构造签名未变，`tests/engine.test.ts` 既有 9 个测试零破坏。
+  - run() 全生命周期埋点：`task_claimed` / `task_checkpointed` / `task_completed` / `task_failed` / `task_re_enqueued`（租约丢失/中止时写），全部吞错防串扰主流程。
+- [service.ts](../apps/server/src/engine/service.ts)：
+  - `createTask` 统一设置 `enqueuedAt` 并埋 `task_created` 事件（幂等：只有 insertIfAbsent 实际插入才埋）。`createSubtask` 复用 createTask，编排子任务自动获得同样待遇。
+  - `control` 埋 `task_paused` / `task_cancelled` / `task_resumed`（monitor 恢复分支同样埋点）；resume/retry 不改 `enqueuedAt`。
+- [fifo-events.test.ts](../tests/fifo-events.test.ts)：新增 7 个测试——FIFO 先入先出、暂停恢复保持队列位置、成功/失败/租约丢失的事件流（version 从 1 起连续递增）、`rebuildTask` 崩溃重放重建、`createTask`/`control` 的创建与暂停/恢复/取消事件且恢复后 enqueuedAt 不变。
+
+**说明**
+
+- 验证：`pnpm test` 全量 1235 项中仅 2 项失败，均为预存环境性失败（`mobile-bots` markdown 预览在改动前 stash 复测即失败；`computer-e2b-desktop` 依赖外部 E2B 沙箱），与本次改动无关；`pnpm typecheck` 通过。
+- P0 四项对齐 PRD：消息排队（FIFO 排序）✓、暂停/恢复/取消（既有 + 事件补全）✓、崩溃安全持久化（SQL 租约既有 + 事件日志审计）✓、事件日志 + 投影 + 租约（events 表 + rebuildTask + 既有 CAS 租约）✓。
+
 ### 2026-11-23 · 技能：同花顺技能卡片补绿色认证盾标
 
 **处理**

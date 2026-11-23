@@ -305,7 +305,7 @@ pnpm test:browser
 pnpm test:computer
 ```
 
-Platform build scripts export JavaScript/Hermes bundles; they do not produce signed app binaries. Browser checks use controlled HTTP fixtures; the local check requires installed Chromium, and the container check requires Docker and registry access to build its image. CI also exercises the browser and Linux computer containers. See [contribution guidance](CONTRIBUTING.md) and [verification results](docs/VERIFICATION.md).
+Platform build scripts export JavaScript/Hermes bundles; they do not produce signed app binaries. Installable iOS and Android builds go through EAS Build — see the [mobile release guide](docs/MOBILE-打包与上架手册.md). Browser checks use controlled HTTP fixtures; the local check requires installed Chromium, and the container check requires Docker and registry access to build its image. CI also exercises the browser and Linux computer containers. See [contribution guidance](CONTRIBUTING.md) and [verification results](docs/VERIFICATION.md).
 
 ## Contributing and license
 

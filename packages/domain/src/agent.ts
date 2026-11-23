@@ -42,6 +42,9 @@ export interface AgentTask {
   state: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+  /** 任务首次进入队列的时间（不可变，ISO 字符串）。Worker 按它严格 FIFO 拾取；
+   *  暂停/恢复不修改它，因此任务恢复后仍保持原队列位置；旧数据缺省回退 createdAt。 */
+  enqueuedAt?: string;
   nextRunAt?: string;
   leaseId?: string | null;
   leaseUntil?: string | null;

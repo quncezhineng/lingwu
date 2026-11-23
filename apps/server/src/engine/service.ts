@@ -418,6 +418,8 @@ export class AgentService {
       },
       createdAt: date(),
       updatedAt: date(),
+      // FIFO 入队时间（不可变）：暂停/恢复不修改它，恢复后的任务仍守原队列位置。
+      enqueuedAt: date(),
       attempts: 0,
       leaseId: null,
       leaseUntil: null,
@@ -432,7 +434,31 @@ export class AgentService {
         : {}),
     };
     await this.ensure(owner);
-    await this.db.insertIfAbsent(owner, "tasks", task);
+    const inserted = await this.db.insertIfAbsent(owner, "tasks", task);
+    // P0 事件日志：任务创建即落一条 task_created（旁路审计，失败只记日志）。
+    if (inserted)
+      await this.db
+        .appendEvent(owner, "task", id, "task_created", {
+          id,
+          title: task.title,
+          kind: task.kind,
+          status: task.status,
+          threadId: task.threadId,
+          goalId: task.goalId,
+          milestoneId: task.milestoneId,
+          plan: task.plan,
+          evidence: task.evidence,
+          input: task.input,
+          state: task.state,
+          createdAt: task.createdAt,
+          enqueuedAt: task.enqueuedAt,
+          attempts: 0,
+          orchestrationId: task.orchestrationId,
+          parentTaskId: task.parentTaskId,
+          delegatedBy: task.delegatedBy,
+          assignedAgent: task.assignedAgent,
+        })
+        .catch((error) => backgroundFailure("append task event", error));
     return (await this.db.get<AgentTask>(owner, "tasks", id)) ?? task;
   }
   async control(owner: string, id: string, action: "pause" | "resume" | "cancel" | "retry") {
@@ -464,6 +490,9 @@ export class AgentService {
         title: `Task ${resumed.status}`,
         detail: "Changed by you",
       });
+      await this.db
+        .appendEvent(owner, "task", id, "task_resumed", { status: resumed.status })
+        .catch((error) => backgroundFailure("append task event", error));
       return resumed;
     }
     const status =
@@ -532,6 +561,17 @@ export class AgentService {
       title: `Task ${status}`,
       detail: "Changed by you",
     });
+    // P0 事件日志：暂停/取消/恢复/重试各落一条对应事件。
+    // resume/retry 不改 enqueuedAt（payload 里保留原值），任务恢复后仍按原入队时间排队。
+    await this.db
+      .appendEvent(
+        owner,
+        "task",
+        id,
+        action === "pause" ? "task_paused" : action === "cancel" ? "task_cancelled" : "task_resumed",
+        { status, ...(task.enqueuedAt ? { enqueuedAt: task.enqueuedAt } : {}) },
+      )
+      .catch((error) => backgroundFailure("append task event", error));
     return updated;
   }
   /** Stop work the user just cancelled from the chat stop button. */

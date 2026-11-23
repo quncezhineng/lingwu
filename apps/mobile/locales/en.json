@@ -1,0 +1,9 @@
+{
+  "NSHumanReadableCopyright": "Copyright © 2026 LingWu",
+  "ios": {
+    "CFBundleDisplayName": "LingWu"
+  },
+  "android": {
+    "app_name": "LingWu"
+  }
+}

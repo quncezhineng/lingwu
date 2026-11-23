@@ -22,6 +22,7 @@ LingWu（灵悟）是面向个人投资者的 AI 投研智能体。它把行情�
 3. [Linux 计算机](COMPUTER.md)。
 4. [个人模型连接](USER-MODEL-CONNECTION.md)。
 5. [Rich Threads 配置](RICH-THREADS.md)。
+6. [移动端打包与上架](MOBILE-打包与上架手册.md)：iOS / Android 发版流程。
 
 ### 理解投研链路
 
@@ -87,6 +88,7 @@ LingWu（灵悟）是面向个人投资者的 AI 投研智能体。它把行情�
 | [浏览器 Worker 本地启动](BROWSER-WORKER-本地启动指南.md) | Chromium、环境变量、排障 |
 | [Linux 计算机](COMPUTER.md) | 容器、终端、文件、网络边界 |
 | [定时任务与部署手册](O2-定时任务与部署手册.md) | 简报调度、AKShare、PDF 自检、生产核对 |
+| [移动端打包与上架](MOBILE-打包与上架手册.md) | EAS 云构建、iOS / Android 上架、版本号、排障 |
 | [个人模型连接](USER-MODEL-CONNECTION.md) | Provider、密钥、账户隔离 |
 | [国际化](I18N.md) | 中英双语与文案约定 |
 | [遥测](TELEMETRY.md) | 运行时追踪与退出 |

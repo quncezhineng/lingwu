@@ -4,6 +4,10 @@
     "slug": "lingwu",
     "scheme": "lingwu",
     "version": "0.1.0",
+    "locales": {
+      "zh-Hans": "./locales/zh.json",
+      "en": "./locales/en.json"
+    },
     "orientation": "default",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -13,7 +17,9 @@
       "bundleIdentifier": "app.lingwu.mobile",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleLocalizations": ["en", "zh-Hans"],
+        "CFBundleAllowMixedLocalizations": true
       }
     },
     "android": {
@@ -23,7 +29,12 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#3a83f7"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",

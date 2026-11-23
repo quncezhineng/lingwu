@@ -76,6 +76,16 @@ export class TaskWorker {
     const started: Promise<void>[] = [];
     try {
       const records = await this.db.scan<AgentTask>("tasks");
+      // 严格 FIFO：按入队时间（enqueuedAt，缺省回退 createdAt）升序拾取。
+      // 稳定排序保证入队时间相同的任务（老数据无 enqueuedAt）仍按 scan 的
+      // updated_at ASC 保持原有相对顺序；暂停/恢复不修改 enqueuedAt，
+      // 因此恢复后的任务仍守在原来的队列位置，不会被后来的任务插队。
+      const entryKey = (t: AgentTask) => t.enqueuedAt ?? t.createdAt;
+      records.sort((a, b) => {
+        const ka = entryKey(a.value),
+          kb = entryKey(b.value);
+        return ka < kb ? -1 : ka > kb ? 1 : 0;
+      });
       const due = records.filter(
         ({ value: t }) =>
           !this.inFlight.has(t.id) &&
@@ -138,9 +148,23 @@ export class TaskWorker {
       attempts: previous.attempts + 1,
     });
     if (!task) return;
+    // 事件日志埋点（P0）：任务的生命周期以追加式事件落库，供审计与「读投影」重放。
+    // 事件是旁路记录，写入失败只记日志，绝不拖垮或中断任务的正常执行。
+    const appendEvent = async (eventType: string, payload: Record<string, unknown>) => {
+      try {
+        await this.db.appendEvent(owner, "task", taskId, eventType, payload);
+      } catch (error) {
+        backgroundFailure("append task event", error);
+      }
+    };
     const controller = new AbortController();
     this.active.set(task.id, controller);
     const taskId = task.id;
+    await appendEvent("task_claimed", {
+      leaseId,
+      attempts: task.attempts,
+      leaseUntil: task.leaseUntil,
+    });
     const guard = async () => {
       const latest = await this.db.get<AgentTask>(owner, "tasks", taskId);
       if (controller.signal.aborted || latest?.leaseId !== leaseId || latest.status !== "running")
@@ -157,6 +181,7 @@ export class TaskWorker {
       );
       if (!next) throw new LostLeaseError();
       task = next;
+      await appendEvent("task_checkpointed", { ...patch });
       return next;
     };
     const event = async (kind: RunEvent["kind"], title: string, detail = "") => {
@@ -202,6 +227,10 @@ export class TaskWorker {
         event,
       });
       await checkpoint({ ...result, leaseId: null, leaseUntil: null });
+      await appendEvent("task_completed", {
+        status: result.status ?? task.status,
+        ...(result.result ? { result: result.result } : {}),
+      });
       await this.db.put(owner, "runs", {
         id: leaseId,
         taskId,
@@ -211,6 +240,9 @@ export class TaskWorker {
       });
     } catch (error) {
       if (error instanceof LostLeaseError || controller.signal.aborted) {
+        await appendEvent("task_re_enqueued", {
+          reason: controller.signal.aborted ? "aborted" : "lease lost",
+        });
         await this.db.compareAndSwap(
           owner,
           "tasks",
@@ -223,6 +255,7 @@ export class TaskWorker {
         await event("error", "Task needs attention", detail).catch((error) =>
           backgroundFailure("record task error", error),
         );
+        await appendEvent("task_failed", { error: detail });
         await this.db.compareAndSwap(
           owner,
           "tasks",
