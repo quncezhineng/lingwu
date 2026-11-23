@@ -789,6 +789,7 @@ const agent = {
   "agent.skillDetailChinese": "Chinese",
   "agent.skillDetailEnglish": "English",
   "agent.skillDetailSource": "Skill source",
+  "agent.skillDetailOfficial": "Official site",
   "agent.skillDetailUse": "Use this skill",
   "agent.skillAddedToChat": "“{title}” is ready in the chat composer.",
   "agent.skillInstallAction": "Add to Agent/Channel",

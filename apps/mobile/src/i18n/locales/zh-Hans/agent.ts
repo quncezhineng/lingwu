@@ -706,6 +706,7 @@ const agent = {
   "agent.skillDetailChinese": "中文说明",
   "agent.skillDetailEnglish": "English",
   "agent.skillDetailSource": "技能来源",
+  "agent.skillDetailOfficial": "官方页面",
   "agent.skillDetailUse": "使用此技能",
   "agent.skillAddedToChat": "已将「{title}」带入对话输入区。",
   "agent.skillInstallAction": "添加到智能体/频道",

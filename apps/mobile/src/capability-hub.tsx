@@ -117,6 +117,8 @@ type CatalogItem = {
   iconSurface: string;
   source: string;
   state: CapabilityState;
+  /** 第三方官方技能标：作者名前打绿色认证标（等同官方灵悟的外观）。 */
+  official?: boolean;
   searchText?: string;
   onPress: () => void;
   /** 技能卡片右下角的快捷动作：把技能带入对话输入区，不经过详情弹层。 */
@@ -419,8 +421,8 @@ function MarketAgentAuthorLine({ source, official }: { source: string; official?
 
 function CapabilityCard({ item }: { item: CatalogItem }) {
   const { t } = useTranslation();
-  /** 来源标签等于官方灵悟标签时，视为官方内置能力，作者名前打绿标。 */
-  const isOfficial = item.source === t("agent.hubSourceLingwu");
+  /** 来源标签等于官方灵悟标签、或明确标记为第三方官方技能时，作者名前打绿标。 */
+  const isOfficial = item.official ?? item.source === t("agent.hubSourceLingwu");
   /** 连接器卡片右下角展示真实连接状态，未接通时不暗示「可用」。 */
   // 已连接用品牌蓝（浅蓝底 + 深蓝字），未连接沿用中性灰。
   const connectorStatus =
@@ -1668,6 +1670,18 @@ export function SkillDetailSheet({
             <Text selectable style={s.small}>
               {skill.sourceFolder}
             </Text>
+            {skill.homepage ? (
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => Linking.openURL(skill.homepage!)}
+                style={[s.row, { gap: 6, marginTop: 6 }]}
+              >
+                <Text style={[s.small, { color: colors.primaryStrong }]}>
+                  {t("agent.skillDetailOfficial")}
+                </Text>
+                <Link2 size={13} color={colors.primaryStrong} />
+              </Pressable>
+            ) : null}
           </View>
 
           {onUse && (
@@ -2251,7 +2265,10 @@ export function CapabilityHubScreen() {
       icon: appearance.icon,
       iconColor: appearance.color,
       iconSurface: appearance.surface,
-      source: skillSource,
+      // 第三方技能展示其作者（如「@同花顺」），官方技能回退为「@灵悟」。
+      source: (locale === "zh-Hans" ? skill.authorZh : skill.authorEn) ?? skillSource,
+      // 同花顺等第三方官方技能也打绿色认证标。
+      official: skill.official,
       state: "ready",
       searchText: [
         skill.id,

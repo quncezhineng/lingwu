@@ -5,6 +5,39 @@
 
 ## 变更记录
 
+### 2026-11-23 · 技能：同花顺技能卡片补绿色认证盾标
+
+**处理**
+
+在上一项（作者署名 + 官方页面入口）基础上，用户要求同花顺技能作者名前也显示和灵悟一样的绿色认证盾标。
+
+- [skill-catalog.ts](../apps/mobile/src/skill-catalog.ts#L34-L35)：`SkillCatalogEntry` 新增可选 `official?: boolean`（第三方官方技能标记，默认缺省）；`hithink-finance` 条目设 `official: true`。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L120-L121)：`CatalogItem` 新增可选 `official?: boolean`。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L424-L425)：`CapabilityCard` 的 `isOfficial` 判断改为 `item.official ?? item.source === 官方灵悟`——显式标记的第三方官方技能与官方灵悟能力同样打绿标。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L2271-L2272)：`skillItems` 把 `skill.official` 透传给卡片。
+
+**说明**
+
+- 验证：`pnpm typecheck` 通过。机制通用：今后任何第三方官方技能只要在目录条目设 `official: true` 即可获得绿标，无需改渲染代码。
+
+### 2026-11-23 · 技能：同花顺技能作者署名改为第三方 + 详情页新增官方页面入口
+
+**背景**
+
+「同花顺金融数据」技能由同花顺官方发布（[fuyao.aicubes.cn](https://fuyao.aicubes.cn/)），但卡片与详情页的来源标签沿用官方的「@灵悟」，用户要求把作者换成「同花顺」，并在技能详情页提供跳转官方页面的链接。
+
+**处理**
+
+- [skill-catalog.ts](../apps/mobile/src/skill-catalog.ts#L21-L34)：`SkillCatalogEntry` 类型新增三个可选字段——`authorZh` / `authorEn`（第三方技能作者展示名，缺省回退官方灵悟）、`homepage`（官方页面链接，存在时详情页展示可点击入口）。可选字段不破坏其余 184 个技能条目。
+- [skill-catalog.ts](../apps/mobile/src/skill-catalog.ts#L1156-L1158)：`hithink-finance` 条目追加 `authorZh: "@同花顺"`、`authorEn: "@Hithink"`、`homepage: "https://fuyao.aicubes.cn/"`。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L2254-L2256)：技能卡片 `source` 改为按当前语言取 `authorZh` / `authorEn`，缺省回退「@灵悟」。hithink-finance 作者变为「@同花顺」后不再匹配官方来源，绿色认证盾标自然隐藏，与「第三方技能」身份一致；其余官方技能不受影响。
+- [capability-hub.tsx](../apps/mobile/src/capability-hub.tsx#L1671-L1682)：`SkillDetailSheet` 技能来源块内，当 `skill.homepage` 存在时渲染「官方页面」链接（`Linking.openURL` 打开）。
+- i18n：[zh-Hans/agent.ts](../apps/mobile/src/i18n/locales/zh-Hans/agent.ts#L709) 新增 `agent.skillDetailOfficial: 官方页面`；[en/agent.ts](../apps/mobile/src/i18n/locales/en/agent.ts#L792) 新增 `agent.skillDetailOfficial: Official site`。
+
+**说明**
+
+- 验证：`pnpm typecheck` 通过。仅前端展示层改动，服务端与技能正文未动。
+
 ### 2026-11-22 · 技能：安装同花顺 `hithink-finance` 技能并在「能力与市场 · 技能」上架卡片
 
 **背景**

@@ -26,6 +26,13 @@ export type SkillCatalogEntry = {
   descriptionEn: string;
   categories: readonly SkillCategory[];
   sourceFolder: string;
+  /** 第三方技能的作者展示名（如「@同花顺」）；缺省时卡片与详情回退显示官方灵悟。 */
+  authorZh?: string;
+  authorEn?: string;
+  /** 第三方技能的官方页面链接；存在时技能详情页展示可点击入口。 */
+  homepage?: string;
+  /** 第三方官方技能（如同花顺）：作者名前打绿色认证标，等同官方灵悟的外观。 */
+  official?: boolean;
 };
 
 export const skillCatalog: readonly SkillCatalogEntry[] = [
@@ -1148,6 +1155,10 @@ export const skillCatalog: readonly SkillCatalogEntry[] = [
       "API wiki and router for the official Hithink (同花顺) financial data service. Use when a task needs to study a stock's trend, analyse filings and revenue/profit, compare valuations, research an industry, theme or index constituents, analyse fund NAV and holdings, query futures and options quotes, track new listings and financial news, or prepare historical data for backtesting — even if the user never mentions Hithink. Locates the right REST endpoint, checks parameters and response fields, handles error codes, and guides bulk downloads and exports.",
     categories: ["research-tools"],
     sourceFolder: "skills/hithink-finance",
+    authorZh: "@同花顺",
+    authorEn: "@Hithink",
+    homepage: "https://fuyao.aicubes.cn/",
+    official: true,
   },
   {
     id: "ib-check-deck",
