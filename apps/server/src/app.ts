@@ -271,7 +271,14 @@ export async function createApp(
   if (savedModel?.model && isOfferedModel(config, savedModel.model))
     applyModel(config, savedModel.model);
   const app = new Hono<{ Variables: { owner: string } }>();
-  const origins = new Set([...config.allowedOrigins, new URL(config.publicUrl).origin]);
+  // 除显式白名单外，正式前端域名（PUBLIC_WEB_URL）与 API 域名也始终允许跨域。
+  // 这样 Render 绑定自定义前端域名后，只要 PUBLIC_WEB_URL 已同步到该域名，
+  // 登录等浏览器请求就不会因为漏配 ALLOWED_ORIGINS 而被拦成 “Failed to fetch”。
+  const origins = new Set([
+    ...config.allowedOrigins,
+    new URL(config.publicUrl).origin,
+    new URL(config.webUrl ?? config.publicUrl).origin,
+  ]);
   app.use("*", async (c, next) => {
     const origin = c.req.header("origin");
     if (origin && !origins.has(origin)) return c.json({ error: "Origin is not allowed" }, 403);

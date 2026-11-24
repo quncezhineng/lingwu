@@ -5,6 +5,24 @@
 
 ## 变更记录
 
+### 2026-11-24 · 修复：Render 自定义前端域名登录时报 `Failed to fetch`
+
+**背景**
+
+- 用户反馈：代码更新后部署到 Render，打开网页无法登录，登录卡片直接报 `Failed to fetch`。
+- 线上排查确认 API 本身可用：`https://lingwu-api.onrender.com/api/health` 与 `/api/auth/config` 都能正常返回，问题不在服务是否启动，而在浏览器请求被拦。
+- 根因是 API 的跨域白名单只信任 `ALLOWED_ORIGINS` 与 API 自己的域名；当 Web 端使用自定义正式域名时，即使 `PUBLIC_WEB_URL` 已指向该域名，浏览器登录请求仍会被判为 “Origin is not allowed”，前端侧表现成通用错误 `Failed to fetch`。
+
+**处理**
+
+- [app.ts](../apps/server/src/app.ts)：CORS 允许源从“`ALLOWED_ORIGINS + API 域名`”扩展为“`ALLOWED_ORIGINS + API 域名 + PUBLIC_WEB_URL 域名`”。
+- [api.test.ts](../tests/api.test.ts)：新增回归断言，验证 `PUBLIC_WEB_URL=https://app.example.com` 时，该前端域名可以正常访问 `/api/auth/config`，而无关域名仍返回 403。
+
+**说明**
+
+- 效果：Render 绑定自定义前端域名后，只要 `PUBLIC_WEB_URL` 已配置成该正式域名，登录/验证码请求就不会再因为漏配 `ALLOWED_ORIGINS` 而在浏览器里报 `Failed to fetch`。
+- 验证：`pnpm exec tsx --import ./tests/setup.ts --test tests/api.test.ts` 通过（15/15）；`pnpm exec tsc --noEmit` 通过。
+
 ### 2026-11-23 · 判级换轻量模型 + R1 秒回回执 + R6 动作审计
 
 **背景**

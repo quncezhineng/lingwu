@@ -30,6 +30,7 @@ before(async () => {
     port: 8787,
     host: "127.0.0.1",
     publicUrl: "http://localhost:8787",
+    webUrl: "https://app.example.com",
     dataDir: directory,
     agentBackend: "sample",
     intelligenceApiKey: "test-project-key-never-sent",
@@ -52,6 +53,15 @@ after(async () => {
 
 test("API protects private data and rejects unrelated web origins", async () => {
   assert.equal((await app.request("/api/workspace")).status, 401);
+  assert.equal(
+    (
+      await app.request("/api/auth/config", {
+        headers: { Origin: "https://app.example.com" },
+      })
+    ).status,
+    200,
+    "PUBLIC_WEB_URL should be allowed for browser logins on a custom frontend domain",
+  );
   assert.equal(
     (
       await app.request("/api/workspace", {
