@@ -32,6 +32,7 @@ import type { ResolvedModel } from "../model-settings.ts";
 import { searchDescription, searchInputSchema, searchInstructions } from "../search.ts";
 import { agentIdentityGuidance } from "./agent-persona.ts";
 import { readInstalledSkill, skillGuidanceForThread } from "./bot-skills.ts";
+import { readArtifact, readArtifactDescription, threadLongformContext } from "./longform.ts";
 import { filterMemoriesForScope, memoryAgentKey, memoryScopeKeys } from "./memory-scope.ts";
 import {
   MEMORY_SETTLE_LIMIT,
@@ -60,6 +61,23 @@ export function formatQuoteToolResult(quotes: BatchQuoteItem[]): {
 function clipCalendarText(text: string, limit: number) {
   const clipped = text.slice(0, limit);
   return text.length > limit && /[\uD800-\uDBFF]$/.test(clipped) ? clipped.slice(0, -1) : clipped;
+}
+
+/**
+ * 把续写（resume）run 的事件消息 id 统一重写为半截消息的 id。
+ * TanStack 单次 run 会随机生成新的 messageId，若不重写，客户端会把
+ * 复盘后新增的文本当成另一条助手消息，气泡断成两条。
+ */
+function rewriteContinuedMessageId(event: BaseEvent, id: string): BaseEvent {
+  const candidate = event as { messageId?: unknown; parentMessageId?: unknown };
+  if (typeof candidate.messageId === "string")
+    return {
+      ...event,
+      messageId: id,
+      ...(typeof candidate.parentMessageId === "string" ? { parentMessageId: id } : {}),
+    };
+  if (typeof candidate.parentMessageId === "string") return { ...event, parentMessageId: id };
+  return event;
 }
 
 export class ConversationAgent extends AbstractAgent {
@@ -138,19 +156,37 @@ export class ConversationAgent extends AbstractAgent {
         agentModelForThread(this.service.db, this.owner, input.threadId),
         skillGuidanceForThread(this.service.db, this.owner, input.threadId),
         connectionGuidance(this.service.db, this.owner),
+        // 本线程长文卡片的清单：摘要常驻，全文按需 read_artifact 回读。
+        threadLongformContext(this.service.db, this.owner, input.threadId),
       ]),
     ).pipe(
-      mergeMap(([identity, agentModel, skillGuide, connectionGuide]) => {
+      mergeMap(([identity, agentModel, skillGuide, connectionGuide, longformGuide]) => {
         if (this.stopped) return this.stoppedRun(input);
         return this.config.agentBackend === "model"
           ? from(this.service.workspace.models.resolve(this.owner, agentModel)).pipe(
               mergeMap((model) =>
                 this.stopped
                   ? this.stoppedRun(input)
-                  : this.runInternal(input, false, model, identity, skillGuide, connectionGuide),
+                  : this.runInternal(
+                      input,
+                      false,
+                      model,
+                      identity,
+                      skillGuide,
+                      connectionGuide,
+                      longformGuide,
+                    ),
               ),
             )
-          : this.runInternal(input, false, undefined, identity, skillGuide, connectionGuide);
+          : this.runInternal(
+              input,
+              false,
+              undefined,
+              identity,
+              skillGuide,
+              connectionGuide,
+              longformGuide,
+            );
       }),
     );
   }
@@ -161,6 +197,8 @@ export class ConversationAgent extends AbstractAgent {
     identity?: AgentIdentity | null,
     skillGuide = "",
     connectionGuide = "",
+    /** 本线程长文卡片清单（摘要 + id + 章节），已经在 `run()` 里查好。 */
+    longformGuide = "",
   ): Observable<BaseEvent> {
     const latest = input.messages.filter((m) => m.role === "user").at(-1);
     const requestKey = `${input.threadId}:${latest?.id ?? input.runId}`;
@@ -191,6 +229,7 @@ export class ConversationAgent extends AbstractAgent {
               identity,
               skillGuide,
               connectionGuide,
+              longformGuide,
             ).subscribe(subscriber);
           } catch (error) {
             if (cancelled) return;
@@ -719,6 +758,17 @@ export class ConversationAgent extends AbstractAgent {
             toolArgs ?? {},
           ),
       }),
+      defineTool({
+        name: "read_artifact",
+        description: readArtifactDescription,
+        parameters: z.object({
+          artifactId: z.string().trim().min(1).max(128),
+          query: z.string().trim().min(1).max(200).optional(),
+          offset: z.number().int().min(0).max(200_000).optional(),
+        }),
+        execute: async ({ artifactId, query, offset }) =>
+          readArtifact({ db: this.service.db, owner: this.owner, id: artifactId, query, offset }),
+      }),
     ];
     const agent = tanstackAgent({
       model: model?.model ?? this.config.model ?? "openai/unconfigured",
@@ -750,6 +800,10 @@ export class ConversationAgent extends AbstractAgent {
           : " Full-page browsing is not configured. Do not claim to have opened pages; distinguish search excerpts from full-page content.") +
         computerInstructions(this.config.computerProvider) +
         (this.config.webSearchEnabled ? searchInstructions : "") +
+        // 长文约定先说清楚：超阈值自动收成卡片，流里只留摘要；细节一律走 read_artifact，
+        // 不猜、不要求用户重发，也不要因为只看到摘要就说「内容被截断了」。
+        " Long-form rule: a reply longer than about 2000 characters is saved as a card and only its summary stays in the conversation. The transcript keeps summaries, so when a question needs exact figures, wording or sections from an earlier long reply, call read_artifact with that artifact ID before answering. Never claim a document was truncated or ask the person to paste it again while its card is listed above. " +
+        longformGuide +
         skillGuide +
         connectionGuide,
     });
@@ -761,10 +815,24 @@ export class ConversationAgent extends AbstractAgent {
         }
         let stopped = false;
         const replyChunks: string[] = [];
+        /** 本轮助手消息 id：长文折叠时要靠它把卡片挂回这条消息。 */
+        let replyMessageId = "";
+        // 续写（resume）：输入的最后一条是中断时留下的半截 assistant 消息。
+        // 把本轮续写产出的所有消息 id 重写为它的 id，客户端才会把新增量
+        // 追加进同一条气泡，而不是另起一条；折叠时卡片也挂回原半截。
+        const continuedId =
+          input.messages.at(-1)?.role === "assistant" && input.messages.at(-1)?.id
+            ? input.messages.at(-1)?.id
+            : undefined;
         const subscription = agent
           .run({ ...input, tools: input.tools.filter((t) => t.name === "open_workspace") })
           .subscribe({
             next: (event) => {
+              const forwarded = continuedId ? rewriteContinuedMessageId(event, continuedId) : event;
+              if (!replyMessageId) {
+                const messageId = (forwarded as { messageId?: unknown }).messageId;
+                if (typeof messageId === "string" && messageId) replyMessageId = messageId;
+              }
               // 累积本轮助手回复的文本增量，供对话正常结束后的记忆自动沉淀使用。
               if (
                 event.type === EventType.TEXT_MESSAGE_CHUNK ||
@@ -773,7 +841,9 @@ export class ConversationAgent extends AbstractAgent {
                 const delta = (event as { delta?: unknown }).delta;
                 if (typeof delta === "string") replyChunks.push(delta);
               }
-              if (!stopped) subscriber.next(event);
+              // 必须转发重写 id 后的事件：客户端靠 messageId 把新增量
+              // 追加进同一条气泡，继续用原 event 会另起一条回复。
+              if (!stopped) subscriber.next(forwarded);
             },
             error: (error) => {
               if (!stopped) subscriber.error(error);
@@ -781,15 +851,18 @@ export class ConversationAgent extends AbstractAgent {
             complete: () => {
               if (!stopped) {
                 subscriber.complete();
+                const reply = replyChunks.join("");
+                // 长回复落成卡片：下一轮上下文能引用摘要 + 按需回读全文，
+                // 这一轮的消息本体不动，历史里不会出现第二次全文。
+                if (reply.trim()) {
+                  void this.service
+                    .foldThreadLongform(this.owner, input.threadId, replyMessageId, reply)
+                    .catch((error) => backgroundFailure("conversation.longform", error));
+                }
                 // 对话正常结束：把这一轮值得长期复用的内容自动沉淀进记忆（尽力而为，
                 // 失败只丢本轮沉淀，不打断这一轮对话；示例后端 model 未解析，跳过）。
                 if (model) {
-                  void this.settleConversationMemories(
-                    model,
-                    input.threadId,
-                    latestText,
-                    replyChunks.join(""),
-                  );
+                  void this.settleConversationMemories(model, input.threadId, latestText, reply);
                 }
               }
             },

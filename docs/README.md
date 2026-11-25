@@ -63,6 +63,7 @@ LingWu（灵悟）是面向个人投资者的 AI 投研智能体。它把行情�
 | [任务、目标与提醒](PRD-任务目标提醒.md) | 目标轨道、接下来、提醒关联 |
 | [多 Agent 记忆系统](PRD-多Agent记忆系统.md) | 投研术语化记忆与多 Agent 隔离 |
 | [OpenBot 对标](PRD-LingWu-openbot对标借鉴.md) | 外部架构参考与取舍 |
+| [OpenDots 对比分析](OpenDots-对比分析与借鉴建议.md) | 通用 AI 工作台对比、借鉴点与不建议照搬项 |
 | [功能清单](FEATURES.md) | 通用 Agent 能力与剩余扩展 |
 | [UI 规格](UI-SPEC-D1-D2-观察列表与市场简报.md) | 观察列表与市场简报界面 |
 

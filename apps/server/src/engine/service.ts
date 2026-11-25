@@ -32,6 +32,7 @@ import type {
   ProposalInput,
 } from "../../../../packages/domain/src/index.ts";
 import type { EventCandidateInput } from "../../../../packages/domain/src/investor.ts";
+import { isLongformReply } from "../../../../packages/domain/src/longform.ts";
 import { resolveMonitorCurrency } from "../../../../packages/domain/src/monitor-currency.ts";
 import type { OrchestrationPlan } from "../../../../packages/domain/src/orchestration.ts";
 import { MarketDataService } from "../../../../packages/integrations/src/market-data.ts";
@@ -66,6 +67,7 @@ import {
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
 import { HindsightClient, type RecallMemory } from "./hindsight.ts";
+import { saveLongformArtifact } from "./longform.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { recallMemories } from "./memory-recall.ts";
 import { SHARED_MEMORY_KEY } from "./memory-scope.ts";
@@ -1601,6 +1603,33 @@ export class AgentService {
     await this.db.put(owner, "agent-artifacts", value);
     return value;
   }
+  /**
+   * 单聊里的长回复：落成卡片，供后续对话引用与按需回读。
+   *
+   * 正文已经流式发出去了，服务端不回改历史消息，所以这里只保证「全文有据可查」：
+   * 下一轮把卡片摘要与 id 拼进上下文，模型需要细节时用 read_artifact 读原文。
+   * 摘要异步补（`ensureChatBrief`），不拖慢这一轮回复的收尾。
+   */
+  async foldThreadLongform(
+    owner: string,
+    threadId: string,
+    messageId: string,
+    text: string,
+  ): Promise<AgentArtifact | null> {
+    if (!threadId || !isLongformReply(text)) return null;
+    const artifact = await saveLongformArtifact({
+      db: this.db,
+      owner,
+      text,
+      scope: { threadId, messageId: messageId || undefined },
+      fallbackTitle: "长文",
+    });
+    if (!artifact) return null;
+    void this.ensureChatBrief(owner, artifact.id).catch((error) => {
+      backgroundFailure("longform.brief", error);
+    });
+    return artifact;
+  }
   /** 用当前模型为报告写一段对话摘要，并写回产物。已有摘要时直接返回。 */
   async ensureChatBrief(owner: string, artifactId: string): Promise<AgentArtifact> {
     const key = `${owner}:${artifactId}`;
@@ -1621,9 +1650,11 @@ export class AgentService {
       throw new AppError("Only a finished report can be summarized", 422);
     if (artifactChatBrief(current.data)) return current;
     const task = await this.db.get<AgentTask>(owner, "tasks", current.taskId);
+    // 折叠出来的长文卡片没有托管任务，模型要按产物所属线程解析。
+    const threadId = task?.threadId ?? current.threadId;
     const model = await this.workspace.models.resolve(
       owner,
-      await agentModelForThread(this.db, owner, task?.threadId),
+      await agentModelForThread(this.db, owner, threadId ?? ""),
     );
     if (!model.configured || !model.model)
       throw new AppError("Configure a model before summarizing a report", 503);

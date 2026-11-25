@@ -129,6 +129,13 @@ export interface ChannelMessage {
   skillIds?: string[];
   /** member 消息：这一轮实际调用过的工具，刷新后仍能看到。 */
   tools?: ChannelToolTrace[];
+  /**
+   * member 消息：长文折叠后指向的产物卡片 id。
+   *
+   * 正文超过阈值时，`text` 只保留摘要，全文落进产物的 `summary`；点卡片进独立
+   * 页面读全文，成员后续追问时用 `read_artifact` 按需回读。
+   */
+  artifactIds?: string[];
 }
 
 /** 群聊打开时先看最新这一页，再往上按页取更早的消息。 */
@@ -204,5 +211,7 @@ export const channelMessageInputSchema = z.object({
   attachmentIds: z.array(z.string().min(1)).max(30).optional(),
   connectorSlugs: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   skillIds: z.array(z.string().trim().min(1).max(128)).max(60).optional(),
+  /** 继续上一轮被暂停的分析：不重复落库提问，保留已说出的半截回复并从断点续写。 */
+  resume: z.boolean().optional(),
 });
 export type ChannelMessageInput = z.infer<typeof channelMessageInputSchema>;

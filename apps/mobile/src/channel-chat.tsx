@@ -8,6 +8,7 @@ import {
   ScrollView,
   View,
 } from "react-native";
+import type { AgentArtifact } from "../../../packages/domain/src/agent";
 import {
   type Channel,
   type ChannelHistoryPage,
@@ -20,6 +21,7 @@ import { conversationColumnStyle } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
 import type { AgentDefinition } from "./agent-space-model";
+import { ArtifactCard } from "./agent-ui";
 import { useAgentWorkspace } from "./agent-workspace";
 import { AppConnectorSheet, type AppConnectorView, useAppConnectors } from "./app-connectors";
 import { Text } from "./app-text";
@@ -34,9 +36,15 @@ import {
   connectorOptions,
   SkillPickerSheet,
   skillDisplayName,
+  type UsedCapability,
+  UsedCapabilityChips,
   visibleConnectorOptions,
 } from "./capability-picker";
-import { type ChannelChatStream, streamChannelChat } from "./channel-chat-stream";
+import {
+  type ChannelChatRequest,
+  type ChannelChatStream,
+  streamChannelChat,
+} from "./channel-chat-stream";
 import { appendMemberDelta } from "./channel-live-text";
 import { useChannels } from "./channels";
 import { promptWithAttachments } from "./chat-content";
@@ -130,6 +138,10 @@ export function ChannelChatScreen({
   const analysisTask = channelTasks.find((task) => TASK_ANALYSIS_ACTIVE.has(task.status));
   const analysisInProgress = analysisTask !== undefined;
   const analysisStepProgress = analysisTask ? taskStepCount(analysisTask) : null;
+  // 长文折叠后的卡片：消息里只带 id，正文仍存产物（独立页读全文）。
+  const artifactById = new Map(
+    (agentWorkspace?.artifacts ?? []).map((artifact) => [artifact.id, artifact]),
+  );
   const { notify, api, refresh, workspace, navigate, open } = useWorkspace();
   const { noteLeader } = useChannels();
   const [draft, setDraft] = useState("");
@@ -140,6 +152,8 @@ export function ChannelChatScreen({
   const [olderError, setOlderError] = useState(false);
   const [positioned, setPositioned] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 暂停态：断流后 busy 会变假，用独立状态记住「这一轮还可以继续」。
+  const [paused, setPaused] = useState(false);
   const [streamingIds, setStreamingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [awayFromLatest, setAwayFromLatest] = useState(false);
   const listRef = useRef<ScrollView>(null);
@@ -154,6 +168,11 @@ export function ChannelChatScreen({
   const scrollViewport = useRef(0);
   const ownScroll = useRef(false);
   const streamRef = useRef<ChannelChatStream | null>(null);
+  // 本轮请求体：暂停后「继续分析」用同一份请求重开流，并带上 resume 让服务端不重复落库。
+  const pendingTurn = useRef<ChannelChatRequest | null>(null);
+  // 暂停那一刻还在直播的成员：继续分析时只把这些半截气泡转回 live 占位、接着追加 delta，
+  // 已经说完的完整回复不参与续写。
+  const pausedLiveAgents = useRef<Set<string>>(new Set());
   // 悬浮输入框：输入框绝对定位悬浮在页面底部，不占用文档流；消息列表用它实时测量出的
   // 高度做底部内距（contentBottomInset）预留滚动站位，滚动时不会被输入框遮挡。
   // 刻意不做大面积灰色垫层：输入框白色圆角卡片自带不透明背景，悬浮时即可盖住滚到最下面的内容。
@@ -273,6 +292,27 @@ export function ChannelChatScreen({
     id,
     name: skillDisplayName(id, channelCustomSkills),
   }));
+
+  /**
+   * 用户提问气泡顶部回看本轮用到的能力：技能 → 文件 → 连接器。
+   * 消息里只存 id / slug，这里按当前目录还原成可读名称；找不到时回退原始 id。
+   */
+  function userCapabilities(message: ChannelMessage): UsedCapability[] {
+    const items: UsedCapability[] = [];
+    for (const id of message.skillIds ?? []) {
+      items.push({ kind: "skill", id, name: skillDisplayName(id, channelCustomSkills) });
+    }
+    for (const id of message.attachmentIds ?? []) {
+      const file = workspace.files.find((candidate) => candidate.id === id);
+      const artifact = artifactById.get(id);
+      items.push({ kind: "file", id, name: file?.name ?? artifact?.title ?? id });
+    }
+    for (const slug of message.connectorSlugs ?? []) {
+      const option = connectorChoices.find((candidate) => candidate.id === slug);
+      items.push({ kind: "connector", id: slug, name: option?.name ?? slug });
+    }
+    return items;
+  }
 
   const members = useMemo(
     () =>
@@ -464,38 +504,11 @@ export function ChannelChatScreen({
     setPicking(true);
   }
 
-  const send = useCallback(() => {
-    const text = draft.trim();
-    if (!text || busy || !loaded || members.length === 0) return;
-    setDraft("");
-    setBusy(true);
-    setMessages((current) => [
-      ...current,
-      {
-        id: `live:user:${Date.now()}`,
-        channelId: channel.id,
-        role: "user",
-        text,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
-    const files = workspace.files.filter((f) => attachments.includes(f.id));
-    const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
-      attachments.includes(artifact.id),
-    );
-    // 附件正文与选定连接器一并写进请求：附件进本轮文本上下文，连接器 slug 由后端注入成员工具引导。
-    const withAttachments = promptWithAttachments(text, files, analysis);
-    try {
-      streamRef.current = streamChannelChat(
-        api,
-        channel.id,
-        {
-          text: withAttachments,
-          attachmentIds: attachments.length ? attachments : undefined,
-          connectorSlugs: selectedConnectorIds.length ? selectedConnectorIds : undefined,
-          skillIds: selectedSkillIds.length ? selectedSkillIds : undefined,
-        },
-        {
+  /** 打开一轮频道 SSE；发送与「继续分析」共用，只换流不重复插入用户气泡。 */
+  const openStream = useCallback(
+    (body: ChannelChatRequest) => {
+      try {
+        streamRef.current = streamChannelChat(api, channel.id, body, {
           onEvent: (event, data) => {
             if (event === "leader") {
               const leaderId = String(data.leaderId ?? "");
@@ -560,10 +573,17 @@ export function ChannelChatScreen({
             } else if (event === "done") {
               setStreamingIds(new Set());
               setBusy(false);
+              setPaused(false);
+              pendingTurn.current = null;
               void loadHistory();
             } else if (event === "member_done") {
               const agentId = String(data.agentId ?? "");
               const finalText = typeof data.text === "string" ? data.text : "";
+              // 服务端折叠了长文：正文只给摘要，卡片 id 挂回这条消息。
+              const artifactIds = Array.isArray(data.artifactIds)
+                ? data.artifactIds.filter((id): id is string => typeof id === "string")
+                : [];
+              if (artifactIds.length) void refresh();
               setStreamingIds((current) => {
                 if (!current.has(agentId)) return current;
                 const next = new Set(current);
@@ -583,6 +603,7 @@ export function ChannelChatScreen({
                     ...message,
                     id: message.id.replace("live:", "said:"),
                     text: finalText || message.text,
+                    ...(artifactIds.length ? { artifactIds } : {}),
                   };
                 }),
               );
@@ -593,6 +614,8 @@ export function ChannelChatScreen({
           onError: (message) => {
             notify(message);
             setBusy(false);
+            setPaused(false);
+            pendingTurn.current = null;
             setStreamingIds(new Set());
           },
           // 断开时服务端会留下已经说出的内容，这里重新读一次历史。
@@ -601,43 +624,123 @@ export function ChannelChatScreen({
             setStreamingIds(new Set());
             void loadHistory();
           },
-        },
-      );
-      // 发送后清空附件与选择连接器，避免带到下一轮。
-      setAttachments([]);
-      setSelectedConnectorIds([]);
-      setSelectedSkillIds([]);
-      setPicking(false);
-    } catch (e) {
-      setBusy(false);
-      setStreamingIds(new Set());
-      notify(e instanceof Error ? e.message : String(e));
-    }
+        });
+      } catch (e) {
+        setBusy(false);
+        setPaused(false);
+        setStreamingIds(new Set());
+        notify(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [api, channel.id, loadHistory, noteLeader, notify, refresh, t],
+  );
+
+  const send = useCallback(() => {
+    const text = draft.trim();
+    if (!text || busy || !loaded || members.length === 0) return;
+    setDraft("");
+    setBusy(true);
+    setPaused(false);
+    setMessages((current) => [
+      ...current,
+      {
+        id: `live:user:${Date.now()}`,
+        channelId: channel.id,
+        role: "user",
+        text,
+        createdAt: new Date().toISOString(),
+        // 先把本轮选择挂到临时气泡上，和后端落库后的历史消息保持一致，
+        // 发出去立刻就能在提问上方看到用过的技能 / 文件 / 连接器。
+        ...(attachments.length ? { attachmentIds: attachments } : {}),
+        ...(selectedConnectorIds.length ? { connectorSlugs: selectedConnectorIds } : {}),
+        ...(selectedSkillIds.length ? { skillIds: selectedSkillIds } : {}),
+      },
+    ]);
+    const files = workspace.files.filter((f) => attachments.includes(f.id));
+    const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
+      attachments.includes(artifact.id),
+    );
+    // 附件正文与选定连接器一并写进请求：附件进本轮文本上下文，连接器 slug 由后端注入成员工具引导。
+    const withAttachments = promptWithAttachments(text, files, analysis);
+    const body: ChannelChatRequest = {
+      text: withAttachments,
+      attachmentIds: attachments.length ? attachments : undefined,
+      connectorSlugs: selectedConnectorIds.length ? selectedConnectorIds : undefined,
+      skillIds: selectedSkillIds.length ? selectedSkillIds : undefined,
+    };
+    // 记住本轮请求体：暂停后「继续分析」用同一份请求重开流。
+    pendingTurn.current = body;
+    openStream(body);
+    // 发送后清空附件与选择连接器，避免带到下一轮。
+    setAttachments([]);
+    setSelectedConnectorIds([]);
+    setSelectedSkillIds([]);
+    setPicking(false);
   }, [
-    api,
     agentWorkspace?.artifacts,
     attachments,
     busy,
     channel.id,
     draft,
-    loadHistory,
     loaded,
     members,
-    noteLeader,
-    notify,
+    openStream,
     selectedConnectorIds,
     selectedSkillIds,
-    t,
     workspace.files,
   ]);
 
+  /** 暂停分析：断开 SSE 让服务端停下，本轮请求体留着供「继续分析」复用。 */
   function stop() {
     streamRef.current?.close();
     streamRef.current = null;
     setBusy(false);
+    setPaused(true);
     setStreamingIds(new Set());
+    // 记住中断时还在说的成员；「继续分析」只把这几位半截气泡转回 live 占位并接着追加。
+    pausedLiveAgents.current = new Set(
+      messagesRef.current
+        .filter((message) => message.role === "member" && message.id.startsWith("live:"))
+        .map((message) => message.agentId)
+        .filter((agentId): agentId is string => Boolean(agentId)),
+    );
     // 服务端在断开时先落库，稍后再读，刷新前也能看到已经说出的内容。
     setTimeout(() => void loadHistory(), 400);
+  }
+
+  /**
+   * 继续分析：用暂停时缓存的请求体重开流，服务端接着上次写的位置继续生成。
+   * 落库的半截不再删掉，而是转回 live 占位（保留已说出的文本）；新 delta 追加
+   * 在同一条气泡上，member_done 时再定稿，与正常一轮的结束方式一致。
+   */
+  function resume() {
+    const body = pendingTurn.current;
+    if (!body || !loaded || members.length === 0) return;
+    setBusy(true);
+    setPaused(false);
+    setStreamingIds(new Set());
+    setMessages((current) => {
+      // 暂停后立刻点继续：live 气泡还没被 loadHistory 合并，直接沿用。
+      if (current.some((message) => message.role === "member" && message.id.startsWith("live:")))
+        return current;
+      const latestUser = [...current].reverse().find((message) => message.role === "user");
+      const floor = latestUser?.createdAt ?? "";
+      return current.map((message) => {
+        // 只把暂停时还在说、且已落库成普通消息（uuid id）的半截转回 live 占位；
+        // 已说完的完整回复、更早的历史消息都不动。
+        if (
+          message.role !== "member" ||
+          message.id.startsWith("live:") ||
+          message.id.startsWith("said:") ||
+          !message.agentId ||
+          !pausedLiveAgents.current.has(message.agentId) ||
+          (floor && message.createdAt < floor)
+        )
+          return message;
+        return { ...message, id: `live:${message.agentId}:${Date.now()}` };
+      });
+    });
+    openStream({ ...body, resume: true });
   }
 
   return (
@@ -797,6 +900,7 @@ export function ChannelChatScreen({
               <UserBubble
                 key={msg.id}
                 text={msg.text}
+                capabilities={userCapabilities(msg)}
                 at={Date.parse(msg.createdAt)}
                 onNotify={notify}
               />
@@ -807,6 +911,11 @@ export function ChannelChatScreen({
                 title={msg.title ?? ""}
                 text={msg.text}
                 tools={msg.tools}
+                artifacts={(msg.artifactIds ?? [])
+                  .map((id) => artifactById.get(id))
+                  .filter((artifact): artifact is NonNullable<typeof artifact> =>
+                    Boolean(artifact),
+                  )}
                 streaming={streamingIds.has(msg.agentId ?? "") && msg.id.startsWith("live:")}
                 member={memberById.get(msg.agentId ?? "")}
                 prompt={promptByMessageId.get(msg.id) ?? ""}
@@ -916,12 +1025,14 @@ export function ChannelChatScreen({
           style={[conversationColumnStyle, { marginBottom: 12 }]}
           value={draft}
           onChangeText={setDraft}
-          onSubmit={busy ? stop : send}
+          onSubmit={busy ? stop : paused && !draft.trim() ? resume : send}
           placeholder={t("channels.composerPlaceholder")}
           accessibilityLabel={t("channels.composerPlaceholder")}
           sendLabel={t("chat.sendMessage")}
-          stopLabel={t("chat.stopReply")}
+          pauseLabel={t("chat.pauseAnalysis")}
+          resumeLabel={t("chat.resumeAnalysis")}
           busy={busy}
+          paused={paused}
           inputMinHeight={38}
           inputMaxHeight={104}
           dense
@@ -1121,16 +1232,20 @@ function ChannelSkillInspectSheet({ skillId, onClose }: { skillId: string; onClo
 
 function UserBubble({
   text,
+  capabilities,
   at,
   onNotify,
 }: {
   text: string;
+  /** 本轮提问用到的技能 / 文件 / 连接器：显示在气泡上方，只读回看。 */
+  capabilities: readonly UsedCapability[];
   /** 发送时间（毫秒）。拿不到时间时这一行只留复制按钮。 */
   at: number;
   onNotify: (message: string) => void;
 }) {
   return (
-    <View style={{ alignSelf: "flex-end", maxWidth: 560 }}>
+    <View style={{ alignSelf: "flex-end", maxWidth: 560, gap: 6 }}>
+      {capabilities.length > 0 && <UsedCapabilityChips items={capabilities} />}
       <View
         style={{
           paddingHorizontal: 14,
@@ -1231,6 +1346,7 @@ function MemberBubble({
   title,
   text,
   tools,
+  artifacts,
   streaming,
   member,
   prompt,
@@ -1243,6 +1359,8 @@ function MemberBubble({
   title: string;
   text: string;
   tools?: ChannelToolTrace[];
+  /** 长文折叠后的卡片：正文只留摘要，全文在卡片里。 */
+  artifacts?: AgentArtifact[];
   streaming: boolean;
   member?: AgentDefinition;
   /** 该条回复对应的用户提问；有值时一并出现在分享的图片与网页里。 */
@@ -1301,6 +1419,14 @@ function MemberBubble({
             }}
           >
             <AssistantResponse content={text} streaming={streaming} />
+          </View>
+        )}
+        {/* 长文卡片跟在摘要下面：流里读到的是结论，点开才是全文（独立页面）。 */}
+        {!!artifacts?.length && (
+          <View style={{ paddingLeft: 35, paddingRight: 35, paddingTop: 8, gap: 8 }}>
+            {artifacts.map((artifact) => (
+              <ArtifactCard key={artifact.id} artifact={artifact} />
+            ))}
           </View>
         )}
         {/* 回复底部功能栏：喜欢/不喜欢、复制与导出 Markdown、分享为图片/链接、时间显示，

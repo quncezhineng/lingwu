@@ -5,6 +5,7 @@ import {
   findReferencedFile,
   markFileMentions,
   promptWithAttachments,
+  promptWithConnectors,
   promptWithSkills,
 } from "../src/chat-content.ts";
 
@@ -17,6 +18,8 @@ test("attachment metadata is hidden from the user bubble and returned as chips",
       { name: "Alpha, Inc. report.pdf", id: "file-1" },
       { name: "data.csv", id: "file-2" },
     ],
+    skills: [],
+    connectors: [],
   });
 });
 
@@ -29,14 +32,42 @@ test("a selected skill line stays out of the bubble and survives beside attachme
   assert.deepEqual(displayUserMessage(content), {
     text: "Compare these filings",
     attachments: [{ name: "data.csv", id: "file-2" }],
+    skills: [{ name: "财报分析", id: "earnings-analysis" }],
+    connectors: [],
   });
   assert.equal(promptWithSkills("Question", []), "Question");
+});
+
+test("a selected connector line is returned as chips instead of leaking into the bubble", () => {
+  const content = promptWithSkills(
+    promptWithConnectors("看看今天的行情", [
+      { id: "hithink", name: "同花顺" },
+      { id: "tavily", name: "Tavily" },
+    ]),
+    [{ id: "earnings-analysis", name: "财报分析" }],
+  );
+  assert.match(
+    content,
+    /Selected connectors: 同花顺 \(connector ID: hithink\), Tavily \(connector ID: tavily\)/,
+  );
+  assert.deepEqual(displayUserMessage(content), {
+    text: "看看今天的行情",
+    attachments: [],
+    skills: [{ name: "财报分析", id: "earnings-analysis" }],
+    connectors: [
+      { name: "同花顺", id: "hithink" },
+      { name: "Tavily", id: "tavily" },
+    ],
+  });
+  assert.equal(promptWithConnectors("Question", []), "Question");
 });
 
 test("ordinary user text is returned unchanged", () => {
   assert.deepEqual(displayUserMessage("What changed this quarter?"), {
     text: "What changed this quarter?",
     attachments: [],
+    skills: [],
+    connectors: [],
   });
 });
 
@@ -44,6 +75,8 @@ test("a malformed attachment tail never leaks transport metadata into the bubble
   assert.deepEqual(displayUserMessage("Read this\n\nAttached documents: not-an-artifact"), {
     text: "Read this",
     attachments: [],
+    skills: [],
+    connectors: [],
   });
 });
 
@@ -83,6 +116,8 @@ test("analysis artifacts are appended with references plus a bounded summary exc
   assert.deepEqual(displayUserMessage(content), {
     text: "结合市场简报",
     attachments: [{ name: "今日市场简报", id: "artifact-1" }],
+    skills: [],
+    connectors: [],
   });
 });
 

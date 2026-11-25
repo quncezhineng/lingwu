@@ -69,6 +69,58 @@ export interface Artifact {
   parentId?: string;
   fields?: { name: string; value: string; type: "text" | "checkbox" | "unsupported" }[];
 }
+export type ResearchSpaceKind = "company" | "industry" | "portfolio" | "briefing" | "general";
+export type ResearchSpaceStatus = "active" | "archived";
+export interface ResearchSpace {
+  id: string;
+  title: string;
+  summary: string;
+  kind: ResearchSpaceKind;
+  status: ResearchSpaceStatus;
+  fileIds: string[];
+  artifactIds: string[];
+  deliverableIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+export type DeliverableKind = "report" | "briefing" | "memo" | "review";
+export type DeliverableStatus = "draft" | "approved" | "shareable" | "archived";
+export interface Deliverable {
+  id: string;
+  title: string;
+  summary: string;
+  body: string;
+  kind: DeliverableKind;
+  status: DeliverableStatus;
+  spaceId?: string;
+  threadId?: string;
+  fileIds: string[];
+  artifactIds: string[];
+  createdAt: string;
+  updatedAt: string;
+  approvedAt?: string;
+  shareUrl?: string;
+}
+export const researchSpaceSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  summary: z.string().trim().max(280).default(""),
+  kind: z.enum(["company", "industry", "portfolio", "briefing", "general"]).default("general"),
+  status: z.enum(["active", "archived"]).default("active"),
+  fileIds: z.array(z.string()).max(100).default([]),
+  artifactIds: z.array(z.string()).max(100).default([]),
+  deliverableIds: z.array(z.string()).max(100).default([]),
+});
+export const deliverableSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  summary: z.string().trim().max(280).default(""),
+  body: z.string().trim().min(1).max(60_000),
+  kind: z.enum(["report", "briefing", "memo", "review"]).default("report"),
+  status: z.enum(["draft", "approved", "shareable", "archived"]).default("draft"),
+  spaceId: z.string().uuid().optional(),
+  threadId: z.string().uuid().optional(),
+  fileIds: z.array(z.string()).max(100).default([]),
+  artifactIds: z.array(z.string()).max(100).default([]),
+});
 export interface BrowserSession {
   id: string;
   title: string;
@@ -201,6 +253,8 @@ export interface Workspace {
   mail: Mail[];
   events: CalendarEvent[];
   files: Artifact[];
+  researchSpaces: ResearchSpace[];
+  deliverables: Deliverable[];
   browsers: BrowserSession[];
   actions: ActionProposal[];
   activity: ActivityEntry[];

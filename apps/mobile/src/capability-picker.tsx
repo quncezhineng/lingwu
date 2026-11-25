@@ -275,6 +275,47 @@ export function ComposerSelectionChips({
   );
 }
 
+/** 提问气泡上方回看的能力标签：只读展示这一轮用过的技能 / 文件 / 连接器。 */
+export type UsedCapability = {
+  kind: "skill" | "file" | "connector";
+  id: string;
+  name: string;
+};
+
+export function UsedCapabilityChips({ items }: { items: readonly UsedCapability[] }) {
+  if (!items.length) return null;
+  return (
+    <View style={[s.row, { gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }]}>
+      {items.map((item) => {
+        const Icon = item.kind === "skill" ? Brain : item.kind === "connector" ? Link2 : FileText;
+        return (
+          <View
+            key={`${item.kind}:${item.id}`}
+            style={[
+              s.row,
+              {
+                gap: 7,
+                maxWidth: "100%",
+                backgroundColor: colors.paper,
+                borderWidth: 1,
+                borderColor: colors.line,
+                borderRadius: 10,
+                paddingHorizontal: 9,
+                paddingVertical: 6,
+              },
+            ]}
+          >
+            <Icon size={13} color={colors.primary} />
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 12, color: colors.text }}>
+              {item.name}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function SelectionBox({ checked }: { checked: boolean }) {
   return (
     <View

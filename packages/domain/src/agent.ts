@@ -196,6 +196,12 @@ export interface AgentArtifact {
   summary: string;
   data: Record<string, unknown>;
   createdAt: string;
+  /** 长文折叠产物：产生它的对话线程（单聊 threadId / 频道成员 threadId）。 */
+  threadId?: string;
+  /** 长文折叠产物：对应那条助手消息，前端据此把卡片挂回原消息下。 */
+  messageId?: string;
+  /** 长文折叠产物：产生它的频道 id（频道折叠时才有）。 */
+  channelId?: string;
 }
 
 /** 模型为对话写的短摘要。没有这份字段时，界面应去请求生成，而不是截取 summary。 */

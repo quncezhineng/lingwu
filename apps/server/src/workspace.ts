@@ -7,8 +7,10 @@ import type {
   BrowserSession,
   CalendarEvent,
   CapabilityInstall,
+  Deliverable,
   Mail,
   ProposalInput,
+  ResearchSpace,
   Workspace,
 } from "../../../packages/domain/src/index.ts";
 import { GoogleClient } from "../../../packages/integrations/src/google.ts";
@@ -365,6 +367,8 @@ export class WorkspaceService {
       mail: mail.sort((a, b) => b.date.localeCompare(a.date)),
       events: events.sort((a, b) => a.start.localeCompare(b.start)),
       files: await this.files.list(owner),
+      researchSpaces: await this.db.list<ResearchSpace>(owner, "research-spaces"),
+      deliverables: await this.db.list<Deliverable>(owner, "deliverables"),
       browsers: await this.db.list<BrowserSession>(owner, "browsers"),
       actions: await this.db.list<ActionProposal>(owner, "actions"),
       activity: await this.db.list<ActivityEntry>(owner, "activity"),

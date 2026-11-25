@@ -1,5 +1,5 @@
 import "./config.ts";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { type Message, MessageSchema } from "@ag-ui/core";
 import { CopilotKitIntelligence } from "@copilotkit/runtime/v2";
 import { Hono } from "hono";
@@ -14,9 +14,11 @@ import {
   channelMessageInputSchema,
   channelUpdateSchema,
   DEFAULT_CHANNEL_AVATAR,
+  deliverableSchema,
   emailDraftSchema,
   type OrchestrationPlan,
   proposalSchema,
+  researchSpaceSchema,
 } from "../../../packages/domain/src/index.ts";
 import type { MarketDataService } from "../../../packages/integrations/src/market-data.ts";
 import { ActionService } from "./actions.ts";

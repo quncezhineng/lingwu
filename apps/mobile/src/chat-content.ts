@@ -10,13 +10,32 @@ export interface UserAttachment {
 export interface DisplayUserMessage {
   text: string;
   attachments: UserAttachment[];
+  /** 本轮勾选的技能：气泡顶部回看时展示成 chip。 */
+  skills: UserAttachment[];
+  /** 本轮勾选的连接器：气泡顶部回看时展示成 chip。 */
+  connectors: UserAttachment[];
 }
 
 const ATTACHMENT_MARKER = /\n\nAttached documents:\s*/;
 
-/** Drop the composer skill line before the bubble or title is shown. */
+/** 选择项在请求文本里的隐藏标记行（技能 / 连接器），不进入用户可见正文。 */
+const SELECTION_LINE = /\n\nSelected (skills|connectors):\s*([^\n]*)/g;
+const SELECTION_ENTRY = /(.+?)\s+\((?:skill|connector) ID:\s*([^)]+)\)(?:\s*,\s*|$)/g;
+
+/** 从「名称 (skill ID: id), …」这类标记里还原出可展示的名称与 id。 */
+function selectionEntries(segment: string): UserAttachment[] {
+  const items: UserAttachment[] = [];
+  for (const match of segment.matchAll(SELECTION_ENTRY)) {
+    const name = match[1]?.trim();
+    const id = match[2]?.trim();
+    if (name && id) items.push({ name, id });
+  }
+  return items;
+}
+
+/** Drop the composer selection lines before the bubble or title is shown. */
 export function withoutSelectedSkills(content: string): string {
-  return content.replace(/\n\nSelected skills:\s*[^\n]*/g, "").trimEnd();
+  return content.replace(SELECTION_LINE, "").trimEnd();
 }
 
 /** Append the skill ids the server uses to load methods the person attached. */
@@ -31,6 +50,25 @@ export function promptWithSkills(
   const line = entries.map((skill) => `${skill.name} (skill ID: ${skill.id})`).join(", ");
   return `${text.replace(/\s+$/g, "")}\n\nSelected skills: ${line}`;
 }
+
+/** 连接器同样以隐藏标记行随这一轮提问落库，刷新后气泡顶部仍能回看用过哪些连接器。 */
+export function promptWithConnectors(
+  text: string,
+  connectors: readonly { id: string; name: string }[],
+): string {
+  const entries = connectors
+    .map((connector) => ({
+      id: connector.id.trim(),
+      name: (connector.name || connector.id).trim(),
+    }))
+    .filter((connector) => connector.id);
+  if (!entries.length) return text;
+  const line = entries
+    .map((connector) => `${connector.name} (connector ID: ${connector.id})`)
+    .join(", ");
+  return `${text.replace(/\s+$/g, "")}\n\nSelected connectors: ${line}`;
+}
+
 const ATTACHMENT_ENTRY = /(.+?)\s+\(artifact ID:\s*([^)]+)\)(?:\s*,\s*|$)/g;
 const UNTOUCHED_MARKDOWN = /(```[\s\S]*?```|`[^`\n]*`|\[[^\]]*\]\([^)]*\)|<[^>]*>)/g;
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\/-]/g;
@@ -38,9 +76,22 @@ const REGEX_SPECIAL = /[.*+?^${}()|[\]\\/-]/g;
 /** The composer appends artifact ids after a blank line for the agent. Hide that
  *  transport detail from the bubble and expose the files as tappable chips. */
 export function displayUserMessage(content: string): DisplayUserMessage {
-  const visible = withoutSelectedSkills(content);
+  const skills: UserAttachment[] = [];
+  const connectors: UserAttachment[] = [];
+  // 先把技能 / 连接器的隐藏标记行摘出来，气泡顶部才能回看本轮用到的能力；
+  // 标记行本身不出现在可见正文里。
+  const visible = content
+    .replace(
+      /\n\nSelected (skills|connectors):\s*([^\n]*)/g,
+      (_line, kind: string, segment: string) => {
+        const items = selectionEntries(segment);
+        (kind === "skills" ? skills : connectors).push(...items);
+        return "";
+      },
+    )
+    .trimEnd();
   const marker = ATTACHMENT_MARKER.exec(visible);
-  if (!marker) return { text: visible, attachments: [] };
+  if (!marker) return { text: visible, attachments: [], skills, connectors };
   const text = visible.slice(0, marker.index).trimEnd();
   const segment = visible.slice(marker.index + marker[0].length);
   const attachments: UserAttachment[] = [];
@@ -49,7 +100,7 @@ export function displayUserMessage(content: string): DisplayUserMessage {
     const id = match[2]?.trim();
     if (name && id) attachments.push({ id, name });
   }
-  return { text, attachments };
+  return { text, attachments, skills, connectors };
 }
 
 /** Appends the stable artifact references the agent uses to load selected files.

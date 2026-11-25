@@ -20,6 +20,8 @@ export interface ChannelChatRequest {
   connectorSlugs?: string[];
   /** 本轮选定的频道技能 id：服务端注入成员提示词，成员可用 use_skill 读取方法。 */
   skillIds?: string[];
+  /** 继续上一轮被暂停的分析：服务端不重复落库提问，保留已说出的半截回复并把剩余内容接着写完整。 */
+  resume?: boolean;
 }
 
 export interface ChannelChatStream {

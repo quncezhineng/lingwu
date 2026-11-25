@@ -6499,3 +6499,45 @@ Render Blueprint 部署时若 `TOKEN_ENCRYPTION_KEY` 使用 `generateValue: true
 - 市场卡片（列表）作者名前方的绿色盾牌标（`OfficialMark`）保持不变，`ShieldCheck` 图标与官方判定逻辑仍在使用。
 - 相关 i18n key（`agent.marketSourceBuiltin`、`agent.marketPublicBadge`、`agent.hubSourceLingwu`）仍被列表卡片与数据构造使用，未删除。
 - 验证：`apps/mobile` 的 `tsc --noEmit` 通过。
+
+### 2026-11-24 · 落地 OpenDots 借鉴建议 P0（交付物审批 / 研究空间 / 连接器权限）
+
+**背景**
+
+按《OpenDots 对比分析与借鉴建议》的 P0 三项完成开发：报告类交付物的草稿审批流程、产物按空间组织、连接器权限用「可查看 / 需确认后执行 / 不允许使用」三层表达。
+
+**处理**
+
+- 服务端新增 [deliverable-routes.ts](../apps/server/src/engine/deliverable-routes.ts)：交付物 CRUD、`approve`、`archive`、`share`；新建强制 `draft`，未批准分享返回 409，归档后不可再批准，分享复用 `/s/:id` 公开页。
+- 服务端新增 [research-space-routes.ts](../apps/server/src/engine/research-space-routes.ts)：研究空间 CRUD，与交付物双向引用；删除空间仅解除 `spaceId`。
+- [workspace.ts](../apps/server/src/workspace.ts) 快照补充 `researchSpaces` / `deliverables`。
+- 前台新增 [library-spaces.tsx](../apps/mobile/src/library-spaces.tsx)（研究空间面板、交付物面板、编辑弹层），[screens.tsx](../apps/mobile/src/screens.tsx) 资料库扩为 5 个页签并打通空间 → 交付物跳转。
+- [catalog.ts](../apps/server/src/connectors/catalog.ts) 推导三层权限并接入 [service.ts](../apps/server/src/connectors/service.ts)，`blocked` 直接拦截调用；前台四处统一展示。
+
+**注意事项**
+
+- 交付物与空间都落在通用 `records` 表（`kind` 为 `deliverables` / `research-spaces`），无需迁移。
+- 新增 [deliverables-api.test.ts](../tests/deliverables-api.test.ts) 8 个用例全部通过；`pnpm typecheck` 通过。
+- `pnpm lint` 仍有历史遗留告警（`db.ts`、`fifo-events.test.ts` 等未改动文件），与本次变更无关。
+
+### 2026-11-26 · 对话页支持「暂停 / 继续分析」（真暂停 LLM 生成）
+
+**背景**
+
+智能体对话与频道对话的输入框发送按钮，原先在分析中点击是「停止」，停止后还会把刚发出的提问回填到输入框。用户要求改为：分析中点击即暂停并把按钮换成暂停图标；暂停不把提问内容放回输入框；再次点击同一按钮（继续图标）从当前上下文接着分析。第一版做的是「暂停 = 中止请求 + 恢复 = 删半截重跑整轮」，不满足「暂停时真正停住 LLM、恢复时从断点续写」的要求，本轮改为真暂停。
+
+**处理**
+
+- [prompt-composer.tsx](../apps/mobile/src/prompt-composer.tsx)：`stopLabel` 拆为 `pauseLabel` / `resumeLabel`，新增 `paused` 属性；运行中显示双竖条 `Pause`，暂停中显示实心三角 `Play`，两者都保持可点击与主色实心样式。
+- [chat.tsx](../apps/mobile/src/chat.tsx)：新增 `paused` 状态；`stop()` 只中止当前 run 并进入暂停态，删除 `lastSent` 回填逻辑；新增 `resume()`，不带新提问重跑当前线程（服务端沿用已有上下文，不新增用户气泡）；若暂停期间已写新问题则按发送处理。
+- [conversation.ts](../apps/server/src/engine/conversation.ts)：智能体对话从「删半截重跑」改为「保留半截续写」——暂停链路原本就会真实停住 LLM（`runAgent` → runner.stop → abortRun → 中止模型请求），本轮补上续写侧：`runInternal` 检测输入最后一条 assistant 半截，将本轮续写产出的所有消息 id 重写为半截消息 id（`rewriteContinuedMessageId`），客户端把新增量追加进同一条气泡，长文折叠时卡片也挂回原半截。
+- [channel-chat.ts](../apps/server/src/engine/channel-chat.ts)：`input.resume` 为真时不重复落库提问，复用最近一条用户消息 id，并把中断时各成员落库的半截回复收集进 `partials`；续写轮跳过分组/点名/相关性/换组长等模型判断，只让有半截的成员继续，`speak()` 把半截作为 assistant 前缀注入 `runInput.messages`，`persistReply` 沿用原半截消息 id 原地更新，不产生重复消息。
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：新增 `paused`、`pendingTurn` 与 `pausedLiveAgents`；`stop()` 断开流并记录还在一直播着的成员，`resume()` 把已落库的半截转回 `live:` 占位（保留已说出的文本），新 delta 追加在同一条气泡，`member_done` 再定稿。
+- [channel-chat-stream.ts](../apps/mobile/src/channel-chat-stream.ts) 与 [channel.ts](../packages/domain/src/channel.ts)：请求体新增 `resume?: boolean`。
+
+**注意事项**
+
+- 「继续」是真正的断点续写：暂停时服务端真实中止 LLM 请求并保留半截文本；恢复时把半截作为历史前缀交给模型从断点接着生成，不再重跑整轮、不再重复烧已生成部分的 token。
+- 频道继续分析时只让暂停那一刻还在直播的成员接着写；已说完的完整回复不参与续写。半截消息沿用原 id 落库，刷新后历史里不出现同一成员的两份回复。
+- 频道恢复依赖 `resume: true`，若客户端缓存丢失则退化为普通发送（会重复一条提问），因此 `pendingTurn` 只在本轮 `done` / 出错 / 重发时清空。
+- 验证：`pnpm typecheck`（根 + mobile）与 `biome check` 通过；`pnpm test` 1300/1302 通过，剩余 2 个失败为历史遗留（`mobile-bots` 预览去 Markdown 的用例未同步、`computer-e2b-desktop` 依赖 `/usr/bin/timeout` 在 macOS 上不适用），与本次改动无关。

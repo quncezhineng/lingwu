@@ -8,7 +8,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Text, TextInput } from "./app-text";
-import { ArrowUp, type IconComponent, Plus, Square } from "./icons";
+import { ArrowUp, type IconComponent, Pause, Play, Plus } from "./icons";
 import { enterConfirmsIme } from "./prompt-composer-ime";
 import { colors, composerMetrics, fonts, radius, semantic, shadow } from "./ui";
 
@@ -42,8 +42,10 @@ export function PromptComposer({
   cornerAction,
   attachments,
   sendLabel,
-  stopLabel,
+  pauseLabel,
+  resumeLabel,
   busy = false,
+  paused = false,
   submitDisabled = false,
   dense = false,
   inline = false,
@@ -61,8 +63,13 @@ export function PromptComposer({
   cornerAction?: ComposerCornerAction;
   attachments?: ReactNode;
   sendLabel: string;
-  stopLabel?: string;
+  /** 分析进行中时按钮的语义（点击暂停）。 */
+  pauseLabel?: string;
+  /** 已暂停时按钮的语义（点击继续分析）。 */
+  resumeLabel?: string;
   busy?: boolean;
+  /** 暂停态：分析已被中止，按钮改为「继续分析」并保持主色。 */
+  paused?: boolean;
   submitDisabled?: boolean;
   dense?: boolean;
   /** The v3 Bot composer keeps attachment, message and send controls in one row. */
@@ -110,10 +117,15 @@ export function PromptComposer({
   }, [inputMinHeight, value]);
 
   const canSubmit = !submitDisabled && value.trim().length > 0;
-  const actionDisabled = busy ? false : !canSubmit;
-  const actionLabel = busy ? (stopLabel ?? sendLabel) : sendLabel;
+  // 暂停态与运行态都保持可点击：前者继续分析，后者暂停分析。
+  const actionDisabled = busy || paused ? false : !canSubmit;
+  const actionLabel = paused
+    ? (resumeLabel ?? sendLabel)
+    : busy
+      ? (pauseLabel ?? sendLabel)
+      : sendLabel;
   const action = () => {
-    if (busy || canSubmit) onSubmit();
+    if (busy || paused || canSubmit) onSubmit();
   };
   const controlSize = inline ? composerMetrics.control : dense ? 34 : 36;
   const multiline = inputHeight > inputMinHeight + composerMetrics.growSlack;
@@ -219,6 +231,8 @@ export function PromptComposer({
       }}
     />
   );
+  // 运行中、暂停中与可发送共用主色实心样式，只有空输入的箭头是描边态。
+  const actionActive = busy || paused || canSubmit;
   const submitAction = (
     <Pressable
       accessibilityRole="button"
@@ -234,15 +248,19 @@ export function PromptComposer({
         borderRadius: radius.full,
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: busy || canSubmit ? 0 : 1,
+        borderWidth: actionActive ? 0 : 1,
         borderColor: semantic.controlBorder,
-        backgroundColor: busy || canSubmit ? colors.primaryAction : colors.surfaceRaised,
+        backgroundColor: actionActive ? colors.primaryAction : colors.surfaceRaised,
         opacity: pressed ? 0.82 : 1,
         transform: [{ scale: pressed ? 0.96 : 1 }],
       })}
     >
-      {busy ? (
-        <Square size={16} fill={colors.onPrimary} strokeWidth={0} />
+      {paused ? (
+        // 暂停后按钮变成「继续」：实心三角，再次点击从当前上下文接着分析。
+        <Play size={16} fill={colors.onPrimary} strokeWidth={0} />
+      ) : busy ? (
+        // 分析进行中点击即暂停，用双竖条替代原来的停止方块。
+        <Pause size={16} fill={colors.onPrimary} strokeWidth={0} />
       ) : (
         <ArrowUp
           size={19}

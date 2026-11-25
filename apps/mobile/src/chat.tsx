@@ -34,6 +34,7 @@ import Markdown, { type MarkdownStyles, type RenderRules } from "react-native-ma
 import { z } from "zod";
 import type { Artifact } from "../../../packages/domain/src";
 import type { AgentArtifact, AgentTask } from "../../../packages/domain/src/agent";
+import { longformBriefOf } from "../../../packages/domain/src/longform";
 import type { OrchestrationNode } from "../../../packages/domain/src/orchestration";
 import { conversationColumnStyle } from "./agent-layout";
 import { AgentOrb } from "./agent-orb";
@@ -60,11 +61,14 @@ import {
   connectorOptions,
   SkillPickerSheet,
   skillDisplayName,
+  type UsedCapability,
+  UsedCapabilityChips,
   visibleConnectorOptions,
 } from "./capability-picker";
 import {
   displayUserMessage,
   promptWithAttachments,
+  promptWithConnectors,
   promptWithSkills,
   withoutSelectedSkills,
 } from "./chat-content";
@@ -798,8 +802,6 @@ export function ChatScreen({
   });
   const { copilotkit } = useCopilotKit();
   const renderToolCall = useRenderToolCall();
-  // 最近一次提交的文本：停止生成时回填到输入框，避免用户重写。
-  const lastSent = useRef("");
   const composerRef = useRef<ComposerHandle>(null);
 
   // ⌘J（App 层派发）聚焦输入框；仅 Web 生效。
@@ -811,6 +813,9 @@ export function ChatScreen({
   }, []);
   const [showResults, setShowResults] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 暂停态：run 被中止后 busy / agent.isRunning 都会变假，需要用独立状态记住
+  // 「这一轮还可以继续」，否则发送按钮会闪回向上箭头。
+  const [paused, setPaused] = useState(false);
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   // Reattach only to the app-owned live stream; persisted history is a snapshot,
@@ -1337,9 +1342,11 @@ export function ChatScreen({
     });
     return () => subscription.unsubscribe();
   }, [copilotkit, agentId, queue]);
+  /** 暂停当前分析：中止这一轮 run，但保留线程上下文，供「继续分析」接着跑。 */
   async function stop() {
     stopping.current = true;
     queue.pause();
+    setPaused(true);
     try {
       await copilotkit.stopAgent({ agent });
       // The runtime proxy posts /stop but does not abort its own run request,
@@ -1348,11 +1355,35 @@ export function ChatScreen({
       if (running.abortController && !running.abortController.signal.aborted)
         running.abortController.abort();
     } catch (e) {
+      // 没停下来就不该显示「继续」，恢复成运行态让用户再点一次。
+      setPaused(false);
       setError(t("chat.stopError", { detail: e instanceof Error ? e.message : String(e) }));
-    } finally {
-      // 停止后保留草稿：把刚提交的内容回填到输入框（用户可改写后重发）。
-      if (!composerRef.current?.read().trim() && lastSent.current)
-        composerRef.current?.setText(lastSent.current);
+    }
+  }
+  /**
+   * 继续分析：不带新提问重跑当前线程，服务端会沿用已有上下文接着生成，
+   * 因此不会多出一条用户气泡，也不需要把上一轮内容回填输入框。
+   */
+  async function resume() {
+    if (!isReady || !loaded) return;
+    // 暂停期间用户已经写了新问题：按发送处理，而不是继续上一轮。
+    if (composerRef.current?.read().trim()) {
+      send();
+      return;
+    }
+    setPaused(false);
+    setError("");
+    try {
+      // 被中止的 run 需要一点时间释放锁；最多等 3 秒，避免把正常恢复误判成未就绪。
+      // 等待期间保持 stopping=true，让旧 run 抛出的 AbortError 继续被当成正常的暂停。
+      for (let i = 0; i < 30 && (runLock.current || agent.isRunning); i += 1)
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      stopping.current = false;
+      if (!queue.getSnapshot().pending.length) queue.resume();
+      await run();
+    } catch (e) {
+      setPaused(true);
+      setError(t("chat.resumeError", { detail: e instanceof Error ? e.message : String(e) }));
     }
   }
   async function uploadMaterial() {
@@ -1384,16 +1415,24 @@ export function ChatScreen({
     const text = composerRef.current?.read().trim() ?? "";
     if (!text || !isReady || !loaded) return;
     stopping.current = false;
+    // 发出新提问就离开暂停态（继续 / 或直接改写问题重发都走这里）。
+    setPaused(false);
     // A new submission can continue after Stop; held follow-ups still need explicit resume.
     if (!busy && !agent.isRunning && !saveError && !queue.getSnapshot().pending.length)
       queue.resume();
     setShowResults(false);
-    lastSent.current = text;
     const files = w.files.filter((f) => attachments.includes(f.id));
     const analysis = (agentWorkspace?.artifacts ?? []).filter((artifact) =>
       attachments.includes(artifact.id),
     );
-    enqueue(promptWithSkills(promptWithAttachments(text, files, analysis), selectedSkills));
+    // 技能与连接器都随这一轮提问写成隐藏标记行：服务端据此加载技能、暴露连接器，
+    // 气泡顶部也能回看本轮用了什么。
+    enqueue(
+      promptWithConnectors(
+        promptWithSkills(promptWithAttachments(text, files, analysis), selectedSkills),
+        selectedConnectors,
+      ),
+    );
     composerRef.current?.clear();
     setAttachments([]);
     setSelectedSkillIds([]);
@@ -1485,6 +1524,14 @@ export function ChatScreen({
       .savedFallback;
   });
   const deliveries = reportDeliveries(messages, messageText, agentWorkspace?.artifacts ?? []);
+  // 长文折叠：按 messageId 精确挂回产生它的那条回复。正文只展示摘要，
+  // 全文留在卡片里（点开是独立页面），复制的仍是原文。
+  const longformByMessage = new Map<string, AgentArtifact>();
+  for (const artifact of agentWorkspace?.artifacts ?? []) {
+    if (artifact.messageId && artifact.data?.longform === true) {
+      longformByMessage.set(artifact.messageId, artifact);
+    }
+  }
   const latestDesktop = messages
     .flatMap((m) => readableToolCalls(m))
     .filter((call) => call.function.name === "use_desktop")
@@ -1909,6 +1956,17 @@ export function ChatScreen({
               const parsedUser = user ? displayUserMessage(userText) : undefined;
               const text = user ? (parsedUser?.text ?? "") : messageText(message);
               const attachments = parsedUser?.attachments ?? [];
+              // 这轮提问勾选的技能 / 连接器：从消息里还原成气泡顶部的只读标签，
+              // 刷新回看时也能看到当时用了什么（附件沿用下方可点开的文件标签）。
+              const capabilities: UsedCapability[] = parsedUser
+                ? [
+                    ...parsedUser.skills.map((item) => ({ ...item, kind: "skill" as const })),
+                    ...parsedUser.connectors.map((item) => ({
+                      ...item,
+                      kind: "connector" as const,
+                    })),
+                  ]
+                : [];
               const draft = user ? undefined : stream.state.drafts[message.id];
               const streaming = !!draft && !draft.done;
               // 真实时间 → 本轮流式时间 → 历史插值，依次兜底。
@@ -1921,11 +1979,15 @@ export function ChatScreen({
                 (call) => call.function.name !== "delegate_task",
               );
               const reports = deliveries.get(message.id) ?? [];
+              // 这条回复被折叠过：流里只放摘要，全文在卡片里（独立页面）。
+              const longformCard = user ? undefined : longformByMessage.get(message.id);
+              const shownText = longformCard && !streaming ? longformBriefOf(longformCard) : text;
               const brief = !user && !streaming ? queuedBrief(text) : null;
               // 委派条和任务卡不占对话位置；报告完成后，摘要和报告卡留在这一轮下面。
               if (
                 !text &&
                 attachments.length === 0 &&
+                capabilities.length === 0 &&
                 toolCalls.length === 0 &&
                 reports.length === 0
               )
@@ -1940,6 +2002,7 @@ export function ChatScreen({
                     gap: 8,
                   }}
                 >
+                  {capabilities.length > 0 && <UsedCapabilityChips items={capabilities} />}
                   {attachments.length > 0 && (
                     <View
                       style={{
@@ -2014,7 +2077,7 @@ export function ChatScreen({
                           </Markdown>
                         ) : (
                           <AssistantResponse
-                            content={text}
+                            content={shownText}
                             streaming={streaming}
                             files={w.files}
                             onOpenFile={openReferencedFile}
@@ -2097,6 +2160,12 @@ export function ChatScreen({
                       ))}
                     </View>
                   ))}
+                  {/* 折叠过的长文：点卡片进独立页面读全文，流里只保留摘要。 */}
+                  {longformCard && (
+                    <View style={{ width: "100%" }}>
+                      <ArtifactCard artifact={longformCard} />
+                    </View>
+                  )}
                 </View>
               );
             })
@@ -2179,6 +2248,9 @@ export function ChatScreen({
                     ))}
                   {[...(agentWorkspace?.artifacts || [])]
                     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                    // 折叠出来的长文卡片已经挂在自己的回复下面，不再进「最近结果」列表，
+                    // 否则这份产物会被当成一份独立报告重复出现。
+                    .filter((artifact) => artifact.data?.longform !== true)
                     .filter(
                       (artifact, index, items) =>
                         items.findIndex((item) => item.kind === artifact.kind) === index,
@@ -2426,7 +2498,7 @@ export function ChatScreen({
             {floatingComposer && <ComposerMatte />}
             <IsolatedComposer
               ref={composerRef}
-              onSubmit={replying ? () => void stop() : send}
+              onSubmit={paused ? () => void resume() : replying ? () => void stop() : send}
               placeholder={
                 !isReady
                   ? t("chat.connecting")
@@ -2509,8 +2581,10 @@ export function ChatScreen({
                 </>
               }
               sendLabel={t("chat.sendMessage")}
-              stopLabel={t("chat.stopReply")}
+              pauseLabel={t("chat.pauseAnalysis")}
+              resumeLabel={t("chat.resumeAnalysis")}
               busy={replying}
+              paused={paused}
               submitDisabled={!loaded || !isReady}
               style={[conversationColumnStyle, { marginBottom: hideHeader ? 12 : wide ? 18 : 0 }]}
             />
