@@ -93,16 +93,17 @@ services:
           type: web
           envVarKey: RENDER_EXTERNAL_URL
       # 分享链接等面向收件人的地址使用前端域名（lingwu-web），而不是 API 域名。
+      # 固定写成自定义前端域名，而不是 fromService 派生 RENDER_EXTERNAL_URL：
+      # 后者永远是默认的 lingwu-web.onrender.com，绑定自定义域名后不会变，
+      # 每次蓝图同步都会把这里重置回默认域名，导致 app.lingwu.xyz 被 403 拦死
+      # （页面能加载、接口全失败，看起来像「打不开」）。改域名只需改这一处。
       - key: PUBLIC_WEB_URL
-        fromService:
-          name: lingwu-web
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://app.lingwu.xyz
+      # 允许跨域的前端来源白名单（前端自定义域名 + 默认 onrender 域名，两者都保留）。
+      # app.ts 还会自动放行 PUBLIC_API_URL 与 PUBLIC_WEB_URL 的 origin，
+      # 这里显式列出是为了自定义域名与默认域名都能正常访问、且不再被蓝图重置。
       - key: ALLOWED_ORIGINS
-        fromService:
-          name: lingwu-web
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://app.lingwu.xyz,https://lingwu-web.onrender.com
       # User accounts: with these three set, every user signs up and signs in with
       # their own email and gets a private workspace. Leave them unset to fall back
       # to the single shared LINGWU_ACCESS_KEY below.

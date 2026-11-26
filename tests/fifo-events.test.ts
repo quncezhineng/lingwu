@@ -226,7 +226,10 @@ test("service: createTask appends task_created and control appends pause/resume 
     assert.ok(created.id);
     assert.ok(created.enqueuedAt, "createTask stamps the FIFO enqueue time");
     let events = await taskEvents(db, created.id);
-    assert.deepEqual(events.map((e) => e.eventType), ["task_created"]);
+    assert.deepEqual(
+      events.map((e) => e.eventType),
+      ["task_created"],
+    );
     const createdPayload = events[0]?.payload;
     assert.equal(createdPayload?.enqueuedAt, created.enqueuedAt);
     assert.equal(createdPayload?.status, "queued");

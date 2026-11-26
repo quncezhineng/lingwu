@@ -1,5 +1,13 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Linking, Platform, Pressable, ScrollView, type TextStyle, useWindowDimensions, View } from "react-native";
+import {
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  type TextStyle,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import Markdown from "react-native-markdown-renderer";
 import { type Channel, normalizeChannelAvatar } from "../../../packages/domain/src/channel";
 import {

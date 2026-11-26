@@ -264,9 +264,10 @@ export class Store {
   /**
    * 按版本升序读回某个 stream 的完整事件流，用于审计与「读投影」重放。
    */
-  async readEvents<
-    T = Record<string, unknown>,
-  >(streamKind: string, streamId: string): Promise<
+  async readEvents<T = Record<string, unknown>>(
+    streamKind: string,
+    streamId: string,
+  ): Promise<
     {
       owner: string;
       version: number;
@@ -281,13 +282,14 @@ export class Store {
       [streamKind, streamId],
     );
     return result.rows.map(
-      (row) => row as unknown as {
-        owner: string;
-        version: number;
-        eventType: string;
-        payload: T;
-        occurredAt: string;
-      },
+      (row) =>
+        row as unknown as {
+          owner: string;
+          version: number;
+          eventType: string;
+          payload: T;
+          occurredAt: string;
+        },
     );
   }
   /**
@@ -326,7 +328,15 @@ export class Store {
         case "task_paused":
         case "task_resumed":
         case "task_re_enqueued":
-          Object.assign(state, { status: event.eventType === "task_paused" ? "paused" : "queued", leaseId: null, leaseUntil: null }, patch);
+          Object.assign(
+            state,
+            {
+              status: event.eventType === "task_paused" ? "paused" : "queued",
+              leaseId: null,
+              leaseUntil: null,
+            },
+            patch,
+          );
           break;
         default:
           break;

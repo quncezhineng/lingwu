@@ -5,6 +5,43 @@
 
 ## 变更记录
 
+### 2026-11-26 · Render 自定义前端域名 app.lingwu.xyz 打不开：跨域白名单被蓝图重置回默认域名
+
+**现象**
+
+- 前端静态站绑定了自定义域名 `https://app.lingwu.xyz/`，但打开后页面像是「打不开」。
+- 线上复查：前端域名本身 **HTTP 200**（DNS 与证书正常），`https://lingwu-api.onrender.com/api/health` 也 200；但带 `Origin: https://app.lingwu.xyz` 请求 API 时被拦：
+
+```
+HTTP/2 403
+{"error":"Origin is not allowed"}
+```
+
+- 即页面能加载，但所有接口请求被 CORS 白名单拦成 403，登录/取数全失败，外观上就是「打不开」。
+
+**根因**
+
+- 代码侧其实已支持自定义域名：2026-11-24 已让 CORS 白名单自动放行 `PUBLIC_WEB_URL` 的 origin（[app.ts](../apps/server/src/app.ts#L279-L300)），回归断言见 [api.test.ts](../tests/api.test.ts#L54-L64)。
+- 问题出在 [render.yaml](../render.yaml)：`PUBLIC_WEB_URL` 与 `ALLOWED_ORIGINS` 都用 `fromService: lingwu-web / RENDER_EXTERNAL_URL` 派生。而 `RENDER_EXTERNAL_URL` **永远是默认的 `https://lingwu-web.onrender.com`**，绑定自定义域名后不会改变。
+- 因此每次蓝图（Blueprint）同步都会把这两个变量重置回默认域名，`app.lingwu.xyz` 永远进不了白名单——正是用户反馈的「跨域配置经常被清除或更新、换成默认域名」。
+
+**修复（render.yaml）**
+
+- `PUBLIC_WEB_URL`：由 `fromService ... RENDER_EXTERNAL_URL` 改为显式 `value: https://app.lingwu.xyz`。
+- `ALLOWED_ORIGINS`：改为显式 `value: https://app.lingwu.xyz,https://lingwu-web.onrender.com`（自定义域名与默认域名都保留），不再随蓝图同步被重置。
+- 两者均补中文注释说明为何不能用 `fromService` 派生、以及改域名只需改这一处。
+
+**验证**
+
+- `curl -X OPTIONS https://lingwu-api.onrender.com/api/health -H "Origin: https://app.lingwu.xyz"` 当前返回 `403 Origin is not allowed`，与白名单缺失一致（修复部署后应转为 200/204）。
+- 代码与回归测试无需改动：`tests/api.test.ts` 已断言 `webUrl=https://app.example.com` 时该域名可访问 `/api/auth/config`（200），无关域名仍 403。
+
+**注意事项 / 后续**
+
+- 仅当服务由 Render 蓝图（render.yaml）管理时，改本文件才会生效；若服务是控制台手动创建，则需在 Render → lingwu-api → Environment 手动把这两个变量设为上述值。
+- 若将来更换前端域名，只需改 `render.yaml` 的 `PUBLIC_WEB_URL`（并同步 `ALLOWED_ORIGINS`）后重新部署。
+- 这类「页面能开、接口全 403」的现象，排查口诀：先看前端域名 HTTP 码（排除 DNS/证书），再带 `Origin` 请求一次 API 看是否被 `Origin is not allowed` 拦截。
+
 ### 2026-11-26 · Render 部署崩溃排查（二）：真因是持久盘写满（ENOSPC），扩大磁盘并让自愈真正腾空间
 
 **现象（承下条）**

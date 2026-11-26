@@ -1,8 +1,8 @@
 import { forwardRef } from "react";
 import {
-  Platform,
   Text as NativeText,
   TextInput as NativeTextInput,
+  Platform,
   type TextInputProps,
   type TextProps,
   type TextStyle,
