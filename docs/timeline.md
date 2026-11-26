@@ -5,6 +5,44 @@
 
 ## 变更记录
 
+### 2026-11-26 · 修复 Render 部署启动崩溃：PGlite 数据目录损坏改为自愈重建
+
+**现象**
+
+Render 部署成功但实例反复重启，日志反复出现同一处崩溃：
+
+```
+[LingWu] 数据库初始化失败 · DATA_DIR=/var/data/lingwu · node=v26.13.1 · RuntimeError: Aborted(). Build with -sASSERTIONS for more info.
+[ELIFECYCLE] Command failed with exit code 1.
+==> Instance ... restarted
+==> Exited with status 1
+```
+
+**根因**
+
+- 与 10-25 / 10-28 / 11-11 三次事故同源：PGlite 数据目录（Render 持久盘 `/var/data/lingwu`）损坏，`createStore` 里 `new PGlite()` 每次打开都失败，服务陷入「启动即崩」。
+- 本地逐项复现确认报错签名：仅截断 `global/pg_control` → `RuntimeError: Aborted()`（与生产一字不差）；其余损坏形态（缺 `base/`、删 `pg_wal`）报 `unreachable`。佐证损坏点在控制文件。
+- 数据目录落在持久盘上，重启不会自愈；此前每次都要人工 `mv` 归档才恢复。
+- 排除干扰：本地 node 22/24/26 均能正常初始化 PGlite，PGlite 版本锁定 0.3.16 未变，Node 版本与依赖均非本次原因。
+
+**修复（apps/server/src/db.ts）**
+
+- 新增 `openEmbedded(dataDir)`：打开 PGlite 失败时，把损坏目录改名归档为 `<dataDir>.corrupt-<时间戳>`（**不删除**，留作取证），换全新空目录重建，**只自愈一次**。
+- 重建后的空目录仍打不开（通常是磁盘写满/只读），带磁盘余量抛出，交由 `index.ts` 记录并退出——不再掩盖真实故障。为此新增 `freeSpace()`（`statfs` 读余量）并补进日志。
+- `createStore` 嵌入式分支由直接 `new PGlite()` 改为调用 `openEmbedded(options.dataDir)`，其余逻辑不变。
+- 把此前靠人工执行的恢复步骤自动化，运维无需再手动介入。
+
+**验证**
+
+- 临时脚本构造损坏目录（截断 `global/pg_control`）后调用 `createStore`：自动归档旧目录、重建新库并读写成功，`.corrupt-*` 归档目录已生成 → `RESULT PASS`（脚本与测试数据已删除）。
+- `pnpm typecheck` 通过；`biome check apps/server/src/db.ts` 对本次改动行（356–425）无告警（文件内 265–341 行既有格式项与本次无关）。
+
+**注意事项**
+
+- 自愈会**清空本地库**；本地仅作兜底，需长期保留的数据必须落 Supabase（分享已走 `share-store.ts` 双写，重建不影响对外链接）。
+- 归档目录 `<dataDir>.corrupt-*` 留在持久盘上，需定期清理，避免占满 1GB 磁盘。
+- 若重建后仍失败，日志会打印磁盘可用空间，优先排查磁盘写满/只读。
+
 ### 2026-11-26 · 对话「选择技能 / 选择连接器」弹窗改为从完整库中选择，已添加项默认勾选并锁定
 
 **背景**

@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, rename, statfs } from "node:fs/promises";
 import { dirname } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
@@ -353,6 +353,62 @@ export function createPool(connectionString: string) {
   return pool;
 }
 
+/** 数据目录所在卷的剩余空间。磁盘写满时 WASM Postgres 只会抛不透明的 Aborted()，把余量补进日志才分得清原因。 */
+async function freeSpace(path: string): Promise<string> {
+  try {
+    const stats = await statfs(path);
+    return `${Math.round((stats.bavail * stats.bsize) / 1024 / 1024)} MiB`;
+  } catch {
+    return "未知";
+  }
+}
+
+/**
+ * 打开嵌入式 PGlite 数据目录，打不开时自愈。
+ *
+ * PGlite 把 Postgres 编译成 WASM 直接跑在数据目录上：进程被强杀、或宿主磁盘
+ * （Render 持久盘是网络块存储）丢掉最后一次写入，都会让 `global/pg_control`
+ * 残留成半截文件。此后每次启动 PGlite 都只抛出不透明的
+ * `RuntimeError: Aborted(). Build with -sASSERTIONS for more info.`
+ * ——Emscripten 不告诉我们具体原因（本地复现：控制文件损坏就是这个报错，其他
+ * 损坏则报 `unreachable`）。数据目录在持久盘上重启不会自愈，服务会一直起不来。
+ *
+ * 这里把此前靠人工执行的恢复步骤自动化：损坏目录改名存档（**不删除**，留作取证
+ * 或后续修复），换全新空目录重建。只自愈一次，重建后的空目录仍然打不开说明问题
+ * 不在数据本身（磁盘写满/只读），此时带着磁盘余量抛出，交由调用方记录并退出。
+ */
+async function openEmbedded(dataDir: string | undefined): Promise<PGlite> {
+  if (dataDir) await mkdir(dirname(dataDir), { recursive: true, mode: 0o700 });
+  try {
+    const embedded = new PGlite(dataDir);
+    await embedded.waitReady;
+    return embedded;
+  } catch (error) {
+    if (!dataDir) throw error;
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    const backup = `${dataDir}.corrupt-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+    console.error(
+      `[LingWu] 本地数据库打不开，已归档为 ${backup}（未删除）并改用全新目录重建 · 磁盘可用 ${await freeSpace(dataDir)} · ${detail.slice(0, 200)}`,
+    );
+    await rename(dataDir, backup).catch(() => undefined);
+    await mkdir(dataDir, { recursive: true, mode: 0o700 });
+    try {
+      const embedded = new PGlite(dataDir);
+      await embedded.waitReady;
+      return embedded;
+    } catch (retryError) {
+      const retryDetail =
+        retryError instanceof Error
+          ? `${retryError.name}: ${retryError.message}`
+          : String(retryError);
+      console.error(
+        `[LingWu] 重建后的空目录依然打不开，通常是磁盘写满或只读 · ${dataDir} · 磁盘可用 ${await freeSpace(dataDir)} · ${retryDetail.slice(0, 200)}`,
+      );
+      throw retryError;
+    }
+  }
+}
+
 export async function createStore(
   options: { dataDir?: string; databaseUrl?: string } = {},
 ): Promise<Store> {
@@ -361,9 +417,7 @@ export async function createStore(
     const pool = createPool(options.databaseUrl);
     database = { query: async (sql, params) => pool.query(sql, params), close: () => pool.end() };
   } else {
-    if (options.dataDir) await mkdir(dirname(options.dataDir), { recursive: true, mode: 0o700 });
-    const embedded = new PGlite(options.dataDir);
-    await embedded.waitReady;
+    const embedded = await openEmbedded(options.dataDir);
     database = {
       query: (sql, params) => embedded.query<Row>(sql, params),
       close: () => embedded.close(),
