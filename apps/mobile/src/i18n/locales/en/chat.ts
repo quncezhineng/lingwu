@@ -89,14 +89,14 @@ const chat = {
   "chat.skillPickerTool": "Choose skills",
   "chat.skillPickerTitle": "Choose skills",
   "chat.skillPickerSubtitle":
-    "Only skills installed on this agent are listed. A selected skill is read before the reply.",
+    "Pick skills from your skill library and the catalog. Skills already added are pre-checked and can't be unchecked here.",
   "chat.skillPickerSearch": "Search skills",
   "chat.skillPickerMineHeading": "My skills",
   "chat.skillPickerCatalogHeading": "Skill catalog",
   "chat.skillPickerMore": "{count} more skills. Type a keyword to keep searching.",
   "chat.skillPickerEmptyTitle": "No matching skills",
   "chat.skillPickerEmptyDetail":
-    "This agent has no skills yet. Add one from the agent's Skills tab.",
+    "No matching skills found. Try another keyword or create a new skill in your library.",
   "chat.skillPickerSelected": "{count} skills selected",
   "chat.skillPickerConfirm": "Confirm",
   "chat.skillPickerDetail": "View skill details",
@@ -104,14 +104,14 @@ const chat = {
   "chat.channelSkillPickerTool": "Choose skills",
   "chat.channelSkillPickerTitle": "Choose skills",
   "chat.channelSkillPickerSubtitle":
-    "Only skills added to this channel are listed. Members will read a selected skill's method.",
-  "chat.channelSkillPickerMineHeading": "Channel skills",
+    "Pick skills from your skill library and the catalog. Skills already added to this channel are pre-checked and can't be unchecked here.",
+  "chat.channelSkillPickerMineHeading": "My skills",
   "chat.channelSkillPickerEmptyDetail":
-    "This channel has no skills yet. Add one from the channel's Skills tab.",
+    "No matching skills found. Try another keyword or create a new skill in your library.",
   "chat.connectorPickerTool": "Choose connectors",
   "chat.connectorPickerTitle": "Choose connectors",
   "chat.connectorPickerSubtitle":
-    "Selected connectors are enabled for this conversation and can be removed at any time.",
+    "Selected connectors are enabled for this conversation. Connectors already added are pre-checked and can't be unchecked here; remove them from connector settings.",
   "chat.connectorPickerConnected": "Connected",
   "chat.connectorPickerDisconnected": "Not connected",
   "chat.connectorPickerSelected": "{count} connectors selected",

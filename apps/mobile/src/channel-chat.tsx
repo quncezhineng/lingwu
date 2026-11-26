@@ -1130,9 +1130,10 @@ export function ChannelChatScreen({
       {skillPickerOpen && (
         <>
           <SkillPickerSheet
-            // 只列频道共享技能：目录技能（channel.installedSkills）+ 频道自建的账户技能库引用。
-            customSkills={channelCustomSkills}
+            // 展示技能库全量技能（账户自建 + 目录）；频道已添加的默认勾选 + 锁定。
+            customSkills={skillLibrary}
             installedCatalogIds={channelInstalledSkills}
+            installedCustomIds={channel.skillRefs}
             selectedIds={selectedSkillIds}
             onToggle={(id) =>
               setSelectedSkillIds((ids) =>
@@ -1165,6 +1166,7 @@ export function ChannelChatScreen({
         <>
           <ConnectorPickerSheet
             options={connectorChoices}
+            installedIds={channel.installedConnectors}
             selectedIds={selectedConnectorIds}
             onToggle={(id) =>
               setSelectedConnectorIds((ids) =>

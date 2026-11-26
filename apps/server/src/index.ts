@@ -1,16 +1,37 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.ts";
+import type { Config } from "./config.ts";
 import { readConfig } from "./config.ts";
+import type { Store } from "./db.ts";
 import { createStore } from "./db.ts";
 import { backgroundFailure } from "./log.ts";
 import { getMarketDataHealth } from "./market-data-health.ts";
 import { getPdfHealth } from "./pdf-health.ts";
 
 const config = readConfig();
-const db = await createStore({
-  dataDir: `${config.dataDir}/postgres`,
-  databaseUrl: config.databaseUrl,
-});
+/**
+ * PGlite 的 dist 是上万个字符挤在一行的产物。数据库初始化抛错时顶层 await 没人接住，
+ * Node 会把那一整行源码打出来，真正的 `Error:` 被推到 100KB 之后，部署日志里等于看不见。
+ * 这里把它收成一行，带上 DATA_DIR 与错误码，失败原因才读得出来。
+ */
+async function openStore(settings: Config): Promise<Store> {
+  try {
+    return await createStore({
+      dataDir: `${settings.dataDir}/postgres`,
+      databaseUrl: settings.databaseUrl,
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    const code = (error as { code?: unknown } | null)?.code;
+    console.error(
+      `[LingWu] 数据库初始化失败 · DATA_DIR=${settings.dataDir}${settings.databaseUrl ? " · DATABASE_URL" : ""}` +
+        `${code ? ` · code=${String(code)}` : ""} · node=${process.version} · ${detail.slice(0, 400)}`,
+    );
+    process.exit(1);
+  }
+}
+
+const db = await openStore(config);
 await db.recoverInterruptedActions();
 const { app, agent, conversationStream } = await createApp(db, config);
 if (config.taskWorkerEnabled) agent.start();

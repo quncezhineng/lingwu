@@ -324,3 +324,47 @@ export async function readInstalledSkill(
   if (!skill) return { error: "That skill is not installed on this agent." };
   return { id: skill.id, name: skill.name, body: skill.body };
 }
+
+/** 临时选用列表（来自 `selectedSkillsFromRun`）是否命中了某个请求（id 或展示名）。 */
+export function selectedSkillMatches(
+  selected: readonly SelectedSkill[],
+  requested: string,
+): boolean {
+  const key = skillKey(requested);
+  return selected.some(
+    (skill) => skillKey(skill.id) === key || (skill.name ? skillKey(skill.name) === key : false),
+  );
+}
+
+export type ResolvedAnySkill = { id: string; name: string; description: string; body: string };
+
+/**
+ * 从全量来源解析技能方法：技能目录（skills/ 目录全部 SKILL.md）+ 账户技能库
+ * （skillLibrary）。目录优先，技能库不覆盖同名 id。
+ *
+ * 用于选择弹窗里「仅临时选用」的未安装技能：用户本轮明确勾选了它，就允许
+ * 按 id / 名称读到完整方法；已安装路径（readInstalledSkill / readChannelSkill）
+ * 查不到时才走到这里。
+ */
+export function resolveAnySkill(
+  space: SkillSpace | null | undefined,
+  requested: string,
+): { error: string } | ResolvedAnySkill {
+  const merged = new Map<string, ResolvedSkill>();
+  for (const builtin of loadBuiltinSkills().values()) {
+    if (!merged.has(builtin.id))
+      merged.set(builtin.id, { id: builtin.id, name: builtin.name, body: builtin.body });
+  }
+  for (const skill of space?.skillLibrary ?? []) {
+    if (merged.has(skill.id)) continue;
+    merged.set(skill.id, { id: skill.id, name: skill.name, body: customBody(skill) });
+  }
+  const skill = matchSkill(merged, requested);
+  if (!skill) return { error: "That skill is not in the skill library or catalog." };
+  return {
+    id: skill.id,
+    name: skill.name,
+    description: skill.body.slice(0, SUMMARY_LIMIT),
+    body: skill.body,
+  };
+}

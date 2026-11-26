@@ -397,9 +397,9 @@ function OptionRow({
           borderWidth: 1,
           borderColor: checked ? colors.primary : colors.line,
           borderRadius: radius.field,
-          backgroundColor:
-            checked && !blocked ? colors.sky : pressed && !blocked ? colors.surface : colors.paper,
-          opacity: disabled ? 0.5 : 1,
+          backgroundColor: checked || (pressed && !blocked) ? colors.sky : colors.paper,
+          // 已勾选的锁定项（已添加的连接器）保持醒目，普通禁用（未连接）才减淡。
+          opacity: disabled && !checked ? 0.5 : 1,
         },
       ]}
     >
@@ -428,10 +428,14 @@ function OptionRow({
         )}
       </View>
       {disabled ? (
+        // 「去连接」优先（未连接要引导去连）；已添加的连接器锁定但不取消勾选，
+        // 显示勾选态；其余 disabled（如已停用）才显示「—」。
         onConnect && connectLabel ? (
           <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>
             {connectLabel}
           </Text>
+        ) : checked ? (
+          <SelectionBox checked />
         ) : (
           <Text style={{ fontSize: 11, color: colors.faint }}>—</Text>
         )
@@ -574,13 +578,9 @@ function OptionCard({
           borderWidth: 1,
           borderColor: checked ? colors.primary : colors.line,
           borderRadius: radius.field,
-          backgroundColor:
-            checked && !disabled
-              ? colors.sky
-              : pressed && !disabled
-                ? colors.surface
-                : colors.paper,
-          opacity: disabled ? 0.5 : 1,
+          backgroundColor: checked || (pressed && !disabled) ? colors.sky : colors.paper,
+          // 已勾选的锁定项（已添加的技能）保持醒目，普通禁用（不可用）才减淡。
+          opacity: disabled && !checked ? 0.5 : 1,
         },
       ]}
     >
@@ -633,7 +633,13 @@ function OptionCard({
           </Pressable>
         )}
         {disabled ? (
-          <Text style={{ fontSize: 11, color: colors.faint }}>—</Text>
+          // checked 的 disabled 是「已添加、锁定不可取消」，仍然显示勾选态；
+          // 其余 disabled（如已停用）才显示「—」。
+          checked ? (
+            <SelectionBox checked />
+          ) : (
+            <Text style={{ fontSize: 11, color: colors.faint }}>—</Text>
+          )
         ) : (
           <SelectionBox checked={checked} />
         )}
@@ -651,6 +657,7 @@ function OptionCard({
 export function SkillPickerSheet({
   customSkills,
   installedCatalogIds,
+  installedCustomIds,
   selectedIds,
   onToggle,
   onConfirm,
@@ -661,9 +668,12 @@ export function SkillPickerSheet({
   mineHeading,
   emptyDetail,
 }: {
+  /** 账户全部自建技能（技能库），不只是当前 Agent/频道已归属的那部分。 */
   customSkills: readonly AgentSkill[];
-  /** 已装的内置（目录）技能。传入后目录列表只含已装技能。 */
+  /** 当前 Agent/频道已添加的内置（目录）技能 id。目录据此显示默认已勾选 + 锁定。 */
   installedCatalogIds?: readonly string[];
+  /** 当前 Agent/频道已引用的自建技能 id（skillRefs）。「我的技能」据此显示默认已勾选 + 锁定。 */
+  installedCustomIds?: readonly string[];
   selectedIds: readonly string[];
   onToggle: (id: string) => void;
   onConfirm: () => void;
@@ -683,16 +693,18 @@ export function SkillPickerSheet({
   const matches = (...values: string[]) =>
     !keyword || values.some((value) => value.toLowerCase().includes(keyword));
 
-  const installed = installedCatalogIds ? new Set(installedCatalogIds) : undefined;
+  // 已添加的技能默认勾选且锁定（不能在这里取消，移除要去 Agent/频道设置页）。
+  const installedCatalog = installedCatalogIds ? new Set(installedCatalogIds) : new Set<string>();
+  const installedCustom = installedCustomIds ? new Set(installedCustomIds) : new Set<string>();
   const custom = customSkills.filter((skill) => matches(skill.name, skill.purpose));
-  const filtered = skillCatalog.filter(
-    (skill) =>
-      (installed ? installed.has(skill.id) : true) &&
-      matches(skill.titleZh, skill.titleEn, skill.descriptionZh, skill.descriptionEn, skill.id),
+  // 目录展示技能库全量技能；已添加的并入勾选态并锁定。
+  const filtered = skillCatalog.filter((skill) =>
+    matches(skill.titleZh, skill.titleEn, skill.descriptionZh, skill.descriptionEn, skill.id),
   );
   const visible = filtered.slice(0, SKILL_PAGE_SIZE);
   const hidden = filtered.length - visible.length;
-  const selectedCount = selectedIds.length;
+  // 底部计数 = 本轮临时勾选 + 已添加（默认勾选且锁定）的技能，与可见勾选态一致。
+  const selectedCount = new Set([...selectedIds, ...installedCatalog, ...installedCustom]).size;
 
   return (
     <Sheet
@@ -715,12 +727,14 @@ export function SkillPickerSheet({
             <OptionGrid>
               {(cellWidth) =>
                 custom.map((skill) => {
-                  const checked = selectedIds.includes(skill.id);
+                  const locked = installedCustom.has(skill.id);
+                  const checked = selectedIds.includes(skill.id) || locked;
                   return (
                     <OptionCard
                       key={skill.id}
                       cellWidth={cellWidth}
                       checked={checked}
+                      disabled={locked}
                       icon={Brain}
                       title={skill.name}
                       detail={skill.purpose}
@@ -742,13 +756,15 @@ export function SkillPickerSheet({
             <OptionGrid>
               {(cellWidth) =>
                 visible.map((skill) => {
-                  const checked = selectedIds.includes(skill.id);
+                  const locked = installedCatalog.has(skill.id);
+                  const checked = selectedIds.includes(skill.id) || locked;
                   const title = zh ? skill.titleZh : skill.titleEn;
                   return (
                     <OptionCard
                       key={skill.id}
                       cellWidth={cellWidth}
                       checked={checked}
+                      disabled={locked}
                       icon={Brain}
                       title={title}
                       detail={zh ? skill.descriptionZh : skill.descriptionEn}
@@ -788,6 +804,7 @@ export function SkillPickerSheet({
  */
 export function ConnectorPickerSheet({
   options,
+  installedIds,
   selectedIds,
   onToggle,
   onConfirm,
@@ -796,6 +813,8 @@ export function ConnectorPickerSheet({
   onConnect,
 }: {
   options: readonly ConnectorOption[];
+  /** 当前 Agent/频道已挂载的连接器 id。列表据此显示默认已勾选 + 锁定。 */
+  installedIds?: readonly string[];
   selectedIds: readonly string[];
   onToggle: (id: string) => void;
   onConfirm: () => void;
@@ -805,7 +824,9 @@ export function ConnectorPickerSheet({
   onConnect?: (id: string) => void;
 }) {
   const { t } = useTranslation();
-  const selectedCount = selectedIds.length;
+  const installed = installedIds ? new Set(installedIds) : new Set<string>();
+  // 底部计数 = 本轮临时勾选 + 已添加（默认勾选且锁定）的连接器，与可见勾选态一致。
+  const selectedCount = new Set([...selectedIds, ...installed]).size;
   return (
     <Sheet
       title={t("chat.connectorPickerTitle")}
@@ -816,28 +837,33 @@ export function ConnectorPickerSheet({
         {options.length > 0 ? (
           <OptionGrid>
             {(cellWidth) =>
-              options.map((option) => (
-                <OptionRow
-                  key={option.id}
-                  cellWidth={cellWidth}
-                  checked={selectedIds.includes(option.id)}
-                  disabled={!option.connected}
-                  icon={option.icon}
-                  iconColor={option.iconColor}
-                  iconSurface={option.iconSurface}
-                  title={option.name}
-                  detail={option.detail}
-                  status={t(
-                    option.connected
-                      ? "chat.connectorPickerConnected"
-                      : "chat.connectorPickerDisconnected",
-                  )}
-                  accessibilityLabel={option.name}
-                  onPress={() => onToggle(option.id)}
-                  onConnect={option.connected ? undefined : () => onConnect?.(option.id)}
-                  connectLabel={option.connected ? undefined : t("chat.connectorPickerConnect")}
-                />
-              ))
+              options.map((option) => {
+                // 已添加的连接器默认勾选且锁定（不能在这里取消，移除要去 Agent/频道设置页）。
+                const locked = installed.has(option.id);
+                const checked = selectedIds.includes(option.id) || locked;
+                return (
+                  <OptionRow
+                    key={option.id}
+                    cellWidth={cellWidth}
+                    checked={checked}
+                    disabled={!option.connected || locked}
+                    icon={option.icon}
+                    iconColor={option.iconColor}
+                    iconSurface={option.iconSurface}
+                    title={option.name}
+                    detail={option.detail}
+                    status={t(
+                      option.connected
+                        ? "chat.connectorPickerConnected"
+                        : "chat.connectorPickerDisconnected",
+                    )}
+                    accessibilityLabel={option.name}
+                    onPress={() => onToggle(option.id)}
+                    onConnect={option.connected ? undefined : () => onConnect?.(option.id)}
+                    connectLabel={option.connected ? undefined : t("chat.connectorPickerConnect")}
+                  />
+                );
+              })
             }
           </OptionGrid>
         ) : (

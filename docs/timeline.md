@@ -5,6 +5,39 @@
 
 ## 变更记录
 
+### 2026-11-26 · 对话「选择技能 / 选择连接器」弹窗改为从完整库中选择，已添加项默认勾选并锁定
+
+**背景**
+
+- 用户反馈：智能体对话与频道对话里，「选择技能」弹窗的技能目录原先只列出当前智能体/频道**已装**的技能，用户无法从整个技能库（自建技能 + 内置技能目录全量）里挑；「选择连接器」弹窗同理。
+- 期望：目录能列出完整技能库，已被当前智能体/频道添加的技能默认显示为**已勾选**；连接器弹窗按同样方式处理。
+
+**关键决策（用户确认）**
+
+- **仅临时选用**：已添加的技能/连接器默认勾选且**锁定**——不能在弹窗里取消勾选；弹窗只负责额外**临时选用**其他技能/连接器；要移除已添加项需去智能体/频道的设置页操作。
+- **一并改好**：原先服务端 `use_skill` 只能读到「已添加」技能的完整方法，临时勾选未添加的技能时 AI 读不到正文。本次一并打通，让「仅临时选用」真正生效。
+
+**处理（客户端）**
+
+- [capability-picker.tsx](../apps/mobile/src/capability-picker.tsx)
+  - `SkillPickerSheet`：技能目录**移除「只显示已装」过滤**，改为展示 `skillCatalog` 全量技能；勾选态合并为 `选中 ∪ 已添加`，已添加项 `disabled` 锁定；新增 `installedCustomIds` prop 用于「我的技能」分区判定锁定（`customSkills` 语义改为账户全量技能库）；底部计数改为 `选中 ∪ 已添加` 去重计数。
+  - `ConnectorPickerSheet`：新增 `installedIds` prop；勾选态合并为 `选中 ∪ 已添加`，已添加项锁定；底部计数同步。
+  - `OptionCard` / `OptionRow`：支持「checked + disabled = 已添加锁定」——保持醒目底色并显示勾选框，与普通禁用（如未连接、已停用）区分；`OptionRow` 中「去连接」引导优先于锁定勾选态。
+- [chat.tsx](../apps/mobile/src/chat.tsx)：`SkillPickerSheet` 改传全量 `skillLibrary` + `installedCustomIds={currentAgent.skillRefs}`；`ConnectorPickerSheet` 新增 `installedIds={currentAgent.installedConnectors}`。
+- [channel-chat.tsx](../apps/mobile/src/channel-chat.tsx)：同样处理，分别传 `channel.skillRefs` 与 `channel.installedConnectors`。
+- 文案：[zh-Hans/chat.ts](../apps/mobile/src/i18n/locales/zh-Hans/chat.ts) 与 [en/chat.ts](../apps/mobile/src/i18n/locales/en/chat.ts) 的 `skillPickerSubtitle`、`channelSkillPickerSubtitle`、`skillPickerEmptyDetail`、`channelSkillPickerEmptyDetail`、`connectorPickerSubtitle` 从「只显示已装/已添加」改为「从技能库与目录中选择，已添加项默认勾选且不可在此取消」。
+
+**处理（服务端：让临时选用真正生效）**
+
+- [bot-skills.ts](../apps/server/src/engine/bot-skills.ts)：新增 `selectedSkillMatches`（按 id 或展示名匹配本轮临时选用的技能）与 `resolveAnySkill`（从全量来源解析技能正文：`skills/` 目录全部 SKILL.md + 账户技能库 `skillLibrary`，目录优先）。
+- [conversation.ts](../apps/server/src/engine/conversation.ts)：`use_skill` 改为「已安装优先 → 临时选用回退（`selectedSkillsFromRun` + `resolveAnySkill`）」；system prompt 追加 `selectedSkillGuide`，点明本轮勾选了哪些技能，模型才会去 `use_skill` 读取。
+- [channel-chat.ts](../apps/server/src/engine/channel-chat.ts)：`pickedSkills` 扩展出 `temporarySkills`（对 `input.skillIds` 中未装到频道的技能走 `resolveAnySkill`），与已装技能合并进 `pickedSkillLine`；成员 `use_skill` 回退链扩展为「成员自己 → 频道共享 → 本轮临时选用」。
+
+**说明**
+
+- 验证：`apps/mobile` 与 `apps/server` 的 `tsc --noEmit` 均通过；`biome check` 无告警；全量测试 `npm test` 1304/1304 通过。
+- 顺带修复：`apps/mobile/test/mobile-bots.test.ts` 的「the bots home preview is the latest user or assistant line」此前失败——断言期望保留 Markdown `**`，与 `mobile-bots.ts` 的 `stripMarkdownFlags`（左侧栏预览应剥掉 `**` 等记号）及同文件「without markdown noise」用例相矛盾，属过期断言。已将期望改为剥离后的 `「今天 伦敦金 在回调」`。
+
 ### 2026-11-26 · Web 端统一去掉输入框点击聚焦时的黄色焦点边框
 
 **背景**

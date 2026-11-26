@@ -31,7 +31,14 @@ import { backgroundFailure } from "../log.ts";
 import type { ResolvedModel } from "../model-settings.ts";
 import { searchDescription, searchInputSchema, searchInstructions } from "../search.ts";
 import { agentIdentityGuidance } from "./agent-persona.ts";
-import { readInstalledSkill, skillGuidanceForThread } from "./bot-skills.ts";
+import {
+  readInstalledSkill,
+  resolveAnySkill,
+  type SkillSpace,
+  selectedSkillMatches,
+  selectedSkillsFromRun,
+  skillGuidanceForThread,
+} from "./bot-skills.ts";
 import { readArtifact, readArtifactDescription, threadLongformContext } from "./longform.ts";
 import { filterMemoriesForScope, memoryAgentKey, memoryScopeKeys } from "./memory-scope.ts";
 import {
@@ -731,10 +738,31 @@ export class ConversationAgent extends AbstractAgent {
       defineTool({
         name: "use_skill",
         description:
-          "Read the full method of one skill installed on this agent. Call it before following a skill. skillId is the id from the installed-skill list. A matching display name is accepted.",
+          "Read the full method of one skill used in this conversation. Call it before following a skill. skillId is the id from the selected/installed skill list. A matching display name is accepted.",
         parameters: z.object({ skillId: z.string().trim().min(1).max(128) }),
-        execute: async ({ skillId }) =>
-          readInstalledSkill(this.service.db, this.owner, input.threadId, skillId),
+        execute: async ({ skillId }) => {
+          // 已安装的优先：Agent 自己装的目录技能 / 引用的技能库技能。
+          const installed = await readInstalledSkill(
+            this.service.db,
+            this.owner,
+            input.threadId,
+            skillId,
+          );
+          if (!("error" in installed)) return installed;
+          // 弹窗「仅临时选用」：技能还没装到 Agent 上，但用户本轮明确勾选（消息里的
+          // `Selected skills:` 标记行），从技能库 / 目录读完整方法，让临时选用真正生效。
+          if (selectedSkillMatches(selectedSkillsFromRun(input), skillId)) {
+            const space = await this.service.db.get<SkillSpace>(
+              this.owner,
+              "agent-settings",
+              "space",
+            );
+            const fallback = resolveAnySkill(space, skillId);
+            if (!("error" in fallback))
+              return { id: fallback.id, name: fallback.name, body: fallback.body };
+          }
+          return installed;
+        },
       }),
       defineTool({
         name: "use_connection",
@@ -770,6 +798,17 @@ export class ConversationAgent extends AbstractAgent {
           readArtifact({ db: this.service.db, owner: this.owner, id: artifactId, query, offset }),
       }),
     ];
+    // 弹窗「仅临时选用」的技能不在已安装清单里，向模型点明这一轮勾了哪些，
+    // 模型才会调用 use_skill 去读它们的方法。
+    const selectedSkillGuide = (() => {
+      const selected = selectedSkillsFromRun(input);
+      if (!selected.length) return "";
+      return ` The user selected these skills for this turn: ${selected
+        .map((skill) => skill.name || skill.id)
+        .join(
+          ", ",
+        )}. To use one, call use_skill with its id or display name and follow the returned method.`;
+    })();
     const agent = tanstackAgent({
       model: model?.model ?? this.config.model ?? "openai/unconfigured",
       connection: model?.connection,
@@ -805,6 +844,7 @@ export class ConversationAgent extends AbstractAgent {
         " Long-form rule: a reply longer than about 2000 characters is saved as a card and only its summary stays in the conversation. The transcript keeps summaries, so when a question needs exact figures, wording or sections from an earlier long reply, call read_artifact with that artifact ID before answering. Never claim a document was truncated or ask the person to paste it again while its card is listed above. " +
         longformGuide +
         skillGuide +
+        selectedSkillGuide +
         connectionGuide,
     });
     return this.expireOnUserTurn(

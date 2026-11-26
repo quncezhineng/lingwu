@@ -16,7 +16,7 @@ test("the bots home preview is the latest user or assistant line", () => {
     { role: "assistant", content: "今天 **伦敦金** 在回调", createdAt: "2026-11-11T09:00:00.000Z" },
   ]);
   assert.deepEqual(preview, {
-    text: "今天 **伦敦金** 在回调",
+    text: "今天 伦敦金 在回调",
     at: "2026-11-11T09:00:00.000Z",
   });
   assert.equal(latestBotPreview([{ role: "tool", content: "only a tool" }]), null);

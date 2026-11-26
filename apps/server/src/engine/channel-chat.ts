@@ -39,6 +39,8 @@ import {
   installedSkillViews,
   readChannelSkill,
   readInstalledSkill,
+  resolveAnySkill,
+  type SkillSummary,
   skillPrompt,
 } from "./bot-skills.ts";
 import { formatQuoteToolResult } from "./conversation.ts";
@@ -1047,11 +1049,27 @@ export async function runChannelChat(
   // 频道技能和成员自己的技能都只给清单。正文等 use_skill 再读。
   const sharedSkills = channelSkillViews(space, channel);
   const sharedSkillLine = skillPrompt(sharedSkills.summaries, "this channel");
-  const pickedSkills = (input.skillIds ?? []).length
-    ? sharedSkills.summaries.filter((skill) => input.skillIds?.includes(skill.id))
+  const pickedIds = input.skillIds ?? [];
+  const pickedSkills = pickedIds.length
+    ? sharedSkills.summaries.filter((skill) => pickedIds.includes(skill.id))
     : [];
-  const pickedSkillLine = pickedSkills.length
-    ? `The user selected these channel skills for this turn. When the request matches one, call use_skill with its id before the others:\n${pickedSkills
+  // 弹窗「仅临时选用」：本轮勾选的技能里，没装到频道的也从技能库 / 目录解析，
+  // 让成员知道这些技能本轮可用，use_skill 也能读到完整方法。
+  const temporarySkills: SkillSummary[] = (() => {
+    if (!pickedIds.length) return [];
+    const known = new Set(sharedSkills.summaries.map((skill) => skill.id));
+    const extra: SkillSummary[] = [];
+    for (const id of pickedIds) {
+      if (known.has(id)) continue;
+      const resolved = resolveAnySkill(space, id);
+      if ("error" in resolved) continue;
+      extra.push({ id: resolved.id, name: resolved.name, description: resolved.description });
+    }
+    return extra;
+  })();
+  const allPickedSkills = [...pickedSkills, ...temporarySkills];
+  const pickedSkillLine = allPickedSkills.length
+    ? `The user selected these channel skills for this turn. When the request matches one, call use_skill with its id before the others:\n${allPickedSkills
         .map((skill) => `- ${skill.id}: ${skill.name} — ${skill.description}`)
         .join("\n")}`
     : "";
@@ -1203,12 +1221,25 @@ export async function runChannelChat(
             }),
             defineTool({
               name: "use_skill",
-              description: "Read the full method of a skill installed on you before following it.",
+              description:
+                "Read the full method of a skill selected or installed for this conversation before following it.",
               parameters: z.object({ skillId: z.string().trim().min(1).max(128) }),
               execute: async ({ skillId }) => {
                 const own = await readInstalledSkill(db, owner, member.threadId, skillId);
                 // 成员自己没有这份技能时，再看频道共享的技能（频道里添加的）。
-                return "error" in own ? readChannelSkill(space, channel, skillId) : own;
+                if ("error" in own) {
+                  const shared = readChannelSkill(space, channel, skillId);
+                  if (!("error" in shared)) return shared;
+                  // 弹窗「仅临时选用」：本轮用户勾选了但还没装到频道的技能，
+                  // 从技能库 / 目录读完整方法，让临时选用真正生效。
+                  if (pickedIds.includes(skillId)) {
+                    const fallback = resolveAnySkill(space, skillId);
+                    if (!("error" in fallback))
+                      return { id: fallback.id, name: fallback.name, body: fallback.body };
+                  }
+                  return shared;
+                }
+                return own;
               },
             }),
           ]

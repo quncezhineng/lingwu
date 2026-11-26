@@ -2619,8 +2619,9 @@ export function ChatScreen({
       {skillPickerOpen && (
         <>
           <SkillPickerSheet
-            customSkills={heldSkills}
+            customSkills={skillLibrary}
             installedCatalogIds={currentAgent.installedSkills}
+            installedCustomIds={currentAgent.skillRefs}
             selectedIds={selectedSkillIds}
             onToggle={(id) =>
               setSelectedSkillIds((ids) =>
@@ -2649,6 +2650,7 @@ export function ChatScreen({
         <>
           <ConnectorPickerSheet
             options={connectorChoices}
+            installedIds={currentAgent.installedConnectors}
             selectedIds={selectedConnectorIds}
             onToggle={(id) =>
               setSelectedConnectorIds((ids) =>
