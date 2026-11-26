@@ -3,7 +3,7 @@
  * 标的详情内嵌笔记区。
  */
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, type TextStyle, View } from "react-native";
 import type { LingWuApi } from "./api";
 import { Text, TextInput } from "./app-text";
 import { type TranslationFn, useTranslation } from "./i18n";
@@ -1165,7 +1165,11 @@ export function SymbolNotesSection({
                 placeholder={t("notes.searchPlaceholder")}
                 placeholderTextColor={colors.faint}
                 accessibilityLabel={t("notes.searchPlaceholder")}
-                style={{ flex: 1, fontSize: 15, color: colors.text, paddingVertical: 8 }}
+                style={[
+                  { flex: 1, fontSize: 15, color: colors.text, paddingVertical: 8 },
+                  // Web 端去掉浏览器默认的黄色 focus 边框（outline），移动端忽略。
+                  Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null,
+                ]}
               />
             </View>
             <Button

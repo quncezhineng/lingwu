@@ -439,6 +439,7 @@ flowchart TB
 | `TASK_WORKER_ENABLED` | API 进程是否内嵌任务 Worker |
 | `DATABASE_URL` / `DATA_DIR` | 拆分部署时的共享数据库和数据目录 |
 | `WEB_SEARCH_ENABLED` | 公共网页搜索，默认开启 |
+| `WEB_SEARCH_API_KEY` | Parallel 搜索 API Key（platform.parallel.ai）；配置后所有用户共享该 Key 的更高额度，替代免费 Keyless 档 |
 | `PDFTOTEXT_BIN` | PDF 文本提取程序 |
 
 ### 9.4 单进程与拆分部署

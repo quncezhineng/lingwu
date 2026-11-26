@@ -4,7 +4,8 @@ const PROTOCOL = "2025-03-26";
 
 export type McpAuth = "query" | "bearer" | "header" | "url";
 
-export type McpTool = { name: string; description: string };
+/** `params` 是压缩后的入参签名，`!` 标记必填：`thscode:string!, report:string!`。 */
+export type McpTool = { name: string; description: string; params?: string };
 
 export class McpError extends Error {
   constructor(
@@ -65,6 +66,35 @@ function parseBody(raw: string, contentType: string): Record<string, unknown> | 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
     throw new McpError("MCP 响应格式不正确");
   return parsed as Record<string, unknown>;
+}
+
+/**
+ * tools/list 里的 inputSchema 之前被丢掉了，模型只看得到名字和简介，调用时只能猜参数，
+ * 上游就会回「Missing required argument: report」。这里把 properties + required 压成一行签名，
+ * 让模型在列工具时就知道哪个参数必填。
+ */
+export function paramSignature(schema: unknown): string {
+  if (!schema || typeof schema !== "object") return "";
+  const { properties, required } = schema as {
+    properties?: unknown;
+    required?: unknown;
+  };
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) return "";
+  const need = new Set(
+    Array.isArray(required)
+      ? required.filter((name): name is string => typeof name === "string")
+      : [],
+  );
+  const parts: string[] = [];
+  for (const [name, spec] of Object.entries(properties as Record<string, unknown>)) {
+    if (parts.length >= 12) break;
+    const type =
+      spec && typeof spec === "object" && typeof (spec as { type?: unknown }).type === "string"
+        ? String((spec as { type: string }).type)
+        : "any";
+    parts.push(`${name}:${type}${need.has(name) ? "!" : ""}`);
+  }
+  return parts.join(", ");
 }
 
 export function assertDingUrl(raw: string): string {
@@ -173,13 +203,17 @@ export async function mcpSession(
       const batch = Array.isArray(result.tools) ? result.tools : [];
       return batch
         .filter(
-          (item): item is { name?: string; description?: string } =>
+          (item): item is { name?: string; description?: string; inputSchema?: unknown } =>
             !!item && typeof item === "object",
         )
-        .map((item) => ({
-          name: String(item.name ?? "").slice(0, 80),
-          description: String(item.description ?? "").slice(0, 240),
-        }))
+        .map((item) => {
+          const params = paramSignature(item.inputSchema);
+          return {
+            name: String(item.name ?? "").slice(0, 80),
+            description: String(item.description ?? "").slice(0, 240),
+            ...(params ? { params } : {}),
+          };
+        })
         .filter((item) => item.name)
         .slice(0, 24);
     },

@@ -31,7 +31,10 @@ const timeoutMs = 45000;
 const maxResponseBytes = 1024 * 1024;
 
 export class SearchService {
-  constructor(private readonly db: Store) {}
+  constructor(
+    private readonly db: Store,
+    private readonly apiKey?: string,
+  ) {}
 
   async search(
     owner: string,
@@ -62,9 +65,15 @@ export class SearchService {
     const deadline = AbortSignal.timeout(timeoutMs);
     const requestSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
     const client = new Client({ name: project.name, version: project.version });
+    // With a configured key the deployment shares a higher Parallel quota across all users;
+    // without one we stay on Parallel's keyless public tier.
+    const headers: Record<string, string> = {
+      "User-Agent": `${project.name}/${project.version}`,
+    };
+    if (this.apiKey) headers["x-api-key"] = this.apiKey;
     const transport = new StreamableHTTPClientTransport(new URL("https://search.parallel.ai/mcp"), {
       // Identify aggregate project usage, without user or installation identifiers.
-      requestInit: { headers: { "User-Agent": `${project.name}/${project.version}` } },
+      requestInit: { headers },
       reconnectionOptions: {
         maxRetries: 0,
         initialReconnectionDelay: 1000,

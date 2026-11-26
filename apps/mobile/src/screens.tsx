@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  Platform,
   Pressable,
+  type TextStyle,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -1474,16 +1476,22 @@ export function FilesScreen({
                   placeholder={t("screens.filesSearchPlaceholder")}
                   placeholderTextColor={colors.faint}
                   accessibilityLabel={t("screens.filesSearchLabel")}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    minHeight: 38,
-                    paddingVertical: 0,
-                    borderWidth: 0,
-                    color: colors.text,
-                    fontSize: 13,
-                    fontFamily: fonts.sans,
-                  }}
+                  style={[
+                    {
+                      flex: 1,
+                      minWidth: 0,
+                      minHeight: 38,
+                      paddingVertical: 0,
+                      borderWidth: 0,
+                      color: colors.text,
+                      fontSize: 13,
+                      fontFamily: fonts.sans,
+                    },
+                    // Web 端去掉浏览器默认的黄色 focus 边框（outline），移动端忽略。
+                    Platform.OS === "web"
+                      ? ({ outlineStyle: "none" } as unknown as TextStyle)
+                      : null,
+                  ]}
                 />
               </View>
               <Pressable

@@ -23,6 +23,8 @@ export default function DateFields({ label, date, time, allDay, onChange }: Date
     width: "100%",
     boxSizing: "border-box" as const,
     minHeight: 46,
+    // Web 端去掉点击聚焦时浏览器默认的黄色 focus 边框（outline）。
+    outline: "none",
   };
   return (
     <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>

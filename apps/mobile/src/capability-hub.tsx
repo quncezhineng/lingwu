@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, type TextStyle, useWindowDimensions, View } from "react-native";
 import Markdown from "react-native-markdown-renderer";
 import { type Channel, normalizeChannelAvatar } from "../../../packages/domain/src/channel";
 import {
@@ -2741,15 +2741,19 @@ export function CapabilityHubScreen() {
         placeholder={t(HUB_SEARCH_LABELS[typeFilter])}
         placeholderTextColor={colors.faint}
         accessibilityLabel={t(HUB_SEARCH_LABELS[typeFilter])}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          paddingVertical: 0,
-          color: colors.text,
-          fontSize: 13,
-          lineHeight: 18,
-          fontFamily: fonts.sans,
-        }}
+        style={[
+          {
+            flex: 1,
+            minWidth: 0,
+            paddingVertical: 0,
+            color: colors.text,
+            fontSize: 13,
+            lineHeight: 18,
+            fontFamily: fonts.sans,
+          },
+          // Web 端去掉浏览器默认的黄色 focus 边框（outline），移动端忽略。
+          Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null,
+        ]}
       />
       {!!query && (
         <Pressable

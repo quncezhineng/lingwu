@@ -68,6 +68,8 @@ export interface Config {
   workerToken?: string;
   taskWorkerEnabled?: boolean;
   webSearchEnabled?: boolean;
+  /** Parallel 搜索的 API Key；配置后请求带上 x-api-key，供所有用户共享更高额度。 */
+  webSearchApiKey?: string;
   computerEnabled?: boolean;
   computerImage?: string;
   computerDeploymentId?: string;
@@ -217,6 +219,7 @@ export function readConfig(): Config {
     workerToken: process.env.WORKER_TOKEN,
     taskWorkerEnabled: process.env.TASK_WORKER_ENABLED !== "false",
     webSearchEnabled: process.env.WEB_SEARCH_ENABLED !== "false",
+    webSearchApiKey: process.env.WEB_SEARCH_API_KEY?.trim(),
     computerEnabled: process.env.COMPUTER_ENABLED === "true",
     computerImage: process.env.COMPUTER_IMAGE ?? "lingwu-computer:local",
     computerDeploymentId: process.env.COMPUTER_DEPLOYMENT_ID,

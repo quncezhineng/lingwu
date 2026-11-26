@@ -84,6 +84,8 @@ export function PromptComposer({
   const [inputHost, setInputHost] = useState<HTMLElement | null>(null);
   const composing = useRef(false);
   const compositionEndedAt = useRef(0);
+  // 工具按钮 + 弹出菜单的宿主节点，用于「点击弹窗外任意处关闭」。
+  const toolsHostRef = useRef<View | null>(null);
   const assignInputRef = useCallback(
     (node: TextInput | null) => {
       setInputHost((current) => {
@@ -115,6 +117,25 @@ export function PromptComposer({
   useEffect(() => {
     if (!value) setInputHeight(inputMinHeight);
   }, [inputMinHeight, value]);
+
+  /**
+   * 工具弹窗打开时，点击弹窗外的任意位置即关闭。
+   * 只在 web 挂 document 监听：点击目标是加号按钮或菜单内部时跳过，
+   * 让按钮自身的展开/收起逻辑与菜单项的 onPress 继续生效。
+   */
+  useEffect(() => {
+    if (!toolsOpen || Platform.OS !== "web") return;
+    const doc = globalThis.document;
+    if (!doc) return;
+    const dismiss = (event: Event) => {
+      const target = event.target as Element | null;
+      const host = toolsHostRef.current as unknown as HTMLElement | null;
+      if (host && target && host.contains(target)) return;
+      setToolsOpen(false);
+    };
+    doc.addEventListener("pointerdown", dismiss);
+    return () => doc.removeEventListener("pointerdown", dismiss);
+  }, [toolsOpen]);
 
   const canSubmit = !submitDisabled && value.trim().length > 0;
   // 暂停态与运行态都保持可点击：前者继续分析，后者暂停分析。
@@ -301,7 +322,7 @@ export function PromptComposer({
             gap: 4,
           }}
         >
-          <View style={{ position: "relative", zIndex: 10, flexShrink: 0 }}>
+          <View ref={toolsHostRef} style={{ position: "relative", zIndex: 10, flexShrink: 0 }}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={tools[0]?.label}
@@ -311,7 +332,7 @@ export function PromptComposer({
                 width: controlSize,
                 height: controlSize,
                 flexShrink: 0,
-                borderRadius: radius.control,
+                borderRadius: radius.full,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: toolsOpen || pressed ? colors.overlay2 : "transparent",

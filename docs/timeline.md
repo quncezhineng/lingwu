@@ -5,6 +5,24 @@
 
 ## 变更记录
 
+### 2026-11-26 · Web 端统一去掉输入框点击聚焦时的黄色焦点边框
+
+**背景**
+
+- 用户连续在多处搜索框（搜索资料名称、搜索笔记/标的/关键词、搜索技能/连接器/智能体等）发现鼠标点击聚焦时出现浏览器默认的黄色 focus 边框（outline），要求全项目清除。
+
+**处理**
+
+- [app-text.tsx](../apps/mobile/src/app-text.tsx)：项目内所有文本输入框都经 `AppTextInput` 包装组件渲染，在此一次性追加 web 端 `outlineStyle: "none"`，全量覆盖所有 RN 输入框（含搜索框、表单输入框），避免逐文件重复写。
+- [index.html](../apps/mobile/public/index.html)：把 `input/textarea/select:focus { outline: none }` 写进文档级样式，页面加载即生效，与 App.tsx 运行时注入构成双保险（首个文档加载时就生效，不依赖 JS bundle 新旧）。
+- [App.tsx](../apps/mobile/App.tsx)：`Platform.OS === "web"` 下运行时注入全局兜底 CSS（此前已加）。
+- [DateFields.web.tsx](../apps/mobile/src/DateFields.web.tsx)：原生 HTML 日期/时间输入框补 `outline: "none"`（不经过 RN 包装组件）。
+
+**说明**
+
+- 验证：`npx tsc --noEmit` 通过；运行中的 bundle 内 `outlineStyle: "none"` 命中 12 处；实测页面聚焦任意输入框 computed outline-style 为 `none`。
+- 此前已经逐文件修过的搜索框（screens.tsx / notes-screen.tsx / note-ui.tsx / capability-hub.tsx / skill-library-panel.tsx / search-sheet.tsx / watchlist.tsx 等）保留原有写法，与新方案兼容、不会冲突。
+
 ### 2026-11-24 · 修复：Render 自定义前端域名登录时报 `Failed to fetch`
 
 **背景**

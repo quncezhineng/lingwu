@@ -47,6 +47,22 @@ test("search preserves citations, reuses session IDs and sends project identity 
   }
 });
 
+test("search sends the configured Parallel API key on every request", async (t) => {
+  const { requests } = await searchFixture(t);
+  const db = await createStore();
+  t.after(() => db.close());
+  const keyed = new SearchService(db, "sk-test-secret");
+  await keyed.search("owner", "chat:one", input);
+  await new SearchService(db, "sk-test-secret").search("owner", "task:two", input);
+  assert.ok(requests.length >= 2);
+  for (const { headers } of requests) {
+    assert.equal(headers["x-api-key"], "sk-test-secret");
+  }
+  const keyless = new SearchService(db);
+  await keyless.search("owner", "chat:three", input);
+  assert.equal(requests.at(-1)?.headers["x-api-key"], undefined);
+});
+
 test("valid empty search succeeds and JSON text is supported without structuredContent", async (t) => {
   await searchFixture(t, (rpc) =>
     rpc.method === "tools/call"

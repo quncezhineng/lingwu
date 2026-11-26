@@ -376,7 +376,7 @@ export async function executeModelTask(
     ),
     tool(
       "use_connection",
-      "Call a tool on an account connection, or list that connection's tools when tool is omitted.",
+      "Call a tool on an account connection, or list that connection's tools when tool is omitted. The list shows each tool's arguments, where ! marks a required one; pass every required argument or the upstream rejects the call.",
       z.object({
         slug: z.string().trim().min(1).max(40),
         tool: z.string().trim().min(1).max(80).optional(),

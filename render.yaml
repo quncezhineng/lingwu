@@ -135,6 +135,12 @@ services:
         sync: false
       - key: WEB_SEARCH_ENABLED
         value: "true"
+      # 公共网页搜索的 Parallel API Key（https://platform.parallel.ai）。
+      # 填了之后：部署内所有用户共享该 Key 的更高额度，避免 Keyless 免费档限流。
+      # 敏感值不在仓库里写死：sync: false 表示需要到 Render 控制台
+      # Environment 中手动填入（与 DEEPSEEK_API_KEY 一致）。
+      - key: WEB_SEARCH_API_KEY
+        sync: false
       - key: CPK_INTELLIGENCE_API_KEY
         sync: false
       # Use the CLI-issued identity for the same Intelligence project as the key.

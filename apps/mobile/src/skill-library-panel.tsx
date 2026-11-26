@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, type TextStyle, useWindowDimensions, View } from "react-native";
 import { useAgentSpace } from "./agent-space";
 import type { AgentSkill } from "./agent-space-model";
 import { Text, TextInput } from "./app-text";
@@ -228,7 +228,11 @@ export function SkillLibraryPanel({
           placeholder={t("agentSpace.addSkillSearch")}
           placeholderTextColor={colors.faint}
           accessibilityLabel={t("agentSpace.addSkillSearch")}
-          style={{ flex: 1, minWidth: 0, paddingVertical: 0, color: colors.text, fontSize: 13 }}
+          style={[
+            { flex: 1, minWidth: 0, paddingVertical: 0, color: colors.text, fontSize: 13 },
+            // Web 端去掉浏览器默认的黄色 focus 边框（outline），移动端忽略。
+            Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null,
+          ]}
         />
       </View>
       {visible.length ? (

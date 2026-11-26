@@ -76,6 +76,17 @@ import {
   WorkspaceContext,
 } from "./src/workspace";
 
+/**
+ * Web 端全局兜底：去掉浏览器输入控件默认的黄色 focus 边框（outline）。
+ * 各输入框已在代码里按需单独关闭 outline；这里是最终保险，
+ * 保证任何遗漏的 input/textarea 被鼠标点击聚焦时也不会出现默认黄框。
+ */
+if (Platform.OS === "web" && typeof document !== "undefined") {
+  const noOutline = document.createElement("style");
+  noOutline.textContent = "input:focus, textarea:focus, select:focus { outline: none; }";
+  document.head.appendChild(noOutline);
+}
+
 /** 登录会话在本地持久化的键，刷新网页后据此恢复登录状态。 */
 const SESSION_KEY = "lingwu.session";
 

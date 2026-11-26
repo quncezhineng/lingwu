@@ -6,7 +6,7 @@
  * AI 结论区块固定附声明，页面底部统一 DisclaimerNote。
  */
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, type TextStyle, useWindowDimensions, View } from "react-native";
 import { Text, TextInput } from "./app-text";
 import { useTranslation } from "./i18n";
 import type { TranslationKey } from "./i18n/locales/en";
@@ -134,7 +134,11 @@ function SymbolFilterModal({
             placeholder={t("notes.searchPlaceholder")}
             placeholderTextColor={colors.faint}
             accessibilityLabel={t("notes.symbolPickerTitle")}
-            style={s.input}
+            style={[
+              s.input,
+              // Web 端去掉浏览器默认的黄色 focus 边框（outline），移动端忽略。
+              Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null,
+            ]}
           />
           <Pressable
             accessibilityRole="button"
@@ -443,7 +447,11 @@ export function NotesScreen() {
             placeholder={t("notes.searchPlaceholder")}
             placeholderTextColor={colors.faint}
             accessibilityLabel={t("notes.searchPlaceholder")}
-            style={{ flex: 1, fontSize: 13, color: colors.text, paddingVertical: 8 }}
+            style={[
+              { flex: 1, fontSize: 13, color: colors.text, paddingVertical: 8 },
+              // Web 端去掉浏览器默认的黄色 focus 边框（outline），移动端忽略。
+              Platform.OS === "web" ? ({ outlineStyle: "none" } as unknown as TextStyle) : null,
+            ]}
           />
           {!!query && (
             <Pressable

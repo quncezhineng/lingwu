@@ -320,7 +320,7 @@ const app = {
   "preferences.characterCount": "{count}/4000",
   "preferences.count": "{count} 条记忆",
   "preferences.toldOn": "你在 {date} 告诉我",
-  "preferences.memoryOwner": "来自 {owner}",
+  "preferences.memoryOwner": "{owner}",
   "preferences.contextDetail": "这些记忆由当下智能体产生，分析时会作为参考。你可以随时编辑或删除。",
   // 频道记忆页简介：频道记忆由各成员共同产生，作为频道共享上下文；
   // Agent 专属记忆页仍使用上面的 preferences.contextDetail，两者文案区分。

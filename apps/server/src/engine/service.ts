@@ -178,7 +178,7 @@ export class AgentService {
     market: MarketDataService = new MarketDataService(),
     search?: SearchService,
   ) {
-    this.search = search ?? new SearchService(db);
+    this.search = search ?? new SearchService(db, config.webSearchApiKey);
     this.market = market;
     this.watchlists = new WatchlistsService(db, market);
     this.portfolios = new PortfoliosService(db, market);

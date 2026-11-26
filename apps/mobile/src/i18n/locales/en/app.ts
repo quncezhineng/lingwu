@@ -352,7 +352,7 @@ const app = {
   "preferences.characterCount": "{count}/4000",
   "preferences.count": "{count} memories",
   "preferences.toldOn": "You told me on {date}",
-  "preferences.memoryOwner": "From {owner}",
+  "preferences.memoryOwner": "{owner}",
   "preferences.contextDetail":
     "These memories are created by the current assistant and used as reference during analysis. You can edit or remove them at any time.",
   // Channel memory page intro: channel memories are created collectively by its members

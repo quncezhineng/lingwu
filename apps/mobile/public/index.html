@@ -57,6 +57,14 @@
         height: 100%;
         flex: 1;
       }
+      /* 去掉输入控件点击聚焦时浏览器默认的黄色 focus 边框（outline）。
+         App.tsx 里已有相同兜底，这里写进 index.html 让它在首个文档加载时立即生效，
+         双保险保证任何 input/textarea/select 聚焦时都不出现默认黄框。 */
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+      }
     </style>
   </head>
 

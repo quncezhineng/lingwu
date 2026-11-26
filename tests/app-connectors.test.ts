@@ -18,7 +18,12 @@ const encryptionKey = randomBytes(32).toString("base64");
 const config = { encryptionKey, publicUrl: "https://lingwu-tick.myfund.dev" } as Config;
 
 function memoryDb() {
-  const rows = new Map<string, { id: string; secret: string; tools: { name: string }[] }>();
+  type Row = {
+    id: string;
+    secret: string;
+    tools: { name: string; description?: string; params?: string }[];
+  };
+  const rows = new Map<string, Row>();
   return {
     rows,
     db: {
@@ -26,7 +31,7 @@ function memoryDb() {
         return rows.get(id) ?? null;
       },
       async put(_owner: string, _kind: string, value: { id: string }) {
-        rows.set(value.id, value as { id: string; secret: string; tools: { name: string }[] });
+        rows.set(value.id, value as Row);
         return value;
       },
       async remove(_owner: string, _kind: string, id: string) {
@@ -265,4 +270,81 @@ test("hithink stops at the first invalid key instead of probing all eight endpoi
     /Invalid or revoked API key/,
   );
   assert.deepEqual(paths, ["/mcp/a-share"]);
+});
+
+/**
+ * 上游工具把必填项写在 inputSchema 里。以前 tools/list 只留 name + description，
+ * 模型看不到 report 必填，于是只传 thscode，被上游回「Missing required argument: report」。
+ */
+function indicatorsFetch(): typeof fetch {
+  return (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? "{}")) as {
+      method?: string;
+      params?: { arguments?: Record<string, unknown> };
+    };
+    const result =
+      body.method === "tools/list"
+        ? {
+            tools: [
+              {
+                name: "get_a_share_financials_indicators",
+                description: "财务指标数据",
+                inputSchema: {
+                  type: "object",
+                  properties: { thscode: { type: "string" }, report: { type: "string" } },
+                  required: ["thscode", "report"],
+                },
+              },
+            ],
+          }
+        : body.method === "tools/call"
+          ? body.params?.arguments?.report
+            ? { content: [{ type: "text", text: '{"code":0}' }] }
+            : {
+                isError: true,
+                content: [
+                  { type: "text", text: "Invalid arguments: Missing required argument: report" },
+                ],
+              }
+          : {};
+    return new Response(JSON.stringify({ result }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+}
+
+test("a tool list carries its required arguments and a missing one comes back as a hint", async () => {
+  const { db, rows } = memoryDb();
+  const deps = { db, config, fetcher: indicatorsFetch() };
+  await connectConnector(deps, "owner-1", "tushare", { token: "abcdabcdabcdabcd" });
+  const listed = await invokeConnection(deps, "owner-1", "tushare");
+  assert.match(JSON.stringify(listed), /thscode:string!, report:string!/);
+  const rejected = await invokeConnection(
+    deps,
+    "owner-1",
+    "tushare",
+    "get_a_share_financials_indicators",
+    { thscode: "000333.SZ" },
+  );
+  assert.match(
+    JSON.stringify(rejected),
+    /Missing required argument: report.*缺少必填参数 report.*report:string!/,
+  );
+  // 老连接是没存参数签名的，缺参数时按工具所在端点补一次并写回缓存。
+  const saved = rows.get("tushare");
+  assert.ok(saved);
+  saved.tools = saved.tools.map(({ name, description }) => ({ name, description }));
+  await invokeConnection(deps, "owner-1", "tushare", "get_a_share_financials_indicators", {
+    thscode: "000333.SZ",
+  });
+  assert.match(JSON.stringify(rows.get("tushare")?.tools), /report:string!/);
+  const called = await invokeConnection(
+    deps,
+    "owner-1",
+    "tushare",
+    "get_a_share_financials_indicators",
+    { thscode: "000333.SZ", report: "2025-1" },
+  );
+  assert.match(JSON.stringify(called), /code/);
 });
