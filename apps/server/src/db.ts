@@ -1,8 +1,8 @@
-import { mkdir, rename, statfs } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readdir, rename, rm, statfs } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
-import { backgroundFailure } from "./log.ts";
+import { backgroundFailure, describeError } from "./log.ts";
 
 /** 统一的行类型：records 的 data 列与 events 的自定义列都走它；字段用 `as`/`as unknown as` 取用。 */
 type Row = { data?: unknown };
@@ -353,56 +353,102 @@ export function createPool(connectionString: string) {
   return pool;
 }
 
-/** 数据目录所在卷的剩余空间。磁盘写满时 WASM Postgres 只会抛不透明的 Aborted()，把余量补进日志才分得清原因。 */
-async function freeSpace(path: string): Promise<string> {
+/** 归档目录命名：`<postgres 目录名>.corrupt-<时间戳>`，与历史人工归档（`postgres.corrupt-20261028`）保持一致。 */
+const CORRUPT_SUFFIX = ".corrupt-";
+/** 重建所需的余量下限：低于它 PGlite 初始化写不进去，只能继续腾空间。 */
+const REBUILD_FREE_BYTES = 64 * 1024 * 1024;
+
+/** 目录所在卷的剩余字节数；读不到返回 null。 */
+async function freeBytes(path: string): Promise<number | null> {
   try {
     const stats = await statfs(path);
-    return `${Math.round((stats.bavail * stats.bsize) / 1024 / 1024)} MiB`;
+    return stats.bavail * stats.bsize;
   } catch {
-    return "未知";
+    return null;
   }
+}
+
+/** 剩余空间的人类可读文本。磁盘写满时 WASM Postgres 只会抛不透明的 Aborted()，把余量补进日志才分得清原因。 */
+async function freeSpace(path: string): Promise<string> {
+  const bytes = await freeBytes(path);
+  return bytes === null ? "未知" : `${Math.round(bytes / 1024 / 1024)} MiB`;
+}
+
+/**
+ * 清理更早的损坏归档，只保留 `keep`（未指定时保留最新一份）。
+ *
+ * 归档是整份 WASM Postgres 数据目录的副本。历史上每次损坏都靠人工 `mv` 归档、
+ * 从不清理，多份累积正是持久盘被写满的主要来源；磁盘写满又会反过来让 PGlite 写不
+ * 进去、再次损坏，形成「损坏 → 归档 → 更满 → 再损坏」的循环。
+ */
+async function pruneArchives(parent: string, prefix: string, keep: string | null) {
+  const names = (await readdir(parent).catch(() => [])).filter(
+    (name) => name.startsWith(prefix) && name !== keep,
+  );
+  names.sort();
+  const keepName = keep ?? names.pop();
+  await Promise.all(
+    names
+      .filter((name) => name !== keepName)
+      .map((name) =>
+        rm(join(parent, name), { recursive: true, force: true }).catch(() => undefined),
+      ),
+  );
 }
 
 /**
  * 打开嵌入式 PGlite 数据目录，打不开时自愈。
  *
- * PGlite 把 Postgres 编译成 WASM 直接跑在数据目录上：进程被强杀、或宿主磁盘
- * （Render 持久盘是网络块存储）丢掉最后一次写入，都会让 `global/pg_control`
- * 残留成半截文件。此后每次启动 PGlite 都只抛出不透明的
+ * PGlite 把 Postgres 编译成 WASM 直接跑在数据目录上。**持久盘写满**（Render 上
+ * 1 GB 的 `lingwu-data`）是首要诱因：写入中途失败会让 `global/pg_control` 残留成
+ * 半截文件，此后每次启动都只抛不透明的
  * `RuntimeError: Aborted(). Build with -sASSERTIONS for more info.`
- * ——Emscripten 不告诉我们具体原因（本地复现：控制文件损坏就是这个报错，其他
- * 损坏则报 `unreachable`）。数据目录在持久盘上重启不会自愈，服务会一直起不来。
+ * ——Emscripten 不告诉我们原因（本地复现：截断控制文件就是这个报错）。数据目录在
+ * 持久盘上重启不会自愈，服务会一直起不来。
  *
- * 这里把此前靠人工执行的恢复步骤自动化：损坏目录改名存档（**不删除**，留作取证
- * 或后续修复），换全新空目录重建。只自愈一次，重建后的空目录仍然打不开说明问题
- * 不在数据本身（磁盘写满/只读），此时带着磁盘余量抛出，交由调用方记录并退出。
+ * 自愈步骤：把损坏目录改名归档（不删除，留作取证）→ 清理更早的归档腾出空间
+ * （改名本身不释放空间，所以腾地方靠删旧归档）→ 换全新空目录重建。重建后仍打不开
+ * 说明磁盘真的满了，此时连本次归档一并删除，优先保证服务能起来；再失败才抛错。
  */
 async function openEmbedded(dataDir: string | undefined): Promise<PGlite> {
-  if (dataDir) await mkdir(dirname(dataDir), { recursive: true, mode: 0o700 });
+  if (!dataDir) {
+    const embedded = new PGlite(dataDir);
+    await embedded.waitReady;
+    return embedded;
+  }
+  const parent = dirname(dataDir);
+  const name = basename(dataDir);
+  const prefix = `${name}${CORRUPT_SUFFIX}`;
+  await mkdir(parent, { recursive: true, mode: 0o700 });
+  // 每次启动先清理陈旧归档，只留最新一份；顺带把此前遗留的归档空间收回来。
+  await pruneArchives(parent, prefix, null);
   try {
     const embedded = new PGlite(dataDir);
     await embedded.waitReady;
     return embedded;
   } catch (error) {
-    if (!dataDir) throw error;
-    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    const backup = `${dataDir}.corrupt-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+    const backup = `${prefix}${new Date().toISOString().replace(/[:.]/g, "-")}`;
     console.error(
-      `[LingWu] 本地数据库打不开，已归档为 ${backup}（未删除）并改用全新目录重建 · 磁盘可用 ${await freeSpace(dataDir)} · ${detail.slice(0, 200)}`,
+      `[LingWu] 本地数据库打不开（磁盘可用 ${await freeSpace(parent)}），已把损坏目录归档为 ${backup} 并重建 · ${describeError(error).slice(0, 200)}`,
     );
-    await rename(dataDir, backup).catch(() => undefined);
+    // 归档 = 改名，不占新空间；真正的空间来自清理更早的归档。
+    await rename(dataDir, join(parent, backup)).catch(() => undefined);
+    await pruneArchives(parent, prefix, backup);
+    const remaining = await freeBytes(parent);
+    if (remaining !== null && remaining < REBUILD_FREE_BYTES) {
+      console.error(
+        `[LingWu] 磁盘仅剩 ${Math.round(remaining / 1024 / 1024)} MiB，连本次损坏归档一并删除以腾出空间`,
+      );
+      await rm(join(parent, backup), { recursive: true, force: true }).catch(() => undefined);
+    }
     await mkdir(dataDir, { recursive: true, mode: 0o700 });
     try {
       const embedded = new PGlite(dataDir);
       await embedded.waitReady;
       return embedded;
     } catch (retryError) {
-      const retryDetail =
-        retryError instanceof Error
-          ? `${retryError.name}: ${retryError.message}`
-          : String(retryError);
       console.error(
-        `[LingWu] 重建后的空目录依然打不开，通常是磁盘写满或只读 · ${dataDir} · 磁盘可用 ${await freeSpace(dataDir)} · ${retryDetail.slice(0, 200)}`,
+        `[LingWu] 重建后的空目录依然打不开，通常是磁盘写满或只读 · ${dataDir} · 磁盘可用 ${await freeSpace(parent)} · ${describeError(retryError).slice(0, 200)}`,
       );
       throw retryError;
     }

@@ -4,7 +4,7 @@ import type { Config } from "./config.ts";
 import { readConfig } from "./config.ts";
 import type { Store } from "./db.ts";
 import { createStore } from "./db.ts";
-import { backgroundFailure } from "./log.ts";
+import { backgroundFailure, describeError } from "./log.ts";
 import { getMarketDataHealth } from "./market-data-health.ts";
 import { getPdfHealth } from "./pdf-health.ts";
 
@@ -21,7 +21,7 @@ async function openStore(settings: Config): Promise<Store> {
       databaseUrl: settings.databaseUrl,
     });
   } catch (error) {
-    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    const detail = describeError(error);
     const code = (error as { code?: unknown } | null)?.code;
     console.error(
       `[LingWu] 数据库初始化失败 · DATA_DIR=${settings.dataDir}${settings.databaseUrl ? " · DATABASE_URL" : ""}` +

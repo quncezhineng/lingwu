@@ -10,10 +10,15 @@ services:
     buildCommand: pnpm install --frozen-lockfile && pnpm build:server
     startCommand: pnpm start
     healthCheckPath: /api/health
+    # API 的持久盘同时承载 PGlite 数据目录（postgres/）、用户上传文件（files/）、
+    # 电脑截图（desktop-screens/）与损坏归档（postgres.corrupt-*）。1 GB 会在积累
+    # 使用后写满：磁盘满会让 PGlite 写入中途失败、控制文件损坏，此后每次启动都抛不透明
+    # 的 RuntimeError: Aborted()，且满到极限时 mkdir 直接 ENOSPC（2026-11-26 线上崩溃）。
+    # 代码已加「启动清理旧归档 + 磁盘满时删除本次归档」自愈，此处保留 5 GB 余量。
     disk:
       name: lingwu-data
       mountPath: /var/data
-      sizeGB: 1
+      sizeGB: 5
     envVars:
       # HOST must be 0.0.0.0 on Render, and LingWu only allows that in live mode.
       - key: HOST
