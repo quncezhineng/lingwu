@@ -356,9 +356,36 @@ export class Store {
   }
 }
 
+/**
+ * 连接串是否需要补一个「加密」默认值。
+ *
+ * 托管 Postgres（Supabase、Render Postgres）一律要求 TLS，但控制台给出的连接串默认
+ * **不带** `sslmode`；node-postgres 在这种情况下走明文，会被服务端直接拒绝。本机
+ * （localhost/127.0.0.1/::1）通常没有 TLS，保持原样以不影响本地开发。若连接串里已显式
+ * 写了 `sslmode`/`ssl`，一律以它为准（`parse()` 的结果会覆盖传入的 ssl 选项）。
+ */
+function needsDefaultTls(connectionString: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    // 不是标准 URL（如 libpq 的 key=value 形式），交给 pg 自行解析，不做假设。
+    return false;
+  }
+  const host = url.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
+  return !url.searchParams.has("sslmode") && !url.searchParams.has("ssl");
+}
+
 /** Idle clients can be disconnected by a database restart; without a listener pg's `error` event crashes the process. */
 export function createPool(connectionString: string) {
-  const pool = new pg.Pool({ connectionString, max: 5 });
+  const pool = new pg.Pool({
+    connectionString,
+    max: 5,
+    // 远程库默认启用 TLS，粘贴 Supabase 连接串即可跑通；想改成严格校验 CA，
+    // 在连接串里显式加 `?sslmode=verify-full` 覆盖此默认值即可。
+    ...(needsDefaultTls(connectionString) ? { ssl: { rejectUnauthorized: false } } : {}),
+  });
   pool.on("error", (error) => backgroundFailure("postgres pool", error));
   return pool;
 }
@@ -465,6 +492,18 @@ async function openEmbedded(dataDir: string | undefined): Promise<PGlite> {
   }
 }
 
+/**
+ * 建表语句（records / events），幂等（IF NOT EXISTS）。
+ *
+ * 独立抽出来是为了让「建库」只有一个来源：`createStore` 启动时执行它，
+ * 数据迁移脚本（`migrate-to-postgres.ts`）也执行它，避免两处 DDL 各写一份而漂移。
+ * events 的 UNIQUE(stream_kind,stream_id,version) 兜住并发追加，和 records 的 CAS 同一哲学。
+ */
+export const SCHEMA_STATEMENTS = [
+  "CREATE TABLE IF NOT EXISTS records(owner text NOT NULL,kind text NOT NULL,id text NOT NULL,data jsonb NOT NULL,updated_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(owner,kind,id))",
+  "CREATE TABLE IF NOT EXISTS events(seq BIGSERIAL PRIMARY KEY,owner text NOT NULL,stream_kind text NOT NULL,stream_id text NOT NULL,version integer NOT NULL,event_type text NOT NULL,payload jsonb NOT NULL,occurred_at timestamptz NOT NULL DEFAULT now(),UNIQUE(stream_kind,stream_id,version))",
+] as const;
+
 export async function createStore(
   options: { dataDir?: string; databaseUrl?: string } = {},
 ): Promise<Store> {
@@ -479,13 +518,6 @@ export async function createStore(
       close: () => embedded.close(),
     };
   }
-  await database.query(
-    "CREATE TABLE IF NOT EXISTS records(owner text NOT NULL,kind text NOT NULL,id text NOT NULL,data jsonb NOT NULL,updated_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(owner,kind,id))",
-  );
-  // P0「事件日志」：追加式事件流，version 是每个 stream 内的单调序号。
-  // 唯一约束 (stream_kind,stream_id,version) 兜住并发追加，和 records 的 CAS 同一哲学。
-  await database.query(
-    "CREATE TABLE IF NOT EXISTS events(seq BIGSERIAL PRIMARY KEY,owner text NOT NULL,stream_kind text NOT NULL,stream_id text NOT NULL,version integer NOT NULL,event_type text NOT NULL,payload jsonb NOT NULL,occurred_at timestamptz NOT NULL DEFAULT now(),UNIQUE(stream_kind,stream_id,version))",
-  );
+  for (const statement of SCHEMA_STATEMENTS) await database.query(statement);
   return new Store(database);
 }

@@ -5,6 +5,50 @@
 
 ## 变更记录
 
+### 2026-11-27 · 记录库迁到 Supabase Postgres（`DATABASE_URL`），根治「一更新就丢数据」
+
+**现象**
+
+- Render 上多次出现「部署/更新后用户数据被清空」：观察列表、任务、简报等记录类数据在重新部署后消失。
+- 已定位为三类风险中的 C 类：[db.ts](../apps/server/src/db.ts) 的 PGlite 自愈在磁盘写满时会**删除整库归档**，且**没有备份**。
+
+**根因**
+
+- 记录库默认是容器内嵌的 **PGlite**，数据放在持久盘 `/var/data/lingwu/postgres`：数据库与磁盘强绑定。
+- 盘写满 → PGlite 写入中途失败 → `global/pg_control` 半截 → 每次启动抛不透明的 `RuntimeError: Aborted()` → 自愈把损坏目录改名归档（改名不释放空间）→ 余量 <64 MiB 时连本次归档一并删除 → **库消失**。
+- 次要原因：`DATA_DIR` 随项目三次改名（`openmuse`→`lingtai`→`lingwu`）而变化，应用每次都去看新的空目录，旧数据其实还在盘里但「看不见」。
+
+**修复**
+
+- [db.ts](../apps/server/src/db.ts)：
+  - `createPool` 新增 `needsDefaultTls()`：非本机地址且连接串未显式带 `sslmode`/`ssl` 时自动补 `ssl: { rejectUnauthorized: false }`。托管 Postgres（Supabase/Render Postgres）强制 TLS 而控制台给的串默认不带 `sslmode`，补上后**粘贴即连**；本地（localhost/127.0.0.1/::1）不受影响；想严格校验 CA 在串里加 `?sslmode=verify-full` 覆盖即可。
+  - 抽出 `SCHEMA_STATEMENTS`（records/events 建表语句），供 `createStore` 与迁移脚本共用，避免两处 DDL 漂移。
+  - 说明：`createStore` 早已有 `if (options.databaseUrl)` 走 `pg.Pool` 的分支，`config.ts`、`index.ts`、`worker-entry.ts` 也已接线，因此本次**无需新增功能代码**，只需配置 + 迁移 + TLS 适配。
+- [render.yaml](../render.yaml)：`lingwu-api` 新增 `DATABASE_URL`（`sync: false`，在 Render 控制台填 Supabase 连接串），并更新持久盘注释（配置后 PGlite 不再落盘）。
+- 新增 [migrate-to-postgres.ts](../apps/server/src/migrate-to-postgres.ts) 与 `pnpm db:migrate`：把存量 PGlite 的 `records`/`events` 整表搬到目标 Postgres。幂等（records 主键 upsert、events 按唯一版本跳过），可重复执行。
+- 文档同步：[.env.example](../.env.example)、[O2-定时任务与部署手册.md](./O2-定时任务与部署手册.md) 的 `DATABASE_URL` 说明。
+
+**验证**
+
+- `pnpm typecheck` 通过；`biome check` 对本次改动文件无新增告警。
+- 迁移脚本：源库只读、目标库建表后按主键/唯一约束写入，重复执行不产生重复数据。
+- **实迁一次成功**：`pnpm db:migrate` 输出「records 914 条；events 新增 15/15 条」；随后两边计数核对一致（Supabase = 本地 PGlite = records 914 / events 15）。
+
+**Supabase 连接串选哪个口（实测）**
+
+- Supabase 控制台给两种连接池串，本项目在**本机**实测：
+  - **Session pooler，端口 5432 → 超时**（`timeout expired`，多次重试均失败）。
+  - **Transaction pooler，端口 6543 → 可用**（`select 1` 正常，迁移全程跑通）。
+  - Direct connection（`db.<ref>.supabase.co:5432`）→ `Connection terminated unexpectedly`。
+- 结论：**连接串用 6543（Transaction pooler）**。`.env` 与 Render 控制台都填这一条；本地 5432 超时疑与本机 VPN/代理有关（DNS 解析到 CGNAT 段 `198.18.x.x`），换 6543 即绕开。
+- Transaction pooler 是「每事务借还连接」，本项目的记录库操作为单语句读写，不依赖 session 级特性，因此可安全使用。
+
+**注意事项 / 后续**
+
+- 启用步骤：① 在 Supabase 建库并复制 Connection string（**用 6543**）；② Render → lingwu-api → Environment 填 `DATABASE_URL` 并重新部署；③ 如需保留现有数据，先在本地 `pnpm db:migrate` 把存量搬过去。
+- 留空 `DATABASE_URL` 会退回 PGlite（本地开发默认如此），生产请务必配置。
+- 切库后持久盘仅承载 `files/`、`desktop-screens/` 等文件类数据；后续可考虑给它们加 LRU/配额。
+
 ### 2026-11-26 · Render 自定义前端域名 app.lingwu.xyz 打不开：跨域白名单被蓝图重置回默认域名
 
 **现象**
