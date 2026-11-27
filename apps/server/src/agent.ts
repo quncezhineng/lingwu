@@ -8,6 +8,7 @@ import {
 } from "@copilotkit/runtime/v2";
 import type { Auth } from "./auth.ts";
 import type { Config } from "./config.ts";
+import type { ConversationArchive } from "./conversation-archive.ts";
 import { coalesceTextChunks } from "./engine/coalesce-text.ts";
 import { ConversationAgent } from "./engine/conversation.ts";
 import type { AgentService } from "./engine/service.ts";
@@ -36,6 +37,7 @@ export function makeRuntime(
   auth: Auth,
   intelligence: CopilotKitIntelligence,
   stream: ConversationStream,
+  archive: ConversationArchive,
 ) {
   // Built on first use, then shared so live mode reuses one TypeSafe client across requests.
   let jevAdapter: JevAdapter | undefined;
@@ -57,11 +59,22 @@ export function makeRuntime(
       // 用户提问不走事件流（事件流只承载助手输出），时间只能在这里打点。
       // 只认本次输入的最后一条：`input.messages` 带着整段上下文，历史提问不能重新计时。
       const question = input.messages.at(-1);
-      if (question?.role === "user")
+      if (question?.role === "user") {
         void stream
           .noteMessage(owner, input.threadId, question.id)
           .catch((error) => backgroundFailure("conversation.stream.note", error));
-      return stream.observe(owner, input.threadId, input.runId, next.run(input));
+        // 提问正文同样只在请求入口可见，顺手归档一份——不 await，绝不阻塞对话。
+        void archive.userMessage(owner, input.threadId, {
+          id: question.id,
+          content: question.content,
+        });
+      }
+      // 先镜像事件流，再在管道上搭归档旁路：底层 observable 只订阅一次，不会重复跑模型。
+      return archive.observe(
+        owner,
+        input.threadId,
+        stream.observe(owner, input.threadId, input.runId, next.run(input)),
+      );
     });
     return { default: agent };
   };

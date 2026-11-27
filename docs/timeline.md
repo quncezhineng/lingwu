@@ -5,6 +5,123 @@
 
 ## 变更记录
 
+### 2026-11-27 · 存量单聊历史一次性回填进归档，永久保存补齐到上线前
+
+**背景**
+
+- 上一条的实时归档只从上线那一刻开始记录，此前的单聊历史仍只存在于 CopilotKit 云端。不回填的话，「永久保存」就缺了开头一段。
+
+**处理**
+
+- 新增 [backfill-archive.ts](../apps/server/src/backfill-archive.ts) 与脚本 `pnpm archive:backfill`：遍历记录库里所有 owner（新增只读方法 `Store.allOwners()`），分页 `listThreads`（含归档线程）→ 逐线程 `getThreadMessages` → 把用户/助手正文写入归档。
+- [conversation-archive.ts](../apps/server/src/conversation-archive.ts) 增加 `backfill()`：只收用户与助手正文，工具消息/空内容跳过；回填消息不打 `at`（CopilotKit 历史本身无时间戳，宁可空着也不写「现在」），并标记 `backfilled: true`。
+- 幂等：按 messageId 覆盖写，重复执行不产生副本；单个用户/线程失败只记日志、继续下一个。
+
+**验证**
+
+- [tests/conversation-archive.test.ts](../tests/conversation-archive.test.ts) 扩到 8 例（新增回填不臆造时间、跳过工具/空消息、重跑只覆盖、`allOwners()` 去重）。全绿；全量 `pnpm test` → **1313 通过 / 0 失败**；`tsc --noEmit` 通过。
+- 实跑 `pnpm archive:backfill`（DATABASE_URL 指向 Supabase）：4 个用户、11 个线程、扫描 662 条消息，写入归档 **168 条**（其余为工具消息/无正文）；抽查两个用户分别 19 条（用户 8 / 助手 11）与 149 条（用户 44 / 助手 105），正文可读。
+
+**注意**
+
+- 回填覆盖的是「CopilotKit 里当前还存在」的历史；更早被平台清理掉的线程无法追回。
+- 未配置 `DATABASE_URL` 时会写本地 PGlite，**必须先停服务**再跑（PGlite 单写者）。
+
+### 2026-11-27 · 智能体单聊增加永久归档，对话历史不再只寄存在 CopilotKit
+
+**背景**
+
+- 智能体单聊的正文由 CopilotKit Intelligence（Rich Threads）云端托管，灵悟本地只镜像了一个会滚动的回放窗口（`conversation-streams`，最近 2000 条 / 8MB）；**用户提问的正文甚至从不落本地**。这意味着单聊历史完全依赖 CopilotKit 项目——换 key、清空项目或该服务终止，历史即失控。
+
+**处理**
+
+- 新增 [conversation-archive.ts](../apps/server/src/conversation-archive.ts)：在消息经过本服务时把完整正文落一份到自有库（复用 `records` 表，`kind=conversation_messages`，因此自动进 Supabase）。用户提问在请求入口落库（[agent.ts](../apps/server/src/agent.ts) 输入钩子），助手回复在 AG-UI 事件流结束时拼装落库。
+- 归档是**只读旁路**：不动事件、顺序或错误语义，不参与上下文装配；任何落库失败只记日志，绝不影响正在进行的对话。用 `tap` 搭在既有管道上，底层 observable 只订阅一次，**不会重复跑模型**。
+- 频道对话本就在自有库完整保存（`kind=channel_messages`），无需改动。
+
+**验证**
+
+- 新增 [tests/conversation-archive.test.ts](../tests/conversation-archive.test.ts)（5 例）：用户提问归档、助手回复按事件拼装、交错消息不串、空消息不落库、`messageText` 兼容字符串与 text parts。全绿。
+- 全量 `pnpm test` → **1310 通过 / 0 失败**；`tsc --noEmit` 通过。
+- 文档同步：[WIKI 7.3](WIKI.md) 存储地图、[RICH-THREADS.md](RICH-THREADS.md)。
+
+**注意**
+
+- 归档从本改造上线后开始实时记录；此前的存量历史已由下一条的 `pnpm archive:backfill` 一次性补齐。
+
+### 2026-11-27 · 会话签名密钥改由环境变量注入，登录态不再随磁盘走
+
+**现象**
+
+- 记录库与文件本体都搬走后，登录态仍有最后一个「磁盘单点」：会话签名密钥原先生成并保存在 `DATA_DIR/session-signing-key`。它一旦丢失（实例/持久盘重建、换区或迁移），此前签发的 JWT 全部验签失败，所有已登录用户被强制重新登录。
+
+**处理**
+
+- 新增 [SESSION_SIGNING_KEY](../.env.example) 环境变量：配置后会话的签发与校验直接用注入密钥，不再读写磁盘。[config.ts](../apps/server/src/config.ts) 读取并做长度校验（不足 32 字符直接报错，挡住误填的弱密钥/占位符——密钥过短会让会话签名可被伪造）。生成方式：`openssl rand -base64 32`。
+- [auth.ts](../apps/server/src/auth.ts) 的 `createAuth` 增加「注入优先」分支：有注入密钥就直接用；没有才退回原磁盘逻辑（首次启动生成一次、原子发布、并发启动共用同一份），本地开发无需任何配置。
+- [render.yaml](../render.yaml) 增加 `SESSION_SIGNING_KEY`（`sync: false`，需在 Render 控制台手动填）；[.env.example](../.env.example) 补充说明。
+
+**验证**
+
+- `tsc --noEmit` 通过；[tests/auth-startup.test.ts](../tests/auth-startup.test.ts) 新增「注入密钥替换磁盘文件」用例：同一注入密钥的另一个实例能验签（证明确实来自注入而非各自落盘生成），且目录内不留任何密钥文件。该文件 3 个用例全绿（另两个仍覆盖磁盘分支）。
+
+**注意**
+
+- 部署环境若不配置此项，将退回持久盘上的 `/var/data/lingwu/session-signing-key`，盘一重建全体用户仍需重新登录。
+- 想保住现有登录态：把持久盘上的现值填进控制台即可——Render Shell 里 `cat /var/data/lingwu/session-signing-key`。
+
+### 2026-11-27 · 分享表在 Supabase 就位，并清理本地 356 MB 残留
+
+**背景**
+
+- 记录库与文件本体都搬到 Supabase 后做全量核对，发现 Supabase 上缺 `lingwu_shares` 表：生成分享时本地写入成功、远端写入失败，走降级路径，后台日志持续出现 `share.persist ... stayed local only`。分享链接本身可用，但换实例/清盘后不再有远端副本可回表。
+
+**处理**
+
+- 在 Supabase 执行 [0002_shares.sql](../supabase/migrations/0002_shares.sql)：建 `lingwu_shares` 表（`id/owner/question/answer/created_at`）、公开只读 RLS 策略与 `created_at` 索引。
+- 端到端验证（复刻应用 [share-store.ts](../apps/server/src/share-store.ts) 的写入/读取请求）：POST → 201；读回字段完整；DELETE → 204；清理后查询为空。应用期望的表结构与新建表逐字段一致。
+- 清理本地磁盘残留：`.lingwu/postgres`（232 MB，迁移前旧库）、`.lingwu/postgres.corrupt-20261111`（121 MB，更早损坏归档）、`.lingwu/files`（3.2 MB），合计约 356 MB。删除前逐一与 Supabase 核对：11 个文件远端齐全、字节一致，records/events 行数与远端一致。保留 `.lingwu/session-signing-key`（会话签名密钥，非数据副本）。
+
+**重要：不要重复执行 `0001_accounts.sql`**
+
+- 核查发现该 Supabase 项目上 0001 的物件其实都已存在，只是**命名与仓库脚本不同**：索引为 `lingtai_audit_logs_user_created_idx`、`lingtai_resources_user_id_resource_type_resource_id_key`，函数为 `user_profiles_handle_new_user`（`on_auth_user_created` 触发器已正确绑定它）。功能齐全。
+- 因此重跑 [0001_accounts.sql](../supabase/migrations/0001_accounts.sql) 只会多出一套同名不同前缀的重复索引，并把 `on_auth_user_created` 从 `user_profiles_handle_new_user` 改绑到新建的 `handle_new_user`——行为一致，属无谓改动，应避免。
+
+**遗留观察**
+
+- `auth.users` 39 人 vs `user_profiles` 37 行，差 2 个：应为建触发器之前注册的历史用户，不影响功能。
+
+### 2026-11-27 · 文件本体改存 Supabase Storage，持久盘不再是数据单点
+
+**现象**
+
+- 记录库迁到托管 Postgres 后，Render 持久盘上只剩文件类数据：用户上传的文件本体（`files/`）与电脑桌面截图（`desktop-screens/`）。
+- 用户追问：这些文件能不能也放进 Supabase？会不会一更新就丢？
+
+**根因**
+
+- 文件本体原先直接写在 API 进程的持久盘上：盘写满就传不进新文件；实例/磁盘重建、换区或迁移时没有任何副本，文件就没了。
+- 「更新丢数据」只根治了一半——数据库搬走了，文件却仍与容器磁盘强绑定。
+
+**处理**
+
+- 新增 [blob-store.ts](../apps/server/src/blob-store.ts)：把「文件字节存哪里」抽成 `BlobStore` 接口（`put` / `create` / `get` / `remove`），提供两个实现——`LocalBlobStore`（磁盘，本地开发默认，行为与改造前一致）与 `SupabaseBlobStore`（Supabase Storage 私有桶 `lingwu-files`，用 service_role 直调 Storage REST，不引入 `@supabase/supabase-js`）。`createBlobStore(config)` 按是否配置 `SUPABASE_URL` / `SUPABASE_SECRET_KEY` 二选一。
+- [files.ts](../apps/server/src/files.ts) 与 [computer.ts](../apps/server/src/computer.ts) 改为通过 `BlobStore` 读写文件本体；对象键沿用改造前的磁盘相对路径（`files/<id>.<ext>`、`desktop-screens/<hash>.jpg`），历史文件与远端对象一一对应。
+- 远端读不到时回退本地盘并**顺手回填**远端：迁移期间被访问到的历史文件会自动过去；未被访问过的用迁移脚本一次性搬完。
+- 新增 [migrate-files.ts](../apps/server/src/migrate-files.ts) 与 `pnpm files:migrate`：递归遍历 `DATA_DIR/files`、`DATA_DIR/desktop-screens` 逐个上传（`x-upsert:false`，远端已存在即跳过）。幂等，可重复执行。
+
+**验证**
+
+- 全量测试：`pnpm test` **1304 个用例全部通过**；`pnpm exec tsc --noEmit` 通过。
+- 实迁一次成功：`pnpm files:migrate` 首跑「新上传 11 个」；再跑「远端已存在跳过 11 个」，幂等无误。
+
+**注意事项 / 后续**
+
+- 未配置 Supabase 时行为与改造前完全一致（本地磁盘），本地开发无感。
+- Supabase Storage 桶为私有，文件只经灵悟 API 中转（`GET /api/files/:id` 仍按 owner 鉴权），不对外暴露。
+- 桶名固定为 `lingwu-files`；若换 Supabase 项目或误删桶，历史对象需重跑 `pnpm files:migrate`（前提是本地盘副本仍在）。
+- 排查过程中 `tests/computer-e2b-desktop.test.ts` 的内置 wrapper 用例出现过间歇失败，最终确认为本机 CPU 负载抖动（该用例依赖 `/bin/bash` 子进程时序），与本次改动无关，未改动该测试。
+
 ### 2026-11-27 · 记录库迁到 Supabase Postgres（`DATABASE_URL`），根治「一更新就丢数据」
 
 **现象**
@@ -47,7 +164,7 @@
 
 - 启用步骤：① 在 Supabase 建库并复制 Connection string（**用 6543**）；② Render → lingwu-api → Environment 填 `DATABASE_URL` 并重新部署；③ 如需保留现有数据，先在本地 `pnpm db:migrate` 把存量搬过去。
 - 留空 `DATABASE_URL` 会退回 PGlite（本地开发默认如此），生产请务必配置。
-- 切库后持久盘仅承载 `files/`、`desktop-screens/` 等文件类数据；后续可考虑给它们加 LRU/配额。
+- 切库后持久盘仅承载 `files/`、`desktop-screens/` 等文件类数据；这批文件本体已进一步改存 Supabase Storage（见上方 2026-11-27「文件本体改存 Supabase Storage」条目）。
 
 ### 2026-11-26 · Render 自定义前端域名 app.lingwu.xyz 打不开：跨域白名单被蓝图重置回默认域名
 

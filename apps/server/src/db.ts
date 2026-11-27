@@ -84,6 +84,17 @@ export class Store {
     );
     return result.rows.map((row) => row.data as T);
   }
+  /**
+   * 记录库里出现过的所有 owner（records 主键第一列，跨所有 kind）。
+   *
+   * 与 `owners(kind)` 的区别：那个只在某个 kind 内去重，适合「按 kind 维护」；
+   * 这个不分 kind，用于「必须覆盖所有用户」的一次性任务，例如把 CopilotKit 里的
+   * 存量单聊历史回填进归档。只读、去重。
+   */
+  async allOwners(): Promise<string[]> {
+    const result = await this.db.query("SELECT DISTINCT owner FROM records ORDER BY owner");
+    return result.rows.map((row) => (row as unknown as { owner: string }).owner);
+  }
   async put<T extends { id: string }>(owner: string, kind: string, value: T): Promise<T> {
     await this.db.query(
       "INSERT INTO records(owner,kind,id,data) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(owner,kind,id) DO UPDATE SET data=excluded.data,updated_at=now()",

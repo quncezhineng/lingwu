@@ -10,11 +10,13 @@ services:
     buildCommand: pnpm install --frozen-lockfile && pnpm build:server
     startCommand: pnpm start
     healthCheckPath: /api/health
-    # API 的持久盘承载用户上传文件（files/）、电脑截图（desktop-screens/）与旧版
-    # PGlite 数据目录（postgres/，配置 DATABASE_URL 后不再使用）。1 GB 会在积累
-    # 使用后写满：磁盘满会让 PGlite 写入中途失败、控制文件损坏，此后每次启动都抛不透明
-    # 的 RuntimeError: Aborted()，且满到极限时 mkdir 直接 ENOSPC（2026-11-26 线上崩溃）。
-    # 代码已加「启动清理旧归档 + 磁盘满时删除本次归档」自愈，此处保留 5 GB 余量。
+    # 持久盘：配置 DATABASE_URL 后不再承载记录库；配好 SUPABASE_URL + SUPABASE_SECRET_KEY
+    # 后用户上传文件（files/）与电脑截图（desktop-screens/）也改存 Supabase Storage，
+    # 只剩旧版 PGlite 数据目录（postgres/，切库后不再使用）与未迁移的历史文件。
+    # 1 GB 会在积累使用后写满：磁盘满会让 PGlite 写入中途失败、控制文件损坏，此后每次
+    # 启动都抛不透明的 RuntimeError: Aborted()，且满到极限时 mkdir 直接 ENOSPC（2026-11-26
+    # 线上崩溃）。代码已加「启动清理旧归档 + 磁盘满时删除本次归档」自愈，此处保留 5 GB 余量。
+    # 存量文件搬运：DATA_DIR=/var/data/lingwu pnpm files:migrate（在本地或一次性 shell 执行）。
     disk:
       name: lingwu-data
       mountPath: /var/data
@@ -128,6 +130,14 @@ services:
       # Signed-in sessions expire after this many milliseconds (default 7 days).
       - key: SESSION_TTL_MS
         value: "604800000"
+      # 会话签名密钥：手动固定，与 TOKEN_ENCRYPTION_KEY 同理（sync: false 表示不从蓝图
+      # 同步，需在 Render 控制台 Environment 手动填入）。配置后登录态不再依赖容器磁盘，
+      # 实例重建、换盘或迁移都不会把已登录用户踢下线；不配则退回持久盘上的
+      # /var/data/lingwu/session-signing-key，盘一重建所有人都要重新登录。
+      # 生成：openssl rand -base64 32。若不想让现有用户掉线，就直接填持久盘上的现值
+      # （Render Shell 里 `cat /var/data/lingwu/session-signing-key`）。
+      - key: SESSION_SIGNING_KEY
+        sync: false
       # Only used when the Supabase variables above are unset (one owner per deploy).
       - key: LINGWU_ACCESS_KEY
         generateValue: true

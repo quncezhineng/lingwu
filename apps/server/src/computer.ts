@@ -1,13 +1,13 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
-import { join, posix } from "node:path";
+import { posix } from "node:path";
 import { z } from "zod";
 import type {
   ComputerCommand,
   ComputerDirectory,
   ComputerSnapshot,
 } from "../../../packages/domain/src/computer.ts";
+import { type BlobStore, createBlobStore } from "./blob-store.ts";
 import {
   type ComputerBackend,
   DesktopComputerBackend,
@@ -184,6 +184,8 @@ type Lease = {
 };
 export class ComputerService {
   private readonly backend: ComputerBackend;
+  /** 桌面截图本体的存储（配置 Supabase 时为对象存储，否则本地磁盘）。 */
+  private readonly blobs: BlobStore;
   constructor(
     readonly db: Store,
     readonly config: Config,
@@ -197,6 +199,7 @@ export class ComputerService {
     this.backend = desktop
       ? new DesktopComputerBackend(config, desktop)
       : new DockerComputer(config, docker);
+    this.blobs = createBlobStore(config);
   }
   // Receipts are kept per provider, so Docker history never shows up on the desktop.
   private get receipts() {
@@ -701,16 +704,10 @@ export class ComputerService {
       try {
         await this.db.put(owner, "computer-desktop-actions", saved);
         if (data) {
-          const directory = join(this.config.dataDir, "desktop-screens");
-          await mkdir(directory, { recursive: true, mode: 0o700 });
+          // 截图本体存进对象存储（配置 Supabase 时）或本地磁盘（未配置时），
+          // 元数据仍写数据库；对象键与改造前的磁盘相对路径一致，便于回退读取。
           const blob = `${hash(owner)}.jpg`;
-          const temporary = join(directory, `${receipt.id}.tmp`);
-          try {
-            await writeFile(temporary, shot.image, { mode: 0o600, flag: "wx" });
-            await rename(temporary, join(directory, blob));
-          } finally {
-            await unlink(temporary).catch(() => {});
-          }
+          await this.blobs.put(`desktop-screens/${blob}`, shot.image);
           await this.db.put<Screen>(owner, "computer-desktop-screens", {
             id: "latest",
             receiptId: saved.id,
@@ -733,12 +730,17 @@ export class ComputerService {
     const shot = await this.db.get<Screen>(owner, "computer-desktop-screens", "latest");
     if (!shot || (receiptId && shot.receiptId !== receiptId))
       throw new AppError("No desktop screenshot yet", 404);
+    // 新格式：截图存在对象存储/磁盘上；旧部署的 base64 内联数据仍兼容读取。
+    const stored =
+      shot.blob === `${hash(owner)}.jpg`
+        ? await this.blobs.get(`desktop-screens/${shot.blob}`)
+        : null;
     return {
       mimeType: shot.mimeType,
-      bytes:
-        shot.blob === `${hash(owner)}.jpg`
-          ? await readFile(join(this.config.dataDir, "desktop-screens", shot.blob))
-          : Buffer.from(shot.data ?? "", "base64"),
+      // 保持返回 Buffer：调用方与既有测试都按 Buffer 处理（可直接取 base64 或作响应体）。
+      bytes: stored
+        ? Buffer.from(stored.buffer, stored.byteOffset, stored.byteLength)
+        : Buffer.from(shot.data ?? "", "base64"),
     };
   }
   list(owner: string, path = "/workspace") {

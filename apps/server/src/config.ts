@@ -78,6 +78,12 @@ export interface Config {
   e2bApiKey?: string;
   /** 登录会话有效期（毫秒），默认 7 天。 */
   sessionTtlMs?: number;
+  /**
+   * 会话签名密钥。配置后会话的签发/校验不再依赖磁盘文件：实例重建、换盘或迁移都
+   * 不会让已登录用户掉线。未配置时沿用 DATA_DIR/session-signing-key（本地开发默认）。
+   * 生成方式：`openssl rand -base64 32`。
+   */
+  sessionSigningKey?: string;
   allowedOrigins: string[];
   trustProxy?: boolean;
   /** 覆盖 /api/* 全局限流的每分钟请求数（默认 120）。 */
@@ -188,6 +194,13 @@ export function readConfig(): Config {
     throw new Error(
       "SUPABASE_URL requires both SUPABASE_PUBLISHABLE_KEY and SUPABASE_SECRET_KEY so each user can sign in",
     );
+  // 会话签名密钥：部署环境注入时优先使用，密钥不再依赖容器磁盘。长度下限是为了挡住
+  // 误填的弱密钥（例如占位符）——密钥过短会让会话签名可被伪造。
+  const sessionSigningKey = process.env.SESSION_SIGNING_KEY?.trim();
+  if (sessionSigningKey && sessionSigningKey.length < 32)
+    throw new Error(
+      "SESSION_SIGNING_KEY must be at least 32 characters; generate one with `openssl rand -base64 32`",
+    );
   const config: Config = {
     mode,
     port,
@@ -227,6 +240,7 @@ export function readConfig(): Config {
     computerE2bTemplate: process.env.COMPUTER_E2B_TEMPLATE?.trim() || "desktop",
     e2bApiKey,
     sessionTtlMs: positiveInt(process.env.SESSION_TTL_MS, "SESSION_TTL_MS"),
+    sessionSigningKey,
     allowedOrigins: (
       process.env.ALLOWED_ORIGINS ?? "http://localhost:8081,http://127.0.0.1:8081"
     ).split(","),

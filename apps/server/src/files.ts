@@ -1,9 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
-import { link, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
 import type { Artifact } from "../../../packages/domain/src/index.ts";
 import { fillPdf, inspectPdf } from "../../../packages/integrations/src/pdf.ts";
 import type { Auth } from "./auth.ts";
+import { type BlobStore, createBlobStore } from "./blob-store.ts";
 import type { Config } from "./config.ts";
 import type { Store } from "./db.ts";
 import { AppError } from "./errors.ts";
@@ -205,11 +204,15 @@ export function deterministicFileId(owner: string, operationKey: string): string
 }
 
 export class Files {
+  private readonly blobs: BlobStore;
   constructor(
     private readonly db: Store,
-    private readonly config: Config,
+    config: Config,
     private readonly auth: Auth,
-  ) {}
+    blobs?: BlobStore,
+  ) {
+    this.blobs = blobs ?? createBlobStore(config);
+  }
   async import(
     owner: string,
     name: string,
@@ -225,24 +228,18 @@ export class Files {
     }
     if (bytes.length > 10 * 1024 * 1024) throw new AppError("Files must be 10 MB or smaller", 413);
     let metadata = await inspectFile(name, bytes);
-    const directory = join(this.config.dataDir, "files");
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    const path = this.pathFor(id, metadata.extension);
+    const key = this.keyFor(id, metadata.extension);
     if (operationKey === undefined) {
-      await writeFile(path, bytes, { mode: 0o600, flag: "wx" });
+      await this.blobs.put(key, bytes);
     } else {
-      const temporary = `${path}.${randomUUID()}.tmp`;
-      try {
-        await writeFile(temporary, bytes, { mode: 0o600, flag: "wx" });
-        try {
-          await link(temporary, path);
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-          bytes = await readFile(path);
+      // 按操作键去重：同一操作重试时对象已存在，读取首写那份，保证内容一致。
+      const created = await this.blobs.create(key, bytes);
+      if (!created) {
+        const existing = await this.blobs.get(key);
+        if (existing) {
+          bytes = existing;
           metadata = await inspectFile(name, bytes);
         }
-      } finally {
-        await rm(temporary, { force: true });
       }
     }
     const safeName = sanitizeFileName(name);
@@ -277,35 +274,37 @@ export class Files {
     if (!file) throw new AppError("File not found", 404);
     return file;
   }
-  private pathFor(id: string, extension: FileFormat = "pdf"): string {
+  /**
+   * 存储对象键：`files/<id>.<ext>`，与改造前的磁盘相对路径一一对应，
+   * 因此历史文件在对象存储读不到时可以原样回退到本地盘。
+   */
+  private keyFor(id: string, extension: FileFormat = "pdf"): string {
     assertFileId(id);
-    const directory = resolve(this.config.dataDir, "files");
-    const resolved = resolve(directory, `${id}.${extension}`);
-    if (!resolved.startsWith(`${directory}${sep}`)) throw new AppError("File not found", 404);
-    return resolved;
+    return `files/${id}.${extension}`;
+  }
+  /** 由 MIME 或文件名推断存储用扩展名，导入、读取、删除三处必须一致。 */
+  private extensionFor(file: Artifact): FileFormat {
+    return (
+      definitionForMime(file.mimeType)?.extension ??
+      FILE_FORMATS[file.name.toLowerCase().split(".").pop() ?? ""]?.extension ??
+      "pdf"
+    );
   }
   async bytes(owner: string, id: string) {
     const file = await this.get(owner, id);
-    const extension =
-      definitionForMime(file.mimeType)?.extension ??
-      FILE_FORMATS[file.name.toLowerCase().split(".").pop() ?? ""]?.extension ??
-      "pdf";
-    return readFile(this.pathFor(id, extension));
+    const data = await this.blobs.get(this.keyFor(id, this.extensionFor(file)));
+    if (!data) throw new AppError("File not found", 404);
+    return data;
   }
-  /** 删除已上传的文件：先删数据库记录，再尽力清理磁盘上的物理文件。 */
+  /** 删除已上传的文件：先删数据库记录，再尽力清理对象存储/磁盘上的物理文件。 */
   async remove(owner: string, id: string): Promise<void> {
     const file = await this.get(owner, id);
-    const extension =
-      definitionForMime(file.mimeType)?.extension ??
-      FILE_FORMATS[file.name.toLowerCase().split(".").pop() ?? ""]?.extension ??
-      "pdf";
+    const key = this.keyFor(id, this.extensionFor(file));
     // 记录先删：即使物理文件清理失败，用户侧也不会再看到这条「幽灵文件」。
     await this.db.remove(owner, "files", id);
-    try {
-      await rm(this.pathFor(id, extension), { force: true });
-    } catch (error) {
-      backgroundFailure(`files.remove(${id})`, error);
-    }
+    await this.blobs
+      .remove(key)
+      .catch((error: unknown) => backgroundFailure(`files.remove(${id})`, error));
   }
   async fill(
     owner: string,

@@ -34,6 +34,7 @@ import { ComputerService, type DockerRunner } from "./computer.ts";
 import { computerRoutes } from "./computer-routes.ts";
 import { assertApiDeploymentConfig, type Config } from "./config.ts";
 import { appConnectorRoutes } from "./connectors/routes.ts";
+import { ConversationArchive } from "./conversation-archive.ts";
 import {
   ConversationHistory,
   conversationHistoryPage,
@@ -250,12 +251,21 @@ export async function createApp(
   );
   const intelligence = new CopilotKitIntelligence({ apiKey: config.intelligenceApiKey });
   const conversationStream = new ConversationStream(db);
+  // 单聊消息的永久归档：CopilotKit 只管运行与回放窗口，正文副本落在自有库（自动进 Supabase）。
+  const conversationArchive = new ConversationArchive(db);
   const conversationHistory = new ConversationHistory(
     async (owner, threadId) =>
       (await intelligence.getThreadMessages({ userId: owner, threadId })).messages,
     async (owner, threadId) => (await conversationStream.status(owner, threadId)).lastEventId,
   );
-  const runtime = makeRuntime(config, agent, auth, intelligence, conversationStream);
+  const runtime = makeRuntime(
+    config,
+    agent,
+    auth,
+    intelligence,
+    conversationStream,
+    conversationArchive,
+  );
   /**
    * 读取线程正文，并补上会话流记录的发送时间。
    *

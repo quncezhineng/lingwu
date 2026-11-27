@@ -141,6 +141,10 @@ export class Auth {
 }
 export async function createAuth(db: Store, config: Config) {
   await mkdir(config.dataDir, { recursive: true, mode: 0o700 });
+  // 部署环境注入了密钥就直接用：会话不再绑定容器磁盘，实例重建、换盘或迁移都
+  // 不会让已登录用户掉线（旧部署把密钥落在持久盘上，盘一重建所有人都被登出）。
+  if (config.sessionSigningKey) return new Auth(db, config, config.sessionSigningKey);
+  // 未注入时退回磁盘：首次启动生成一次，之后并发启动共用同一份，保证签名一致。
   const path = join(config.dataDir, "session-signing-key");
   let key: string;
   try {

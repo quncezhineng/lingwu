@@ -20,6 +20,8 @@
     "format": "biome check --write .",
     "build:server": "tsc -p tsconfig.build.json",
     "db:migrate": "node --env-file-if-exists=.env --import tsx apps/server/src/migrate-to-postgres.ts",
+    "files:migrate": "node --env-file-if-exists=.env --import tsx apps/server/src/migrate-files.ts",
+    "archive:backfill": "node --env-file-if-exists=.env --import tsx apps/server/src/backfill-archive.ts",
     "start": "node dist/apps/server/src/index.js",
     "build:web": "pnpm --dir apps/mobile build:web",
     "build:ios": "pnpm --dir apps/mobile build:ios",

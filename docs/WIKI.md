@@ -319,6 +319,25 @@ flowchart TB
 | `engine/hindsight.ts` | Hindsight 写入、召回、删除客户端 |
 | `packages/integrations/market-data.ts` | 行情 provider、缓存、降级与历史数据 |
 
+### 7.3 对话内容存储在哪里
+
+两类对话的正文**存储位置不同**，排障/迁移时务必分开看待：
+
+| 对话类型 | 消息正文 | 灵悟本地库保留什么 |
+| --- | --- | --- |
+| 智能体对话（单聊） | **CopilotKit Intelligence（Rich Threads）云端**，同时在灵悟自有库留一份**归档副本**（`records` 表 `kind=conversation_messages`） | 完整正文归档（含用户提问与助手回复）+ 流事件回放窗口（`kind=conversation-streams`，默认最近 2000 条 / 8MB） |
+| 频道对话（多 Agent 群聊） | **灵悟自己的库**（`records` 表 `kind=channel_messages`，频道元数据 `kind=channels`） | 完整消息与频道元数据 |
+
+要点：
+
+- 智能体单聊正文由 `CopilotKitIntelligence` 持久化（`apps/server/src/app.ts` 中 `getOrCreateThread` / `getThreadMessages`），作为运行与历史读取的主来源。
+- 为了**永久保存**，灵悟在消息经过本服务时把完整正文再落一份到自有库 `kind=conversation_messages`（`apps/server/src/conversation-archive.ts`）：用户提问在请求入口落库，助手回复在事件流结束时拼装落库。因此单聊历史有了**不依赖 CopilotKit 的永久副本**——换 Intelligence 项目或清空那边也不影响这份归档。
+- 归档上线前的存量历史用一次性脚本补齐：`pnpm archive:backfill`（遍历所有 owner → `listThreads` → `getThreadMessages` → 写入归档）。幂等，可重复执行；回填消息标记 `backfilled: true` 且不带 `at`（历史本身无时间戳）。
+- `conversation-streams` 只用于断线重连回放（滚动窗口，非完整历史），与上面的完整归档是两回事。
+- 频道对话**不经过 CopilotKit**，完整存在灵悟自己的库里；频道成员回复时生成的临时 threadId 只用于当轮推理上下文，不落 Intelligence。
+- 灵悟的库只有 `records`（通用 KV，主键 `(owner, kind, id)`，数据在 `data` jsonb）与 `events`（事件日志）两张物理表，所有业务实体靠 `kind` 区分。「灵悟自己的库」在配置 `DATABASE_URL` 后即 Supabase 托管 Postgres，否则为本地 PGlite。
+- Supabase 侧的 `user_profiles`、`lingwu_audit_logs`、`lingwu_resources`、`lingwu_shares` 只涉及账号、审计、资源索引与分享，**不含任何对话消息**。
+
 ---
 
 ## 8. 核心运行链路
@@ -434,6 +453,7 @@ flowchart TB
 | `LINGWU_ACCESS_KEY` | 单租户共享访问密钥，至少 24 字符 |
 | `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` | 启用多用户账户 |
 | `SESSION_TTL_MS` | JWT 会话有效期，默认 7 天 |
+| `SESSION_SIGNING_KEY` | 会话签名密钥（≥32 字符）；配置后登录态不再依赖持久盘，留空则用 `DATA_DIR/session-signing-key` |
 | `BROWSER_WORKER_URL` / `WORKER_TOKEN` | 浏览器 Worker |
 | `COMPUTER_ENABLED` | 启用智能体计算机 |
 | `TASK_WORKER_ENABLED` | API 进程是否内嵌任务 Worker |
