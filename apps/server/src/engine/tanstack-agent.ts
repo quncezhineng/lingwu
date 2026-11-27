@@ -28,9 +28,12 @@ import { MODEL_MAX_RETRIES } from "../config.ts";
 import type { ModelConnection } from "../model-settings.ts";
 
 /**
- * DeepSeek thinking mode requires reasoning_content to be echoed back on an
- * assistant turn that also contains tool calls. TanStack retains that text as
- * `thinking` during a run, but its Chat Completions serializer only emits the
+ * DeepSeek thinking mode: any request that carries `tools` must echo the
+ * reasoning_content of every prior assistant turn back to the API, including
+ * turns that made no tool call. An empty string is accepted, but a missing
+ * field is rejected with HTTP 400 ("The reasoning_content in the thinking mode
+ * must be passed back to the API"). TanStack keeps the text as `thinking`
+ * during a run, but its Chat Completions serializer only emits the
  * OpenAI-standard message fields.
  */
 export class ReasoningChatCompletionsAdapter<
@@ -58,10 +61,12 @@ export class ReasoningChatCompletionsAdapter<
 
   protected override convertMessage(message: ModelMessage) {
     const converted = super.convertMessage(message);
-    if (!this.sendReasoningContent || message.role !== "assistant" || !message.toolCalls?.length)
-      return converted;
-    const reasoning = message.thinking?.map((part) => part.content).join("");
-    if (!reasoning) return converted;
+    // Pass reasoning_content back on every assistant turn, not just tool-call turns:
+    // DeepSeek validates the field on any request that carries tools. Fall back to an
+    // empty string when the reasoning was not retained (e.g. replayed history), because
+    // omitting the field is what triggers the 400.
+    if (!this.sendReasoningContent || message.role !== "assistant") return converted;
+    const reasoning = message.thinking?.map((part) => part.content).join("") ?? "";
     return { ...converted, reasoning_content: reasoning };
   }
 }

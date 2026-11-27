@@ -258,6 +258,55 @@ test("channel-produced artifacts group by channel instead of 小悟 or unassigne
   );
 });
 
+test("longform artifacts without a backing task group by their own channel/thread ids", () => {
+  const agents = [
+    { id: "system-agent", name: "小悟", threadId: "thread-main" },
+    { id: "analyst", name: "分析师", threadId: "thread-analyst" },
+  ];
+  // 对话里折叠的长文产物不属于任何托管任务：taskId 是合成 id（channel:/thread:），
+  // 库里没有对应任务，只能靠产物自带的 channelId / threadId 归属。
+  const artifacts: AgentArtifact[] = [
+    {
+      ...artifact("channel-longform", "2026-11-23T08:00:00.000Z"),
+      taskId: "channel:chan-1",
+      channelId: "chan-1",
+      threadId: "thread-main",
+    },
+    {
+      ...artifact("thread-longform", "2026-11-22T08:00:00.000Z"),
+      taskId: "thread:thread-analyst",
+      threadId: "thread-analyst",
+    },
+  ];
+  const channelLabels = new Map([["chan-1", "AI 产业研究频道"]]);
+
+  const groups = groupArtifactsByAgent(
+    artifacts,
+    [],
+    agents,
+    "未归属智能体",
+    channelLabels,
+    "频道",
+  );
+
+  // 频道长文按频道分组，个人长文按线程归到对应智能体，均不再落「未归属」。
+  assert.deepEqual(
+    groups.map((group) => [group.agentId, group.agentName]),
+    [
+      ["channel:chan-1", "AI 产业研究频道"],
+      ["analyst", "分析师"],
+    ],
+  );
+  assert.deepEqual(
+    groups[0].artifacts.map((item) => item.id),
+    ["channel-longform"],
+  );
+  assert.deepEqual(
+    groups[1].artifacts.map((item) => item.id),
+    ["thread-longform"],
+  );
+});
+
 test("artifact search matches the report title case-insensitively", () => {
   const items: AgentArtifact[] = [
     { ...artifact("alpha", "2026-10-26T08:00:00.000Z"), title: "NVIDIA 估值报告" },

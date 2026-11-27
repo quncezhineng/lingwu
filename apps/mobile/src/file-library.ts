@@ -108,12 +108,16 @@ function isSystemProducedTask(
  * 把智能体生成的分析产物按「生成它的智能体」归类，频道（多 Agent 群聊）产物独立分组。
  *
  * 归属优先级：
- * 1. 任务 input 里带 channelId 的，是频道发起/编排的产物，一律归入独立的「频道」分组
+ * 1. 产物或任务带 channelId 的，是频道发起/编排的产物，一律归入独立的「频道」分组
  *    （即使该任务的 threadId 碰巧匹配某个成员 Agent 的线程，也不划归那个智能体）；
- * 2. 其余按 artifact.taskId → task.threadId → agent.threadId → agent 归属；
+ * 2. 其余按 artifact.threadId / task.threadId → agent.threadId → agent 归属；
  * 3. 不带 threadId 但由系统能力产出的任务（定时简报、计划任务、编排根任务）
  *    兜底归入系统智能体「小悟」；
  * 4. 完全无法溯源的产物归「未归属」分组。
+ *
+ * 频道归属同时看两层来源：对话里折叠的长文产物不属于任何托管任务（taskId 是
+ * `channel:<id>` / `thread:<id>` 合成 id），但产物自带 channelId/threadId，必须优先用它们，
+ * 否则这些报告会从频道页消失、并在全局资料页落进「未归属」。
  *
  * 频道分组名取自 channelLabels（channelId → 频道名），查不到的频道用 channelFallbackLabel 兜底。
  * 任务对象至少需要 id 与 threadId；kind/orchestrationId 仅在兜底判断时可选。
@@ -138,21 +142,30 @@ export function groupArtifactsByAgent(
   const groups = new Map<string, AgentArtifactGroup>();
   for (const artifact of newestFirst(artifacts)) {
     const task = taskById.get(artifact.taskId);
+    // 频道归属优先取产物自带的 channelId（对话折叠的长文产物不属于托管任务，
+    // taskId 只是合成 id），再回落到任务 input.channelId。
     const channelId =
-      typeof task?.input?.channelId === "string" && task.input.channelId.length > 0
-        ? task.input.channelId
-        : undefined;
+      typeof artifact.channelId === "string" && artifact.channelId.length > 0
+        ? artifact.channelId
+        : typeof task?.input?.channelId === "string" && task.input.channelId.length > 0
+          ? task.input.channelId
+          : undefined;
+    // 线程归属同理：长文产物自带 threadId，任务查不到时用它回溯智能体。
+    const threadId =
+      typeof artifact.threadId === "string" && artifact.threadId.length > 0
+        ? artifact.threadId
+        : task?.threadId;
     let agentId: string;
     let agentName: string;
     if (channelId) {
       agentId = `channel:${channelId}`;
       agentName = channelLabels.get(channelId) ?? channelFallbackLabel;
     } else {
-      const owner = task?.threadId ? agentByThread.get(task.threadId) : undefined;
+      const owner = threadId ? agentByThread.get(threadId) : undefined;
       if (owner) {
         agentId = owner.id;
         agentName = owner.name;
-      } else if (systemAgent && !task?.threadId && isSystemProducedTask(task)) {
+      } else if (systemAgent && !threadId && isSystemProducedTask(task)) {
         agentId = SYSTEM_AGENT_ID;
         agentName = systemAgent.name;
       } else {

@@ -5,6 +5,76 @@
 
 ## 变更记录
 
+### 2026-11-28 · 修复频道对话产生的分析报告未归入频道：折叠长文产物缺失归属
+
+**背景**
+
+用户在频道详情页「资料」看到空态（「这个频道还没有资料」），而全局资料库「分析生成」列表里，
+该频道对话产出的报告却全部落在「未归属智能体」分组，未按频道分类。
+
+**根因**
+
+- 频道对话里成员的整段回复会被折叠成长文产物（`foldLongformReply`）。这类产物**不属于任何托管任务**，
+  [longform.ts](../apps/server/src/engine/longform.ts) 有意把 `taskId` 写成合成 id
+  （频道为 `channel:<channelId>`、单聊为 `thread:<threadId>`），并额外在产物上直接写 `channelId`/`threadId`。
+- 前端两处归属逻辑只认任务：全局分组 `groupArtifactsByAgent` 查 `task.input.channelId`、
+  频道页 `ChannelFilesPanel` 按 `taskIds.has(artifact.taskId)` 过滤。合成 `taskId` 在任务表里查不到，
+  于是这些产物既进不了频道页，又在全局落进「未归属」。
+
+**处理**
+
+- [file-library.ts](../apps/mobile/src/file-library.ts) `groupArtifactsByAgent`：频道归属改为
+  「优先取 `artifact.channelId`，再回落到任务 `input.channelId`」；线程归属同样优先取
+  `artifact.threadId`，任务查不到时也能回溯到发起智能体。
+- [channel-settings-screen.tsx](../apps/mobile/src/channel-settings-screen.tsx) `ChannelFilesPanel`：
+  产物过滤增加 `artifact.channelId === channel.id`，把频道长文产物收进频道「资料」页。
+- 测试 [file-library.test.ts](../apps/mobile/test/file-library.test.ts) 新增用例：无对应任务的
+  频道长文 / 个人长文分别按频道、按线程归属，不再落「未归属」。
+
+**说明**
+
+- 对历史数据立即生效：`channelId`/`threadId` 一直写在产物上，本次只改前端归类，不动数据、无需迁移。
+- 验证：`tsx --test apps/mobile/test/file-library.test.ts` 9 条用例全部通过；`pnpm typecheck` 通过；
+  `biome check` 对改动文件无告警。
+
+### 2026-11-28 · 修复 DeepSeek 思考模式多轮对话 400：reasoning_content 未回传
+
+**现象**
+
+- 本地 `pnpm dev`（`MODEL=deepseek/deepseek-flash`）对话时，首轮之后报错并使 Agent 执行失败：
+  `400 The reasoning_content in the thinking mode must be passed back to the API.`，
+  报错来源 `openai-chat.chatStream`，栈顶落在 CopilotKit 的 TanStack 转换器。
+
+**根因**
+
+- DeepSeek 思考模式官方规则：只要请求携带 `tools`，此前每一轮 assistant 的
+  `reasoning_content` 都必须回传；缺失该字段即 400，而传空字符串 `""` 可通过校验
+  （见 DeepSeek「Thinking Mode」官方文档）。
+- [tanstack-agent.ts](../apps/server/src/engine/tanstack-agent.ts) 的 `ReasoningChatCompletionsAdapter`
+  有两处漏传：① 仅在「带 tool_calls 的 assistant 轮」注入，漏掉了未调用工具的 assistant 轮；
+  ② 当 `thinking` 为空（历史回放丢了 reasoning 块）时直接 `return converted`，把字段整个省略。
+  两者都会触发 400。
+
+**处理**
+
+- [tanstack-agent.ts（apps/server）](../apps/server/src/engine/tanstack-agent.ts)：`convertMessage`
+  中对**所有** assistant 轮都注入 `reasoning_content`，并在取不到 `thinking` 时回退为 `""`
+  （空串可通过校验，省略字段才是 400 的触发点）；同步更新类注释为准确的官方规则。
+- [tests/gateway-chat-completions.test.ts](../tests/gateway-chat-completions.test.ts)：新增两条回归用例，
+  分别锁死「回放的历史 tool-call 轮无 reasoning 时必须回传空串」与「未调用工具的 assistant 轮
+  也要回传 reasoning」。
+
+**验证**
+
+- `tsx --test tests/gateway-chat-completions.test.ts` → 10 pass / 0 fail；
+  去掉本次源码改动后新增的两条用例（RED）稳定失败，改回后（GREEN）通过。
+- `tsc --noEmit` 通过；`biome check` 无告警。
+
+**注意**
+
+- 该修复优先保证「不再 400」：历史回放若丢失 reasoning，会以空串占位，模型失去上一轮思维链上下文，
+  但不会中断对话。若后续要保留思维链质量，需要让会话持久化把 reasoning 消息一并存下并回放。
+
 ### 2026-11-28 · 修复 lingwu-browser 磁盘满仍启动崩溃：应急回收一直空转
 
 **现象**
@@ -194,6 +264,34 @@
 
 - 部署环境若不配置此项，将退回持久盘上的 `/var/data/lingwu/session-signing-key`，盘一重建全体用户仍需重新登录。
 - 想保住现有登录态：把持久盘上的现值填进控制台即可——Render Shell 里 `cat /var/data/lingwu/session-signing-key`。
+
+### 2026-11-27 · Supabase 物件统一改名：`lingtai_` → `lingwu_`
+
+**背景**
+
+- 该 Supabase 项目早期叫 `lingtai`，账号体系三张表虽在搬到 `lingwu` 时已改成 `lingwu_audit_logs` / `lingwu_resources`，但它们的索引、约束、RLS 策略仍沿用旧名（`lingtai_*`），与仓库脚本、以及同库其他命名不一致。
+
+**处理**
+
+- 扫描全库含 `lingtai` 的 catalog 物件，共 13 项：6 个索引、5 个约束（2 个主键 / 1 个唯一 / 2 个外键）、2 个 RLS 策略。无 lingtai 表名、序列、函数、列或存储桶。
+- 在一个事务内做前缀替换 `lingtai_` → `lingwu_`，改完当场自检「零残留」才提交。先改约束（PostgreSQL 会一并重命名 PK/UNIQUE 的底层索引），再动态查出仍残留的独立索引逐个改名，最后改策略。
+- 先以 dry-run 演练（事务内改完 → 回滚）确认计划正确，再正式提交。
+
+**验证**
+
+- 全库剩余 `lingtai` 物件 **0 项**；6 个 `lingwu_*` 索引、5 个约束、2 个策略全部就位。
+- 功能未受影响：`on_auth_user_created` 触发器仍绑定 `user_profiles_handle_new_user`；两个外键仍指向 `auth.users`；数据行数不变（records 1801 / events 409 / audit_logs 183 / profiles 37）；三个 `lingwu_*` 策略齐全；桶 `lingwu-files` 在。
+
+**同步仓库脚本（已做）**
+
+- [0001_accounts.sql](../supabase/migrations/0001_accounts.sql) 原先的索引名、函数名与线上库不一致（脚本 `lingwu_audit_logs_user_idx` / `lingwu_resources_owner_type_id_idx` / `handle_new_user`）。已改为与线上一致：`lingwu_audit_logs_user_created_idx` / `lingwu_resources_user_id_resource_type_resource_id_key` / `user_profiles_handle_new_user`。
+- 函数体一并对齐：线上函数比脚本原先的版本完整（多了 `avatar_url`、昵称回退链 nickname→display_name→邮箱前缀、`on conflict do update` 的 upsert），若只改名不动函数体，重跑会把线上版本覆盖退化。函数体已改为**逐字符与线上一致**（含 `coalesce` 单行写法）。
+- 验证方式：把改后的脚本在事务里对实库跑一遍再回滚——**新增索引 0、函数定义逐字符无变化、触发器无变化、行数不变**，即重跑是真正的 no-op。
+
+**脚本仍未涵盖、线上另有（不影响运行）**
+
+- 索引 `lingwu_audit_logs_action_idx`（`action`）、`lingwu_resources_type_idx`（`resource_type`）。
+- 三张表上的 `select_own` 只读 RLS 策略（`lingwu_audit_logs_select_own`、`lingwu_resources_select_own`）。注意：脚本开头注释写的是「启用 RLS 后对用户端完全隐藏」，与线上「有 owner 只读策略」并不一致，属历史演进差异，需要时再决定以哪边为准。
 
 ### 2026-11-27 · 分享表在 Supabase 就位，并清理本地 356 MB 残留
 

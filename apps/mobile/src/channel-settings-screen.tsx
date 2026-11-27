@@ -1024,6 +1024,8 @@ function ChannelFilesPanel({ channel }: { channel: Channel }) {
   }, [api, channel.id]);
 
   // 频道范围：对话里附过的文件，以及这个频道任务带上的文件和产物。
+  // 产物归属分两种：频道任务产出（taskId 命中本频道任务）与对话里折叠的长文产物
+  // （不属于托管任务，taskId 是合成 id，但自带 channelId），两者都要收进来。
   const { files, artifacts } = useMemo(() => {
     const tasks = (data?.tasks ?? []).filter(
       (task) => typeof task.input?.channelId === "string" && task.input.channelId === channel.id,
@@ -1032,7 +1034,9 @@ function ChannelFilesPanel({ channel }: { channel: Channel }) {
     const fileIds = new Set([...tasks.flatMap((task) => task.artifactIds), ...chatFileIds]);
     return {
       files: workspace.files.filter((file) => fileIds.has(file.id)),
-      artifacts: (data?.artifacts ?? []).filter((artifact) => taskIds.has(artifact.taskId)),
+      artifacts: (data?.artifacts ?? []).filter(
+        (artifact) => taskIds.has(artifact.taskId) || artifact.channelId === channel.id,
+      ),
     };
   }, [chatFileIds, data?.tasks, data?.artifacts, workspace.files, channel.id]);
 
