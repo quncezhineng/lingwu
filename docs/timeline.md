@@ -5,6 +5,43 @@
 
 ## 变更记录
 
+### 2026-11-28 · 修复 lingwu-browser 磁盘满仍启动崩溃：应急回收一直空转
+
+**现象**
+
+- Render 上 `lingwu-browser`（pserv）部署后立即崩溃并反复重启：
+  `Error: ENOSPC: no space left on device, mkdir '/data/<id>/download-outcomes'`，
+  调用链 `readDownloadFailures` → `restoreSessions` → `createBrowserManager` → `createWorkerServer`。
+
+**根因**
+
+- 磁盘 2 GB 被 Chromium 持久化配置 + 已下载 PDF 写满，启动时连建 `download-outcomes`
+  目录都失败（`mkdir` 需分配 inode/目录块）。
+- 上一版已加「ENOSPC 时回收再重试」，但应急回收沿用了 `maxProfiles`（20）作为保留数：
+  当会话数本就 ≤ 20 时 `reclaimSessionSpace` 一个配置目录都不会删，回收等于空操作，
+  重试仍抛 ENOSPC → worker 启动即崩（2026-11-27 线上日志，栈顶落在 `browser.ts:150` 的重试）。
+
+**处理**
+
+- [browser.ts（apps/worker）](../apps/worker/src/browser.ts)：应急回收改为「远低于上限」的
+  保留数 `EMERGENCY_KEEP_PROFILES = 4`，并加第二档兜底——若第一档释放的仍不够
+  （例如少数超大配置），`reclaimSessionSpace(dataDir, 0)` 清空全部配置做最后一次抢救，
+  宁可让用户重新登录网站，也不让 worker 启动即崩。顺带导出该常量以便回归测试。
+- [render.yaml](../render.yaml)：`lingwu-browser` 持久盘 2 GB → 5 GB（按 20 份配置
+  + PDF 修剪到每会话 4 份的稳态占用留出余量）。
+- [tests/browser.test.ts](../tests/browser.test.ts)：新增回归用例，锁死「会话数低于配置上限时
+  应急回收仍必须真正删除配置」这条契约。
+
+**验证**
+
+- `pnpm exec tsx --test tests/browser.test.ts` → 28 通过 / 0 失败（含新增回归用例）。
+- `pnpm --dir apps/worker exec tsc --noEmit` 通过；`biome check` 无告警。
+
+**注意**
+
+- 磁盘真正写满前应先扩容；自愈只在 ENOSPC 触发，属最后防线。第二档会丢弃全部已保存配置
+  （登录态、已下载 PDF），用户需重新登录原网站。
+
 ### 2026-11-28 · 消除「云端线程缺失/非法」导致的读历史报错刷屏
 
 **现象**

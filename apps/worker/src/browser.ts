@@ -26,6 +26,12 @@ type Running = {
   downloadError?: boolean;
 };
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/**
+ * 磁盘写满时按数量回收配置目录后保留的会话数上限。必须远小于 maxProfiles：
+ * 启动时若会话数本就 ≤ maxProfiles，按上限淘汰一个目录都不会删，回收等于空操作，
+ * 磁盘依旧满、恢复重试照样抛 ENOSPC。
+ */
+export const EMERGENCY_KEEP_PROFILES = 4;
 
 export function validateSessionId(id: unknown): string {
   if (typeof id !== "string" || !SESSION_ID.test(id))
@@ -143,11 +149,20 @@ export async function createBrowserManager(
   try {
     await restoreSessions();
   } catch (error) {
-    // 磁盘写满时绝不能让 worker 陷入反复崩溃的循环：先回收空间（清理半成品、
-    // 修剪旧 PDF、淘汰最旧配置），再重试一次恢复。
+    // 磁盘写满时绝不能让 worker 陷入反复崩溃的循环：先回收空间再重试恢复。
     if (!isEnospc(error)) throw error;
-    await reclaimSessionSpace(dataDir, maxProfiles);
-    await restoreSessions();
+    // 第一档：清理半成品、修剪旧 PDF，并把配置目录淘汰到远低于上限的数量
+    // （此前沿用 maxProfiles，会话数本就 ≤ 上限时一个目录都不会删，回收空转）。
+    await reclaimSessionSpace(dataDir, Math.min(maxProfiles, EMERGENCY_KEEP_PROFILES));
+    try {
+      await restoreSessions();
+    } catch (retryError) {
+      if (!isEnospc(retryError)) throw retryError;
+      // 第二档：第一档释放的仍不够（例如少数超大配置）时，丢弃全部已保存配置做
+      // 最后一次抢救——用户需重新登录网站，但远好过 worker 启动即崩。
+      await reclaimSessionSpace(dataDir, 0);
+      await restoreSessions();
+    }
   }
   const directory = (id: string) => join(dataDir, validateSessionId(id));
   async function persist(session: Session) {

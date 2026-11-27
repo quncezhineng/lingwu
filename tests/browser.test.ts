@@ -20,6 +20,7 @@ import { Auth } from "../apps/server/src/auth.ts";
 import { BrowserService } from "../apps/server/src/browser.ts";
 import { Files } from "../apps/server/src/files.ts";
 import {
+  EMERGENCY_KEEP_PROFILES,
   reclaimSessionSpace,
   type Session,
   selectEvictionVictim,
@@ -828,4 +829,41 @@ test("worker startup reclaims a full disk by pruning leftovers and old profiles"
     file.endsWith(".pdf"),
   );
   assert.ok(remaining.length > 0 && remaining.length <= 4);
+});
+
+test("emergency reclaim frees profiles while the session count is below the profile cap", async (t) => {
+  // 回归：启动时磁盘满，若按 maxProfiles（20）淘汰，而会话数本就 ≤ 20，
+  // 一个配置目录都不会删，回收等于空操作，恢复重试仍抛 ENOSPC 导致启动即崩。
+  const dataDir = await mkdtemp(join(tmpdir(), "lingwu-reclaim-cap-"));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+  // 造出「数量低于配置上限、但磁盘已被占满」的现场：8 份配置，超过应急保留数。
+  const ids = Array.from(
+    { length: 8 },
+    (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+  );
+  for (const [index, id] of ids.entries()) {
+    const folder = join(dataDir, id);
+    await mkdir(folder, { recursive: true });
+    await writeFile(
+      join(folder, "session.json"),
+      JSON.stringify({
+        id,
+        updatedAt: `2026-10-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`,
+      }),
+    );
+  }
+  assert.ok(ids.length <= 20, "the scenario must stay within the default profile cap");
+  assert.ok(EMERGENCY_KEEP_PROFILES < ids.length, "reclaim must actually delete something");
+  await reclaimSessionSpace(dataDir, EMERGENCY_KEEP_PROFILES);
+  const survived = (await readdir(dataDir)).filter((name) => ids.includes(name));
+  assert.equal(survived.length, EMERGENCY_KEEP_PROFILES);
+  // 保留的是最新的若干份：最早的两份配置必须已被删除以腾出空间。
+  await assert.rejects(readFile(join(dataDir, ids[0], "session.json")), { code: "ENOENT" });
+  assert.equal(
+    await readFile(join(dataDir, ids[ids.length - 1], "session.json"), "utf8"),
+    JSON.stringify({
+      id: ids[ids.length - 1],
+      updatedAt: "2026-10-08T00:00:00.000Z",
+    }),
+  );
 });
