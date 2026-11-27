@@ -1423,9 +1423,10 @@ function MemberBubble({
             <AssistantResponse content={text} streaming={streaming} />
           </View>
         )}
-        {/* 长文卡片跟在摘要下面：流里读到的是结论，点开才是全文（独立页面）。 */}
+        {/* 长文卡片跟在摘要下面：流里读到的是结论，点开才是全文（独立页面）。
+            左缘贴齐回复卡片的左侧框线（整列左缘），不再保留 35px 缩进，与底部操作栏同一套对齐规则。 */}
         {!!artifacts?.length && (
-          <View style={{ paddingLeft: 35, paddingRight: 35, paddingTop: 8, gap: 8 }}>
+          <View style={{ paddingRight: 35, paddingTop: 8, gap: 8 }}>
             {artifacts.map((artifact) => (
               <ArtifactCard key={artifact.id} artifact={artifact} />
             ))}

@@ -323,10 +323,10 @@ flowchart TB
 
 两类对话的正文**存储位置不同**，排障/迁移时务必分开看待：
 
-| 对话类型 | 消息正文 | 灵悟本地库保留什么 |
-| --- | --- | --- |
-| 智能体对话（单聊） | **CopilotKit Intelligence（Rich Threads）云端**，同时在灵悟自有库留一份**归档副本**（`records` 表 `kind=conversation_messages`） | 完整正文归档（含用户提问与助手回复）+ 流事件回放窗口（`kind=conversation-streams`，默认最近 2000 条 / 8MB） |
-| 频道对话（多 Agent 群聊） | **灵悟自己的库**（`records` 表 `kind=channel_messages`，频道元数据 `kind=channels`） | 完整消息与频道元数据 |
+| 对话类型 | 消息正文（主副本） | 备份 | 灵悟本地库保留什么 |
+| --- | --- | --- | --- |
+| 智能体对话（单聊） | **CopilotKit Intelligence（Rich Threads）云端** | 灵悟自有库归档副本（`records` 表 `kind=conversation_messages`） | 完整正文归档（含用户提问与助手回复）+ 流事件回放窗口（`kind=conversation-streams`，默认最近 2000 条 / 8MB） |
+| 频道对话（多 Agent 群聊） | **CopilotKit 云端**（旁路镜像，线程 `channel-<channelId>`） | 灵悟自有库全量（`records` 表 `kind=channel_messages`，频道元数据 `kind=channels`） | 完整消息与频道元数据（读取源） |
 
 要点：
 
@@ -334,8 +334,14 @@ flowchart TB
 - 为了**永久保存**，灵悟在消息经过本服务时把完整正文再落一份到自有库 `kind=conversation_messages`（`apps/server/src/conversation-archive.ts`）：用户提问在请求入口落库，助手回复在事件流结束时拼装落库。因此单聊历史有了**不依赖 CopilotKit 的永久副本**——换 Intelligence 项目或清空那边也不影响这份归档。
 - 归档上线前的存量历史用一次性脚本补齐：`pnpm archive:backfill`（遍历所有 owner → `listThreads` → `getThreadMessages` → 写入归档）。幂等，可重复执行；回填消息标记 `backfilled: true` 且不带 `at`（历史本身无时间戳）。
 - `conversation-streams` 只用于断线重连回放（滚动窗口，非完整历史），与上面的完整归档是两回事。
-- 频道对话**不经过 CopilotKit**，完整存在灵悟自己的库里；频道成员回复时生成的临时 threadId 只用于当轮推理上下文，不落 Intelligence。
+- **频道对话也以 CopilotKit 云为主副本**：频道仍照旧在本地跑模型、按原样子回复，灵悟的库（`kind=channel_messages`）继续全量留档并作为**读取源**；每轮结束后由 `apps/server/src/channel-mirror.ts` 把「用户提问 + 成员回复 + 工具过程」**全量旁路镜像**一份送进 CopilotKit 云落库（即发即忘，失败只记 `channel.mirror` 日志，绝不影响频道对话）。
+  - 镜像走既有消息通道（CopilotKit 无写消息 REST 接口，消息只能靠「让某个 agent 经运行时跑一遍」投递）：专用 agentId `channel-mirror`、每频道一条线程，用独立的 agentId 避免混进单聊线程列表（移动端 `useThreads` 只按 `agentId=default` 过滤）。
+  - **线程 id 必须是标准 UUID**：`channelMirrorThreadId()` 用固定命名空间把 `channelId` 按 RFC 4122 v5（SHA-1）确定性地映射成 UUID —— 云端只接受 UUID 作 threadId，非 UUID 的自定义 id 会被 400 `VALIDATION_ERROR` 拒绝、线程建不起来；确定性映射又保证「同频道 = 同线程」，无需任何持久化映射表。
+  - **事件流必须以 `RUN_STARTED` 开头、`RUN_FINISHED` 收尾**：`ChannelMirrorAgent` 在这两个「运行级」事件之间回放工具与正文事件。缺首事件时云端会抛 `AGUIError: First event must be 'RUN_STARTED'`，助手回复整段被丢弃（只剩用户提问落库）。
+  - 投递经内部 `runtime.fetch` 直接命中运行时路由 `agent/channel-mirror/run`，复用与真实对话一致的鉴权与落库链路，不联外网、不新建登录会话；同一线程按序串行 + 最多 3 次重试，规避云端「Thread already running」。
 - 灵悟的库只有 `records`（通用 KV，主键 `(owner, kind, id)`，数据在 `data` jsonb）与 `events`（事件日志）两张物理表，所有业务实体靠 `kind` 区分。「灵悟自己的库」在配置 `DATABASE_URL` 后即 Supabase 托管 Postgres，否则为本地 PGlite。
+- **列表预览合并成一次请求**：手机首页 / 宽屏侧栏要为每个频道、每个智能体显示「最近一条回复」。早期实现是逐个会话各发一次请求（N+1），每次都要过一次登录会话校验并跨区查一次库；数据库在海外（新加坡）时，刷新页面并发的大量请求会互相排队，明显变慢。现改为一次 `GET /api/home/previews`：服务端只校验一次会话、频道消息只查一次（内存按 `channelId` 分组）、智能体线程并发读取，返回裁剪后的消息（每个会话最多 30 条，只留 `id/role/text|content/createdAt`），最终文案仍由客户端既有纯函数 `latestReplyPreview` / `latestBotPreview` 计算，保证预览逻辑只有一份。
+- 鉴权侧同样做去重：`apps/server/src/auth.ts` 的 `sessionRecord()` 把「同一瞬间、同一会话」的并发查询合并成一次在途请求（不做缓存，查询一结束即释放），刷新瞬间的一批请求只会查一次 `system/sessions`。
 - Supabase 侧的 `user_profiles`、`lingwu_audit_logs`、`lingwu_resources`、`lingwu_shares` 只涉及账号、审计、资源索引与分享，**不含任何对话消息**。
 
 ---
@@ -453,7 +459,7 @@ flowchart TB
 | `LINGWU_ACCESS_KEY` | 单租户共享访问密钥，至少 24 字符 |
 | `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` | 启用多用户账户 |
 | `SESSION_TTL_MS` | JWT 会话有效期，默认 7 天 |
-| `SESSION_SIGNING_KEY` | 会话签名密钥（≥32 字符）；配置后登录态不再依赖持久盘，留空则用 `DATA_DIR/session-signing-key` |
+| `SESSION_SIGNING_KEY` | 会话签名密钥（≥32 字符）；配置后登录态不再依赖持久盘，留空则用 `DATA_DIR/session-signing-key`。迁移/轮换见 [O2 部署手册 §2.8](./O2-定时任务与部署手册.md#28-会话签名密钥session_signing_key迁移与轮换) |
 | `BROWSER_WORKER_URL` / `WORKER_TOKEN` | 浏览器 Worker |
 | `COMPUTER_ENABLED` | 启用智能体计算机 |
 | `TASK_WORKER_ENABLED` | API 进程是否内嵌任务 Worker |

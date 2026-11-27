@@ -22,6 +22,13 @@ export interface SessionRecord {
   revokedAt?: number;
 }
 export class Auth {
+  /**
+   * 同一会话在同一瞬间可能被多个并发请求校验（刷新页面时前端会并发发起一批请求）。
+   *
+   * 这里按 jti 复用「正在途中的那一次查询」，把这一批重复查询合成一次；查询一结束即释放，
+   * 不做缓存，因此会话被远程下线后，下一个请求仍然会立刻读到最新状态。
+   */
+  private readonly inflightSessions = new Map<string, Promise<SessionRecord | null>>();
   constructor(
     private readonly db: Store,
     private readonly config: Config,
@@ -75,12 +82,22 @@ export class Auth {
       throw new AppError("Access key is incorrect", 401);
     return this.issue("local-user", undefined, device);
   }
+  /** 读取会话记录：同一瞬间的并发请求共用同一次在途查询（见 inflightSessions）。 */
+  private sessionRecord(jti: string): Promise<SessionRecord | null> {
+    const existing = this.inflightSessions.get(jti);
+    if (existing) return existing;
+    const pending = this.db.get<SessionRecord>("system", "sessions", jti).finally(() => {
+      this.inflightSessions.delete(jti);
+    });
+    this.inflightSessions.set(jti, pending);
+    return pending;
+  }
   /** 读取会话详情：先验 JWT 签名/过期，再查库确认会话未被撤销。 */
   async profile(authorization?: string) {
     if (!authorization?.startsWith("Bearer ")) throw new AppError("Sign in to LingWu", 401);
     const claims = verifyJwt(authorization.slice(7), this.signingKey);
     if (!claims) throw new AppError("Session expired. Sign in again.", 401);
-    const session = await this.db.get<SessionRecord>("system", "sessions", claims.jti);
+    const session = await this.sessionRecord(claims.jti);
     if (!session || session.revokedAt || session.expiresAt < Date.now())
       throw new AppError("Session expired. Sign in again.", 401);
     return {

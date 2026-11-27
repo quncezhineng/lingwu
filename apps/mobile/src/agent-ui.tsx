@@ -1178,6 +1178,10 @@ export function ArtifactCard({
             </View>
             <ArrowUpRight size={15} color={colors.faint} />
           </View>
+          {/* 右下角：产物生成时间，让用户一眼看清这份报告的产出时刻 */}
+          <Text style={{ fontSize: 10, lineHeight: 14, color: colors.faint, textAlign: "right" }}>
+            {stamp(artifact.createdAt)}
+          </Text>
         </Pressable>
       </View>
     </View>

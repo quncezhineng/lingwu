@@ -8,6 +8,7 @@ import { cors } from "hono/cors";
 import { z } from "zod";
 import {
   type Channel,
+  type ChannelMessage,
   calendarRangeSchema,
   channelHistoryPage,
   channelInputSchema,
@@ -30,6 +31,7 @@ import {
 } from "./agent-space.ts";
 import { createAuth } from "./auth.ts";
 import { BrowserService } from "./browser.ts";
+import { ChannelMirror } from "./channel-mirror.ts";
 import { ComputerService, type DockerRunner } from "./computer.ts";
 import { computerRoutes } from "./computer-routes.ts";
 import { assertApiDeploymentConfig, type Config } from "./config.ts";
@@ -71,6 +73,53 @@ import { createShareStore } from "./share-store.ts";
 import { createSupabaseAuth, type SupabaseAuth } from "./supabase-auth.ts";
 import { createSupabaseData } from "./supabase-data.ts";
 import { WorkspaceService } from "./workspace.ts";
+
+/**
+ * 首页 / 侧栏预览每个会话时，只回最近这么多条消息。
+ *
+ * 「最近一条回复」在绝大多数情况下都落在这个窗口内，取整页历史既无必要又让响应体膨胀。
+ */
+const PREVIEW_SCAN = 30;
+
+/** 频道消息裁剪：只留预览文案用得到的字段，工具过程、附件等大字段不回传。 */
+function previewChannelMessage(message: ChannelMessage) {
+  return { id: message.id, role: message.role, text: message.text, createdAt: message.createdAt };
+}
+
+/**
+ * 单聊消息裁剪：role/content 足够算出预览；消息自带 createdAt 时一并保留（用于按活跃度排序）。
+ *
+ * 入参用 `unknown`：会话历史返回的是 Rich Threads 的 ThreadMessage，比 AG-UI 的
+ * `Message` 宽（多了 activity 等形态），按字段安全取值即可。
+ */
+function previewAgentMessage(message: unknown) {
+  const record = (message ?? {}) as {
+    id?: unknown;
+    role?: unknown;
+    content?: unknown;
+    createdAt?: unknown;
+  };
+  return {
+    id: typeof record.id === "string" ? record.id : "",
+    role: typeof record.role === "string" ? record.role : "",
+    content: record.content,
+    ...(typeof record.createdAt === "string" ? { createdAt: record.createdAt } : {}),
+  };
+}
+
+/**
+ * 云端「这条线程读不到」的两类信号：
+ *   - 404 `THREAD_NOT_FOUND`：线程从没建过、或已被清理（例如换过 Intelligence 项目）；
+ *   - 400 `VALIDATION_ERROR`：线程 id 不是标准 UUID（客户端占位 id，如主线程加载前的 `local`）。
+ *
+ * 读历史时这两类都按「没有历史」处理——首页预览、打开会话不该因为某条线程缺失而整体报错。
+ * SDK 未导出 `PlatformRequestError` 类，只能按 `status` 属性判断（见 docs/timeline.md）。
+ */
+function isMissingCloudThread(error: unknown): boolean {
+  const status =
+    error && typeof error === "object" ? (error as { status?: unknown }).status : undefined;
+  return status === 404 || status === 400;
+}
 
 /**
  * 把 agent-space 里「已公开」的智能体同步到跨用户可见的智能体市场。
@@ -267,16 +316,45 @@ export async function createApp(
     conversationArchive,
   );
   /**
+   * 频道对话的旁路镜像：每轮结束后，把提问和成员回复额外复制一份送进 CopilotKit 云。
+   *
+   * 直接调用运行时自带的处理入口（与真实对话走同一条落库通道），不经过网络、也不新建会话；
+   * 云端按传入的登录凭证识别用户。纯旁路：即发即忘、失败只记日志，频道照旧本地回复。
+   */
+  const channelMirror = new ChannelMirror(async (input, authorization) => {
+    for (let attempt = 1; ; attempt += 1) {
+      const response = await runtime.fetch(
+        new Request("http://localhost/api/copilotkit/agent/channel-mirror/run", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization },
+          body: JSON.stringify(input),
+        }),
+      );
+      const detail = await response.text().catch(() => "");
+      if (response.ok) return;
+      // 同一线程同一时刻只允许一个 run；上一轮镜像可能还没跑完，稍后重试。
+      if (attempt >= 3) throw new Error(`Channel mirror failed: ${response.status} ${detail}`);
+      await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+    }
+  });
+  /**
    * 读取线程正文，并补上会话流记录的发送时间。
    *
    * 正文由 Rich Threads 持久化、本身不带时间戳，所以每条回复下面的时间来自
    * 本服务转发流事件时记下的第一次出现时间（见 `ConversationStream.messageTimes`）。
    */
-  const threadMessages = async (owner: string, threadId: string) =>
-    withMessageTimes(
-      await conversationHistory.messages(owner, threadId),
-      await conversationStream.messageTimes(owner, threadId),
-    );
+  const threadMessages = async (owner: string, threadId: string) => {
+    let messages: Awaited<ReturnType<typeof conversationHistory.messages>>;
+    try {
+      messages = await conversationHistory.messages(owner, threadId);
+    } catch (error) {
+      // 线程在云端不存在（孤儿数据）或 id 非法（客户端占位 id，如 `local`）时按空历史处理，
+      // 否则打开会话/读上下文会整体 502，前端每次轮询都刷一条 PlatformRequestError。
+      if (isMissingCloudThread(error)) return [];
+      throw error;
+    }
+    return withMessageTimes(messages, await conversationStream.messageTimes(owner, threadId));
+  };
   // 启动时恢复上一次在 App 里选中的模型，让选择跨重启保留。
   // 若该厂商的密钥已被移除，则回退到 .env 的 MODEL，避免指向不可用的模型。
   const savedModel = await db.get<{ model?: string }>("system", "settings", "model");
@@ -712,6 +790,64 @@ export async function createApp(
     return c.json(page);
   });
   /**
+   * 首页 / 侧栏的「最近消息」预览素材，一次请求返回所有频道与智能体。
+   *
+   * 列表页原先为每个频道、每个智能体各发一次请求（N+1）。每多一次请求就多一次登录
+   * 会话校验和一次数据查询；数据库在海外时，刷新页面并发的大量请求会让这些跨区往返
+   * 互相排队，明显变慢。这里把 N+1 收成一次：会话只校验一次、频道消息只查一次（再按
+   * 频道分组）、智能体线程并发读取。返回的是裁剪过的消息，最终文案仍由客户端用既有
+   * 纯函数计算，保证预览逻辑只有一份。
+   */
+  app.get("/api/home/previews", async (c) => {
+    const owner = c.get("owner");
+    const [space, channels, channelMessages] = await Promise.all([
+      db.get<PersistedAgentSpace & { id: string }>(owner, "agent-settings", "space"),
+      db.list<Channel>(owner, "channels"),
+      db.list<ChannelMessage>(owner, "channel_messages"),
+    ]);
+
+    // 一条 SQL 取回全部频道消息，在内存里按 channelId 分组，避免每个频道查一次库。
+    const grouped = new Map<string, ChannelMessage[]>();
+    for (const message of channelMessages) {
+      const list = grouped.get(message.channelId);
+      if (list) list.push(message);
+      else grouped.set(message.channelId, [message]);
+    }
+    const channelPreviews: Record<string, ReturnType<typeof previewChannelMessage>[]> = {};
+    for (const channel of channels) {
+      const ordered = (grouped.get(channel.id) ?? [])
+        .slice()
+        .sort((left, right) =>
+          left.createdAt < right.createdAt ? -1 : left.createdAt > right.createdAt ? 1 : 0,
+        );
+      channelPreviews[channel.id] = ordered.slice(-PREVIEW_SCAN).map(previewChannelMessage);
+    }
+
+    // 智能体线程并发读取；单个线程读不到（云端暂时不可达 / 尚无会话）按「没有消息」处理，
+    // 不能让一个线程的失败拖垮整页预览。
+    const agentPreviews: Record<string, ReturnType<typeof previewAgentMessage>[]> = {};
+    await Promise.all(
+      (space?.agents ?? []).map(async (agent) => {
+        try {
+          const messages = await conversationHistory.messages(owner, agent.threadId);
+          agentPreviews[agent.threadId] = messages.slice(-PREVIEW_SCAN).map(previewAgentMessage);
+        } catch (error) {
+          agentPreviews[agent.threadId] = [];
+          // 线程缺失/非法（404/400）属于正常情况——Agent 还没聊过、或本地库重建后留下孤儿 threadId。
+          // 这类不记日志，否则每次进首页都会刷一片 PlatformRequestError。
+          if (isMissingCloudThread(error)) return;
+          console.error({
+            timestamp: new Date().toISOString(),
+            context: { phase: "home previews", threadId: agent.threadId },
+            error: error instanceof Error ? error.name : "Thread preview failed",
+          });
+        }
+      }),
+    );
+
+    return c.json({ channels: channelPreviews, agents: agentPreviews });
+  });
+  /**
    * 频道群聊流式对话：用户消息落库后，各成员依次以对话方式回复（SSE）。
    * 事件：member_start / delta / tool / member_done / leader / done / error。
    */
@@ -751,6 +887,8 @@ export async function createApp(
                 computer,
                 workspace,
                 service: agent,
+                // 每轮结束后镜像进 CopilotKit 云；凭证沿用本次请求的登录态。
+                mirror: (turn) => channelMirror.turn(turn, c.req.header("authorization") ?? ""),
               },
               owner,
               channel,

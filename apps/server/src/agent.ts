@@ -7,6 +7,7 @@ import {
   createCopilotHonoHandler,
 } from "@copilotkit/runtime/v2";
 import type { Auth } from "./auth.ts";
+import { CHANNEL_MIRROR_AGENT_ID, ChannelMirrorAgent } from "./channel-mirror.ts";
 import type { Config } from "./config.ts";
 import type { ConversationArchive } from "./conversation-archive.ts";
 import { coalesceTextChunks } from "./engine/coalesce-text.ts";
@@ -76,7 +77,12 @@ export function makeRuntime(
         stream.observe(owner, input.threadId, input.runId, next.run(input)),
       );
     });
-    return { default: agent };
+    return {
+      default: agent,
+      // 频道对话的旁路镜像代理：不调模型，只把本轮内容回放成事件写进云端。
+      // 独立 agentId 让它走 `agent/<agentId>/run` 路由，又不会混进单聊线程列表。
+      [CHANNEL_MIRROR_AGENT_ID]: new ChannelMirrorAgent(),
+    };
   };
   const runtime = new CopilotRuntime({
     agents,

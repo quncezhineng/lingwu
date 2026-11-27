@@ -6,7 +6,7 @@ import { after, before, test } from "node:test";
 import { createApp } from "../apps/server/src/app.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
-import type { Channel } from "../packages/domain/src/channel.ts";
+import type { Channel, ChannelMessage } from "../packages/domain/src/channel.ts";
 
 type App = Awaited<ReturnType<typeof createApp>>;
 
@@ -121,4 +121,50 @@ test("channels are isolated per owner", async () => {
     await server.app.request("/api/channels", { headers: headers(bob) })
   ).json()) as Channel[];
   assert.equal(bobList.length, 0);
+});
+
+test("home previews require a session and stay per owner", async () => {
+  assert.equal((await server.app.request("/api/home/previews")).status, 401);
+  const bobPreviews = (await (
+    await server.app.request("/api/home/previews", { headers: headers(bob) })
+  ).json()) as { channels: Record<string, unknown>; agents: Record<string, unknown> };
+  // Bob 没有任何频道、也没有智能体空间，预览应为空，看不到 Alice 的数据。
+  assert.deepEqual(Object.keys(bobPreviews.channels), []);
+  assert.deepEqual(Object.keys(bobPreviews.agents), []);
+});
+
+test("home previews return every channel once, trimmed and capped", async () => {
+  const created = await server.app.request("/api/channels", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ name: "预览频道", agentIds: ["a", "b"] }),
+  });
+  const channel = (await created.json()) as Channel;
+  // 塞满大字段（工具过程、附件），验证预览会裁剪掉，只留文案需要的四个字段。
+  const message = (index: number): ChannelMessage => ({
+    id: `m-${String(index).padStart(3, "0")}`,
+    channelId: channel.id,
+    role: index % 2 === 0 ? "user" : "member",
+    text: `第 ${index} 条`,
+    createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+    tools: [{ id: `tool-${index}`, name: "search", args: { q: "x" } }],
+    attachmentIds: ["file-1"],
+  });
+  const total = 35;
+  for (let index = 0; index < total; index += 1)
+    await db.put("alice", "channel_messages", message(index));
+
+  const response = await server.app.request("/api/home/previews", { headers: headers() });
+  assert.equal(response.status, 200);
+  const previews = (await response.json()) as {
+    channels: Record<string, { id: string; role: string; text: string; createdAt: string }[]>;
+    agents: Record<string, unknown[]>;
+  };
+  const list = previews.channels[channel.id];
+  // 只回最近 30 条（共 35 条），并按时间升序，末尾是最新一条。
+  assert.equal(list.length, 30);
+  assert.equal(list[0].id, "m-005");
+  assert.equal(list.at(-1)?.id, "m-034");
+  // 裁剪：工具过程与附件不回传。
+  assert.deepEqual(Object.keys(list[0]).sort(), ["createdAt", "id", "role", "text"]);
 });

@@ -12,6 +12,28 @@ export interface BotPreview {
 }
 
 /**
+ * 列表预览用的一条消息（服务端已裁剪，只留算文案需要的字段）。
+ */
+export interface PreviewMessage {
+  id?: string;
+  role: string;
+  content?: unknown;
+  text?: string;
+  createdAt?: string;
+}
+
+/**
+ * 首页 / 侧栏一次请求拉回的预览素材：键是频道 id 或智能体线程 id。
+ *
+ * 服务端把「每个会话各查一次」的 N+1 收成一次请求（见 `/api/home/previews`），
+ * 这里只负责接住结果、再用下面的纯函数算最终文案。
+ */
+export interface HomePreviews {
+  channels: Record<string, PreviewMessage[]>;
+  agents: Record<string, PreviewMessage[]>;
+}
+
+/**
  * 只取「回复」的预览：从后往前找一条指定角色的消息。
  *
  * 左侧栏的小字要展示「最近回复」，所以不把用户自己发的话算进去：

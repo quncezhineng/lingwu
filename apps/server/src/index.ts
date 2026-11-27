@@ -4,9 +4,13 @@ import type { Config } from "./config.ts";
 import { readConfig } from "./config.ts";
 import type { Store } from "./db.ts";
 import { createStore } from "./db.ts";
-import { backgroundFailure, describeError } from "./log.ts";
+import { backgroundFailure, describeError, silenceMissingThreadLogs } from "./log.ts";
 import { getMarketDataHealth } from "./market-data-health.ts";
 import { getPdfHealth } from "./pdf-health.ts";
+
+// 已经在读历史链路里把「云端线程缺失」按空历史处理了（见 app.ts），
+// 这里再压掉 SDK 自己那条重复报错，避免打开首页/会话时刷屏。
+silenceMissingThreadLogs();
 
 const config = readConfig();
 /**

@@ -10,11 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  type Channel,
-  type ChannelHistoryPage,
-  normalizeChannelAvatar,
-} from "../../../packages/domain/src/channel";
+import { type Channel, normalizeChannelAvatar } from "../../../packages/domain/src/channel";
 import { AccountScreen } from "./account";
 import { AccountAvatar } from "./account-avatar";
 import { AgentFloatingHeader, floatingHeaderClearance } from "./agent-floating-header";
@@ -47,7 +43,6 @@ import { useChannels } from "./channels";
 import { ChatScreen, WorkspaceTools } from "./chat";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ComputerScreen } from "./computer";
-import { type ThreadHistoryPage, threadHistoryPagePath } from "./conversation-history";
 import { columnMaxWidth, desktopColumns } from "./desktop-columns";
 import { Details, SettingsScreen } from "./details";
 import { useTranslation } from "./i18n";
@@ -73,7 +68,7 @@ import {
 } from "./icons";
 import { IdeasOverlay } from "./ideas-overlay";
 import { IosStack } from "./ios-stack";
-import { type BotPreview, latestReplyPreview } from "./mobile-bots";
+import { type BotPreview, type HomePreviews, latestReplyPreview } from "./mobile-bots";
 import { MobileBotsHome } from "./mobile-bots-home";
 import { ModalOverlay } from "./modal-overlay";
 import { unreadCount } from "./notification-actions";
@@ -1104,51 +1099,36 @@ function AgentRail({
   const agentKey = agents.map((agent) => agent.id).join("|");
   const channelKey = channels.map((channel) => channel.id).join("|");
   useEffect(() => {
+    // 侧栏逐个会话请求同样是 N+1（切会话时重拉一次），叠加海外库延迟很慢。
+    // 改成一次批量请求，前端继续用同一套纯函数算文案。
     let alive = true;
-    for (const agent of agents) {
-      void api
-        .request<ThreadHistoryPage>(threadHistoryPagePath(agent.threadId))
-        .then((page) => {
-          if (!alive) return;
-          setPreviews((current) => ({
-            ...current,
-            [agent.id]: latestReplyPreview(page.messages),
-          }));
-        })
-        // 还没有对话的 Agent 会 404，按「没有回复」处理。
-        .catch(() => {
-          if (!alive) return;
-          setPreviews((current) => ({ ...current, [agent.id]: null }));
-        });
-    }
-    return () => {
-      alive = false;
-    };
-  }, [api, agentKey, current.id]);
-  useEffect(() => {
-    let alive = true;
-    for (const channel of channels) {
-      void api
-        .request<ChannelHistoryPage>(
-          `/api/channels/${encodeURIComponent(channel.id)}/messages?limit=30`,
-        )
-        .then((page) => {
-          if (!alive) return;
+    void api
+      .request<HomePreviews>("/api/home/previews")
+      .then((result) => {
+        if (!alive) return;
+        const nextAgents: Record<string, BotPreview | null> = {};
+        for (const agent of agents) {
+          nextAgents[agent.id] = latestReplyPreview(result.agents[agent.threadId] ?? []);
+        }
+        const nextChannels: Record<string, BotPreview | null> = {};
+        for (const channel of channels) {
           // 频道里只有成员（member）发言算「回复」，用户自己的话不算。
-          setChannelPreviews((current) => ({
-            ...current,
-            [channel.id]: latestReplyPreview(page.messages, ["member"]),
-          }));
-        })
-        .catch(() => {
-          if (!alive) return;
-          setChannelPreviews((current) => ({ ...current, [channel.id]: null }));
-        });
-    }
+          nextChannels[channel.id] = latestReplyPreview(result.channels[channel.id] ?? [], [
+            "member",
+          ]);
+        }
+        setPreviews(nextAgents);
+        setChannelPreviews(nextChannels);
+      })
+      // 预览只是列表第二行的小字，拉取失败时保持「还没有消息」，不影响列表本身。
+      .catch((error) => {
+        if (!alive) return;
+        console.error("Failed to load home previews", error);
+      });
     return () => {
       alive = false;
     };
-  }, [api, channelKey, currentChannelId]);
+  }, [api, agentKey, channelKey, current.id, currentChannelId]);
   const unreadNotifications = unreadCount(agentData?.notifications);
   const accountNickname = workspace.profile.name.trim() || t("agentSpace.account");
   const choose = (agent: AgentDefinition) => {

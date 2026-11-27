@@ -5,6 +5,94 @@
 
 ## 变更记录
 
+### 2026-11-28 · 消除「云端线程缺失/非法」导致的读历史报错刷屏
+
+**现象**
+
+- `pnpm dev` 起来后打开首页/会话，控制台被三类报错刷屏：
+  1. 云端 SDK 自带的一条 `{ status: 404, body: '...THREAD_NOT_FOUND...', path: '/api/threads/<id>/messages?userId=...' } Intelligence platform request failed`（不同 Agent 线程各一条，另有 `/api/threads/local/messages` 的 `400 VALIDATION_ERROR`）；
+  2. 灵悟统一错误兜底打印 `[LingWu] PlatformRequestError`；
+  3. `{ context: { phase: 'home previews', threadId }, error: 'PlatformRequestError' }`。
+
+**根因**
+
+- 读历史链路 = `GET /api/home/previews`、`GET /api/conversation/threads/:threadId/messages|context` → `ConversationHistory.messages` → `intelligence.getThreadMessages`。
+- 云端对两类「预期内的缺失」同样返回错误：**线程从没建过（还没聊过，404 `THREAD_NOT_FOUND`）** 与 **threadId 非法（客户端占位 id `local`，云端只收标准 UUID，400 `VALIDATION_ERROR`）**。
+- 灵悟此前没区分这两类，直接向上抛 → `home previews` 的 catch 打了 error 日志、会话接口整体 502 并触发 `app.onError` 兜底打印 `[LingWu] PlatformRequestError`。同一个 Agent 只要还没聊过，每次进首页都会重放一遍。
+
+**处理**
+
+- [app.ts](../apps/server/src/app.ts)：新增 `isMissingCloudThread(error)`（按 `error.status` 判定 404/400，SDK 未导出 `PlatformRequestError` 类）；`threadMessages` 读不到时**按空历史返回**（不再 502）；`/api/home/previews` 的 catch 对该类**不再打 error 日志**。
+- [log.ts](../apps/server/src/log.ts) 新增 `silenceMissingThreadLogs()`，在 [index.ts](../apps/server/src/index.ts) 启动时安装：只过滤 SDK 那条固定文案 + `/api/threads/` 的 400/404，其它错误（401/403/5xx）原样透出。
+
+**验证**
+
+- `pnpm typecheck` 通过；`pnpm biome check` 仅剩历史遗留告警。
+- `pnpm dev` 正常起服（`LingWu live API ready`），持续观察 >2 分钟无线程读历史报错，也未出现 `phase: 'task worker tick'` / `'maintenance'` 的 `error: 'Error'`。
+
+**注意**
+
+- 这两类缺失是**正常情况**（Agent 未聊过 / 主线程加载前的占位 id），按空历史处理即可；仅线程接口的 400/404 被静音，真实平台故障仍会打印。
+- 用户日志里偶发的 `task worker tick` / `maintenance` 的 `error: 'Error'` 本轮本地未复现（后台任务日志只留 `error.name`，历史同型问题见 2026-11-11 的 PGlite/SQL 条目），如再出现需按该条目步骤排查。
+
+### 2026-11-27 · 刷新页面加载历史变慢：把列表预览的 N+1 收成一次请求
+
+**背景**
+
+- 用户反馈「刷新页面后，每次获取智能体历史消息与频道历史消息都非常非常慢」。
+- 实测定位：数据库在海外（Supabase `ap-southeast-1` 新加坡），单次读写往返约 0.1~0.7 秒；`EXPLAIN ANALYZE` 显示同一条 SQL 在库内仅约 20ms（索引命中的 `Index Scan`），即**瓶颈是跨区网络往返，不是 SQL、索引或数据量**（`channel_messages` 仅二十余条）。
+- 真正的放大器在客户端：手机首页 / 宽屏侧栏都为**每个频道、每个智能体各发一次请求**，且每次请求都过一次登录会话校验（`auth.profile()` 查 `system/sessions`）；频道请求还不带 `limit`，服务端直接返回全量。刷新瞬间几十个跨区请求互相排队，叠加成明显卡顿。
+
+**处理（减少查询次数与数据量，不改服务器/数据库区域）**
+
+- 新增批量端点 `GET /api/home/previews`（[app.ts](../apps/server/src/app.ts)）：一次会话校验内，`channel_messages` **只查一次**后在内存按 `channelId` 分组，智能体线程用 `Promise.all` **并发读取**（单个线程失败按「没有消息」处理，不拖垮整页），返回 `{ channels, agents }`。
+- 响应裁剪：每个会话只回最近 `PREVIEW_SCAN = 30` 条，字段只留预览用得到的 `id/role/text|content/createdAt`，工具过程、附件等大字段不回传。
+- 客户端两处 N+1 改为一次请求：[mobile-bots-home.tsx](../apps/mobile/src/mobile-bots-home.tsx)（手机首页）与 [agent-product.tsx](../apps/mobile/src/agent-product.tsx)（宽屏侧栏）。最终文案仍由既有纯函数 `latestReplyPreview` / `latestBotPreview` 计算——预览逻辑保持只有一份。类型 `PreviewMessage` / `HomePreviews` 落在 [mobile-bots.ts](../apps/mobile/src/mobile-bots.ts)。
+- 鉴权去重：[auth.ts](../apps/server/src/auth.ts) 抽出 `sessionRecord()`，把「同一瞬间、同一会话」的并发查询合并成一次在途请求（不做缓存，查询一结束即释放），因此会话被远程下线后下一个请求仍立刻读到最新状态。
+
+**验证**
+
+- `npx tsc --noEmit` 通过；`npx biome check` 仅剩历史遗留告警。
+- [tests/channel-api.test.ts](../tests/channel-api.test.ts) 新增 2 例（预览需登录且按 owner 隔离；单频道预览只回最近 30 条、升序、且裁剪掉工具过程与附件），该文件 6 例全绿；全量 `pnpm test` → **1319 通过 / 0 失败**。
+
+**注意**
+
+- 这是「先优化代码」这一步：查询次数与响应体都显著变小，但**跨区单次往返延迟本身没变**。若仍嫌慢，下一步应把服务端与数据库放到同一区域（用户本轮未选）。
+- 预览窗口固定 30 条：若某会话最近 30 条内没有任何「回复」角色（`assistant` / `member`）消息，列表会显示「还没有消息」——这是刻意的取舍（预览只认最近一小段）。
+
+### 2026-11-27 · 频道对话全量镜像进 CopilotKit 云，与单聊统一为「云主 + 本地备」
+
+**背景**
+
+- 单聊已确立「CopilotKit 云为主副本、自有库归档为备份」，但频道对话此前**完全不经过 CopilotKit**，正文只存在灵悟自己的库里（`kind=channel_messages`）。用户希望两类对话的口径一致：**频道正文也主要存在 CopilotKit 云，并以自有库全量留档作备份**。
+- 难点：CopilotKit 没有任何「写消息」的 REST 接口——消息的唯一入口是「让某个 agent 经运行时跑一遍」，由运行时经 WebSocket 落库。因此镜像不能直接 POST，必须复用这条既有通道。
+
+**处理（旁路镜像，双副本）**
+
+- 新增 [channel-mirror.ts](../apps/server/src/channel-mirror.ts)：
+  - `ChannelMirrorAgent`（agentId `channel-mirror`）是只做「回放」的代理，**不调用任何模型**：把提问放在 `input.messages`，把成员回复与工具过程放在 `forwardedProps.replies`（`RunAgentInputSchema` 是 `z.looseObject`，额外字段原样保留），再转成标准 AG-UI 事件——以运行级 `RUN_STARTED` 开头、`RUN_FINISHED` 收尾，中间是工具 `TOOL_CALL_START/ARGS/END/RESULT` + 正文 `TEXT_MESSAGE_START/CONTENT/END`，与真实回复是同一形态。
+  - `ChannelMirror` 负责编排：每频道一条线程（`channelMirrorThreadId()` 经固定命名空间按 RFC 4122 v5 把 channelId 确定性映射成 UUID），按 threadId 串行投递（`tails` 链），避免云端 `Thread already running`。
+- [agent.ts](../apps/server/src/agent.ts)：`AgentsFactory` 在 `default` 之外注册 `channel-mirror`，让它走 `agent/<agentId>/run` 路由；独立 agentId 避免混进单聊线程列表（移动端 `useThreads` 只按 `agentId=default` 过滤）。
+- [app.ts](../apps/server/src/app.ts)：在 `makeRuntime` 之后构造 `channelMirror`，投递实现 = 内部 `runtime.fetch` 直接请求 `/api/copilotkit/agent/channel-mirror/run`（Hono 子应用自带 `.fetch`），**复用与真实对话一致的鉴权与落库链路**，不联外网、不新建登录会话；失败最多重试 3 次（400ms×次数退避）；凭证透传发起该轮频道对话的 `authorization`。
+- [channel-chat.ts](../apps/server/src/engine/channel-chat.ts)：`ChannelChatDeps` 增加可选 `mirror`；在 `persistReply` 收集本轮成员回复与工具过程，于每处 `emit({ type: "done" })` 后调用 `mirrorTurn()` 一次性投递。**纯旁路、即发即忘**：不 await，任何失败只记 `channel.mirror` 日志，绝不阻塞或影响频道对话本身。
+
+**修复（同日本地 `pnpm dev` 实测发现）**
+
+- 现象：频道对话录进云端后**只看到用户提问、看不到成员回复**（`channel-mirror` agent 下线程数长期为 0）。
+- 根因一：线程 id 用 `channel-<channelId>` 这种自定义字符串，云端只接受标准 UUID，直接以 `400 VALIDATION_ERROR`（`Failed to get or create thread`）拒绝，线程建不起来。改为 `channelMirrorThreadId()` = 固定命名空间 + channelId 的 RFC 4122 v5 确定性 UUID。
+- 根因二：事件流从工具/正文事件开始，缺 AG-UI 协议要求的首事件 `RUN_STARTED`（`@ag-ui/client` 的 `verify` 会校验），云端抛 `AGUIError: First event must be 'RUN_STARTED'`，助手回复整段被丢弃。改为 `ChannelMirrorAgent.run` 在事件序列首尾补 `RUN_STARTED` / `RUN_FINISHED`。
+- 验证：`npx tsc --noEmit` 通过；`tests/channel-mirror.test.ts` 4 例全过（已更新断言：首事件为 `RUN_STARTED`、threadId 为 UUID 且同频道稳定）；用一次性探针脚本直连 `runtime.fetch` 投递后，云端线程的首条消息数由 **1** 变为 **2**（提问 + 成员回复均落库），确认修复生效。
+
+**验证**
+
+- `npx tsc --noEmit` 通过；`npx biome check` 仅剩历史遗留告警；新增 [tests/channel-mirror.test.ts](../tests/channel-mirror.test.ts)（4 例：事件序列、无正文不产空事件、同频道串行与凭证透传、空轮次不投递），与 `tests/channel-chat.test.ts` + `tests/channel-api.test.ts` 合计 **13 例全通过**。
+
+**注意**
+
+- 频道仍是「本地跑模型、本地回复」，灵悟的库（`kind=channel_messages`）继续全量留档并作为**读取源**；CopilotKit 云是新增的**主副本**。
+- 镜像依赖 CopilotKit 内部路由与 `forwardedProps` 透传约定，升级运行时需回归验证。
+- `resume`（继续分析）沿用原提问 id，云端按已有历史去重，不会产生重复用户消息。
+
 ### 2026-11-27 · 存量单聊历史一次性回填进归档，永久保存补齐到上线前
 
 **背景**

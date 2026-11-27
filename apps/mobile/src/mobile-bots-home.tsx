@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
-import {
-  type Channel,
-  type ChannelMessage,
-  normalizeChannelAvatar,
-} from "../../../packages/domain/src/channel";
+import { type Channel, normalizeChannelAvatar } from "../../../packages/domain/src/channel";
 import { AccountAvatar } from "./account-avatar";
 import { AgentOrb } from "./agent-orb";
 import { useAgentSpace } from "./agent-space";
@@ -12,7 +8,6 @@ import type { AgentDefinition } from "./agent-space-model";
 import { useAgentWorkspace } from "./agent-workspace";
 import { Text } from "./app-text";
 import { useChannels } from "./channels";
-import { type ThreadHistoryPage, threadHistoryPagePath } from "./conversation-history";
 import { useTranslation } from "./i18n";
 import {
   ArrowDown,
@@ -26,7 +21,12 @@ import {
   Settings2,
   Trash2,
 } from "./icons";
-import { type BotPreview, latestBotPreview, latestReplyPreview } from "./mobile-bots";
+import {
+  type BotPreview,
+  type HomePreviews,
+  latestBotPreview,
+  latestReplyPreview,
+} from "./mobile-bots";
 import {
   attachWebRubberBand,
   edgeFadeMask,
@@ -359,48 +359,35 @@ export function MobileBotsHome({
   const channelKey = channels.map((channel) => channel.id).join("|");
 
   useEffect(() => {
+    // 刷新时逐个会话请求会造成 N+1（每个频道/智能体一次往返），叠加海外库延迟非常慢。
+    // 这里改成一次批量请求：服务端把每个会话的最近消息一起回给我们，前端仍用同一套纯函数算文案。
     let active = true;
-    for (const agent of agents) {
-      void api
-        .request<ThreadHistoryPage>(threadHistoryPagePath(agent.threadId))
-        .then((page) => {
-          if (!active) return;
-          setPreviews((current) => ({
-            ...current,
-            [agent.id]: latestBotPreview(page.messages),
-          }));
-        })
-        .catch(() => {
-          if (!active) return;
-          setPreviews((current) => ({ ...current, [agent.id]: null }));
-        });
-    }
+    void api
+      .request<HomePreviews>("/api/home/previews")
+      .then((result) => {
+        if (!active) return;
+        const nextAgents: Record<string, BotPreview | null> = {};
+        for (const agent of agents) {
+          nextAgents[agent.id] = latestBotPreview(result.agents[agent.threadId] ?? []);
+        }
+        const nextChannels: Record<string, BotPreview | null> = {};
+        for (const channel of channels) {
+          nextChannels[channel.id] = latestReplyPreview(result.channels[channel.id] ?? [], [
+            "member",
+          ]);
+        }
+        setPreviews(nextAgents);
+        setChannelPreviews(nextChannels);
+      })
+      .catch((error) => {
+        // 预览只是列表上的一行小字，拉取失败时保持「还没有消息」，不影响列表本身。
+        if (!active) return;
+        console.error("Failed to load home previews", error);
+      });
     return () => {
       active = false;
     };
-  }, [api, agentKey]);
-
-  useEffect(() => {
-    let active = true;
-    for (const channel of channels) {
-      void api
-        .request<ChannelMessage[]>(`/api/channels/${encodeURIComponent(channel.id)}/messages`)
-        .then((messages) => {
-          if (!active) return;
-          setChannelPreviews((current) => ({
-            ...current,
-            [channel.id]: latestReplyPreview(messages, ["member"]),
-          }));
-        })
-        .catch(() => {
-          if (!active) return;
-          setChannelPreviews((current) => ({ ...current, [channel.id]: null }));
-        });
-    }
-    return () => {
-      active = false;
-    };
-  }, [api, channelKey]);
+  }, [api, agentKey, channelKey]);
 
   useEffect(() => {
     const node = (

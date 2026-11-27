@@ -22,6 +22,7 @@ import { calendarRangeSchema } from "../../../../packages/domain/src/index.ts";
 import type { MarketDataService } from "../../../../packages/integrations/src/market-data.ts";
 import { agentIdForThread, agentModelForThread, type PersistedAgentSpace } from "../agent-space.ts";
 import type { BrowserService } from "../browser.ts";
+import type { ChannelMirrorReply, ChannelMirrorTurn } from "../channel-mirror.ts";
 import type { ComputerService } from "../computer.ts";
 import { computerTools } from "../computer-tools.ts";
 import type { Config } from "../config.ts";
@@ -88,6 +89,11 @@ export interface ChannelChatDeps {
   computer?: ComputerService;
   workspace?: WorkspaceService;
   service?: AgentService;
+  /**
+   * 旁路镜像：一轮对话结束后，把提问与成员回复额外复制一份送进 CopilotKit 云（即发即忘）。
+   * 只是「多存一份」，本地照旧回复，失败也不影响本轮对话。不传则该能力关闭。
+   */
+  mirror?: (turn: ChannelMirrorTurn) => void;
 }
 
 const HISTORY_LIMIT = 12;
@@ -1115,6 +1121,17 @@ export async function runChannelChat(
     "memories",
   );
 
+  // 本轮要镜像进 CopilotKit 云的成员回复，按落库顺序收集；一轮结束时一次性投递。
+  const mirrorReplies: ChannelMirrorReply[] = [];
+  /** 把本轮提问 + 已落库的成员回复镜像进云端（旁路、即发即忘）。 */
+  const mirrorTurn = () => {
+    deps.mirror?.({
+      channelId: channel.id,
+      question: { id: userMessage.id, text: userMessage.text },
+      replies: mirrorReplies,
+    });
+  };
+
   const speak = async (
     member: (typeof members)[number],
     mode: "reply" | "assign" | "work" | "summarize",
@@ -1163,6 +1180,8 @@ export async function runChannelChat(
       }).catch(() => null);
       const shown = folded?.brief ?? value;
       const artifactIds = folded ? [folded.artifact.id] : [];
+      // 续写一轮通常不再调工具；没有新痕迹时沿用中断前已留下的，避免工具记录消失。
+      const tools = toolTraces.length ? toolTraces : (partialMessage?.tools ?? []);
       await db.put(owner, "channel_messages", {
         id: messageId,
         channelId: channel.id,
@@ -1171,12 +1190,7 @@ export async function runChannelChat(
         title: member.role || member.name,
         text: shown,
         createdAt: partialMessage?.createdAt ?? now(),
-        // 续写一轮通常不再调工具；没有新痕迹时沿用中断前已留下的，避免工具记录消失。
-        ...(toolTraces.length
-          ? { tools: toolTraces }
-          : partialMessage?.tools?.length
-            ? { tools: partialMessage.tools }
-            : {}),
+        ...(tools.length ? { tools } : {}),
         ...(artifactIds.length ? { artifactIds } : {}),
       });
       persistedReply = {
@@ -1184,6 +1198,14 @@ export async function runChannelChat(
         artifactIds,
         ...(folded ? { cardLine: longformContextLine(folded.artifact) } : {}),
       };
+      // 同一份正文顺手镜像进 CopilotKit 云（与库里的这条一一对应，工具过程一起带上）。
+      mirrorReplies.push({
+        id: messageId,
+        agentId: member.id,
+        title: member.role || member.name,
+        text: shown,
+        ...(tools.length ? { tools } : {}),
+      });
       return persistedReply;
     };
     const toolTraces: ChannelToolTrace[] = [];
@@ -1528,6 +1550,7 @@ export async function runChannelChat(
     if (!signal.aborted) {
       // 先把 done 推给界面（成员气泡立刻定稿），再补写这一轮的频道记忆。
       emit({ type: "done" });
+      mirrorTurn();
       await settleChannelMemories(deps, owner, channel, members, input.text, priorReplies);
     }
     return;
@@ -1536,6 +1559,7 @@ export async function runChannelChat(
   await speakTogether(speakers, "reply", () => input.text);
   if (!signal.aborted) {
     emit({ type: "done" });
+    mirrorTurn();
     await settleChannelMemories(deps, owner, channel, members, input.text, priorReplies);
   }
 

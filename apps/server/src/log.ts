@@ -45,3 +45,35 @@ export function providerFailure(phase: string, error: unknown) {
     error: error instanceof Error ? error.name : "Provider request failed",
   });
 }
+
+/**
+ * 过滤掉 Rich Threads SDK 对「线程读不到」的重复报错。
+ *
+ * 云端 SDK 每次请求失败都会自己打一条 `... Intelligence platform request failed`，
+ * 而「线程没建过（404）/ 线程 id 非法（400，客户端占位 id `local`）」是我们已经按
+ * 空历史处理的正常情况（见 app.ts 的 isMissingCloudThread）。不做这层过滤的话，
+ * 每次打开首页/会话都会为每个还没聊过的 Agent 刷一条 error，把真正的报错淹没。
+ *
+ * 只拦 SDK 那一条固定文案 + 线程接口的 400/404，其它错误（含 401/403/5xx）原样透出。
+ */
+export function silenceMissingThreadLogs() {
+  const original = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    const [first, second] = args;
+    if (
+      second === "Intelligence platform request failed" &&
+      first !== null &&
+      typeof first === "object"
+    ) {
+      const { status, path } = first as { status?: unknown; path?: unknown };
+      if (
+        (status === 400 || status === 404) &&
+        typeof path === "string" &&
+        path.startsWith("/api/threads/")
+      ) {
+        return;
+      }
+    }
+    original(...args);
+  };
+}
