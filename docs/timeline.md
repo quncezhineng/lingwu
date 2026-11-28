@@ -265,23 +265,6 @@
 - 部署环境若不配置此项，将退回持久盘上的 `/var/data/lingwu/session-signing-key`，盘一重建全体用户仍需重新登录。
 - 想保住现有登录态：把持久盘上的现值填进控制台即可——Render Shell 里 `cat /var/data/lingwu/session-signing-key`。
 
-### 2026-11-27 · Supabase 物件统一改名：`lingtai_` → `lingwu_`
-
-**背景**
-
-- 该 Supabase 项目早期叫 `lingtai`，账号体系三张表虽在搬到 `lingwu` 时已改成 `lingwu_audit_logs` / `lingwu_resources`，但它们的索引、约束、RLS 策略仍沿用旧名（`lingtai_*`），与仓库脚本、以及同库其他命名不一致。
-
-**处理**
-
-- 扫描全库含 `lingtai` 的 catalog 物件，共 13 项：6 个索引、5 个约束（2 个主键 / 1 个唯一 / 2 个外键）、2 个 RLS 策略。无 lingtai 表名、序列、函数、列或存储桶。
-- 在一个事务内做前缀替换 `lingtai_` → `lingwu_`，改完当场自检「零残留」才提交。先改约束（PostgreSQL 会一并重命名 PK/UNIQUE 的底层索引），再动态查出仍残留的独立索引逐个改名，最后改策略。
-- 先以 dry-run 演练（事务内改完 → 回滚）确认计划正确，再正式提交。
-
-**验证**
-
-- 全库剩余 `lingtai` 物件 **0 项**；6 个 `lingwu_*` 索引、5 个约束、2 个策略全部就位。
-- 功能未受影响：`on_auth_user_created` 触发器仍绑定 `user_profiles_handle_new_user`；两个外键仍指向 `auth.users`；数据行数不变（records 1801 / events 409 / audit_logs 183 / profiles 37）；三个 `lingwu_*` 策略齐全；桶 `lingwu-files` 在。
-
 **同步仓库脚本（已做）**
 
 - [0001_accounts.sql](../supabase/migrations/0001_accounts.sql) 原先的索引名、函数名与线上库不一致（脚本 `lingwu_audit_logs_user_idx` / `lingwu_resources_owner_type_id_idx` / `handle_new_user`）。已改为与线上一致：`lingwu_audit_logs_user_created_idx` / `lingwu_resources_user_id_resource_type_resource_id_key` / `user_profiles_handle_new_user`。
@@ -304,11 +287,6 @@
 - 在 Supabase 执行 [0002_shares.sql](../supabase/migrations/0002_shares.sql)：建 `lingwu_shares` 表（`id/owner/question/answer/created_at`）、公开只读 RLS 策略与 `created_at` 索引。
 - 端到端验证（复刻应用 [share-store.ts](../apps/server/src/share-store.ts) 的写入/读取请求）：POST → 201；读回字段完整；DELETE → 204；清理后查询为空。应用期望的表结构与新建表逐字段一致。
 - 清理本地磁盘残留：`.lingwu/postgres`（232 MB，迁移前旧库）、`.lingwu/postgres.corrupt-20261111`（121 MB，更早损坏归档）、`.lingwu/files`（3.2 MB），合计约 356 MB。删除前逐一与 Supabase 核对：11 个文件远端齐全、字节一致，records/events 行数与远端一致。保留 `.lingwu/session-signing-key`（会话签名密钥，非数据副本）。
-
-**重要：不要重复执行 `0001_accounts.sql`**
-
-- 核查发现该 Supabase 项目上 0001 的物件其实都已存在，只是**命名与仓库脚本不同**：索引为 `lingtai_audit_logs_user_created_idx`、`lingtai_resources_user_id_resource_type_resource_id_key`，函数为 `user_profiles_handle_new_user`（`on_auth_user_created` 触发器已正确绑定它）。功能齐全。
-- 因此重跑 [0001_accounts.sql](../supabase/migrations/0001_accounts.sql) 只会多出一套同名不同前缀的重复索引，并把 `on_auth_user_created` 从 `user_profiles_handle_new_user` 改绑到新建的 `handle_new_user`——行为一致，属无谓改动，应避免。
 
 **遗留观察**
 
@@ -356,7 +334,7 @@
 
 - 记录库默认是容器内嵌的 **PGlite**，数据放在持久盘 `/var/data/lingwu/postgres`：数据库与磁盘强绑定。
 - 盘写满 → PGlite 写入中途失败 → `global/pg_control` 半截 → 每次启动抛不透明的 `RuntimeError: Aborted()` → 自愈把损坏目录改名归档（改名不释放空间）→ 余量 <64 MiB 时连本次归档一并删除 → **库消失**。
-- 次要原因：`DATA_DIR` 随项目三次改名（`openmuse`→`lingtai`→`lingwu`）而变化，应用每次都去看新的空目录，旧数据其实还在盘里但「看不见」。
+- 次要原因：`DATA_DIR` 随项目两次改名（`openmuse`→`lingwu`）而变化，应用每次都去看新的空目录，旧数据其实还在盘里但「看不见」。
 
 **修复**
 
