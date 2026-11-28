@@ -303,7 +303,7 @@ export function AccountScreen({
   onOpenPreferences?: () => void;
 }) {
   const { t } = useTranslation();
-  const { api, notify, refresh } = useWorkspace();
+  const { api, navigate, notify, refresh } = useWorkspace();
   const [profile, setProfile] = useState<AccountProfile>();
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -562,6 +562,20 @@ export function AccountScreen({
           />
         </Card>
       </View>
+      <Card style={{ paddingVertical: 4 }}>
+        <LinkRow
+          icon={IdCard}
+          title={t("investor.profileTitle")}
+          detail={t("investor.profileEntryDetail")}
+          onPress={() => navigate("investor-profile")}
+        />
+        <LinkRow
+          icon={ShieldCheck}
+          title={t("investor.consentsTitle")}
+          detail={t("investor.consentsEntryDetail")}
+          onPress={() => navigate("investor-consents")}
+        />
+      </Card>
       {onOpenPreferences && (
         <Card style={{ paddingVertical: 4 }}>
           <LinkRow

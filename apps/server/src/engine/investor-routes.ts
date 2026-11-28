@@ -3,9 +3,14 @@ import { z } from "zod";
 import type { InvestmentNote, ResearchReport } from "../../../../packages/domain/src/agent.ts";
 import type { InvestorMutedTopic } from "../../../../packages/domain/src/investor.ts";
 import {
+  consentCreateSchema,
+  consentUpdateSchema,
+  deviceQuietOverrideSchema,
   type EventDecision,
   eventCandidateSchema,
   feedFeedbackSchema,
+  profileProposalSchema,
+  profileUpdateSchema,
   thesisEvidenceInputSchema,
 } from "../../../../packages/domain/src/investor.ts";
 import { AppError } from "../errors.ts";
@@ -132,6 +137,101 @@ export function investorRoutes(service: AgentService): Hono<{ Variables: { owner
     const check = await service.thesisEvidence.check(owner, note);
     return c.json({ check, note: await service.db.get(owner, "notes", note.id) });
   });
+
+  // ─── A1 投资档案 ───
+
+  /** 档案视图：永远返回一份可用档案 + 四组可信状态 + 待确认项。 */
+  app.get("/profile", async (c) => c.json(await service.investorProfile.view(c.get("owner"))));
+
+  /**
+   * 更新档案。触碰强制确认字段（风险偏好 / 期限 / 禁止行业）且未带 confirm 时，
+   * 服务端抛 422 confirm_required（模型不得静默改写）；成功则回最新视图。
+   */
+  app.put("/profile", async (c) => {
+    const owner = c.get("owner");
+    const body = profileUpdateSchema.parse(await c.req.json());
+    await service.investorProfile.update(owner, body);
+    return c.json(await service.investorProfile.view(owner));
+  });
+
+  app.get("/profile/proposals", async (c) =>
+    c.json(await service.investorProfile.listProposals(c.get("owner"))),
+  );
+
+  /** 模型对档案的改动提议：只入库待审，绝不直接落库。 */
+  app.post("/profile/proposals", async (c) => {
+    const body = profileProposalSchema.parse(await c.req.json());
+    return c.json(await service.investorProfile.createProposal(c.get("owner"), body), 201);
+  });
+
+  app.post("/profile/proposals/:id/review", async (c) => {
+    const body = z.object({ action: z.enum(["accept", "reject"]) }).parse(await c.req.json());
+    return c.json(
+      await service.investorProfile.reviewProposal(c.get("owner"), c.req.param("id"), body.action),
+    );
+  });
+
+  // ─── A3 授权中心 ───
+
+  app.get("/consents", async (c) => c.json(await service.consents.list(c.get("owner"))));
+
+  /** 当前免打扰门槛（含当日已推送条数）：UI 直接显示"现在能不能推"。 */
+  app.get("/consents/gate", async (c) => {
+    const owner = c.get("owner");
+    const now = new Date();
+    const pushedToday = await service.events.pushedToday(owner, now);
+    const deviceId = c.req.query("deviceId");
+    return c.json(
+      await service.consents.gate(owner, { now, pushedToday, ...(deviceId ? { deviceId } : {}) }),
+    );
+  });
+
+  app.post("/consents", async (c) => {
+    const body = consentCreateSchema.parse(await c.req.json());
+    return c.json(await service.consents.create(c.get("owner"), body), 201);
+  });
+
+  app.get("/consents/:id", async (c) => {
+    const consent = await service.consents.get(c.get("owner"), c.req.param("id"));
+    if (!consent) throw new AppError("Consent not found", 404);
+    return c.json(consent);
+  });
+
+  app.patch("/consents/:id", async (c) => {
+    const body = consentUpdateSchema.parse(await c.req.json());
+    return c.json(await service.consents.update(c.get("owner"), c.req.param("id"), body));
+  });
+
+  /** 撤回即停：置 revokedAt，后续判定不再生效。 */
+  app.post("/consents/:id/revoke", async (c) =>
+    c.json(await service.consents.revoke(c.get("owner"), c.req.param("id"))),
+  );
+
+  app.delete("/consents/:id", async (c) => {
+    await service.consents.remove(c.get("owner"), c.req.param("id"));
+    return c.json({ ok: true });
+  });
+
+  /** 设备级免打扰覆盖（优先级高于账户级）。 */
+  app.put("/consents/:id/devices/:deviceId", async (c) => {
+    const body = deviceQuietOverrideSchema.omit({ deviceId: true }).parse(await c.req.json());
+    return c.json(
+      await service.consents.setDeviceOverride(c.get("owner"), c.req.param("id"), {
+        ...body,
+        deviceId: c.req.param("deviceId"),
+      }),
+    );
+  });
+
+  app.delete("/consents/:id/devices/:deviceId", async (c) =>
+    c.json(
+      await service.consents.clearDeviceOverride(
+        c.get("owner"),
+        c.req.param("id"),
+        c.req.param("deviceId"),
+      ),
+    ),
+  );
 
   return app;
 }

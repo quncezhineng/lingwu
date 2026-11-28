@@ -31,7 +31,7 @@ import type {
   Mail,
   ProposalInput,
 } from "../../../../packages/domain/src/index.ts";
-import type { EventCandidateInput } from "../../../../packages/domain/src/investor.ts";
+import type { ConsentGate, EventCandidateInput } from "../../../../packages/domain/src/investor.ts";
 import { isLongformReply } from "../../../../packages/domain/src/longform.ts";
 import { resolveMonitorCurrency } from "../../../../packages/domain/src/monitor-currency.ts";
 import type { OrchestrationPlan } from "../../../../packages/domain/src/orchestration.ts";
@@ -55,8 +55,10 @@ import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
 import { ActionLogService } from "./action-log.ts";
 import { createBriefingScheduler } from "./briefing-scheduler.ts";
+import { ConsentService } from "./consent.ts";
 import { detectDealSignals } from "./deal-signal.ts";
 import { judgeEventWithModel } from "./event-judge-model.ts";
+import { EventSourcesService } from "./event-sources.ts";
 import {
   EventTriageService,
   isMarketClosed,
@@ -67,6 +69,7 @@ import {
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
 import { HindsightClient, type RecallMemory } from "./hindsight.ts";
+import { InvestorProfileService } from "./investor-profile.ts";
 import { saveLongformArtifact } from "./longform.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { recallMemories } from "./memory-recall.ts";
@@ -82,6 +85,7 @@ import {
   pageLines,
   withoutRelativeTimes,
 } from "./page-diff.ts";
+import { PolicyDriftService } from "./policy-drift.ts";
 import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
 import { summarizeReport, synthesizeResearch } from "./report-brief.ts";
@@ -148,6 +152,14 @@ export class AgentService {
   readonly market: MarketDataService;
   readonly watchlists: WatchlistsService;
   readonly portfolios: PortfoliosService;
+  /** A1 投资档案（PRD）：目标 / 期限 / 风险偏好与可信状态。 */
+  readonly investorProfile: InvestorProfileService;
+  /** A2 目标配置与偏离（PRD）：组合级 InvestmentPolicy 与市值口径偏离。 */
+  readonly policyDrift: PolicyDriftService;
+  /** A3 授权中心（PRD）：五维授权与免打扰 / 每日上限判定。 */
+  readonly consents: ConsentService;
+  /** A4 事件源（PRD）：到期 / 首次亏损 / 配置偏离候选生成。 */
+  readonly eventSources: EventSourcesService;
   readonly notes: NotesService;
   readonly financials: FinancialsService;
   readonly priceAlerts: PriceAlertsService;
@@ -182,6 +194,10 @@ export class AgentService {
     this.market = market;
     this.watchlists = new WatchlistsService(db, market);
     this.portfolios = new PortfoliosService(db, market);
+    this.investorProfile = new InvestorProfileService(db);
+    this.policyDrift = new PolicyDriftService(db, this.portfolios);
+    this.consents = new ConsentService(db);
+    this.eventSources = new EventSourcesService(db);
     this.notes = new NotesService(db);
     this.financials = new FinancialsService(db);
     this.priceAlerts = new PriceAlertsService(db, market);
@@ -194,6 +210,7 @@ export class AgentService {
       db,
       notify: (owner, title, body, key) => this.notify(owner, title, body, undefined, key),
       quiet: (_owner, now) => isMarketClosed(now),
+      consent: (owner, now) => this.consentGate(owner, now),
       judge: (owner, candidate, context, rules) =>
         this.judgeEvent(owner, candidate, context, rules),
     });
@@ -1537,6 +1554,16 @@ export class AgentService {
     return mode === "shadow"
       ? { result: rules, source: "rules", shadow: modelShadow, model: resolved.model }
       : { result: judged, source: "model", shadow: rulesShadow, model: resolved.model };
+  }
+  /**
+   * A3 授权闸：把当日已推送条数喂给授权中心，得到 push → feed 的降级结论。
+   *
+   * 未配置任何授权时返回 undefined，事件管线沿用既有行为（不强制降级）。
+   */
+  private async consentGate(owner: string, now: Date): Promise<ConsentGate | undefined> {
+    const pushedToday = await this.events.pushedToday(owner, now);
+    const gate = await this.consents.gate(owner, { now, pushedToday });
+    return gate.configured ? gate : undefined;
   }
   private alertNotifier(owner: string): AlertNotifier {
     return async (title, body, key, context) => {

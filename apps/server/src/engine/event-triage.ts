@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Holding, InvestmentNote } from "../../../../packages/domain/src/agent.ts";
 import type {
+  ConsentGate,
   EventCandidateInput,
   EventDecision,
   EventFeedItem,
@@ -22,6 +23,8 @@ export const PRICE_MOVE_FLOOR_PERCENT = 2;
 const CONTENT_DEDUPE_MS = 24 * 60 * 60 * 1000;
 /** 「这类少推点」的默认冷却天数。 */
 export const DEFAULT_MUTE_DAYS = 14;
+/** 账户级（无标的）事件的占位符号：风险测评到期等，走同一条事件管线。 */
+export const ACCOUNT_SYMBOL = "PROFILE";
 
 /** 二级判级的分档线：宁可进信息流，也不轻易打扰（PRD §9.1）。 */
 export const PUSH_SCORE = 60;
@@ -47,6 +50,8 @@ export interface TriageContext {
   mutedTopics: string[];
   /** 休市 / 静默时段：行情类事件只进信息流。 */
   quiet?: boolean;
+  /** A3 授权闸：没有 remind 用途 / 免打扰 / 超每日上限时把 push 降级为 feed。 */
+  consent?: ConsentGate;
 }
 
 export interface PrefilterResult {
@@ -96,6 +101,8 @@ export function applyDecisionPolicy(input: {
   reasons: string[];
   explicitAlert: boolean;
   quiet?: boolean;
+  /** A3 授权闸；只在已配置授权（configured）时才降级，缺省沿用既有行为。 */
+  consent?: ConsentGate;
   pushScore?: number;
   feedScore?: number;
 }): JudgeResult {
@@ -113,6 +120,19 @@ export function applyDecisionPolicy(input: {
   if (decision === "push" && input.quiet) {
     decision = "feed";
     reasons.push("当前处于休市 / 静默时段，只进信息流，不推送。");
+  }
+  // A3 授权闸：生效顺序 设备级 > 账户级（已由 ConsentGate 归并）> 是否开市。
+  if (decision === "push" && input.consent?.configured) {
+    if (!input.consent.remind) {
+      decision = "feed";
+      reasons.push("没有开启「主动提醒」用途的授权，推送降级为信息流。");
+    } else if (input.consent.quiet) {
+      decision = "feed";
+      reasons.push("当前处于免打扰时段，推送降级为信息流。");
+    } else if (input.consent.remaining <= 0) {
+      decision = "feed";
+      reasons.push("今日推送额度已用完，后续只进信息流。");
+    }
   }
   if (decision === "push") reasons.push(`判级得分 ${score} ≥ ${pushScore}，值得打扰。`);
   else if (decision === "feed")
@@ -138,6 +158,11 @@ export function muteTopicForEvent(type: EventType): string {
 const BASE_SCORE: Record<EventType, number> = {
   thesis_risk: 50,
   price_level: 45,
+  // 到期 / 首次亏损 / 配置偏离是 A4 新增的三类：都直接对应资金或既定约束，
+  // 基准分按「越接近影响决策越高」排布（配置偏离越界默认值得打扰）。
+  policy_drift: 62,
+  maturity: 54,
+  first_loss: 50,
   earnings: 42,
   announcement: 34,
   price_move: 26,
@@ -146,6 +171,9 @@ const BASE_SCORE: Record<EventType, number> = {
 };
 
 const PRICE_TYPES = new Set<EventType>(["price_move", "price_level"]);
+
+/** 组合级事件类型：symbol 是组合 id（非交易标的），一级相关性闸对它们放行。 */
+const PORTFOLIO_SCOPED_TYPES = new Set<EventType>(["policy_drift"]);
 
 /**
  * 是否处于休市 / 静默时段。
@@ -176,6 +204,9 @@ function dayBucket(now: Date): string {
  * 条新闻隔天再推一遍。
  */
 export function eventDedupeKey(candidate: EventCandidateInput, now = new Date()): string {
+  // A4 候选生成器可显式给出周期去重键（到期 / 首次亏损 / 配置偏离），语义是
+  // 「同一周期只推一次、跨周期可再推」，与「类型+标的+自然日」不同，优先采用。
+  if (candidate.dedupeKey) return candidate.dedupeKey;
   const day = dayBucket(now);
   if (PRICE_TYPES.has(candidate.type)) {
     // 阈值也进 key：同一标的上挂了多条不同阈值的提醒时，各自提醒、不互相吞掉。
@@ -198,7 +229,9 @@ export function prefilterEvent(
   context: TriageContext,
 ): PrefilterResult {
   const entry = context.universe.get(candidate.symbol);
-  if (!entry) {
+  // 组合级事件的 symbol 是组合 id，不在标的universe里；它本就只在配置越界时产生，
+  // 不再走"是否关注该标的"的相关性闸（PRD A2：breach 必产出候选）。
+  if (!entry && !PORTFOLIO_SCOPED_TYPES.has(candidate.type)) {
     return {
       level1: "not_relevant",
       reasons: [`${candidate.symbol} 不在持仓 / 自选 / 论点 / 提醒范围内，按不打扰处理。`],
@@ -291,6 +324,7 @@ export function judgeEvent(
     reasons,
     explicitAlert,
     quiet: context.quiet,
+    consent: context.consent,
     pushScore,
     feedScore,
   });
@@ -341,6 +375,11 @@ export interface TriageDeps {
   notify?: (owner: string, title: string, body: string, key: string) => Promise<{ id: string }>;
   /** 当前是否休市 / 静默（按用户时区与交易日历），缺省视为非静默。 */
   quiet?: (owner: string, now: Date) => Promise<boolean> | boolean;
+  /** A3 授权闸：返回该用户当前的门槛（无授权记录时返回 undefined）。 */
+  consent?: (
+    owner: string,
+    now: Date,
+  ) => Promise<ConsentGate | undefined> | ConsentGate | undefined;
   /** 可替换的二级判级（轻量模型）；缺省或返回 null 时用规则结论。 */
   judge?: EventJudgeHook;
   now?: () => Date;
@@ -446,11 +485,13 @@ export class EventTriageService {
     }
 
     const quiet = this.deps.quiet ? await this.deps.quiet(owner, now) : false;
+    const consent = this.deps.consent ? await this.deps.consent(owner, now) : undefined;
     const context: TriageContext = {
       now,
       universe,
       mutedTopics: mutes.map((mute) => muteTopicForEvent(mute.topic as EventType)),
       quiet,
+      ...(consent ? { consent } : {}),
     };
 
     const prefilter = prefilterEvent(candidate, context);
@@ -524,6 +565,8 @@ export class EventTriageService {
       createdAt: now.toISOString(),
       read: false,
       ...(notificationId ? { notificationId } : {}),
+      // A3 使用回看：推过的条目记下命中的授权 id，撤回后仍可追溯"当初是哪份授权放行的"。
+      ...(context.consent?.consentId ? { consentId: context.consent.consentId } : {}),
     };
     return this.db.put(owner, FEED_KIND, item);
   }
@@ -564,6 +607,20 @@ export class EventTriageService {
       if (!item.read && item.decision !== "silent") counts.unread++;
     }
     return counts;
+  }
+
+  /**
+   * 今日已推送条数（按 UTC 自然日），供 A3 每日推送上限判定。
+   *
+   * 与「是否休市」同口径地用 UTC 日，避免引入第二套时区推断；用户级时区只用于
+   * 免打扰时段（quietHours 自带 timeZone）。
+   */
+  async pushedToday(owner: string, now = this.now()): Promise<number> {
+    const items = await this.db.list<EventFeedItem>(owner, FEED_KIND);
+    const today = dayBucket(now);
+    return items.filter(
+      (item) => item.decision === "push" && dayBucket(new Date(item.createdAt)) === today,
+    ).length;
   }
 
   /**

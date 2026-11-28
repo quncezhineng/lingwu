@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createStore } from "../apps/server/src/db.ts";
 import {
+  applyDecisionPolicy,
   EventTriageService,
   eventDedupeKey,
   judgeEvent,
@@ -9,6 +10,7 @@ import {
   type TriageContext,
   type UniverseEntry,
 } from "../apps/server/src/engine/event-triage.ts";
+import type { ConsentGate } from "../packages/domain/src/investor.ts";
 
 function entry(symbol: string, patch: Partial<UniverseEntry> = {}): UniverseEntry {
   return {
@@ -334,6 +336,189 @@ test("服务：同一标的下同标题内容事件 24h 内不重复打扰", asy
     assert.equal(announcement.id, news.id);
     assert.ok(announcement.reasons.some((reason) => reason.includes("24 小时内")));
     assert.equal((await service.list(owner, { includeSilent: true })).length, 1);
+  } finally {
+    await db.close();
+  }
+});
+
+test("去重键：候选自带周期键时优先采用，不受自然日影响", () => {
+  const candidate = {
+    type: "maturity" as const,
+    symbol: "019547.SH",
+    title: "到期临近",
+    body: "",
+    dedupeKey: "maturity:019547.SH:d7",
+  };
+  assert.equal(
+    eventDedupeKey(candidate, new Date("2026-11-23T02:00:00.000Z")),
+    candidate.dedupeKey,
+  );
+  // 跨自然日仍是同一个键：A4 的周期语义是「同周期只推一次」，不是「每天一次」。
+  assert.equal(
+    eventDedupeKey(candidate, new Date("2026-11-24T02:00:00.000Z")),
+    candidate.dedupeKey,
+  );
+});
+
+test("一级过滤：组合级配置偏离事件不因标的缺失被拦掉", () => {
+  const result = prefilterEvent(
+    { type: "policy_drift", symbol: "portfolio-1", title: "配置偏离", body: "" },
+    context(),
+  );
+  assert.equal(result.level1, "passed");
+});
+
+function gate(patch: Partial<ConsentGate> = {}): ConsentGate {
+  return {
+    configured: true,
+    remind: true,
+    quiet: false,
+    dailyPushCap: 5,
+    remaining: 5,
+    reasons: [],
+    ...patch,
+  };
+}
+
+test("授权闸：未开启主动提醒用途时推送降级为信息流", () => {
+  const result = applyDecisionPolicy({
+    score: 90,
+    reasons: [],
+    explicitAlert: false,
+    consent: gate({ remind: false }),
+  });
+  assert.equal(result.decision, "feed");
+  assert.ok(result.reasons.some((reason) => reason.includes("主动提醒")));
+});
+
+test("授权闸：免打扰时段与额度用尽都降级为信息流", () => {
+  const quiet = applyDecisionPolicy({
+    score: 90,
+    reasons: [],
+    explicitAlert: false,
+    consent: gate({ quiet: true }),
+  });
+  assert.equal(quiet.decision, "feed");
+  assert.ok(quiet.reasons.some((reason) => reason.includes("免打扰")));
+
+  const capped = applyDecisionPolicy({
+    score: 90,
+    reasons: [],
+    explicitAlert: false,
+    consent: gate({ remaining: 0 }),
+  });
+  assert.equal(capped.decision, "feed");
+  assert.ok(capped.reasons.some((reason) => reason.includes("额度已用完")));
+});
+
+test("授权闸：未配置授权时不影响既有判级", () => {
+  const result = applyDecisionPolicy({
+    score: 90,
+    reasons: [],
+    explicitAlert: false,
+    consent: gate({ configured: false, remind: false, quiet: true, remaining: 0 }),
+  });
+  assert.equal(result.decision, "push");
+});
+
+test("服务：经授权闸降级 / 放行，并留痕命中的授权 id", async () => {
+  const db = await createStore();
+  try {
+    const owner = "owner-consent-gate";
+    await db.put(owner, "holdings", {
+      id: "h1",
+      portfolio_id: "p1",
+      symbol_code: "300750.SZ",
+      market: "CN",
+      currency: "CNY",
+      quantity: 10,
+      avg_cost: 200,
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+    });
+    const notified: string[] = [];
+    const blocked = new EventTriageService({
+      db,
+      now: () => new Date("2026-11-23T02:00:00.000Z"),
+      consent: () => gate({ remaining: 0, consentId: "c1" }),
+      notify: async (_owner, title) => {
+        notified.push(title);
+        return { id: `notice-${notified.length}` };
+      },
+    });
+
+    const degraded = await blocked.ingest(owner, {
+      type: "price_move",
+      symbol: "300750.SZ",
+      title: "异动 5%",
+      body: "",
+      magnitudePercent: 5,
+    });
+    assert.equal(degraded.decision, "feed");
+    assert.ok(degraded.reasons.some((reason) => reason.includes("额度已用完")));
+    assert.equal(degraded.notificationId, undefined);
+    assert.equal(notified.length, 0);
+    assert.equal(degraded.consentId, "c1");
+
+    // 额度充足时正常推送，并记录当初放行的授权 id（供 A3 使用回看）。
+    const allowed = new EventTriageService({
+      db,
+      now: () => new Date("2026-11-23T02:00:00.000Z"),
+      consent: () => gate({ consentId: "c1" }),
+      notify: async (_owner, title) => ({ id: `notice-${title}` }),
+    });
+    const pushed = await allowed.ingest(owner, {
+      type: "price_level",
+      symbol: "300750.SZ",
+      title: "价格提醒",
+      body: "",
+      thresholdValue: 250,
+    });
+    assert.equal(pushed.decision, "push");
+    assert.ok(pushed.notificationId);
+    assert.equal(pushed.consentId, "c1");
+  } finally {
+    await db.close();
+  }
+});
+
+test("服务：pushedToday 只统计当日已推送条目", async () => {
+  const db = await createStore();
+  try {
+    const owner = "owner-pushed-today";
+    await db.put(owner, "notes", {
+      id: "n1",
+      user_id: owner,
+      symbol_code: "002594.SZ",
+      type: "THESIS",
+      content: "长期看好",
+      status: "ACTIVE",
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+    });
+    const service = new EventTriageService({
+      db,
+      now: () => new Date("2026-11-23T02:00:00.000Z"),
+      notify: async () => ({ id: "notice" }),
+    });
+    assert.equal(await service.pushedToday(owner), 0);
+
+    const pushed = await service.ingest(owner, {
+      type: "thesis_risk",
+      symbol: "002594.SZ",
+      title: "论点走弱",
+      body: "",
+    });
+    assert.equal(pushed.decision, "push");
+    assert.equal(await service.pushedToday(owner), 1);
+
+    // 换到次日：同一批条目不再计入当日。
+    const tomorrow = new EventTriageService({
+      db,
+      now: () => new Date("2026-11-24T02:00:00.000Z"),
+      notify: async () => ({ id: "notice" }),
+    });
+    assert.equal(await tomorrow.pushedToday(owner), 0);
   } finally {
     await db.close();
   }

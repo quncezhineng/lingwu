@@ -142,6 +142,7 @@ export async function judgeEventWithModel(input: ModelJudgeInput): Promise<Judge
     reasons: [`模型判级：${parsed.reasons.join("；")}`],
     explicitAlert: hasExplicitAlert(input.candidate, input.context),
     quiet: input.context.quiet,
+    consent: input.context.consent,
     pushScore: input.pushScore ?? PUSH_SCORE,
     feedScore: input.feedScore ?? FEED_SCORE,
   });

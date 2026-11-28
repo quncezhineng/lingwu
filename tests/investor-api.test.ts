@@ -7,7 +7,15 @@ import { createApp } from "../apps/server/src/app.ts";
 import type { Config } from "../apps/server/src/config.ts";
 import { createStore, type Store } from "../apps/server/src/db.ts";
 import type { AgentNotification, InvestmentNote } from "../packages/domain/src/agent.ts";
-import type { EventFeedItem, InvestorMutedTopic } from "../packages/domain/src/investor.ts";
+import type {
+  Consent,
+  ConsentGate,
+  EventFeedItem,
+  InvestmentPolicy,
+  InvestorMutedTopic,
+  InvestorProfileView,
+  PolicyDrift,
+} from "../packages/domain/src/investor.ts";
 import type { MarketDataService } from "../packages/integrations/src/market-data.ts";
 
 let db: Store;
@@ -231,4 +239,151 @@ test("论点绑定证据后可立即判定，缺行情时如实回落到待确�
   // 当前价 150 > 绑定阈值 100，论点成立；自动判定不擅自把状态改成"已确认"。
   assert.equal(checked.check?.outcome, "valid");
   assert.equal(checked.note.status, "ACTIVE");
+});
+
+test("A1 投资档案：空档可读，强制确认字段需 confirm=true 才落库", async () => {
+  const view = await call<InvestorProfileView>("/investor/profile");
+  assert.equal(view.profile.owner.length > 0, true);
+  assert.deepEqual(view.profile.goals, []);
+  assert.ok(view.missingConfirmation.includes("risk.appetite"));
+
+  // 不带 confirm 写风险偏好 → 422 confirm_required（模型不得静默改写）。
+  const rejected = await server.app.request("/api/investor/profile", {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify({ risk: { appetite: "balanced" } }),
+  });
+  assert.equal(rejected.status, 422);
+  assert.equal(((await rejected.json()) as { code?: string }).code, "confirm_required");
+
+  const saved = await call<InvestorProfileView>("/investor/profile", {
+    method: "PUT",
+    body: JSON.stringify({
+      confirm: true,
+      risk: { appetite: "balanced", excludedSectors: ["烟草"] },
+      goals: [{ kind: "growth", label: "增值", horizonMonths: 60 }],
+    }),
+  });
+  assert.equal(saved.profile.risk.appetite, "balanced");
+  assert.equal(saved.profile.risk.source, "user");
+  assert.deepEqual(saved.missingConfirmation, []);
+});
+
+test("A1 提议：模型提议需用户 accept 后才落库", async () => {
+  const proposal = await post<{ id: string; status: string }>(
+    "/investor/profile/proposals",
+    {
+      field: "risk.appetite",
+      label: "风险偏好",
+      currentValue: "balanced",
+      proposedValue: "aggressive",
+      rationale: "近一年回撤承受度上升",
+    },
+    201,
+  );
+  assert.equal(proposal.status, "pending");
+  assert.equal((await call<unknown[]>("/investor/profile/proposals")).length, 1);
+
+  const reviewed = await post<{
+    proposal: { status: string };
+    profile: { risk: { appetite?: string } };
+  }>(`/investor/profile/proposals/${proposal.id}/review`, { action: "accept" });
+  assert.equal(reviewed.proposal.status, "accepted");
+  assert.equal(reviewed.profile.risk.appetite, "aggressive");
+});
+
+test("A3 授权中心：创建 / 门槛 / 设备覆盖 / 撤回 / 删除", async () => {
+  assert.deepEqual(await call<Consent[]>("/investor/consents"), []);
+
+  const created = await post<Consent>(
+    "/investor/consents",
+    {
+      dataScope: ["holdings", "market_data"],
+      purposes: ["research", "remind"],
+      channels: ["in_app"],
+      frequency: "daily",
+      quietHours: { start: "22:00", end: "07:00", timeZone: "Asia/Shanghai" },
+      dailyPushCap: 3,
+    },
+    201,
+  );
+  assert.ok(created.id);
+
+  const gate = await call<ConsentGate>("/investor/consents/gate");
+  assert.equal(gate.configured, true);
+  assert.equal(gate.remind, true);
+  assert.equal(gate.dailyPushCap, 3);
+
+  const patched = await call<Consent>(`/investor/consents/${created.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ dailyPushCap: 2, validTo: null }),
+  });
+  assert.equal(patched.dailyPushCap, 2);
+
+  const withDevice = await call<Consent>(`/investor/consents/${created.id}/devices/phone-1`, {
+    method: "PUT",
+    body: JSON.stringify({
+      quietHours: { start: "00:00", end: "08:00", timeZone: "Asia/Shanghai" },
+    }),
+  });
+  assert.equal(withDevice.deviceQuietOverrides?.length, 1);
+  const deviceGate = await call<ConsentGate>("/investor/consents/gate?deviceId=phone-1");
+  assert.equal(deviceGate.dailyPushCap, 2);
+
+  const revoked = await post<Consent>(`/investor/consents/${created.id}/revoke`, {});
+  assert.ok(revoked.revokedAt);
+  assert.equal((await call<ConsentGate>("/investor/consents/gate")).remind, false);
+
+  await call<{ ok: boolean }>(`/investor/consents/${created.id}`, { method: "DELETE" });
+  assert.deepEqual(await call<Consent[]>("/investor/consents"), []);
+});
+
+test("A2 目标配置与偏离：无政策不产出，越界按市值口径判定", async () => {
+  const portfolio = await post<{ id: string }>("/portfolios", { name: "目标盘" }, 201);
+  await post(
+    `/portfolios/${portfolio.id}/holdings`,
+    { symbol_code: "600519.SS", quantity: 10, avg_cost: 100, sector: "白酒" },
+    201,
+  );
+  await post(
+    `/portfolios/${portfolio.id}/holdings`,
+    { symbol_code: "000001.SZ", quantity: 10, avg_cost: 100, sector: "银行" },
+    201,
+  );
+  // maturity_date 透传：A4 到期事件源依赖它。
+  const bond = await post<{ maturity_date?: string }>(
+    `/portfolios/${portfolio.id}/holdings`,
+    { symbol_code: "019547.SH", quantity: 5, avg_cost: 100, maturity_date: "2026-12-05" },
+    201,
+  );
+  assert.equal(bond.maturity_date, "2026-12-05");
+
+  assert.equal(await call<InvestmentPolicy | null>(`/portfolios/${portfolio.id}/policy`), null);
+  assert.deepEqual(
+    (await call<{ parts: PolicyDrift[] }>(`/portfolios/${portfolio.id}/drift`)).parts,
+    [],
+  );
+
+  await call<InvestmentPolicy>(`/portfolios/${portfolio.id}/policy`, {
+    method: "PUT",
+    body: JSON.stringify({
+      basis: "sector",
+      targets: [
+        { key: "白酒", label: "白酒", targetPercent: 90 },
+        { key: "银行", label: "银行", targetPercent: 10 },
+      ],
+    }),
+  });
+
+  const drift = await call<{ parts: PolicyDrift[] }>(`/portfolios/${portfolio.id}/drift`);
+  assert.equal(drift.parts.length, 1);
+  assert.equal(drift.parts[0]?.valueBasis, "market");
+  assert.ok(drift.parts[0]?.rows.some((row) => row.status === "breach"));
+
+  const removed = await server.app.request(`/api/portfolios/${portfolio.id}/policy`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  assert.equal(removed.status, 204);
+  assert.equal(await call<InvestmentPolicy | null>(`/portfolios/${portfolio.id}/policy`), null);
 });

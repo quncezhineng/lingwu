@@ -59,6 +59,8 @@ export const addHoldingSchema = z.object({
   sector: z.string().trim().max(100).optional(),
   currency: currencySchema.optional(),
   buy_date: z.string().date().optional(),
+  /** 到期日（债券 / 理财 / 存款等）；A4 到期事件源据此产出候选。 */
+  maturity_date: z.string().date().optional(),
 });
 
 /** Frontend may send raw CSV + this mapping (canonical field → header name). */
@@ -83,6 +85,7 @@ export const updateHoldingSchema = z
     avg_cost: z.number().finite().nonnegative().optional(),
     name: z.string().trim().max(200).optional(),
     sector: z.string().trim().max(100).optional(),
+    maturity_date: z.string().date().optional(),
   })
   .refine((value) => Object.values(value).some((item) => item !== undefined), {
     message: "Provide at least one field to update",
@@ -433,6 +436,7 @@ export class PortfoliosService {
       quantity: input.quantity,
       avg_cost: input.avg_cost,
       buy_date: input.buy_date ?? at.slice(0, 10),
+      ...(input.maturity_date ? { maturity_date: input.maturity_date } : {}),
       ...(input.name ? { name: input.name } : {}),
       ...(input.sector ? { sector: input.sector } : {}),
       created_at: at,
@@ -481,6 +485,7 @@ export class PortfoliosService {
       avg_cost: input.avg_cost ?? holding.avg_cost,
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.sector !== undefined ? { sector: input.sector } : {}),
+      ...(input.maturity_date !== undefined ? { maturity_date: input.maturity_date } : {}),
       updated_at: new Date().toISOString(),
     });
   }

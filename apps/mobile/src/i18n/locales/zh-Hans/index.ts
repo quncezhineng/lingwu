@@ -7,6 +7,7 @@ import common from "./common";
 import computer from "./computer";
 import details from "./details";
 import financials from "./financials";
+import investor from "./investor";
 import markets from "./markets";
 import notes from "./notes";
 import portfolio from "./portfolio";
@@ -44,6 +45,7 @@ export const zhHans = {
   ...threads,
   ...tools,
   ...channels,
+  ...investor,
 } satisfies Record<TranslationKey, string>;
 
 export default zhHans;

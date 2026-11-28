@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { investmentPolicySchema } from "../../../../packages/domain/src/investor.ts";
 import {
   addHoldingSchema,
   createPortfolioSchema,
@@ -59,6 +60,29 @@ export function portfolioRoutes(service: AgentService): Hono<Env> {
   app.get("/:id/summary", async (c) =>
     c.json(await service.portfolios.summary(c.get("owner"), c.req.param("id"))),
   );
+
+  // ─── A2 目标配置与偏离 ───
+  // 无政策时 getPolicy 返回 null、drift 返回空数组——绝不用默认值假设。
+
+  app.get("/:id/policy", async (c) =>
+    c.json(await service.policyDrift.getPolicy(c.get("owner"), c.req.param("id"))),
+  );
+  app.put("/:id/policy", async (c) => {
+    const input = investmentPolicySchema.parse(await c.req.json());
+    return c.json(await service.policyDrift.savePolicy(c.get("owner"), c.req.param("id"), input));
+  });
+  app.delete("/:id/policy", async (c) => {
+    await service.policyDrift.removePolicy(c.get("owner"), c.req.param("id"));
+    return c.body(null, 204);
+  });
+  /** 偏离分析：默认市值口径；cost 口径仅作对比，不参与事件触发。 */
+  app.get("/:id/drift", async (c) => {
+    const valueBasis = c.req.query("valueBasis") === "cost" ? "cost" : "market";
+    return c.json({
+      parts: await service.policyDrift.drift(c.get("owner"), c.req.param("id"), { valueBasis }),
+    });
+  });
+
   app.post("/:id/holdings", async (c) => {
     const input = addHoldingSchema.parse(await c.req.json());
     return c.json(
