@@ -288,6 +288,132 @@ test("服务：少推点写入降噪偏好，随后同类事件不再打扰", as
   }
 });
 
+test("二级判级：未授权主动提醒时把推送降级为信息流", () => {
+  const judged = judgeEvent(
+    { type: "thesis_risk", symbol: "300750.SZ", title: "论点走弱", body: "" },
+    context({ consent: { canRemind: false, quietHours: false, pushCapReached: false } }),
+  );
+  assert.equal(judged.decision, "feed");
+  assert.ok(judged.reasons.some((reason) => reason.includes("尚未授权")));
+});
+
+test("二级判级：免打扰时段与超出推送上限各自把推送降级", () => {
+  const candidate = {
+    type: "thesis_risk" as const,
+    symbol: "300750.SZ",
+    title: "论点走弱",
+    body: "",
+  };
+  const quiet = judgeEvent(
+    candidate,
+    context({ consent: { canRemind: true, quietHours: true, pushCapReached: false } }),
+  );
+  assert.equal(quiet.decision, "feed");
+  assert.ok(quiet.reasons.some((reason) => reason.includes("免打扰")));
+
+  const capped = judgeEvent(
+    candidate,
+    context({ consent: { canRemind: true, quietHours: false, pushCapReached: true } }),
+  );
+  assert.equal(capped.decision, "feed");
+  assert.ok(capped.reasons.some((reason) => reason.includes("上限")));
+});
+
+test("去重键：到期 / 首次亏损 / 配置偏离按分桶聚合", () => {
+  const now = new Date("2026-11-23T02:00:00.000Z");
+  const matureD1 = eventDedupeKey(
+    { type: "maturity", symbol: "019547", title: "D1", body: "", dedupeBucket: "2026-11-24:D1" },
+    now,
+  );
+  const matureD7 = eventDedupeKey(
+    { type: "maturity", symbol: "019547", title: "D7", body: "", dedupeBucket: "2026-11-28:D7" },
+    now,
+  );
+  assert.notEqual(matureD1, matureD7);
+  assert.ok(matureD1.includes("019547"));
+
+  const loss0 = eventDedupeKey(
+    { type: "first_loss", symbol: "A", title: "x", body: "", dedupeBucket: "loss-0" },
+    now,
+  );
+  const loss10 = eventDedupeKey(
+    { type: "first_loss", symbol: "A", title: "y", body: "", dedupeBucket: "loss-10" },
+    now,
+  );
+  assert.notEqual(loss0, loss10);
+});
+
+test("二级判级：新增三类事件源能正常打分（不崩、可进信息流以上）", () => {
+  for (const candidate of [
+    {
+      type: "maturity" as const,
+      symbol: "300750.SZ",
+      title: "到期",
+      body: "",
+      dedupeBucket: "2026-11-24:D1",
+    },
+    {
+      type: "first_loss" as const,
+      symbol: "300750.SZ",
+      title: "亏损",
+      body: "",
+      dedupeBucket: "loss-0",
+    },
+  ]) {
+    const judged = judgeEvent(candidate, context());
+    assert.notEqual(judged.decision, "silent");
+  }
+});
+
+test("服务：分桶事件同桶幂等，跨桶重新提醒", async () => {
+  const db = await createStore();
+  try {
+    const owner = "owner-bucket";
+    await db.put(owner, "holdings", {
+      id: "h1",
+      portfolio_id: "p1",
+      symbol_code: "300750.SZ",
+      market: "CN",
+      currency: "CNY",
+      quantity: 10,
+      avg_cost: 200,
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+    });
+    const service = new EventTriageService({
+      db,
+      now: () => new Date("2026-11-23T02:00:00.000Z"),
+      notify: async () => ({ id: "notice" }),
+    });
+    const first = await service.ingest(owner, {
+      type: "maturity",
+      symbol: "300750.SZ",
+      title: "D1",
+      body: "",
+      dedupeBucket: "2026-11-24:D1",
+    });
+    const same = await service.ingest(owner, {
+      type: "maturity",
+      symbol: "300750.SZ",
+      title: "D1 再次派生",
+      body: "",
+      dedupeBucket: "2026-11-24:D1",
+    });
+    assert.equal(same.id, first.id, "同一分桶应幂等");
+
+    const next = await service.ingest(owner, {
+      type: "maturity",
+      symbol: "300750.SZ",
+      title: "D7",
+      body: "",
+      dedupeBucket: "2026-11-28:D7",
+    });
+    assert.notEqual(next.id, first.id, "跨分桶应重新提醒");
+  } finally {
+    await db.close();
+  }
+});
+
 test("服务：降噪项到期后自动失效", async () => {
   const db = await createStore();
   try {

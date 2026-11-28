@@ -13,6 +13,7 @@ import {
   CalendarClock,
   type IconComponent,
   IdCard,
+  ListChecks,
   LogOut,
   Mail,
   MessageCircle,
@@ -22,6 +23,7 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  Target,
   Trash2,
   Upload,
   UserRound,
@@ -303,7 +305,7 @@ export function AccountScreen({
   onOpenPreferences?: () => void;
 }) {
   const { t } = useTranslation();
-  const { api, notify, refresh } = useWorkspace();
+  const { api, notify, refresh, navigate } = useWorkspace();
   const [profile, setProfile] = useState<AccountProfile>();
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -572,6 +574,20 @@ export function AccountScreen({
           />
         </Card>
       )}
+      <Card style={{ paddingVertical: 4 }}>
+        <LinkRow
+          icon={Target}
+          title={t("investor.profileEntry")}
+          detail={t("investor.profileEntryDetail")}
+          onPress={() => navigate("investor-profile")}
+        />
+        <LinkRow
+          icon={ListChecks}
+          title={t("investor.consentsEntry")}
+          detail={t("investor.consentsEntryDetail")}
+          onPress={() => navigate("investor-consents")}
+        />
+      </Card>
       <View style={{ gap: 10 }}>
         <Button danger icon={LogOut} onPress={onSignOut}>
           {t("app.signOutLabel")}

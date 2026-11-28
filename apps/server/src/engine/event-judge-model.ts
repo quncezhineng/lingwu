@@ -142,6 +142,8 @@ export async function judgeEventWithModel(input: ModelJudgeInput): Promise<Judge
     reasons: [`模型判级：${parsed.reasons.join("；")}`],
     explicitAlert: hasExplicitAlert(input.candidate, input.context),
     quiet: input.context.quiet,
+    // A3：模型判级同样要过授权策略闸，否则会绕过「未授权 / 免打扰 / 超上限」的降级。
+    consent: input.context.consent,
     pushScore: input.pushScore ?? PUSH_SCORE,
     feedScore: input.feedScore ?? FEED_SCORE,
   });

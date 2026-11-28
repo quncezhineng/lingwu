@@ -23,6 +23,7 @@ import { AlertTriangle, CircleDollarSign, MoreHorizontal, Plus, RefreshCw, Uploa
 import { metaFor } from "./market";
 import { currencySymbol, directionOf, formatPercent, formatPrice } from "./market-format";
 import { ModalOverlay } from "./modal-overlay";
+import { PolicyDriftSection } from "./policy-drift-section";
 import {
   activePortfolio,
   addHolding,
@@ -1376,6 +1377,9 @@ export function PortfolioScreen({ embedded = false }: { embedded?: boolean } = {
           </View>
         </View>
       )}
+
+      {/* A2：目标配置与偏离。总览回答「有多少钱」，这里回答「离目标偏了多少」。*/}
+      {portfolio && <PolicyDriftSection portfolioId={portfolio.id} />}
 
       {/* 第二层：明细。每个币种一个分区，分区之间用一条细线 + 更大留白断开。*/}
       {groups.map((group, index) => (

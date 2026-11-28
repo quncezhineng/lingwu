@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Holding, InvestmentNote } from "../../../../packages/domain/src/agent.ts";
 import type {
+  ConsentGate,
   EventCandidateInput,
   EventDecision,
   EventFeedItem,
@@ -12,7 +13,7 @@ import { EVENT_TYPE_LABELS } from "../../../../packages/domain/src/investor.ts";
 import type { Store } from "../db.ts";
 import { AppError } from "../errors.ts";
 
-const FEED_KIND = "event-feed";
+export const FEED_KIND = "event-feed";
 /** 用户的降噪偏好单独存一条记录，和事件流分开：判级读它，反馈写它。 */
 const MUTE_KIND = "event-mutes";
 const MUTE_ID = "mutes";
@@ -47,6 +48,8 @@ export interface TriageContext {
   mutedTopics: string[];
   /** 休市 / 静默时段：行情类事件只进信息流。 */
   quiet?: boolean;
+  /** A3：该时刻生效的授权结论，用于把 push 降级为 feed。 */
+  consent?: ConsentGate;
 }
 
 export interface PrefilterResult {
@@ -96,6 +99,7 @@ export function applyDecisionPolicy(input: {
   reasons: string[];
   explicitAlert: boolean;
   quiet?: boolean;
+  consent?: ConsentGate;
   pushScore?: number;
   feedScore?: number;
 }): JudgeResult {
@@ -113,6 +117,20 @@ export function applyDecisionPolicy(input: {
   if (decision === "push" && input.quiet) {
     decision = "feed";
     reasons.push("当前处于休市 / 静默时段，只进信息流，不推送。");
+  }
+  // A3 授权策略闸：不改判定算法，只在你没授权提醒 / 免打扰 / 超上限时把 push 降级为 feed。
+  if (decision === "push" && input.consent) {
+    const gate = input.consent;
+    if (!gate.canRemind) {
+      decision = "feed";
+      reasons.push("你尚未授权「主动提醒」，这条只进信息流，等你主动来看。");
+    } else if (gate.pushCapReached) {
+      decision = "feed";
+      reasons.push("今日推送已达你设置的上限，这条合并进信息流。");
+    } else if (gate.quietHours) {
+      decision = "feed";
+      reasons.push("当前处于你设置的免打扰时段，这条只进信息流。");
+    }
   }
   if (decision === "push") reasons.push(`判级得分 ${score} ≥ ${pushScore}，值得打扰。`);
   else if (decision === "feed")
@@ -138,14 +156,23 @@ export function muteTopicForEvent(type: EventType): string {
 const BASE_SCORE: Record<EventType, number> = {
   thesis_risk: 50,
   price_level: 45,
+  first_loss: 44,
   earnings: 42,
+  maturity: 40,
+  policy_drift: 38,
   announcement: 34,
   price_move: 26,
   valuation: 26,
   news: 20,
 };
 
+/** 价格类事件：按「类型 + 标的 + 自然日」聚合去重。 */
 const PRICE_TYPES = new Set<EventType>(["price_move", "price_level"]);
+/**
+ * 分桶类事件：按「类型 + 标的 + dedupeBucket」聚合，用「首次/持续」语义。
+ * 分桶不变视为同一事件不重复打扰；分桶变化（如回到成本上方再度跌破）才重新提醒。
+ */
+const BUCKETED_TYPES = new Set<EventType>(["maturity", "first_loss", "policy_drift"]);
 
 /**
  * 是否处于休市 / 静默时段。
@@ -181,6 +208,10 @@ export function eventDedupeKey(candidate: EventCandidateInput, now = new Date())
     // 阈值也进 key：同一标的上挂了多条不同阈值的提醒时，各自提醒、不互相吞掉。
     const threshold = candidate.thresholdValue === undefined ? "" : `:${candidate.thresholdValue}`;
     return `${candidate.type}:${candidate.symbol}${threshold}:${day}`;
+  }
+  if (BUCKETED_TYPES.has(candidate.type)) {
+    // 分桶即去重键：同桶视为同一事件，换桶（状态变化）才重新提醒。
+    return `${candidate.type}:${candidate.symbol}:${candidate.dedupeBucket ?? "default"}`;
   }
   return `${candidate.type}:${candidate.symbol}:${titleKey(candidate.title)}`;
 }
@@ -291,6 +322,7 @@ export function judgeEvent(
     reasons,
     explicitAlert,
     quiet: context.quiet,
+    consent: context.consent,
     pushScore,
     feedScore,
   });
@@ -341,6 +373,8 @@ export interface TriageDeps {
   notify?: (owner: string, title: string, body: string, key: string) => Promise<{ id: string }>;
   /** 当前是否休市 / 静默（按用户时区与交易日历），缺省视为非静默。 */
   quiet?: (owner: string, now: Date) => Promise<boolean> | boolean;
+  /** A3：解析该时刻的授权结论（是否授权提醒 / 免打扰 / 超上限）；缺省视为不设闸。 */
+  consent?: (owner: string, now: Date) => Promise<ConsentGate | undefined>;
   /** 可替换的二级判级（轻量模型）；缺省或返回 null 时用规则结论。 */
   judge?: EventJudgeHook;
   now?: () => Date;
@@ -429,7 +463,8 @@ export class EventTriageService {
     const [universe, mutes] = await Promise.all([this.universe(owner), this.activeMutes(owner)]);
 
     // 内容类 24h 去重：同一标的下同一标题（哪怕换了类型）只保留第一次。
-    if (!PRICE_TYPES.has(candidate.type)) {
+    // 价格类与分桶类不打这条路——前者的 key 已含自然日，后者的 key 已含分桶。
+    if (!PRICE_TYPES.has(candidate.type) && !BUCKETED_TYPES.has(candidate.type)) {
       const recent = await this.recent(owner, CONTENT_DEDUPE_MS, now);
       const clash = recent.find(
         (item) =>
@@ -446,11 +481,13 @@ export class EventTriageService {
     }
 
     const quiet = this.deps.quiet ? await this.deps.quiet(owner, now) : false;
+    const consent = this.deps.consent ? await this.deps.consent(owner, now) : undefined;
     const context: TriageContext = {
       now,
       universe,
       mutedTopics: mutes.map((mute) => muteTopicForEvent(mute.topic as EventType)),
       quiet,
+      ...(consent ? { consent } : {}),
     };
 
     const prefilter = prefilterEvent(candidate, context);
@@ -524,6 +561,7 @@ export class EventTriageService {
       createdAt: now.toISOString(),
       read: false,
       ...(notificationId ? { notificationId } : {}),
+      ...(consent?.consentId ? { consentId: consent.consentId } : {}),
     };
     return this.db.put(owner, FEED_KIND, item);
   }

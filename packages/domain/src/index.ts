@@ -22,7 +22,10 @@ export type Section =
   | "agent"
   | "channel"
   | "channels"
-  | "account";
+  | "account"
+  // A1 投资档案 / A3 授权中心（PRD-灵悟-主动服务与信任架构）。
+  | "investor-profile"
+  | "investor-consents";
 export interface Mail {
   id: string;
   threadId: string;
@@ -313,13 +316,42 @@ export {
 } from "./channel.ts";
 export type { ComputerCommand, ComputerDirectory, ComputerSnapshot } from "./computer.ts";
 export type {
+  Consent,
+  ConsentChannel,
+  ConsentCreateInput,
+  ConsentDataScope,
+  ConsentFrequency,
+  ConsentGate,
+  ConsentPurpose,
+  ConsentUpdateInput,
+  DeviceQuietOverride,
+  DeviceQuietOverrideInput,
+  DriftStatus,
   EventCandidateInput,
   EventDecision,
   EventFeedItem,
   EventPrefilter,
   EventType,
   FeedFeedbackInput,
+  GoalKind,
+  InvestmentPolicy,
+  InvestmentPolicyInput,
+  InvestmentProfile,
   InvestorMutedTopic,
+  PolicyBasis,
+  PolicyDrift,
+  PolicyDriftRow,
+  PolicyTarget,
+  ProfileChangeProposal,
+  ProfileGoal,
+  ProfileMarket,
+  ProfileProposalInput,
+  ProfileRisk,
+  ProfileSource,
+  ProfileTrust,
+  ProfileUpdateInput,
+  QuietHours,
+  RiskAppetite,
   SignalBreach,
   SuggestedMonitor,
   ThesisEvidenceInput,
@@ -333,10 +365,35 @@ export type {
   TrackingPlanItem,
 } from "./investor.ts";
 export {
+  CONSENT_CHANNELS,
+  CONSENT_DATA_SCOPES,
+  CONSENT_FREQUENCIES,
+  CONSENT_PURPOSES,
+  DEFAULT_DAILY_PUSH_CAP,
   EVENT_TYPE_LABELS,
   EVENT_TYPES,
+  GOAL_KINDS,
+  GOAL_KIND_LABELS,
+  POLICY_BASES,
+  POLICY_BASIS_LABELS,
+  POLICY_MARKET_NOTE,
+  POLICY_SUM_TOLERANCE,
+  PROFILE_CONFIRM_REQUIRED_FIELDS,
+  PROFILE_MARKETS,
+  RISK_APPETITES,
+  RISK_APPETITE_LABELS,
+  consentCreateSchema,
+  consentUpdateSchema,
+  deviceQuietOverrideInputSchema,
+  deviceQuietOverrideSchema,
   eventCandidateSchema,
   feedFeedbackSchema,
+  investmentPolicySchema,
+  policyTargetSchema,
+  profileGoalSchema,
+  profileProposalSchema,
+  profileUpdateSchema,
+  quietHoursSchema,
   thesisEvidenceInputSchema,
   thesisSignalSchema,
 } from "./investor.ts";

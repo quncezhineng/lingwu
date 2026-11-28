@@ -403,6 +403,8 @@ export const holdingSchema = z.object({
   avg_cost: z.number().finite().nonnegative(),
   /** 建仓日期 YYYY-MM-DD。手工录入可省略（默认当天），CSV 导入必填。 */
   buy_date: z.string().date().optional(),
+  /** A4：债券/存款/理财等有固定期限品种的到期日 YYYY-MM-DD；股票等无到期日留空。 */
+  maturity_date: z.string().date().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });

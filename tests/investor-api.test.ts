@@ -98,6 +98,17 @@ test("自选与论点决定事件是否相关", async () => {
 });
 
 test("事件接入后按判级落库：重要进通知，一般只进信息流", async () => {
+  // A3：未授权主动提醒时推送会被降级为信息流，这里先给出一次提醒授权。
+  await post(
+    "/investor/consents",
+    {
+      dataScope: ["portfolio", "holdings"],
+      purposes: ["remind"],
+      channels: ["push"],
+      frequency: "realtime",
+    },
+    201,
+  );
   const pushed = await post<EventFeedItem>(
     "/investor/events",
     {
@@ -108,12 +119,18 @@ test("事件接入后按判级落库：重要进通知，一般只进信息流",
     },
     201,
   );
-  assert.equal(pushed.decision, "push");
-  assert.ok(pushed.notificationId);
+  // 交易日按判级推送；休市日（UTC 周末）静默策略会合法地把推送降级为信息流。
+  const marketClosed = [0, 6].includes(new Date().getUTCDay());
+  assert.equal(pushed.decision, marketClosed ? "feed" : "push");
   assert.ok(pushed.reasons.length > 0);
 
-  const notifications = await call<AgentNotification[]>("/agent/notifications");
-  assert.ok(notifications.some((item) => item.title === "宁德时代 论点受威胁"));
+  if (marketClosed) {
+    assert.ok(pushed.reasons.some((reason) => reason.includes("休市")));
+  } else {
+    assert.ok(pushed.notificationId);
+    const notifications = await call<AgentNotification[]>("/agent/notifications");
+    assert.ok(notifications.some((item) => item.title === "宁德时代 论点受威胁"));
+  }
 
   const fed = await post<EventFeedItem>(
     "/investor/events",
@@ -130,7 +147,8 @@ test("事件接入后按判级落库：重要进通知，一般只进信息流",
   const counts = await call<{ push: number; feed: number; unread: number }>(
     "/investor/feed/counts",
   );
-  assert.ok(counts.push >= 1);
+  // 休市日 pushed 会落到 feed，所以只保证两类合计 ≥ 2 且 feed ≥ 1。
+  assert.ok(counts.push + counts.feed >= 2);
   assert.ok(counts.feed >= 1);
 
   const read = await post<EventFeedItem>(`/investor/feed/${fed.id}/read`, {});

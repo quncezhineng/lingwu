@@ -59,6 +59,8 @@ export const addHoldingSchema = z.object({
   sector: z.string().trim().max(100).optional(),
   currency: currencySchema.optional(),
   buy_date: z.string().date().optional(),
+  /** A4：债券/存款/理财等到期日 YYYY-MM-DD；股票等留空。 */
+  maturity_date: z.string().date().optional(),
 });
 
 /** Frontend may send raw CSV + this mapping (canonical field → header name). */
@@ -68,6 +70,7 @@ export const csvMappingSchema = z
     quantity: z.string().trim().min(1).max(64).optional(),
     cost_price: z.string().trim().min(1).max(64).optional(),
     buy_date: z.string().trim().min(1).max(64).optional(),
+    maturity_date: z.string().trim().min(1).max(64).optional(),
     name: z.string().trim().min(1).max(64).optional(),
     sector: z.string().trim().min(1).max(64).optional(),
     market: z.string().trim().min(1).max(64).optional(),
@@ -83,6 +86,8 @@ export const updateHoldingSchema = z
     avg_cost: z.number().finite().nonnegative().optional(),
     name: z.string().trim().max(200).optional(),
     sector: z.string().trim().max(100).optional(),
+    /** A4：债券/存款/理财等到期日 YYYY-MM-DD；股票等留空。 */
+    maturity_date: z.string().date().optional(),
   })
   .refine((value) => Object.values(value).some((item) => item !== undefined), {
     message: "Provide at least one field to update",
@@ -164,6 +169,7 @@ export interface CsvRowResult {
     quantity: number;
     avg_cost: number;
     buy_date: string;
+    maturity_date?: string;
     name?: string;
     sector?: string;
     market?: "US" | "CN" | "HK";
@@ -276,6 +282,7 @@ export function parseHoldingsCsv(text: string, mapping?: CsvMapping): CsvPreview
   const sectorIndex = column("sector");
   const marketIndex = column("market");
   const currencyIndex = column("currency");
+  const maturityDateIndex = column("maturity_date", ["maturity", "逾期日", "到期日"]);
   const rows: CsvRowResult[] = [];
 
   for (const item of numbered.slice(1)) {
@@ -298,6 +305,14 @@ export function parseHoldingsCsv(text: string, mapping?: CsvMapping): CsvPreview
     const buyDate = rawBuyDate.slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(buyDate) || Number.isNaN(Date.parse(rawBuyDate)))
       errors.push({ field: "buy_date", reason: "expected YYYY-MM-DD" });
+
+    const rawMaturityDate = (fields[maturityDateIndex] ?? "").trim();
+    const maturityDate = rawMaturityDate.slice(0, 10);
+    if (
+      rawMaturityDate &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(maturityDate) || Number.isNaN(Date.parse(rawMaturityDate)))
+    )
+      errors.push({ field: "maturity_date", reason: "expected YYYY-MM-DD" });
 
     const rawMarket = (fields[marketIndex] ?? "").toUpperCase();
     const market =
@@ -333,6 +348,7 @@ export function parseHoldingsCsv(text: string, mapping?: CsvMapping): CsvPreview
         quantity,
         avg_cost: cost,
         buy_date: buyDate,
+        ...(maturityDate ? { maturity_date: maturityDate } : {}),
         ...(nameIndex >= 0 && fields[nameIndex] ? { name: fields[nameIndex] } : {}),
         ...(sectorIndex >= 0 && fields[sectorIndex] ? { sector: fields[sectorIndex] } : {}),
         ...(market ? { market } : {}),
@@ -433,6 +449,7 @@ export class PortfoliosService {
       quantity: input.quantity,
       avg_cost: input.avg_cost,
       buy_date: input.buy_date ?? at.slice(0, 10),
+      ...(input.maturity_date ? { maturity_date: input.maturity_date } : {}),
       ...(input.name ? { name: input.name } : {}),
       ...(input.sector ? { sector: input.sector } : {}),
       created_at: at,
@@ -481,6 +498,7 @@ export class PortfoliosService {
       avg_cost: input.avg_cost ?? holding.avg_cost,
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.sector !== undefined ? { sector: input.sector } : {}),
+      ...(input.maturity_date !== undefined ? { maturity_date: input.maturity_date } : {}),
       updated_at: new Date().toISOString(),
     });
   }
@@ -551,6 +569,7 @@ export class PortfoliosService {
           avg_cost: row.parsed.avg_cost,
           buy_date: row.parsed.buy_date,
           currency: currencySchema.parse(row.parsed.currency),
+          ...(row.parsed.maturity_date ? { maturity_date: row.parsed.maturity_date } : {}),
           ...(row.parsed.name ? { name: row.parsed.name } : {}),
           ...(row.parsed.sector ? { sector: row.parsed.sector } : {}),
         });

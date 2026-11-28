@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { investmentPolicySchema } from "../../../../packages/domain/src/investor.ts";
 import {
   addHoldingSchema,
   createPortfolioSchema,
@@ -84,6 +85,28 @@ export function portfolioRoutes(service: AgentService): Hono<Env> {
       c.req.param("holdingId"),
     );
     return c.body(null, 204);
+  });
+
+  // ─── A2 目标配置与偏离 ───
+  // 目标配置每个组合一份；偏离按币种拆开算（原币市值占比，不做汇率折算）。
+
+  app.get("/:id/policy", async (c) =>
+    c.json(await service.policyDrift.get(c.get("owner"), c.req.param("id"))),
+  );
+  app.put("/:id/policy", async (c) => {
+    const input = investmentPolicySchema.parse(await c.req.json());
+    return c.json(await service.policyDrift.set(c.get("owner"), c.req.param("id"), input));
+  });
+  app.delete("/:id/policy", async (c) => {
+    await service.policyDrift.remove(c.get("owner"), c.req.param("id"));
+    return c.body(null, 204);
+  });
+  /** 偏离：默认市值口径（主口径，参与 breach 判定）；?valueBasis=cost 看成本口径对比。 */
+  app.get("/:id/drift", async (c) => {
+    const valueBasis = c.req.query("valueBasis") === "cost" ? "cost" : "market";
+    return c.json({
+      parts: await service.policyDrift.drift(c.get("owner"), c.req.param("id"), valueBasis),
+    });
   });
   return app;
 }

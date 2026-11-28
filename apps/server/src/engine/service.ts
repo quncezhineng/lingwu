@@ -55,8 +55,10 @@ import { SearchService } from "../search.ts";
 import type { WorkspaceService } from "../workspace.ts";
 import { ActionLogService } from "./action-log.ts";
 import { createBriefingScheduler } from "./briefing-scheduler.ts";
+import { ConsentService } from "./consent.ts";
 import { detectDealSignals } from "./deal-signal.ts";
 import { judgeEventWithModel } from "./event-judge-model.ts";
+import { generateEventCandidates } from "./event-sources.ts";
 import {
   EventTriageService,
   isMarketClosed,
@@ -67,6 +69,7 @@ import {
 import { analyzeSpending } from "./finance.ts";
 import { FinancialsService } from "./financials.ts";
 import { HindsightClient, type RecallMemory } from "./hindsight.ts";
+import { InvestorProfileService } from "./investor-profile.ts";
 import { saveLongformArtifact } from "./longform.ts";
 import { generateMarketBriefing } from "./market-briefing.ts";
 import { recallMemories } from "./memory-recall.ts";
@@ -82,6 +85,7 @@ import {
   pageLines,
   withoutRelativeTimes,
 } from "./page-diff.ts";
+import { PolicyDriftService } from "./policy-drift.ts";
 import { PortfoliosService } from "./portfolios.ts";
 import { type AlertNotifier, type PriceAlertRecord, PriceAlertsService } from "./price-alerts.ts";
 import { summarizeReport, synthesizeResearch } from "./report-brief.ts";
@@ -161,6 +165,12 @@ export class AgentService {
   readonly trackingPlans: TrackingPlanService;
   /** 论点证据判定（R3）：绑定信号才判定，缺数据明说缺数据。 */
   readonly thesisEvidence: ThesisEvidenceService;
+  /** A1 投资档案：目标 + 风险约束，高风险字段须用户确认。 */
+  readonly investorProfile: InvestorProfileService;
+  /** A2 目标配置与偏离：每个组合一份目标，按币种分口径算偏离。 */
+  readonly policyDrift: PolicyDriftService;
+  /** A3 授权中心：数据范围 / 用途 / 渠道 / 频率，及免打扰与推送上限。 */
+  readonly consents: ConsentService;
   /** Agent 动作审计（R6）：做过什么、能不能撤。 */
   readonly actionLog: ActionLogService;
   private readonly briefings: ReturnType<typeof createBriefingScheduler>;
@@ -190,10 +200,15 @@ export class AgentService {
       apiKey: config.hindsightApiKey,
     });
     this.thesisEvidence = new ThesisEvidenceService({ db, market, search: this.search });
+    this.consents = new ConsentService(db);
+    this.investorProfile = new InvestorProfileService(db);
+    this.policyDrift = new PolicyDriftService(db, this.portfolios);
     this.events = new EventTriageService({
       db,
       notify: (owner, title, body, key) => this.notify(owner, title, body, undefined, key),
       quiet: (_owner, now) => isMarketClosed(now),
+      // A3：判级前解析该时刻的授权结论（是否授权提醒 / 免打扰 / 超上限）。
+      consent: (owner, now) => this.consents.resolveGate(owner, { now }),
       judge: (owner, candidate, context, rules) =>
         this.judgeEvent(owner, candidate, context, rules),
     });
@@ -289,6 +304,14 @@ export class AgentService {
           .check(owner, value.id, this.alertNotifier(owner))
           .catch((error) => backgroundFailure("price alert check", error));
       }
+      // A4：按持仓与目标配置派生到期 / 首次亏损 / 配置偏离事件（幂等）。
+      const portfolioOwners = new Set(
+        (await this.db.scan<{ id: string }>("portfolios")).map(({ owner }) => owner),
+      );
+      for (const owner of portfolioOwners)
+        await this.refreshInvestorEvents(owner).catch((error) =>
+          backgroundFailure("investor events", error),
+        );
       // Daily briefing: durable task creation, idempotent per owner and UTC date.
       await this.briefings
         .runOnce()
@@ -1578,6 +1601,35 @@ export class AgentService {
     };
     await this.db.insertIfAbsent(owner, "notifications", value);
     return (await this.db.get<AgentNotification>(owner, "notifications", value.id)) ?? value;
+  }
+  /**
+   * A4：从持仓与目标配置派生三类事件（到期 / 首次亏损 / 配置偏离），统一走判级落库。
+   * 幂等：去重键按「类型 + 标的 + 分桶」收敛，同一分桶重复派生不会重复打扰。
+   */
+  async refreshInvestorEvents(owner: string, now = new Date()): Promise<number> {
+    let ingested = 0;
+    for (const portfolio of await this.portfolios.list(owner)) {
+      const summary = await this.portfolios.summary(owner, portfolio.id);
+      const policy = await this.policyDrift.get(owner, portfolio.id);
+      const drift = policy
+        ? await this.policyDrift.drift(owner, portfolio.id, "market")
+        : undefined;
+      const candidates = generateEventCandidates({
+        now,
+        holdings: summary.positions,
+        positions: summary.positions,
+        ...(policy ? { policy } : {}),
+        ...(drift ? { drift } : {}),
+      });
+      for (const candidate of candidates)
+        await this.events
+          .ingest(owner, candidate)
+          .then(() => {
+            ingested += 1;
+          })
+          .catch((error) => backgroundFailure("investor event", error));
+    }
+    return ingested;
   }
   mailEvidence(mail: Mail): Evidence {
     return { id: mail.id, kind: "mail", title: mail.subject, excerpt: mail.body.slice(0, 400) };

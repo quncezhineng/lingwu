@@ -7,6 +7,7 @@ import common from "./common";
 import computer from "./computer";
 import details from "./details";
 import financials from "./financials";
+import investor from "./investor";
 import markets from "./markets";
 import notes from "./notes";
 import portfolio from "./portfolio";
@@ -43,6 +44,7 @@ export const en = {
   ...threads,
   ...tools,
   ...channels,
+  ...investor,
 } satisfies Dictionary;
 
 /** 所有合法的文案 key，用于为 `t()` 提供编译期校验。 */

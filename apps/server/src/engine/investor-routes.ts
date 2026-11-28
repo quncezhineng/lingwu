@@ -3,12 +3,18 @@ import { z } from "zod";
 import type { InvestmentNote, ResearchReport } from "../../../../packages/domain/src/agent.ts";
 import type { InvestorMutedTopic } from "../../../../packages/domain/src/investor.ts";
 import {
+  consentCreateSchema,
+  consentUpdateSchema,
+  deviceQuietOverrideInputSchema,
   type EventDecision,
   eventCandidateSchema,
   feedFeedbackSchema,
+  profileProposalSchema,
+  profileUpdateSchema,
   thesisEvidenceInputSchema,
 } from "../../../../packages/domain/src/investor.ts";
 import { AppError } from "../errors.ts";
+import { missingConfirmations, profileTrust } from "./investor-profile.ts";
 import type { AgentService } from "./service.ts";
 
 const muteSchema = z.object({
@@ -89,6 +95,15 @@ export function investorRoutes(service: AgentService): Hono<{ Variables: { owner
     return c.json(await service.events.ingest(c.get("owner"), candidate), 201);
   });
 
+  /**
+   * A4：立即按持仓与目标配置派生到期 / 首次亏损 / 配置偏离事件。
+   * 幂等：同一分桶重复派生不会重复打扰；后台维护也会定期跑同一逻辑。
+   */
+  app.post("/events/derive", async (c) => {
+    const ingested = await service.refreshInvestorEvents(c.get("owner"));
+    return c.json({ ingested });
+  });
+
   app.get("/tracking-plans", async (c) =>
     c.json(await service.trackingPlans.list(c.get("owner"), c.req.query("symbol") || undefined)),
   );
@@ -132,6 +147,107 @@ export function investorRoutes(service: AgentService): Hono<{ Variables: { owner
     const check = await service.thesisEvidence.check(owner, note);
     return c.json({ check, note: await service.db.get(owner, "notes", note.id) });
   });
+
+  // ─── A1 投资档案 ───
+  // 档案分「目标」与「风险约束」两组，附可信状态与待确认字段，前端据此引导确认。
+
+  app.get("/profile", async (c) => {
+    const owner = c.get("owner");
+    const profile = await service.investorProfile.get(owner);
+    return c.json({
+      profile,
+      trust: profileTrust(profile),
+      missingConfirmation: missingConfirmations(profile),
+    });
+  });
+
+  /**
+   * 更新档案。试图改写「风险偏好 / 期限 / 禁止行业」而未带 confirm:true 时，
+   * 服务端返回 422（code=confirm_required）——强制走「提议 → 用户确认」路径。
+   */
+  app.put("/profile", async (c) => {
+    const input = profileUpdateSchema.parse(await c.req.json());
+    return c.json(await service.investorProfile.update(c.get("owner"), input));
+  });
+
+  app.get("/profile/proposals", async (c) =>
+    c.json(await service.investorProfile.listProposals(c.get("owner"))),
+  );
+
+  /** 模型或前端提出一条档案变更提议；高风险字段需用户确认后才落库。 */
+  app.post("/profile/proposals", async (c) => {
+    const input = profileProposalSchema.parse(await c.req.json());
+    return c.json(await service.investorProfile.propose(c.get("owner"), input), 201);
+  });
+
+  app.post("/profile/proposals/:id/accept", async (c) =>
+    c.json(await service.investorProfile.decideProposal(c.get("owner"), c.req.param("id"), true)),
+  );
+
+  app.post("/profile/proposals/:id/reject", async (c) =>
+    c.json(await service.investorProfile.decideProposal(c.get("owner"), c.req.param("id"), false)),
+  );
+
+  // ─── A3 授权中心 ───
+  // 每条授权回答：能用哪些数据 / 用来做什么 / 走什么渠道 / 多久一次。
+
+  app.get("/consents", async (c) => c.json(await service.consents.list(c.get("owner"))));
+
+  app.post("/consents", async (c) => {
+    const input = consentCreateSchema.parse(await c.req.json());
+    return c.json(await service.consents.create(c.get("owner"), input), 201);
+  });
+
+  /**
+   * 当前生效的授权结论（判级用的策略闸）。前端用它展示「是否会主动提醒 / 是否在免打扰 /
+   * 今日是否超上限」，也可带 deviceId 查询某设备的投放结论。
+   */
+  app.get("/consents/gate", async (c) => {
+    const deviceId = c.req.query("deviceId");
+    return c.json(
+      await service.consents.resolveGate(c.get("owner"), {
+        ...(deviceId ? { deviceId } : {}),
+      }),
+    );
+  });
+
+  app.put("/consents/:id", async (c) => {
+    const input = consentUpdateSchema.parse(await c.req.json());
+    return c.json(await service.consents.update(c.get("owner"), c.req.param("id"), input));
+  });
+
+  /** 撤回授权（软撤回，留痕）：撤回后立刻不再构成提醒授权。 */
+  app.post("/consents/:id/revoke", async (c) =>
+    c.json(await service.consents.revoke(c.get("owner"), c.req.param("id"))),
+  );
+
+  app.delete("/consents/:id", async (c) => {
+    await service.consents.remove(c.get("owner"), c.req.param("id"));
+    return c.body(null, 204);
+  });
+
+  /** 设备级免打扰覆盖（设备优先于账户级），仅影响该设备收到推送时的投放。 */
+  app.put("/consents/:id/devices/:deviceId", async (c) => {
+    const input = deviceQuietOverrideInputSchema.parse(await c.req.json());
+    return c.json(
+      await service.consents.setDeviceOverride(
+        c.get("owner"),
+        c.req.param("id"),
+        c.req.param("deviceId"),
+        input,
+      ),
+    );
+  });
+
+  app.delete("/consents/:id/devices/:deviceId", async (c) =>
+    c.json(
+      await service.consents.removeDeviceOverride(
+        c.get("owner"),
+        c.req.param("id"),
+        c.req.param("deviceId"),
+      ),
+    ),
+  );
 
   return app;
 }

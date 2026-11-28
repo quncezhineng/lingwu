@@ -43,6 +43,7 @@ import { useChannels } from "./channels";
 import { ChatScreen, WorkspaceTools } from "./chat";
 import { ColumnResizeHandle } from "./column-resize-handle";
 import { ComputerScreen } from "./computer";
+import { ConsentCenterScreen } from "./consent-center-screen";
 import { columnMaxWidth, desktopColumns } from "./desktop-columns";
 import { Details, SettingsScreen } from "./details";
 import { useTranslation } from "./i18n";
@@ -67,6 +68,7 @@ import {
   X,
 } from "./icons";
 import { IdeasOverlay } from "./ideas-overlay";
+import { InvestorProfileScreen } from "./investor-profile-screen";
 import { IosStack } from "./ios-stack";
 import { type BotPreview, type HomePreviews, latestReplyPreview } from "./mobile-bots";
 import { MobileBotsHome } from "./mobile-bots-home";
@@ -1918,7 +1920,11 @@ function AgentHeader({
                                   ? t("details.settingsTitle")
                                   : section === "channels"
                                     ? t("app.navChannels")
-                                    : t("app.navChat");
+                                    : section === "investor-profile"
+                                      ? t("investor.profileTitle")
+                                      : section === "investor-consents"
+                                        ? t("investor.consentsTitle")
+                                        : t("app.navChat");
   return (
     <View
       style={{
@@ -2025,6 +2031,10 @@ function SecondarySection({
         return <ComputerScreen />;
       case "ideas":
         return <IdeasScreen />;
+      case "investor-profile":
+        return <InvestorProfileScreen />;
+      case "investor-consents":
+        return <ConsentCenterScreen />;
       default:
         return (
           <View style={{ alignItems: "center", padding: 40, gap: 14 }}>
